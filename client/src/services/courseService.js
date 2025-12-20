@@ -43,8 +43,28 @@ export const deleteCourse = async (courseId) => {
   return response.data;
 };
 
-// Toggle publish status
-export const togglePublishStatus = async (courseId) => {
-  const response = await axios.put(`${API_URL}/courses/${courseId}/toggle-publish`, {}, getAuthHeader());
+// OBE-specific functions
+
+// Get CO-PO mapping matrix
+export const getCOPOMatrix = async (courseId) => {
+  const response = await axios.get(`${API_URL}/courses/${courseId}/co-po-matrix`, getAuthHeader());
+  return response.data;
+};
+
+// Validate OBE compliance
+export const validateOBE = async (courseId) => {
+  const response = await axios.get(`${API_URL}/courses/${courseId}/validate-obe`, getAuthHeader());
+  return response.data;
+};
+
+// Get courses by semester
+export const getCoursesBySemester = async (semester) => {
+  const response = await axios.get(`${API_URL}/courses/curriculum/semester/${semester}`, getAuthHeader());
+  return response.data;
+};
+
+// Get PO attainment summary
+export const getPOSummary = async () => {
+  const response = await axios.get(`${API_URL}/courses/reports/po-summary`, getAuthHeader());
   return response.data;
 };

@@ -19,11 +19,11 @@ const courseValidation = [
     .withMessage('Course title is required')
     .isLength({ min: 3 })
     .withMessage('Course title must be at least 3 characters'),
-  body('courseType')
+  body('course_type')
     .notEmpty()
     .withMessage('Course type is required')
-    .isIn(['Core', 'Optional', 'Lab'])
-    .withMessage('Course type must be Core, Optional, or Lab'),
+    .isIn(['THEORY', 'SESSIONAL', 'PROJECT/THESIS'])
+    .withMessage('Course type must be THEORY, SESSIONAL, or PROJECT/THESIS'),
   body('credit')
     .notEmpty()
     .withMessage('Credit is required')
@@ -31,10 +31,48 @@ const courseValidation = [
     .withMessage('Credit must be a number')
     .custom((value) => value >= 0)
     .withMessage('Credit cannot be negative'),
-  body('department')
+  body('course_offered_to')
     .trim()
     .notEmpty()
-    .withMessage('Department is required')
+    .withMessage('Course offered to department is required')
+    .toUpperCase()
+    .isIn(['CSE', 'EEE', 'ME', 'CE', 'ECE', 'IEM', 'ESE', 'BME', 'URP', 'LE', 'TE', 'BECM', 'ARCH', 'MSE', 'CHE', 'MTE'])
+    .withMessage('Invalid department code'),
+  body('category')
+    .notEmpty()
+    .withMessage('Category is required')
+    .toUpperCase()
+    .isIn(['COMPULSORY', 'OPTIONAL'])
+    .withMessage('Category must be COMPULSORY or OPTIONAL'),
+  body('academicYear')
+    .optional()
+    .isInt({ min: 1967 })
+    .withMessage('Academic year must be a number with minimum value 1967'),
+  body('semester')
+    .optional()
+    .isInt({ min: 1, max: 8 })
+    .withMessage('Semester must be an integer between 1 and 8'),
+  body('lecture_plan')
+    .notEmpty()
+    .withMessage('Lecture plan is required')
+    .isArray({ min: 1, max: 13 })
+    .withMessage('Lecture plan must be an array with 1-13 entries'),
+  body('lecture_plan.*.week')
+    .isInt({ min: 1, max: 13 })
+    .withMessage('Week must be an integer between 1 and 13'),
+  body('lecture_plan.*.plan')
+    .trim()
+    .notEmpty()
+    .withMessage('Plan description is required'),
+  body('references')
+    .notEmpty()
+    .withMessage('At least one reference is required')
+    .isArray({ min: 1 })
+    .withMessage('References must be an array with at least 1 item'),
+  body('references.*')
+    .trim()
+    .notEmpty()
+    .withMessage('Reference must not be empty')
 ];
 
 // All routes require authentication and admin role
@@ -47,6 +85,9 @@ router.get('/', courseController.getAllCourses);
 router.get('/:id', courseController.getCourse);
 router.put('/:id', courseValidation, courseController.updateCourse);
 router.delete('/:id', courseController.deleteCourse);
-router.put('/:id/toggle-publish', courseController.togglePublishStatus);
+
+// OBE-specific routes
+router.get('/:id/validate-obe', courseController.validateCourseOBE);
+router.get('/curriculum/semester/:semester', courseController.getCurriculumBySemester);
 
 module.exports = router;
