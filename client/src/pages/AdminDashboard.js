@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCheck, faTimes, faBook, faStar, faUniversity, faChartBar, faEdit, faBookOpen, faPlus, faGraduationCap, faHourglass, faUsers, faCog, faSignOutAlt, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
 import { getPendingUsers, approveUser, rejectUser } from '../services/adminService';
-import { createCourse, getAllCourses } from '../services/courseService';
+import { createCourse, getAllCourses, updateCourse, deleteCourse } from '../services/courseService';
 import CourseForm from '../components/CourseForm';
+import CourseOBEView from '../components/CourseOBEView';
 import '../styles/Dashboard.css';
 import '../styles/AdminDashboard.css';
 import '../styles/spinner.css';
@@ -20,6 +23,12 @@ const AdminDashboard = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [showCourseForm, setShowCourseForm] = useState(false);
   const [courseFormLoading, setCourseFormLoading] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [showOBEView, setShowOBEView] = useState(false);
+  const [editingCourse, setEditingCourse] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [courseToDelete, setCourseToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     const userData = getUser();
@@ -86,6 +95,8 @@ const AdminDashboard = () => {
 
   const handleCreateCourse = async (courseData) => {
     setCourseFormLoading(true);
+    console.log('=== Submitting Course Data ===');
+    console.log(JSON.stringify(courseData, null, 2));
     try {
       await createCourse(courseData);
       setSuccessMessage('Course created successfully');
@@ -93,11 +104,72 @@ const AdminDashboard = () => {
       fetchCourses();
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
+      console.error('=== Course Creation Error ===');
+      console.error('Error:', err);
+      console.error('Response:', err.response?.data);
+      console.error('Response Message:', err.response?.data?.message);
+      console.error('Response Error:', err.response?.data?.error);
+      if (err.response?.data?.errors) {
+        console.error('Validation Errors:', JSON.stringify(err.response.data.errors, null, 2));
+      }
       setError(err.response?.data?.message || 'Failed to create course');
       setTimeout(() => setError(''), 3000);
     } finally {
       setCourseFormLoading(false);
     }
+  };
+
+  const handleUpdateCourse = async (courseData) => {
+    setCourseFormLoading(true);
+    console.log('=== Updating Course Data ===');
+    console.log(JSON.stringify(courseData, null, 2));
+    try {
+      await updateCourse(editingCourse._id, courseData);
+      setSuccessMessage('Course updated successfully');
+      setShowCourseForm(false);
+      setEditingCourse(null);
+      fetchCourses();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      console.error('=== Course Update Error ===');
+      console.error('Error:', err);
+      console.error('Response:', err.response?.data);
+      console.error('Response Message:', err.response?.data?.message);
+      console.error('Response Error:', err.response?.data?.error);
+      if (err.response?.data?.errors) {
+        console.error('Validation Errors:', JSON.stringify(err.response.data.errors, null, 2));
+      }
+      setError(err.response?.data?.message || 'Failed to update course');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setCourseFormLoading(false);
+    }
+  };
+
+  const handleDeleteCourse = async () => {
+    if (!courseToDelete) return;
+    
+    setDeleteLoading(true);
+    try {
+      await deleteCourse(courseToDelete._id);
+      setSuccessMessage(`Course "${courseToDelete.courseCode}" deleted successfully`);
+      setCourses(courses.filter(c => c._id !== courseToDelete._id));
+      setShowDeleteModal(false);
+      setCourseToDelete(null);
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      console.error('=== Course Delete Error ===');
+      console.error(err);
+      setError(err.response?.data?.message || 'Failed to delete course');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const openDeleteModal = (course) => {
+    setCourseToDelete(course);
+    setShowDeleteModal(true);
   };
 
   const handleLogout = () => {
@@ -134,7 +206,7 @@ const AdminDashboard = () => {
                 </div>
               ) : pendingUsers.length === 0 ? (
                 <div className="empty-state">
-                  <div className="empty-icon">✓</div>
+                  <div className="empty-icon"><FontAwesomeIcon icon={faCheck} /></div>
                   <h3>No Pending Approvals</h3>
                   <p>All user registrations have been processed</p>
                 </div>
@@ -192,23 +264,28 @@ const AdminDashboard = () => {
         return (
           <div className="section-container">
             <div className="section-header">
-              <h2>Course Management</h2>
+              <div className="header-content">
+                <h2>Course Management</h2>
+                <p className="header-subtitle">Manage course catalog and outcomes</p>
+              </div>
               <button 
                 className="btn btn-primary"
                 onClick={() => setShowCourseForm(true)}
               >
-                Create New Course
+                <FontAwesomeIcon icon={faPlus} /> Create New Course
               </button>
             </div>
             <div className="section-body">
               {successMessage && (
                 <div className="alert alert-success">
+                  <span className="alert-icon"><FontAwesomeIcon icon={faCheck} /></span>
                   {successMessage}
                 </div>
               )}
 
               {error && (
                 <div className="alert alert-error">
+                  <span className="alert-icon"><FontAwesomeIcon icon={faTimes} /></span>
                   {error}
                 </div>
               )}
@@ -220,41 +297,87 @@ const AdminDashboard = () => {
                 </div>
               ) : courses.length === 0 ? (
                 <div className="empty-state">
-                  <div className="empty-icon">📚</div>
+                  <div className="empty-icon"><FontAwesomeIcon icon={faBookOpen} /></div>
                   <h3>No Courses Yet</h3>
                   <p>Create your first course to get started</p>
+                  <button 
+                    className="btn btn-primary"
+                    onClick={() => setShowCourseForm(true)}
+                  >
+                    Create First Course
+                  </button>
                 </div>
               ) : (
                 <div className="courses-grid">
                   {courses.map((course) => (
                     <div key={course._id} className="course-card">
                       <div className="course-card-header">
-                        <div className="course-code">{course.courseCode}</div>
-                        <span className={`status-badge ${course.isPublished ? 'published' : 'draft'}`}>
-                          {course.isPublished ? 'Published' : 'Draft'}
-                        </span>
+                        <div className="course-code-wrapper">
+                          <span className="course-code">{course.courseCode}</span>
+                        </div>
                       </div>
                       <div className="course-card-body">
-                        <h3>{course.courseTitle}</h3>
+                        <h3 className="course-title">{course.courseTitle}</h3>
                         <div className="course-meta">
-                          <span>Type: {course.courseType}</span>
-                          <span>Credit: {course.credit}</span>
-                          <span>Dept: {course.department}</span>
+                          <span className="meta-item">
+                            <span className="meta-icon"><FontAwesomeIcon icon={faBook} /></span>
+                            {course.course_type || 'N/A'}
+                          </span>
+                          <span className="meta-item">
+                            <span className="meta-icon"><FontAwesomeIcon icon={faStar} /></span>
+                            {course.credit} Credits
+                          </span>
+                          <span className="meta-item">
+                            <span className="meta-icon"><FontAwesomeIcon icon={faUniversity} /></span>
+                            {course.course_offered_to || 'N/A'}
+                          </span>
                         </div>
+                        {course.semester && (
+                          <div className="course-extra-info">
+                            <span>Semester {course.semester}</span>
+                            {course.yearLevel && <span>• Year {course.yearLevel}</span>}
+                          </div>
+                        )}
+                        {course.courseOutcomes && course.courseOutcomes.length > 0 && (
+                          <div className="course-obe-indicator">
+                            <span className="obe-badge">
+                              <span className="obe-icon"><FontAwesomeIcon icon={faCheck} /></span>
+                              {course.courseOutcomes.length} Course Outcomes
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="course-card-actions">
+                        <button 
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => {
+                            setSelectedCourse(course);
+                            setShowOBEView(true);
+                          }}
+                        >
+                          <FontAwesomeIcon icon={faChartBar} /> View Details
+                        </button>
+                        <button 
+                          className="btn btn-outline btn-sm"
+                          onClick={() => {
+                            setEditingCourse(course);
+                            setShowCourseForm(true);
+                          }}
+                        >
+                          <FontAwesomeIcon icon={faEdit} /> Edit
+                        </button>
+                        <button 
+                          className="btn btn-danger btn-sm"
+                          onClick={() => openDeleteModal(course)}
+                        >
+                          <FontAwesomeIcon icon={faTrash} /> Delete
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-
-            {showCourseForm && (
-              <CourseForm 
-                onClose={() => setShowCourseForm(false)}
-                onSubmit={handleCreateCourse}
-                loading={courseFormLoading}
-              />
-            )}
           </div>
         );
 
@@ -267,7 +390,7 @@ const AdminDashboard = () => {
             </div>
             <div className="section-body">
               <div className="empty-state">
-                <div className="empty-icon">👥</div>
+                <div className="empty-icon"><FontAwesomeIcon icon={faUsers} /></div>
                 <h3>User Management</h3>
                 <p>This section is under development</p>
               </div>
@@ -301,10 +424,14 @@ const AdminDashboard = () => {
     <div className="dashboard-layout">
       <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
-          <h1>LMS Admin</h1>
+          <div className="logo-section">
+            <span className="logo-icon"><FontAwesomeIcon icon={faGraduationCap} /></span>
+            {sidebarOpen && <h1>LMS Admin</h1>}
+          </div>
           <button 
             className="sidebar-toggle"
             onClick={() => setSidebarOpen(!sidebarOpen)}
+            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           >
             {sidebarOpen ? '←' : '→'}
           </button>
@@ -315,23 +442,29 @@ const AdminDashboard = () => {
             className={`nav-item ${activeSection === 'pending' ? 'active' : ''}`}
             onClick={() => setActiveSection('pending')}
           >
-            <span className="nav-icon">⏳</span>
+            <span className="nav-icon"><FontAwesomeIcon icon={faHourglass} /></span>
             {sidebarOpen && <span className="nav-label">Pending Approvals</span>}
+            {sidebarOpen && pendingUsers.length > 0 && (
+              <span className="badge-count">{pendingUsers.length}</span>
+            )}
           </button>
 
           <button
             className={`nav-item ${activeSection === 'courses' ? 'active' : ''}`}
             onClick={() => setActiveSection('courses')}
           >
-            <span className="nav-icon">📚</span>
-            {sidebarOpen && <span className="nav-label">Course Management</span>}
+            <span className="nav-icon"><FontAwesomeIcon icon={faBookOpen} /></span>
+            {sidebarOpen && <span className="nav-label">Courses</span>}
+            {sidebarOpen && courses.length > 0 && (
+              <span className="badge-info">{courses.length}</span>
+            )}
           </button>
 
           <button
             className={`nav-item ${activeSection === 'users' ? 'active' : ''}`}
             onClick={() => setActiveSection('users')}
           >
-            <span className="nav-icon">👥</span>
+            <span className="nav-icon"><FontAwesomeIcon icon={faUsers} /></span>
             {sidebarOpen && <span className="nav-label">All Users</span>}
           </button>
 
@@ -339,27 +472,32 @@ const AdminDashboard = () => {
             className={`nav-item ${activeSection === 'settings' ? 'active' : ''}`}
             onClick={() => setActiveSection('settings')}
           >
-            <span className="nav-icon">⚙️</span>
+            <span className="nav-icon"><FontAwesomeIcon icon={faCog} /></span>
             {sidebarOpen && <span className="nav-label">Settings</span>}
           </button>
         </nav>
 
         <div className="sidebar-footer">
-          <div className="user-info">
-            {user && sidebarOpen && (
-              <>
-                <div className="user-avatar-small">
-                  {user.name?.charAt(0).toUpperCase()}
-                </div>
+          {user && (
+            <div className="user-profile">
+              <div className="user-avatar-small">
+                {user.name?.charAt(0).toUpperCase()}
+              </div>
+              {sidebarOpen && (
                 <div className="user-details-small">
                   <p className="user-name">{user.name}</p>
                   <p className="user-role">{user.role}</p>
                 </div>
-              </>
-            )}
-          </div>
-          <button className="btn btn-logout" onClick={handleLogout}>
-            {sidebarOpen ? 'Logout' : '↪'}
+              )}
+            </div>
+          )}
+          <button 
+            className="btn btn-logout" 
+            onClick={handleLogout}
+            title="Logout"
+          >
+            <span className="logout-icon"><FontAwesomeIcon icon={faSignOutAlt} /></span>
+            {sidebarOpen && <span>Logout</span>}
           </button>
         </div>
       </aside>
@@ -369,6 +507,84 @@ const AdminDashboard = () => {
           {renderSection()}
         </div>
       </main>
+
+      {/* Modals */}
+      {showCourseForm && (
+        <CourseForm 
+          onCancel={() => {
+            setShowCourseForm(false);
+            setEditingCourse(null);
+          }}
+          onSubmit={editingCourse ? handleUpdateCourse : handleCreateCourse}
+          loading={courseFormLoading}
+          initialData={editingCourse}
+          isEditMode={!!editingCourse}
+        />
+      )}
+
+      {showOBEView && selectedCourse && (
+        <CourseOBEView 
+          course={selectedCourse}
+          onClose={() => {
+            setShowOBEView(false);
+            setSelectedCourse(null);
+          }}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && courseToDelete && (
+        <div className="modal-overlay" onClick={() => !deleteLoading && setShowDeleteModal(false)}>
+          <div className="modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Confirm Delete</h3>
+              <button 
+                className="close-btn" 
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleteLoading}
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="warning-icon">
+                <FontAwesomeIcon icon={faTrash} />
+              </div>
+              <p className="warning-text">
+                Are you sure you want to delete the course <strong>{courseToDelete.courseCode} - {courseToDelete.courseTitle}</strong>?
+              </p>
+              <p className="warning-subtext">
+                This action will permanently delete the course and all associated data including course outcomes and CO-PO mappings. This cannot be undone.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="btn btn-outline"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleteLoading}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-danger"
+                onClick={handleDeleteCourse}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? (
+                  <>
+                    <div className="spinner spinner-small"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <FontAwesomeIcon icon={faTrash} /> Delete Course
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

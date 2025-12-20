@@ -35,10 +35,16 @@ app.get('/', (req, res) => {
 const authRoutes = require('./routes/authRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const courseRoutes = require('./routes/courseRoutes');
+const courseOutcomeRoutes = require('./routes/courseOutcomeRoutes');
+const programOutcomeRoutes = require('./routes/programOutcomeRoutes');
+const copoMappingRoutes = require('./routes/copoMappingRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/courses', courseRoutes);
+app.use('/api/courses', courseOutcomeRoutes);
+app.use('/api/program-outcomes', programOutcomeRoutes);
+app.use('/api', copoMappingRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;
