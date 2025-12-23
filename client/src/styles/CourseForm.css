@@ -20,6 +20,8 @@
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
+  font-family: Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
 }
 
 .course-form-header {
@@ -35,6 +37,8 @@
   font-weight: 700;
   color: var(--color-text-primary);
   margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
 }
 
 .close-btn {
@@ -84,6 +88,8 @@
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--color-text-primary);
+  font-family: Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
 }
 
 .form-group input,
@@ -92,7 +98,8 @@
   font-size: 0.95rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  font-family: 'Inter', sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
   transition: var(--transition-base);
   color: var(--color-text-primary);
   background-color: var(--color-surface);
@@ -285,6 +292,8 @@
   color: var(--color-text-primary);
   display: block;
   margin-bottom: var(--spacing-xs);
+  font-family: Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
 }
 
 .section-header {
@@ -351,7 +360,8 @@ textarea {
   font-size: 0.95rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  font-family: 'Inter', sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
   resize: vertical;
   min-height: 80px;
   color: var(--color-text-primary);

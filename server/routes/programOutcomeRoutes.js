@@ -15,6 +15,5 @@ router.get('/:code', getProgramOutcomeByCode);
 // Admin-only routes
 router.put('/:code', authenticateUser, authorizeAdmin, updateProgramOutcome);
 
-// Note: No DELETE routes - Program Outcomes are reference data
 
 module.exports = router;

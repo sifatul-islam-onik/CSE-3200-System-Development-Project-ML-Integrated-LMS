@@ -2,6 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { getCOPOMatrix } from '../services/courseService';
 import '../styles/CourseOBEView.css';
 
+// Helper function to format PO codes from PO_A to PO(a)
+const formatPOCode = (code) => {
+  if (!code) return code;
+  const match = code.match(/PO_([A-Z])/);
+  if (match) {
+    return `PO(${match[1].toLowerCase()})`;
+  }
+  return code;
+};
+
 const CourseOBEView = ({ course, onClose }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [copoMatrix, setCopoMatrix] = useState(null);
@@ -205,7 +215,7 @@ const CourseOBEView = ({ course, onClose }) => {
                       <td className="co-statement-cell">{co.description}</td>
                       <td className="co-pos-cell">
                         {co.po_mappings && co.po_mappings.length > 0 
-                          ? co.po_mappings.map(mapping => mapping.program_outcome_code).join(', ')
+                          ? co.po_mappings.map(mapping => formatPOCode(mapping.program_outcome_code)).join(', ')
                           : '-'
                         }
                       </td>
@@ -286,10 +296,9 @@ const CourseOBEView = ({ course, onClose }) => {
             <thead>
               <tr>
                 <th>CO</th>
-                <th>Description</th>
                 <th>Taxonomy Levels</th>
                 {poKeys.map(po => (
-                  <th key={po} className="po-header">{po}</th>
+                  <th key={po} className="po-header">{formatPOCode(po)}</th>
                 ))}
               </tr>
             </thead>
@@ -297,7 +306,6 @@ const CourseOBEView = ({ course, onClose }) => {
               {copoMatrix.matrix.map((row, idx) => (
                 <tr key={idx}>
                   <td className="co-cell">{row.coNumber}</td>
-                  <td className="description-cell">{row.description}</td>
                   <td className="taxonomy-cell">
                     {row.taxonomy_levels && row.taxonomy_levels.length > 0 
                       ? row.taxonomy_levels.join(', ') 
@@ -312,18 +320,10 @@ const CourseOBEView = ({ course, onClose }) => {
                 </tr>
               ))}
               <tr className="totals-row">
-                <td colSpan="3"><strong>Total</strong></td>
+                <td colSpan="2"><strong>Total</strong></td>
                 {poKeys.map(po => (
                   <td key={po} className="total-cell">
                     <strong>{copoMatrix.poTotals[po]}</strong>
-                  </td>
-                ))}
-              </tr>
-              <tr className="average-row">
-                <td colSpan="3"><strong>Average</strong></td>
-                {poKeys.map(po => (
-                  <td key={po} className="average-cell">
-                    {copoMatrix.averages[po]}
                   </td>
                 ))}
               </tr>
