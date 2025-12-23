@@ -3,6 +3,16 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
+// Helper function to format PO codes from PO_A to PO(a)
+const formatPOCode = (code) => {
+  if (!code) return code;
+  const match = code.match(/PO_([A-Z])/);
+  if (match) {
+    return `PO(${match[1].toLowerCase()})`;
+  }
+  return code;
+};
+
 const CourseOutcomeEditor = ({ courseOutcomes, onChange, onValidationChange }) => {
   const [expandedCO, setExpandedCO] = useState(null);
   const [programOutcomes, setProgramOutcomes] = useState([]);
@@ -301,7 +311,7 @@ const CourseOutcomeEditor = ({ courseOutcomes, onChange, onValidationChange }) =
                       {programOutcomes.map(po => (
                         <div key={po.po_code} className="po-mapping-item">
                           <span className="po-label" title={po.title}>
-                            {po.po_code}
+                            {formatPOCode(po.po_code)}
                           </span>
                           <select
                             value={getPOMappingLevel(co, po.po_code)}

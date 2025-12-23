@@ -15,7 +15,6 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
     term: initialData.term || '',
     contactHours: initialData.contactHours || '',
     academicYear: initialData.academicYear ? initialData.academicYear.split('-')[0] : '',
-    semester: initialData.semester || '',
     yearLevel: initialData.yearLevel || '',
     prerequisites: initialData.prerequisites || [],
     course_content: initialData.course_content || [],
@@ -39,7 +38,6 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
     term: '',
     contactHours: '',
     academicYear: '',
-    semester: '',
     yearLevel: '',
     prerequisites: [],
     course_content: [],
@@ -355,10 +353,6 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
       newErrors.academicYear = 'Valid 4-digit academic year (≥1967) is required';
     }
 
-    if (!formData.semester || formData.semester < 1 || formData.semester > 8 || !Number.isInteger(Number(formData.semester))) {
-      newErrors.semester = 'Semester must be an integer between 1-8';
-    }
-
     const maxYearLevel = formData.course_offered_to === 'ARCH' ? 5 : 4;
     if (!formData.yearLevel || formData.yearLevel < 1 || formData.yearLevel > maxYearLevel) {
       newErrors.yearLevel = `Year level must be between 1-${maxYearLevel} for ${formData.course_offered_to || 'this department'}`;
@@ -489,7 +483,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                 name="courseCode"
                 value={formData.courseCode}
                 onChange={handleChange}
-                placeholder="e.g., CSE101"
+                placeholder="e.g., CSE1101"
                 disabled={loading}
               />
               {errors.courseCode && <span className="error-text">{errors.courseCode}</span>}
@@ -638,8 +632,25 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                   name="contactHours"
                   value={formData.contactHours}
                   onChange={handleChange}
+                  onKeyDown={(e) => {
+                    // Prevent 'e', 'E', '+', '-', '.'
+                    if (['e', 'E', '+', '-', '.'].includes(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
+                  onInput={(e) => {
+                    // Limit to single digit (0-9)
+                    if (e.target.value.length > 1) {
+                      e.target.value = e.target.value.slice(0, 1);
+                    }
+                    // Ensure value is between 0-9
+                    if (e.target.value !== '' && (parseInt(e.target.value) < 0 || parseInt(e.target.value) > 9)) {
+                      e.target.value = '';
+                    }
+                  }}
                   min="0"
-                  step="0.5"
+                  max="9"
+                  step="1"
                   disabled={loading}
                   placeholder="e.g., 3"
                   required
@@ -673,22 +684,6 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                   </small>
                 ) : null}
                 {errors.academicYear && <span className="error-text">{errors.academicYear}</span>}
-              </div>
-              <div className="form-group">
-                <label htmlFor="semester">Semester (1-8) *</label>
-                <input
-                  type="number"
-                  id="semester"
-                  name="semester"
-                  value={formData.semester}
-                  onChange={handleChange}
-                  min="1"
-                  max="8"
-                  step="1"
-                  disabled={loading}
-                  required
-                />
-                {errors.semester && <span className="error-text">{errors.semester}</span>}
               </div>
               <div className="form-group">
                 <label htmlFor="yearLevel">
@@ -828,65 +823,50 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
 
           {/* KPA Mapping */}
           <div className="form-section">
-            <label className="section-label">KPA Mapping (Knowledge, Practice, Attitude) *</label>
+            <label className="section-label">Mapping of Knowledge Profile, Complex Engineering Problem Solving and Complex Engineering Activities *</label>
             {errors.kpa_mapping && <span className="error-text" style={{display: 'block', marginBottom: '10px'}}>{errors.kpa_mapping}</span>}
             
             <div style={{marginTop: '10px'}}>
-              <div style={{marginBottom: '15px'}}>
-                <strong style={{display: 'block', marginBottom: '8px', color: '#333'}}>Knowledge (K1-K8):</strong>
-                <div style={{display: 'flex', flexWrap: 'wrap', gap: '12px'}}>
-                  {['K1', 'K2', 'K3', 'K4', 'K5', 'K6', 'K7', 'K8'].map(kpa => (
-                    <label key={kpa} style={{display: 'flex', alignItems: 'center', cursor: 'pointer', minWidth: '60px'}}>
-                      <input
-                        type="checkbox"
-                        value={kpa}
-                        checked={formData.kpa_mapping.includes(kpa)}
-                        onChange={() => handleKPAChange(kpa)}
-                        disabled={loading}
-                        style={{marginRight: '6px', cursor: 'pointer'}}
-                      />
-                      <span>{kpa}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{marginBottom: '15px'}}>
-                <strong style={{display: 'block', marginBottom: '8px', color: '#333'}}>Practice (P1-P7):</strong>
-                <div style={{display: 'flex', flexWrap: 'wrap', gap: '12px'}}>
-                  {['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7'].map(kpa => (
-                    <label key={kpa} style={{display: 'flex', alignItems: 'center', cursor: 'pointer', minWidth: '60px'}}>
-                      <input
-                        type="checkbox"
-                        value={kpa}
-                        checked={formData.kpa_mapping.includes(kpa)}
-                        onChange={() => handleKPAChange(kpa)}
-                        disabled={loading}
-                        style={{marginRight: '6px', cursor: 'pointer'}}
-                      />
-                      <span>{kpa}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{marginBottom: '15px'}}>
-                <strong style={{display: 'block', marginBottom: '8px', color: '#333'}}>Attitude (A1-A5):</strong>
-                <div style={{display: 'flex', flexWrap: 'wrap', gap: '12px'}}>
-                  {['A1', 'A2', 'A3', 'A4', 'A5'].map(kpa => (
-                    <label key={kpa} style={{display: 'flex', alignItems: 'center', cursor: 'pointer', minWidth: '60px'}}>
-                      <input
-                        type="checkbox"
-                        value={kpa}
-                        checked={formData.kpa_mapping.includes(kpa)}
-                        onChange={() => handleKPAChange(kpa)}
-                        disabled={loading}
-                        style={{marginRight: '6px', cursor: 'pointer'}}
-                      />
-                      <span>{kpa}</span>
-                    </label>
-                  ))}
-                </div>
+              <div style={{display: 'flex', flexWrap: 'wrap', gap: '12px'}}>
+                {['K1', 'K2', 'K3', 'K4', 'K5', 'K6', 'K7', 'K8'].map(kpa => (
+                  <label key={kpa} style={{display: 'flex', alignItems: 'center', cursor: 'pointer', minWidth: '60px'}}>
+                    <input
+                      type="checkbox"
+                      value={kpa}
+                      checked={formData.kpa_mapping.includes(kpa)}
+                      onChange={() => handleKPAChange(kpa)}
+                      disabled={loading}
+                      style={{marginRight: '6px', cursor: 'pointer'}}
+                    />
+                    <span>{kpa}</span>
+                  </label>
+                ))}
+                {['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7'].map(kpa => (
+                  <label key={kpa} style={{display: 'flex', alignItems: 'center', cursor: 'pointer', minWidth: '60px'}}>
+                    <input
+                      type="checkbox"
+                      value={kpa}
+                      checked={formData.kpa_mapping.includes(kpa)}
+                      onChange={() => handleKPAChange(kpa)}
+                      disabled={loading}
+                      style={{marginRight: '6px', cursor: 'pointer'}}
+                    />
+                    <span>{kpa}</span>
+                  </label>
+                ))}
+                {['A1', 'A2', 'A3', 'A4', 'A5'].map(kpa => (
+                  <label key={kpa} style={{display: 'flex', alignItems: 'center', cursor: 'pointer', minWidth: '60px'}}>
+                    <input
+                      type="checkbox"
+                      value={kpa}
+                      checked={formData.kpa_mapping.includes(kpa)}
+                      onChange={() => handleKPAChange(kpa)}
+                      disabled={loading}
+                      style={{marginRight: '6px', cursor: 'pointer'}}
+                    />
+                    <span>{kpa}</span>
+                  </label>
+                ))}
               </div>
 
               {formData.kpa_mapping.length > 0 && (
@@ -1076,7 +1056,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                   type="text"
                   value={prereq}
                   onChange={(e) => updatePrerequisite(index, e.target.value)}
-                  placeholder="e.g., CSE101"
+                  placeholder="e.g., CSE1101"
                   disabled={loading}
                 />
                 <button
