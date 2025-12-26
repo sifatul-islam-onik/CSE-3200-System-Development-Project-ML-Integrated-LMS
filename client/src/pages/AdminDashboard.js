@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faTimes, faBook, faStar, faUniversity, faChartBar, faEdit, faBookOpen, faPlus, faGraduationCap, faHourglass, faUsers, faCog, faSignOutAlt, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faTimes, faBook, faStar, faUniversity, faChartBar, faEdit, faBookOpen, faPlus, faGraduationCap, faHourglass, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
 import { getPendingUsers, approveUser, rejectUser } from '../services/adminService';
 import { createCourse, getAllCourses, updateCourse, deleteCourse } from '../services/courseService';
+import { getAllProposals, getProposalById, approveProposal, rejectProposal } from '../services/courseProposalService';
 import CourseForm from '../components/CourseForm';
 import CourseOBEView from '../components/CourseOBEView';
 import '../styles/Dashboard.css';
@@ -29,10 +30,17 @@ const AdminDashboard = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [proposals, setProposals] = useState([]);
+  const [selectedProposal, setSelectedProposal] = useState(null);
+  const [showProposalDetail, setShowProposalDetail] = useState(false);
+  const [reviewComment, setReviewComment] = useState('');
 
   useEffect(() => {
     const userData = getUser();
     setUser(userData);
+    // Fetch initial data for badge counts
+    fetchPendingUsers();
+    fetchProposals();
   }, []);
 
   useEffect(() => {
@@ -40,6 +48,8 @@ const AdminDashboard = () => {
       fetchPendingUsers();
     } else if (activeSection === 'courses') {
       fetchCourses();
+    } else if (activeSection === 'proposals') {
+      fetchProposals();
     }
   }, [activeSection]);
 
@@ -64,6 +74,19 @@ const AdminDashboard = () => {
       setCourses(response.data || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch courses');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchProposals = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await getAllProposals();
+      setProposals(response.data || []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to fetch proposals');
     } finally {
       setLoading(false);
     }
@@ -172,6 +195,63 @@ const AdminDashboard = () => {
     setShowDeleteModal(true);
   };
 
+  const handleViewProposal = async (proposalId) => {
+    setLoading(true);
+    try {
+      const response = await getProposalById(proposalId);
+      setSelectedProposal(response.data);
+      setShowProposalDetail(true);
+      setReviewComment('');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to fetch proposal details');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveProposal = async () => {
+    if (!selectedProposal) return;
+    
+    setLoading(true);
+    try {
+      await approveProposal(selectedProposal._id, reviewComment);
+      setSuccessMessage('Course proposal approved successfully');
+      setShowProposalDetail(false);
+      setSelectedProposal(null);
+      fetchProposals();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to approve proposal');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectProposal = async () => {
+    if (!selectedProposal || !reviewComment.trim()) {
+      setError('Please provide a reason for rejection');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      await rejectProposal(selectedProposal._id, reviewComment);
+      setSuccessMessage('Course proposal rejected');
+      setShowProposalDetail(false);
+      setSelectedProposal(null);
+      fetchProposals();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to reject proposal');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -251,6 +331,91 @@ const AdminDashboard = () => {
                         >
                           Reject
                         </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'proposals':
+        return (
+          <div className="section-container">
+            <div className="section-header">
+              <h2>Course Proposals</h2>
+              <p>Review and approve course creation and update requests from teachers</p>
+            </div>
+            <div className="section-body">
+              {successMessage && (
+                <div className="alert alert-success">
+                  {successMessage}
+                </div>
+              )}
+
+              {error && (
+                <div className="alert alert-error">
+                  {error}
+                </div>
+              )}
+
+              {loading && !showProposalDetail ? (
+                <div className="loading-container">
+                  <div className="spinner spinner-large"></div>
+                  <p>Loading proposals...</p>
+                </div>
+              ) : proposals.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-icon"><FontAwesomeIcon icon={faClipboardList} /></div>
+                  <h3>No Course Proposals</h3>
+                  <p>All proposals have been processed</p>
+                </div>
+              ) : (
+                <div className="proposals-grid">
+                  {proposals.map((proposal) => (
+                    <div key={proposal._id} className="proposal-card">
+                      <div className="proposal-header">
+                        <span className={`proposal-type-badge ${proposal.proposalType.toLowerCase()}`}>
+                          {proposal.proposalType}
+                        </span>
+                        <span className={`status-badge status-${proposal.status.toLowerCase()}`}>
+                          {proposal.status}
+                        </span>
+                      </div>
+                      <div className="proposal-body">
+                        <h3>{proposal.proposedData.courseCode} - {proposal.proposedData.courseTitle}</h3>
+                        <div className="proposal-meta">
+                          <p><strong>Proposed by:</strong> {proposal.proposedBy?.name || 'Unknown'}</p>
+                          <p><strong>Date:</strong> {new Date(proposal.createdAt).toLocaleDateString()}</p>
+                          {proposal.proposalType === 'UPDATE' && proposal.existingCourse && (
+                            <p><strong>Existing Course:</strong> {proposal.existingCourse.courseCode}</p>
+                          )}
+                        </div>
+                        {proposal.changeDescription && (
+                          <div className="proposal-description">
+                            <strong>Description:</strong>
+                            <p>{proposal.changeDescription}</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="proposal-actions">
+                        <button 
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleViewProposal(proposal._id)}
+                        >
+                          View Details
+                        </button>
+                        {proposal.status === 'PENDING' && (
+                          <>
+                            <button 
+                              className="btn btn-approve btn-sm"
+                              onClick={() => handleViewProposal(proposal._id)}
+                            >
+                              <FontAwesomeIcon icon={faCheck} /> Review
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -450,6 +615,17 @@ const AdminDashboard = () => {
           </button>
 
           <button
+            className={`nav-item ${activeSection === 'proposals' ? 'active' : ''}`}
+            onClick={() => setActiveSection('proposals')}
+          >
+            <span className="nav-icon"><FontAwesomeIcon icon={faClipboardList} /></span>
+            {sidebarOpen && <span className="nav-label">Course Proposals</span>}
+            {sidebarOpen && proposals.filter(p => p.status === 'PENDING').length > 0 && (
+              <span className="badge-count">{proposals.filter(p => p.status === 'PENDING').length}</span>
+            )}
+          </button>
+
+          <button
             className={`nav-item ${activeSection === 'courses' ? 'active' : ''}`}
             onClick={() => setActiveSection('courses')}
           >
@@ -581,6 +757,146 @@ const AdminDashboard = () => {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Proposal Detail Modal */}
+      {showProposalDetail && selectedProposal && (
+        <div className="modal-overlay" onClick={() => !loading && setShowProposalDetail(false)}>
+          <div className="modal-content proposal-detail-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Course Proposal Details</h3>
+              <button 
+                className="close-btn" 
+                onClick={() => setShowProposalDetail(false)}
+                disabled={loading}
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="proposal-info-section">
+                <div className="info-row">
+                  <span className={`proposal-type-badge ${selectedProposal.proposalType.toLowerCase()}`}>
+                    {selectedProposal.proposalType}
+                  </span>
+                  <span className={`status-badge status-${selectedProposal.status.toLowerCase()}`}>
+                    {selectedProposal.status}
+                  </span>
+                </div>
+                <div className="info-row">
+                  <strong>Proposed by:</strong> {selectedProposal.proposedBy?.name || 'Unknown'}
+                </div>
+                <div className="info-row">
+                  <strong>Date:</strong> {new Date(selectedProposal.createdAt).toLocaleDateString()}
+                </div>
+                {selectedProposal.changeDescription && (
+                  <div className="info-row">
+                    <strong>Change Description:</strong>
+                    <p>{selectedProposal.changeDescription}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="course-details-section">
+                <h4>Course Information</h4>
+                <div className="details-grid">
+                  <div className="detail-item">
+                    <strong>Course Code:</strong> {selectedProposal.proposedData.courseCode}
+                  </div>
+                  <div className="detail-item">
+                    <strong>Course Title:</strong> {selectedProposal.proposedData.courseTitle}
+                  </div>
+                  <div className="detail-item">
+                    <strong>Course Type:</strong> {selectedProposal.proposedData.course_type}
+                  </div>
+                  <div className="detail-item">
+                    <strong>Credits:</strong> {selectedProposal.proposedData.credit}
+                  </div>
+                  <div className="detail-item">
+                    <strong>Offered To:</strong> {selectedProposal.proposedData.course_offered_to}
+                  </div>
+                  <div className="detail-item">
+                    <strong>Semester:</strong> {selectedProposal.proposedData.semester || 'N/A'}
+                  </div>
+                  {selectedProposal.proposedData.courseOutcomes && selectedProposal.proposedData.courseOutcomes.length > 0 && (
+                    <div className="detail-item full-width">
+                      <strong>Course Outcomes:</strong> {selectedProposal.proposedData.courseOutcomes.length} COs defined
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {selectedProposal.status === 'PENDING' && (
+                <div className="review-section">
+                  <label htmlFor="reviewComment">
+                    <strong>Review Comment {selectedProposal.status === 'PENDING' && '(Optional for approval, required for rejection)'}:</strong>
+                  </label>
+                  <textarea
+                    id="reviewComment"
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder="Add a comment about this proposal..."
+                    rows={4}
+                    disabled={loading}
+                  />
+                </div>
+              )}
+
+              {selectedProposal.reviewedBy && selectedProposal.reviewComment && (
+                <div className="review-history">
+                  <strong>Review by {selectedProposal.reviewedBy.name}:</strong>
+                  <p>{selectedProposal.reviewComment}</p>
+                  <small>Reviewed on {new Date(selectedProposal.updatedAt).toLocaleDateString()}</small>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="btn btn-outline"
+                onClick={() => setShowProposalDetail(false)}
+                disabled={loading}
+              >
+                Close
+              </button>
+              {selectedProposal.status === 'PENDING' && (
+                <>
+                  <button 
+                    className="btn btn-danger"
+                    onClick={handleRejectProposal}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <div className="spinner spinner-small"></div>
+                        Rejecting...
+                      </>
+                    ) : (
+                      <>
+                        <FontAwesomeIcon icon={faTimes} /> Reject
+                      </>
+                    )}
+                  </button>
+                  <button 
+                    className="btn btn-approve"
+                    onClick={handleApproveProposal}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <div className="spinner spinner-small"></div>
+                        Approving...
+                      </>
+                    ) : (
+                      <>
+                        <FontAwesomeIcon icon={faCheck} /> Approve
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

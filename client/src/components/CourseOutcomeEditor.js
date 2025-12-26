@@ -168,7 +168,7 @@ const CourseOutcomeEditor = ({ courseOutcomes, onChange, onValidationChange }) =
   if (loadingPOs) {
     return (
       <div className="course-outcomes-section">
-        <div className="section-header">
+        <div className="course-section-header">
           <h4>Course Outcomes & CO-PO Mapping</h4>
         </div>
         <p className="loading-message">Loading Program Outcomes...</p>
@@ -178,7 +178,7 @@ const CourseOutcomeEditor = ({ courseOutcomes, onChange, onValidationChange }) =
 
   return (
     <div className="course-outcomes-section">
-      <div className="section-header">
+      <div className="course-section-header">
         <h4>Course Outcomes & CO-PO Mapping</h4>
         <button type="button" className="btn-add-small" onClick={addCourseOutcome}>
           + Add CO

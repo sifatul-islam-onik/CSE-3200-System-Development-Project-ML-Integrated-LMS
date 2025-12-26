@@ -675,11 +675,11 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                   required
                 />
                 {formData.academicYear && formData.academicYear.length === 4 && parseInt(formData.academicYear) >= 1967 ? (
-                  <small style={{ color: '#28a745', marginTop: '4px', display: 'block', fontWeight: '500' }}>
+                  <small style={{ color: '#28a745', marginTop: '4px', display: 'block', fontWeight: '500', textAlign: 'left' }}>
                     ✓ Format: {formData.academicYear}-{String(parseInt(formData.academicYear) + 1).slice(-2)}
                   </small>
                 ) : formData.academicYear && formData.academicYear.length > 0 ? (
-                  <small style={{ color: '#dc3545', marginTop: '4px', display: 'block' }}>
+                  <small style={{ color: '#dc3545', marginTop: '4px', display: 'block', textAlign: 'left' }}>
                     Enter a valid 4-digit year (≥1967)
                   </small>
                 ) : null}
@@ -707,15 +707,15 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
 
           {/* Knowledge Required */}
           <div className="form-section">
-            <div className="section-header">
+            <div className="course-section-header">
               <label className="section-label">Knowledge Required *</label>
               <button type="button" className="btn-add-small" onClick={addKnowledgeRequired} disabled={loading}>
                 + Add Knowledge
               </button>
             </div>
-            {errors.knowledge_required && <span className="error-text" style={{display: 'block', marginBottom: '10px'}}>{errors.knowledge_required}</span>}
+            {errors.knowledge_required && <span className="error-text" style={{display: 'block', marginBottom: '10px', textAlign: 'left'}}>{errors.knowledge_required}</span>}
             {formData.knowledge_required.length === 0 && (
-              <p style={{color: '#666', fontSize: '14px', marginBottom: '10px'}}>No knowledge required yet. Click "+ Add Knowledge" to start.</p>
+              <p className="info-text" style={{color: '#666', fontSize: '14px', marginBottom: '10px', textAlign: 'left'}}>No knowledge required yet. Click "+ Add Knowledge" to start.</p>
             )}
             {formData.knowledge_required.map((knowledge, index) => (
               <div key={index} className="array-item">
@@ -740,15 +740,15 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
 
           {/* Course Objectives */}
           <div className="form-section">
-            <div className="section-header">
+            <div className="course-section-header">
               <label className="section-label">Course Objectives *</label>
               <button type="button" className="btn-add-small" onClick={addCourseObjective} disabled={loading}>
                 + Add Objective
               </button>
             </div>
-            {errors.course_objectives && <span className="error-text" style={{display: 'block', marginBottom: '10px'}}>{errors.course_objectives}</span>}
+            {errors.course_objectives && <span className="error-text" style={{display: 'block', marginBottom: '10px', textAlign: 'left'}}>{errors.course_objectives}</span>}
             {formData.course_objectives.length === 0 && (
-              <p style={{color: '#666', fontSize: '14px', marginBottom: '10px'}}>No course objectives yet. Click "+ Add Objective" to start.</p>
+              <p className="info-text" style={{color: '#666', fontSize: '14px', marginBottom: '10px', textAlign: 'left'}}>No course objectives yet. Click "+ Add Objective" to start.</p>
             )}
             {formData.course_objectives.map((objective, index) => (
               <div key={index} className="array-item">
@@ -773,17 +773,17 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
 
           {/* Course Content */}
           <div className="form-section">
-            <div className="section-header">
+            <div className="course-section-header">
               <label className="section-label">Course Content *</label>
               <button type="button" className="btn-add-small" onClick={addCourseContent} disabled={loading}>
                 + Add Content
               </button>
             </div>
-            {errors.course_content && <span className="error-text" style={{display: 'block', marginBottom: '10px'}}>{errors.course_content}</span>}
+            {errors.course_content && <span className="error-text" style={{display: 'block', marginBottom: '10px', textAlign: 'left'}}>{errors.course_content}</span>}
             {formData.course_content.map((content, index) => (
-              <div key={index} className="course-content-item" style={{marginBottom: '15px', padding: '15px', border: '1px solid #ddd', borderRadius: '4px'}}>
+              <div key={index} className="course-content-item" style={{marginBottom: '15px', padding: '15px', border: '1px solid #ddd', borderRadius: '4px', textAlign: 'left'}}>
                 <div className="form-group" style={{marginBottom: '10px'}}>
-                  <label>Concept Name *</label>
+                  <label style={{textAlign: 'left', display: 'block'}}>Concept Name *</label>
                   <input
                     type="text"
                     value={content.concept_name}
@@ -793,7 +793,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                   />
                 </div>
                 <div className="form-group" style={{marginBottom: '10px'}}>
-                  <label>Concept Description *</label>
+                  <label style={{textAlign: 'left', display: 'block'}}>Concept Description *</label>
                   <textarea
                     value={content.concept_description}
                     onChange={(e) => updateCourseContent(index, 'concept_description', e.target.value)}
@@ -815,7 +815,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
               </div>
             ))}
             {formData.course_content.length === 0 && (
-              <p style={{color: '#666', fontStyle: 'italic', marginTop: '10px'}}>
+              <p className="info-text" style={{color: '#666', fontStyle: 'italic', marginTop: '10px', textAlign: 'left'}}>
                 No course content added yet. Click "+ Add Content" to begin.
               </p>
             )}
@@ -823,8 +823,8 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
 
           {/* KPA Mapping */}
           <div className="form-section">
-            <label className="section-label">Mapping of Knowledge Profile, Complex Engineering Problem Solving and Complex Engineering Activities *</label>
-            {errors.kpa_mapping && <span className="error-text" style={{display: 'block', marginBottom: '10px'}}>{errors.kpa_mapping}</span>}
+            <label className="section-label" style={{textAlign: 'left'}}>Mapping of Knowledge Profile, Complex Engineering Problem Solving and Complex Engineering Activities *</label>
+            {errors.kpa_mapping && <span className="error-text" style={{display: 'block', marginBottom: '10px', textAlign: 'left'}}>{errors.kpa_mapping}</span>}
             
             <div style={{marginTop: '10px'}}>
               <div style={{display: 'flex', flexWrap: 'wrap', gap: '12px'}}>
@@ -870,7 +870,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
               </div>
 
               {formData.kpa_mapping.length > 0 && (
-                <div style={{marginTop: '10px', padding: '10px', backgroundColor: '#f0f9ff', borderRadius: '4px', border: '1px solid #bfdbfe'}}>
+                <div style={{marginTop: '10px', padding: '10px', backgroundColor: '#f0f9ff', borderRadius: '4px', border: '1px solid #bfdbfe', textAlign: 'left'}}>
                   <strong style={{color: '#1e40af'}}>Selected: </strong>
                   <span style={{color: '#1e40af'}}>{formData.kpa_mapping.join(', ')}</span>
                 </div>
@@ -880,7 +880,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
 
           {/* Lecture Plan */}
           <div className="form-section">
-            <div className="section-header">
+            <div className="course-section-header">
               <label className="section-label">Lecture Plan (Week 1-13) *</label>
               <button 
                 type="button" 
@@ -892,9 +892,9 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                 + Add Week
               </button>
             </div>
-            {errors.lecture_plan && <span className="error-text" style={{display: 'block', marginBottom: '10px'}}>{errors.lecture_plan}</span>}
+            {errors.lecture_plan && <span className="error-text" style={{display: 'block', marginBottom: '10px', textAlign: 'left'}}>{errors.lecture_plan}</span>}
             {formData.lecture_plan.length === 0 && (
-              <p style={{color: '#666', fontSize: '14px', marginBottom: '10px'}}>No lecture plan entries yet. Click "+ Add Week" to start.</p>
+              <p className="info-text" style={{color: '#666', fontSize: '14px', marginBottom: '10px', textAlign: 'left'}}>No lecture plan entries yet. Click "+ Add Week" to start.</p>
             )}
             {formData.lecture_plan.map((item, index) => {
               const usedWeeks = formData.lecture_plan
@@ -914,12 +914,13 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                     border: hasError ? '2px solid #dc3545' : '1px solid #ddd', 
                     borderRadius: '4px', 
                     backgroundColor: hasError ? '#fff5f5' : '#fafafa',
-                    boxShadow: hasError ? '0 0 5px rgba(220, 53, 69, 0.2)' : 'none'
+                    boxShadow: hasError ? '0 0 5px rgba(220, 53, 69, 0.2)' : 'none',
+                    textAlign: 'left'
                   }}
                 >
                   <div style={{display: 'flex', gap: '15px', alignItems: 'flex-start'}}>
                     <div className="form-group" style={{flex: '0 0 120px', marginBottom: '0'}}>
-                      <label>Week *</label>
+                      <label style={{textAlign: 'left', display: 'block'}}>Week *</label>
                       <select
                         value={item.week}
                         onChange={(e) => updateLecturePlan(index, 'week', parseInt(e.target.value))}
@@ -943,13 +944,13 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                         ))}
                       </select>
                       {rowError.week && (
-                        <span style={{color: '#dc3545', fontSize: '12px', marginTop: '4px', display: 'block'}}>
+                        <span style={{color: '#dc3545', fontSize: '12px', marginTop: '4px', display: 'block', textAlign: 'left'}}>
                           {rowError.week}
                         </span>
                       )}
                     </div>
                     <div className="form-group" style={{flex: '1', marginBottom: '0'}}>
-                      <label>Lecture Plan *</label>
+                      <label style={{textAlign: 'left', display: 'block'}}>Lecture Plan *</label>
                       <textarea
                         value={item.plan}
                         onChange={(e) => updateLecturePlan(index, 'plan', e.target.value)}
@@ -964,7 +965,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                         }}
                       />
                       {rowError.plan && (
-                        <span style={{color: '#dc3545', fontSize: '12px', marginTop: '4px', display: 'block'}}>
+                        <span style={{color: '#dc3545', fontSize: '12px', marginTop: '4px', display: 'block', textAlign: 'left'}}>
                           {rowError.plan}
                         </span>
                       )}
@@ -987,15 +988,15 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
 
           {/* References */}
           <div className="form-section">
-            <div className="section-header">
+            <div className="course-section-header">
               <label className="section-label">References *</label>
               <button type="button" className="btn-add-small" onClick={addReference} disabled={loading}>
                 + Add Reference
               </button>
             </div>
-            {errors.references && <span className="error-text" style={{display: 'block', marginBottom: '10px'}}>{errors.references}</span>}
+            {errors.references && <span className="error-text" style={{display: 'block', marginBottom: '10px', textAlign: 'left'}}>{errors.references}</span>}
             {formData.references.length === 0 && (
-              <p style={{color: '#666', fontSize: '14px', marginBottom: '10px'}}>No references yet. Click "+ Add Reference" to start.</p>
+              <p className="info-text" style={{color: '#666', fontSize: '14px', marginBottom: '10px', textAlign: 'left'}}>No references yet. Click "+ Add Reference" to start.</p>
             )}
             {formData.references.map((ref, index) => {
               const hasError = referencesErrors[index];
@@ -1033,7 +1034,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                     ✕
                   </button>
                   {hasError && (
-                    <span style={{color: '#dc3545', fontSize: '12px', marginTop: '4px', display: 'block', marginLeft: '0'}}>
+                    <span style={{color: '#dc3545', fontSize: '12px', marginTop: '4px', display: 'block', marginLeft: '0', textAlign: 'left'}}>
                       {hasError}
                     </span>
                   )}
@@ -1044,7 +1045,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
 
           {/* Prerequisites */}
           <div className="form-section">
-            <div className="section-header">
+            <div className="course-section-header">
               <label className="section-label">Prerequisites (Optional)</label>
               <button type="button" className="btn-add-small" onClick={addPrerequisite} disabled={loading}>
                 + Add

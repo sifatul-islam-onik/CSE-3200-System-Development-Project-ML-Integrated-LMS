@@ -75,18 +75,17 @@ const courseValidation = [
     .withMessage('Reference must not be empty')
 ];
 
-// All routes require authentication and admin role
+// All routes require authentication
 router.use(authenticateUser);
-router.use(authorizeAdmin);
 
 // Course CRUD routes
-router.post('/', courseValidation, courseController.createCourse);
-router.get('/', courseController.getAllCourses);
-router.get('/:id', courseController.getCourse);
-router.put('/:id', courseValidation, courseController.updateCourse);
-router.delete('/:id', courseController.deleteCourse);
+router.post('/', authorizeAdmin, courseValidation, courseController.createCourse);
+router.get('/', courseController.getAllCourses); // Available to all authenticated users
+router.get('/:id', courseController.getCourse); // Available to all authenticated users
+router.put('/:id', authorizeAdmin, courseValidation, courseController.updateCourse);
+router.delete('/:id', authorizeAdmin, courseController.deleteCourse);
 
-// OBE-specific routes
+// OBE-specific routes (available to all authenticated users)
 router.get('/:id/validate-obe', courseController.validateCourseOBE);
 router.get('/curriculum/semester/:semester', courseController.getCurriculumBySemester);
 

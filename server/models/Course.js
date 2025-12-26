@@ -17,6 +17,16 @@ const courseSchema = new mongoose.Schema({
     required: [true, 'Credit is required'],
     min: [0, 'Credit cannot be negative']
   },
+  course_type: {
+    type: String,
+    required: [true, 'Course type is required'],
+    uppercase: true,
+    enum: {
+      values: ['THEORY', 'SESSIONAL', 'PROJECT/THESIS'],
+      message: 'Course type must be THEORY, SESSIONAL, or PROJECT/THESIS'
+    },
+    default: 'THEORY'
+  },
   course_offered_to: {
     type: String,
     required: [true, 'Course offered to department is required'],
