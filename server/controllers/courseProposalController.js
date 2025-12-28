@@ -218,10 +218,14 @@ exports.getProposalById = async (req, res) => {
 // @route   PUT /api/course-proposals/:id/approve
 // @access  Admin only
 exports.approveProposal = async (req, res) => {
+  console.log('=== Approve Proposal Started ===');
+  console.log('Proposal ID:', req.params.id);
+  console.log('Review Comments:', req.body.reviewComments);
   try {
     const { reviewComments } = req.body;
 
     const proposal = await CourseProposal.findById(req.params.id);
+    console.log('Proposal found:', proposal ? 'YES' : 'NO');
 
     if (!proposal) {
       return res.status(404).json({
@@ -237,32 +241,101 @@ exports.approveProposal = async (req, res) => {
       });
     }
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    // Normalize helper to align proposed data with Course schema expectations
+    const normalizeCourseData = (raw) => {
+      const data = { ...(raw || {}) };
+      // Ensure uppercase enums/strings where applicable
+      if (typeof data.course_type === 'string') data.course_type = data.course_type.toUpperCase();
+      if (typeof data.category === 'string') data.category = data.category.toUpperCase();
+      if (typeof data.course_offered_to === 'string') data.course_offered_to = data.course_offered_to.toUpperCase();
+      // Elective group should be null for COMPULSORY
+      if (data.category === 'COMPULSORY') {
+        data.elective_group = null;
+      }
+      // Academic year should be a string; Course model will format YYYY -> YYYY-YY
+      if (typeof data.academicYear === 'number') data.academicYear = String(data.academicYear);
+      // Trim arrays of strings
+      const trimArray = (arr) => Array.isArray(arr) ? arr.map(v => (typeof v === 'string' ? v.trim() : v)).filter(v => !(typeof v === 'string' && v === '')) : arr;
+      data.prerequisites = trimArray(data.prerequisites);
+      data.knowledge_required = trimArray(data.knowledge_required);
+      data.course_objectives = trimArray(data.course_objectives);
+      data.learningObjectives = trimArray(data.learningObjectives);
+      data.references = trimArray(data.references);
+      // Ensure course_content items have trimmed strings
+      if (Array.isArray(data.course_content)) {
+        data.course_content = data.course_content.map(item => ({
+          concept_name: item?.concept_name?.trim(),
+          concept_description: item?.concept_description?.trim()
+        }));
+      }
+      // Sort lecture_plan by week and coerce week to number
+      if (Array.isArray(data.lecture_plan)) {
+        data.lecture_plan = data.lecture_plan.map(lp => ({
+          week: typeof lp.week === 'string' ? parseInt(lp.week, 10) : lp.week,
+          plan: lp?.plan?.trim()
+        })).sort((a, b) => (a.week || 0) - (b.week || 0));
+      }
+      // Uppercase kpa_mapping entries
+      if (Array.isArray(data.kpa_mapping)) {
+        data.kpa_mapping = data.kpa_mapping.map(k => (typeof k === 'string' ? k.toUpperCase() : k));
+      }
+      return data;
+    };
+
+    // Attempt to start a transaction (optional)
+    let session = null;
+    let useSession = false;
+    try {
+      session = await mongoose.startSession();
+      session.startTransaction();
+      useSession = true;
+    } catch (txnErr) {
+      console.warn('Transactions unavailable, proceeding without session:', txnErr.message);
+    }
 
     try {
+      console.log('Proposal Type:', proposal.proposalType);
       if (proposal.proposalType === 'CREATE') {
+        console.log('Creating new course...');
         // Create new course
         const courseData = {
-          ...proposal.proposedData,
+          ...normalizeCourseData(proposal.proposedData),
           createdBy: proposal.proposedBy
         };
+        console.log('Normalized course data:', JSON.stringify(courseData, null, 2));
 
         // Extract courseOutcomes if present
         const courseOutcomes = courseData.courseOutcomes;
         delete courseData.courseOutcomes;
 
-        const [course] = await Course.create([courseData], { session });
+        let course;
+        if (useSession) {
+          const created = await Course.create([courseData], { session });
+          course = created[0];
+        } else {
+          course = await Course.create(courseData);
+        }
 
         // Create course outcomes if provided
         if (courseOutcomes && courseOutcomes.length > 0) {
           for (const coData of courseOutcomes) {
-            const [courseOutcome] = await CourseOutcome.create([{
-              course: course._id,
-              co_code: coData.co_code,
-              description: coData.description,
-              taxonomy_levels: coData.taxonomy_levels || []
-            }], { session });
+            let courseOutcome;
+            if (useSession) {
+              const createdCO = await CourseOutcome.create([{
+                course: course._id,
+                co_code: coData.co_code,
+                description: coData.description,
+                taxonomy_levels: coData.taxonomy_levels || []
+              }], { session });
+              courseOutcome = createdCO[0];
+            } else {
+              courseOutcome = await CourseOutcome.create({
+                course: course._id,
+                co_code: coData.co_code,
+                description: coData.description,
+                taxonomy_levels: coData.taxonomy_levels || []
+              });
+            }
 
             // Create CO-PO mappings
             if (coData.po_mappings && coData.po_mappings.length > 0) {
@@ -272,20 +345,26 @@ exports.approveProposal = async (req, res) => {
                 level: Number(mapping.level)
               }));
 
-              await COPOMapping.create(mappingsToCreate, { session });
+              if (useSession) {
+                await COPOMapping.create(mappingsToCreate, { session, ordered: true });
+              } else {
+                await COPOMapping.create(mappingsToCreate);
+              }
             }
           }
         }
 
       } else if (proposal.proposalType === 'UPDATE') {
         // Update existing course
-        const course = await Course.findById(proposal.existingCourse).session(session);
+        const course = useSession
+          ? await Course.findById(proposal.existingCourse).session(session)
+          : await Course.findById(proposal.existingCourse);
 
         if (!course) {
           throw new Error('Course not found');
         }
 
-        const updateData = { ...proposal.proposedData };
+        const updateData = { ...normalizeCourseData(proposal.proposedData) };
         const courseOutcomes = updateData.courseOutcomes;
         delete updateData.courseOutcomes;
 
@@ -293,25 +372,50 @@ exports.approveProposal = async (req, res) => {
         Object.assign(course, updateData);
         course.lastReviewed = Date.now();
         course.reviewedBy = req.user._id;
-        await course.save({ session });
+        if (useSession) {
+          await course.save({ session });
+        } else {
+          await course.save();
+        }
 
         // Handle course outcomes if provided
         if (courseOutcomes && courseOutcomes.length > 0) {
           // Delete existing outcomes and mappings
-          const existingCOs = await CourseOutcome.find({ course: course._id }).session(session);
+          const existingCOs = useSession
+            ? await CourseOutcome.find({ course: course._id }).session(session)
+            : await CourseOutcome.find({ course: course._id });
           for (const co of existingCOs) {
-            await COPOMapping.deleteMany({ course_outcome: co._id }, { session });
+            if (useSession) {
+              await COPOMapping.deleteMany({ course_outcome: co._id }, { session });
+            } else {
+              await COPOMapping.deleteMany({ course_outcome: co._id });
+            }
           }
-          await CourseOutcome.deleteMany({ course: course._id }, { session });
+          if (useSession) {
+            await CourseOutcome.deleteMany({ course: course._id }, { session });
+          } else {
+            await CourseOutcome.deleteMany({ course: course._id });
+          }
 
           // Create new outcomes
           for (const coData of courseOutcomes) {
-            const [courseOutcome] = await CourseOutcome.create([{
-              course: course._id,
-              co_code: coData.co_code,
-              description: coData.description,
-              taxonomy_levels: coData.taxonomy_levels || []
-            }], { session });
+            let courseOutcome;
+            if (useSession) {
+              const createdCO = await CourseOutcome.create([{
+                course: course._id,
+                co_code: coData.co_code,
+                description: coData.description,
+                taxonomy_levels: coData.taxonomy_levels || []
+              }], { session });
+              courseOutcome = createdCO[0];
+            } else {
+              courseOutcome = await CourseOutcome.create({
+                course: course._id,
+                co_code: coData.co_code,
+                description: coData.description,
+                taxonomy_levels: coData.taxonomy_levels || []
+              });
+            }
 
             if (coData.po_mappings && coData.po_mappings.length > 0) {
               const mappingsToCreate = coData.po_mappings.map(mapping => ({
@@ -319,8 +423,11 @@ exports.approveProposal = async (req, res) => {
                 program_outcome_code: mapping.program_outcome_code.toUpperCase(),
                 level: Number(mapping.level)
               }));
-
-              await COPOMapping.create(mappingsToCreate, { session });
+              if (useSession) {
+                await COPOMapping.create(mappingsToCreate, { session, ordered: true });
+              } else {
+                await COPOMapping.create(mappingsToCreate);
+              }
             }
           }
         }
@@ -331,10 +438,16 @@ exports.approveProposal = async (req, res) => {
       proposal.reviewedBy = req.user._id;
       proposal.reviewedAt = Date.now();
       proposal.reviewComment = reviewComments || '';
-      await proposal.save({ session });
+      if (useSession) {
+        await proposal.save({ session });
+      } else {
+        await proposal.save();
+      }
 
-      await session.commitTransaction();
-      session.endSession();
+      if (useSession) {
+        await session.commitTransaction();
+        session.endSession();
+      }
 
       await proposal.populate('proposedBy', 'name email');
       await proposal.populate('reviewedBy', 'name email');
@@ -346,12 +459,38 @@ exports.approveProposal = async (req, res) => {
       });
 
     } catch (error) {
-      await session.abortTransaction();
-      session.endSession();
+      if (useSession && session) {
+        try { await session.abortTransaction(); } catch {}
+        try { session.endSession(); } catch {}
+      }
       throw error;
     }
   } catch (error) {
-    console.error('Approve proposal error:', error);
+    console.error('=== Approve proposal error ===');
+    console.error('Error type:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('Full error:', error);
+    // Surface validation and duplicate key errors clearly to client
+    if (error && (error.name === 'ValidationError' || error.errors)) {
+      const errors = {};
+      for (const key in (error.errors || {})) {
+        errors[key] = error.errors[key].message || 'Invalid value';
+      }
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed while approving proposal',
+        errors
+      });
+    }
+    if (error && error.code === 11000) {
+      // Duplicate key (likely courseCode unique index)
+      return res.status(400).json({
+        success: false,
+        message: 'Duplicate value detected. A course with this code may already exist.',
+        error: error.message
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Failed to approve proposal',

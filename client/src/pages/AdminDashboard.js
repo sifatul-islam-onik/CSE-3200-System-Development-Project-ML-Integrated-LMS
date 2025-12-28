@@ -16,7 +16,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [activeSection, setActiveSection] = useState('pending');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 1024);
   const [pendingUsers, setPendingUsers] = useState([]);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -41,6 +41,18 @@ const AdminDashboard = () => {
     // Fetch initial data for badge counts
     fetchPendingUsers();
     fetchProposals();
+
+    // Handle window resize for sidebar behavior
+    const handleResize = () => {
+      if (window.innerWidth > 1024) {
+        setSidebarOpen(true);
+      } else {
+        setSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -89,6 +101,14 @@ const AdminDashboard = () => {
       setError(err.response?.data?.message || 'Failed to fetch proposals');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSectionChange = (section) => {
+    setActiveSection(section);
+    // Close sidebar on mobile after selecting a section
+    if (window.innerWidth <= 1024) {
+      setSidebarOpen(false);
     }
   };
 
@@ -222,7 +242,9 @@ const AdminDashboard = () => {
       fetchProposals();
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to approve proposal');
+      // Surface meaningful error messages from service (which throws data objects)
+      const msg = err?.message || err?.error || err?.response?.data?.message || 'Failed to approve proposal';
+      setError(msg);
       setTimeout(() => setError(''), 3000);
     } finally {
       setLoading(false);
@@ -245,7 +267,8 @@ const AdminDashboard = () => {
       fetchProposals();
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to reject proposal');
+      const msg = err?.message || err?.error || err?.response?.data?.message || 'Failed to reject proposal';
+      setError(msg);
       setTimeout(() => setError(''), 3000);
     } finally {
       setLoading(false);
@@ -587,6 +610,23 @@ const AdminDashboard = () => {
 
   return (
     <div className="dashboard-layout">
+      {/* Mobile hamburger button */}
+      <button 
+        className="mobile-menu-btn"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        title="Toggle menu"
+      >
+        <FontAwesomeIcon icon={sidebarOpen ? faTimes : faBookOpen} />
+      </button>
+
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div 
+          className="sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
           <div className="logo-section">
@@ -605,7 +645,7 @@ const AdminDashboard = () => {
         <nav className="sidebar-nav">
           <button
             className={`nav-item ${activeSection === 'pending' ? 'active' : ''}`}
-            onClick={() => setActiveSection('pending')}
+            onClick={() => handleSectionChange('pending')}
           >
             <span className="nav-icon"><FontAwesomeIcon icon={faHourglass} /></span>
             {sidebarOpen && <span className="nav-label">Pending Approvals</span>}
@@ -616,7 +656,7 @@ const AdminDashboard = () => {
 
           <button
             className={`nav-item ${activeSection === 'proposals' ? 'active' : ''}`}
-            onClick={() => setActiveSection('proposals')}
+            onClick={() => handleSectionChange('proposals')}
           >
             <span className="nav-icon"><FontAwesomeIcon icon={faClipboardList} /></span>
             {sidebarOpen && <span className="nav-label">Course Proposals</span>}
@@ -627,7 +667,7 @@ const AdminDashboard = () => {
 
           <button
             className={`nav-item ${activeSection === 'courses' ? 'active' : ''}`}
-            onClick={() => setActiveSection('courses')}
+            onClick={() => handleSectionChange('courses')}
           >
             <span className="nav-icon"><FontAwesomeIcon icon={faBookOpen} /></span>
             {sidebarOpen && <span className="nav-label">Courses</span>}
@@ -638,7 +678,7 @@ const AdminDashboard = () => {
 
           <button
             className={`nav-item ${activeSection === 'users' ? 'active' : ''}`}
-            onClick={() => setActiveSection('users')}
+            onClick={() => handleSectionChange('users')}
           >
             <span className="nav-icon"><FontAwesomeIcon icon={faUsers} /></span>
             {sidebarOpen && <span className="nav-label">All Users</span>}
@@ -646,7 +686,7 @@ const AdminDashboard = () => {
 
           <button
             className={`nav-item ${activeSection === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveSection('settings')}
+            onClick={() => handleSectionChange('settings')}
           >
             <span className="nav-icon"><FontAwesomeIcon icon={faCog} /></span>
             {sidebarOpen && <span className="nav-label">Settings</span>}
@@ -765,7 +805,7 @@ const AdminDashboard = () => {
       {/* Proposal Detail Modal */}
       {showProposalDetail && selectedProposal && (
         <div className="modal-overlay" onClick={() => !loading && setShowProposalDetail(false)}>
-          <div className="modal-content proposal-detail-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content proposal-detail-modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '900px', maxHeight: '90vh'}}>
             <div className="modal-header">
               <h3>Course Proposal Details</h3>
               <button 
@@ -776,7 +816,7 @@ const AdminDashboard = () => {
                 <FontAwesomeIcon icon={faTimes} />
               </button>
             </div>
-            <div className="modal-body">
+            <div className="modal-body" style={{maxHeight: 'calc(90vh - 200px)', overflowY: 'auto'}}>
               <div className="proposal-info-section">
                 <div className="info-row">
                   <span className={`proposal-type-badge ${selectedProposal.proposalType.toLowerCase()}`}>
@@ -800,7 +840,7 @@ const AdminDashboard = () => {
                 )}
               </div>
 
-              <div className="course-details-section">
+              <div className="course-details-section" style={{maxHeight: '60vh', overflowY: 'auto', padding: '0 5px'}}>
                 <h4>Course Information</h4>
                 <div className="details-grid">
                   <div className="detail-item">
@@ -819,14 +859,195 @@ const AdminDashboard = () => {
                     <strong>Offered To:</strong> {selectedProposal.proposedData.course_offered_to}
                   </div>
                   <div className="detail-item">
-                    <strong>Semester:</strong> {selectedProposal.proposedData.semester || 'N/A'}
+                    <strong>Category:</strong> {selectedProposal.proposedData.category}
                   </div>
-                  {selectedProposal.proposedData.courseOutcomes && selectedProposal.proposedData.courseOutcomes.length > 0 && (
-                    <div className="detail-item full-width">
-                      <strong>Course Outcomes:</strong> {selectedProposal.proposedData.courseOutcomes.length} COs defined
+                  {selectedProposal.proposedData.elective_group && (
+                    <div className="detail-item">
+                      <strong>Elective Group:</strong> {selectedProposal.proposedData.elective_group}
+                    </div>
+                  )}
+                  {selectedProposal.proposedData.term && (
+                    <div className="detail-item">
+                      <strong>Term:</strong> {selectedProposal.proposedData.term}
+                    </div>
+                  )}
+                  {selectedProposal.proposedData.semester && (
+                    <div className="detail-item">
+                      <strong>Semester:</strong> {selectedProposal.proposedData.semester}
+                    </div>
+                  )}
+                  {selectedProposal.proposedData.yearLevel && (
+                    <div className="detail-item">
+                      <strong>Year Level:</strong> {selectedProposal.proposedData.yearLevel}
+                    </div>
+                  )}
+                  {selectedProposal.proposedData.academicYear && (
+                    <div className="detail-item">
+                      <strong>Academic Year:</strong> {selectedProposal.proposedData.academicYear}
+                    </div>
+                  )}
+                  {selectedProposal.proposedData.contactHours && (
+                    <div className="detail-item">
+                      <strong>Contact Hours:</strong> {selectedProposal.proposedData.contactHours} hrs/week
                     </div>
                   )}
                 </div>
+
+                {/* KPA Mapping */}
+                {selectedProposal.proposedData.kpa_mapping && selectedProposal.proposedData.kpa_mapping.length > 0 && (
+                  <div style={{marginTop: '20px'}}>
+                    <h4>KPA Mapping</h4>
+                    <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px'}}>
+                      {selectedProposal.proposedData.kpa_mapping.map((kpa, idx) => (
+                        <span key={idx} style={{
+                          padding: '4px 12px',
+                          backgroundColor: '#e3f2fd',
+                          color: '#1976d2',
+                          borderRadius: '4px',
+                          fontSize: '13px',
+                          fontWeight: '500'
+                        }}>
+                          {kpa}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Prerequisites */}
+                {selectedProposal.proposedData.prerequisites && selectedProposal.proposedData.prerequisites.length > 0 && (
+                  <div style={{marginTop: '20px'}}>
+                    <h4>Prerequisites</h4>
+                    <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px'}}>
+                      {selectedProposal.proposedData.prerequisites.map((prereq, idx) => (
+                        <span key={idx} style={{
+                          padding: '4px 12px',
+                          border: '1px solid #1976d2',
+                          color: '#1976d2',
+                          borderRadius: '4px',
+                          fontSize: '13px'
+                        }}>
+                          {prereq}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Knowledge Required */}
+                {selectedProposal.proposedData.knowledge_required && selectedProposal.proposedData.knowledge_required.length > 0 && (
+                  <div style={{marginTop: '20px'}}>
+                    <h4>Knowledge Required</h4>
+                    <ul style={{marginTop: '10px', paddingLeft: '20px'}}>
+                      {selectedProposal.proposedData.knowledge_required.map((knowledge, idx) => (
+                        <li key={idx} style={{marginBottom: '5px'}}>{knowledge}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Course Objectives */}
+                {selectedProposal.proposedData.course_objectives && selectedProposal.proposedData.course_objectives.length > 0 && (
+                  <div style={{marginTop: '20px'}}>
+                    <h4>Course Objectives</h4>
+                    <ol style={{marginTop: '10px', paddingLeft: '20px'}}>
+                      {selectedProposal.proposedData.course_objectives.map((objective, idx) => (
+                        <li key={idx} style={{marginBottom: '8px'}}>{objective}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                {/* Course Content */}
+                {selectedProposal.proposedData.course_content && selectedProposal.proposedData.course_content.length > 0 && (
+                  <div style={{marginTop: '20px'}}>
+                    <h4>Course Content</h4>
+                    <div style={{marginTop: '10px'}}>
+                      {selectedProposal.proposedData.course_content.map((content, idx) => (
+                        <div key={idx} style={{marginBottom: '15px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px'}}>
+                          <h5 style={{margin: '0 0 5px 0', color: '#333'}}>{idx + 1}. {content.concept_name}</h5>
+                          <p style={{margin: '0', fontSize: '14px', color: '#666'}}>{content.concept_description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Course Outcomes */}
+                {selectedProposal.proposedData.courseOutcomes && selectedProposal.proposedData.courseOutcomes.length > 0 && (
+                  <div style={{marginTop: '20px'}}>
+                    <h4>Course Outcomes ({selectedProposal.proposedData.courseOutcomes.length})</h4>
+                    <div style={{marginTop: '10px', overflowX: 'auto'}}>
+                      <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '13px'}}>
+                        <thead>
+                          <tr style={{backgroundColor: '#f5f5f5'}}>
+                            <th style={{padding: '8px', border: '1px solid #ddd', textAlign: 'left'}}>CO</th>
+                            <th style={{padding: '8px', border: '1px solid #ddd', textAlign: 'left'}}>Description</th>
+                            <th style={{padding: '8px', border: '1px solid #ddd', textAlign: 'left'}}>PO Mappings</th>
+                            <th style={{padding: '8px', border: '1px solid #ddd', textAlign: 'left'}}>Taxonomy</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedProposal.proposedData.courseOutcomes.map((co, idx) => (
+                            <tr key={idx}>
+                              <td style={{padding: '8px', border: '1px solid #ddd'}}>{co.co_code}</td>
+                              <td style={{padding: '8px', border: '1px solid #ddd'}}>{co.description}</td>
+                              <td style={{padding: '8px', border: '1px solid #ddd'}}>
+                                {co.po_mappings && co.po_mappings.length > 0 
+                                  ? co.po_mappings.map(m => `${m.program_outcome_code}(${m.level})`).join(', ')
+                                  : '-'
+                                }
+                              </td>
+                              <td style={{padding: '8px', border: '1px solid #ddd'}}>
+                                {co.taxonomy_levels && co.taxonomy_levels.length > 0 
+                                  ? co.taxonomy_levels.join(', ')
+                                  : '-'
+                                }
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Lecture Plan */}
+                {selectedProposal.proposedData.lecture_plan && selectedProposal.proposedData.lecture_plan.length > 0 && (
+                  <div style={{marginTop: '20px'}}>
+                    <h4>Lecture Plan</h4>
+                    <div style={{marginTop: '10px', overflowX: 'auto'}}>
+                      <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '13px'}}>
+                        <thead>
+                          <tr style={{backgroundColor: '#f5f5f5'}}>
+                            <th style={{padding: '8px', border: '1px solid #ddd', width: '80px'}}>Week</th>
+                            <th style={{padding: '8px', border: '1px solid #ddd', textAlign: 'left'}}>Plan</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedProposal.proposedData.lecture_plan.map((lecture, idx) => (
+                            <tr key={idx}>
+                              <td style={{padding: '8px', border: '1px solid #ddd', textAlign: 'center'}}>Week {lecture.week}</td>
+                              <td style={{padding: '8px', border: '1px solid #ddd'}}>{lecture.plan}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* References */}
+                {selectedProposal.proposedData.references && selectedProposal.proposedData.references.length > 0 && (
+                  <div style={{marginTop: '20px'}}>
+                    <h4>References</h4>
+                    <ol style={{marginTop: '10px', paddingLeft: '20px'}}>
+                      {selectedProposal.proposedData.references.map((reference, idx) => (
+                        <li key={idx} style={{marginBottom: '8px', fontSize: '14px'}}>{reference}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
               </div>
 
               {selectedProposal.status === 'PENDING' && (
