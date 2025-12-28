@@ -34,8 +34,7 @@ const programOutcomeSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster queries
-programOutcomeSchema.index({ po_code: 1 });
+// Index for faster queries (unique index on po_code is already defined via the schema field)
 programOutcomeSchema.index({ po_number: 1 });
 
 // Prevent deletion of system POs

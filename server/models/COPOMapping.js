@@ -20,11 +20,11 @@ const copoMappingSchema = new mongoose.Schema({
   level: {
     type: Number,
     required: [true, 'Mapping level is required'],
-    min: [1, 'Mapping level must be at least 1 (Low)'],
-    max: [3, 'Mapping level must be at most 3 (High)'],
+    min: [0, 'Mapping level must be at least 0 (Not Mapped)'],
+    max: [1, 'Mapping level must be at most 1 (Mapped)'],
     enum: {
-      values: [1, 2, 3],
-      message: 'Mapping level must be 1 (Low), 2 (Medium), or 3 (High)'
+      values: [0, 1],
+      message: 'Mapping level must be 0 (Not Mapped) or 1 (Mapped)'
     }
   }
 }, {
@@ -40,9 +40,8 @@ copoMappingSchema.index({ program_outcome_code: 1 });
 // Virtual to get level description
 copoMappingSchema.virtual('level_description').get(function() {
   const levels = {
-    1: 'Low',
-    2: 'Medium',
-    3: 'High'
+    0: 'Not Mapped',
+    1: 'Mapped'
   };
   return levels[this.level] || 'Unknown';
 });

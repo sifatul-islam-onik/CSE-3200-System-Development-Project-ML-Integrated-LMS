@@ -239,14 +239,13 @@ const courseSchema = new mongoose.Schema({
   // OBE: References (books/learning resources)
   references: {
     type: [String],
-    required: [true, 'At least one reference is required'],
     validate: {
       validator: function(v) {
-        if (!v || v.length === 0) return false;
-        // Ensure no empty references
+        if (!v || v.length === 0) return true; // Allow empty
+        // Ensure no empty references if array has items
         return v.every(ref => ref && ref.trim() !== '');
       },
-      message: 'References must contain at least one non-empty item'
+      message: 'References must contain only non-empty items'
     }
   },
   // OBE: Assessment plan

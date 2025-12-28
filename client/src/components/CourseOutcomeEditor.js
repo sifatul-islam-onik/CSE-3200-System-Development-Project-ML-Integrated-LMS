@@ -302,10 +302,8 @@ const CourseOutcomeEditor = ({ courseOutcomes, onChange, onValidationChange }) =
                       <span className="helper-text"> (Select at least one Program Outcome)</span>
                     </label>
                     <div className="mapping-legend">
-                      <span>0 = None</span>
-                      <span>1 = Low</span>
-                      <span>2 = Medium</span>
-                      <span>3 = High</span>
+                      <span>0 = Not Mapped</span>
+                      <span>1 = Mapped</span>
                     </div>
                     <div className="po-mapping-grid">
                       {programOutcomes.map(po => (
@@ -320,8 +318,6 @@ const CourseOutcomeEditor = ({ courseOutcomes, onChange, onValidationChange }) =
                           >
                             <option value="0">0</option>
                             <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
                           </select>
                         </div>
                       ))}

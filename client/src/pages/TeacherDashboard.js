@@ -26,7 +26,7 @@ const TeacherDashboard = () => {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [showOBEView, setShowOBEView] = useState(false);
   const [changeDescription, setChangeDescription] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 1024);
   const [proposalsOpen, setProposalsOpen] = useState(true);
 
   useEffect(() => {
@@ -34,6 +34,18 @@ const TeacherDashboard = () => {
     setUser(userData);
     // Fetch initial data for badge counts
     fetchMyProposals();
+
+    // Handle window resize for sidebar behavior
+    const handleResize = () => {
+      if (window.innerWidth > 1024) {
+        setSidebarOpen(true);
+      } else {
+        setSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -97,6 +109,14 @@ const TeacherDashboard = () => {
     }
   };
 
+  const handleSectionChange = (section) => {
+    setActiveSection(section);
+    // Close sidebar on mobile after selecting a section
+    if (window.innerWidth <= 1024) {
+      setSidebarOpen(false);
+    }
+  };
+
   const handleDeleteProposal = async (proposalId) => {
     if (!window.confirm('Are you sure you want to delete this proposal?')) return;
     
@@ -116,6 +136,7 @@ const TeacherDashboard = () => {
     setSelectedCourse(null);
     setChangeDescription('');
     setShowCourseForm(true);
+    handleSectionChange('create-proposal');
   };
 
   const openEditProposal = (course) => {
@@ -324,6 +345,23 @@ const TeacherDashboard = () => {
 
   return (
     <div className="dashboard-layout">
+      {/* Mobile hamburger button */}
+      <button 
+        className="mobile-menu-btn"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        title="Toggle menu"
+      >
+        <FontAwesomeIcon icon={sidebarOpen ? faTimesCircle : faBook} />
+      </button>
+
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div 
+          className="sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
           <div className="logo-section">
@@ -341,7 +379,7 @@ const TeacherDashboard = () => {
         <nav className="sidebar-nav">
           <button
             className={`nav-item ${activeSection === 'overview' ? 'active' : ''}`}
-            onClick={() => setActiveSection('overview')}
+            onClick={() => handleSectionChange('overview')}
           >
             <span className="nav-icon"><FontAwesomeIcon icon={faBook} /></span>
             {sidebarOpen && <span className="nav-label">Overview</span>}
@@ -379,7 +417,7 @@ const TeacherDashboard = () => {
                 </button>
                 <button
                   className={`nav-item nav-subitem ${activeSection === 'proposals' ? 'active' : ''}`}
-                  onClick={() => setActiveSection('proposals')}
+                  onClick={() => handleSectionChange('proposals')}
                 >
                   <span className="nav-icon"><FontAwesomeIcon icon={faHourglass} /></span>
                   {sidebarOpen && <span className="nav-label">My Proposals</span>}
@@ -393,7 +431,7 @@ const TeacherDashboard = () => {
           
           <button
             className={`nav-item ${activeSection === 'courses' ? 'active' : ''}`}
-            onClick={() => setActiveSection('courses')}
+            onClick={() => handleSectionChange('courses')}
           >
             <span className="nav-icon"><FontAwesomeIcon icon={faBook} /></span>
             {sidebarOpen && <span className="nav-label">Browse Courses</span>}
