@@ -103,13 +103,23 @@ exports.createCourse = async (req, res) => {
     } else {
       // Validate course_content structure
       course_content.forEach((concept, index) => {
-        if (!concept.concept_name || !concept.concept_name.trim()) {
-          validationErrors.push({ field: `course_content[${index}].concept_name`, message: 'Concept name is required' });
-        }
         if (!concept.concept_description || !concept.concept_description.trim()) {
           validationErrors.push({ field: `course_content[${index}].concept_description`, message: 'Concept description is required' });
         }
       });
+    }
+
+    // Parity rule for course code last digit vs course type
+    if (courseCode && course_type) {
+      const digits = (courseCode.match(/\d+/g) || []).join('');
+      if (digits.length > 0) {
+        const last = parseInt(digits[digits.length - 1], 10);
+        if (course_type === 'THEORY' && last % 2 === 0) {
+          validationErrors.push({ field: 'courseCode', message: 'Theory course code must end with an odd digit' });
+        } else if ((course_type === 'SESSIONAL' || course_type === 'PROJECT/THESIS') && last % 2 !== 0) {
+          validationErrors.push({ field: 'courseCode', message: 'Sessional/Project/Thesis course code must end with an even digit' });
+        }
+      }
     }
 
     // Validate lecture_plan
@@ -124,21 +134,33 @@ exports.createCourse = async (req, res) => {
       const weeksSeen = new Set();
       const duplicateWeeks = [];
       
+      // Week is only required if there are multiple entries
+      const isWeekRequired = lecture_plan.length > 1;
+      
       // Validate each lecture plan entry
       lecture_plan.forEach((item, index) => {
-        // Check if week field exists
-        if (item.week === undefined || item.week === null) {
-          validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week is missing' });
-        } else if (!Number.isInteger(item.week)) {
-          validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be an integer' });
-        } else if (item.week < 1 || item.week > 13) {
-          validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be between 1 and 13' });
-        } else {
-          // Check for duplicate weeks
-          if (weeksSeen.has(item.week)) {
-            duplicateWeeks.push(item.week);
+        // Check if week field exists (only required for multiple entries)
+        if (isWeekRequired) {
+          if (item.week === undefined || item.week === null) {
+            validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week is missing' });
+          } else if (!Number.isInteger(item.week)) {
+            validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be an integer' });
+          } else if (item.week < 1 || item.week > 13) {
+            validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be between 1 and 13' });
+          } else {
+            // Check for duplicate weeks
+            if (weeksSeen.has(item.week)) {
+              duplicateWeeks.push(item.week);
+            }
+            weeksSeen.add(item.week);
           }
-          weeksSeen.add(item.week);
+        } else if (item.week !== undefined && item.week !== null) {
+          // If week is provided for single entry, still validate it
+          if (!Number.isInteger(item.week)) {
+            validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be an integer' });
+          } else if (item.week < 1 || item.week > 13) {
+            validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be between 1 and 13' });
+          }
         }
         
         // Check if plan field exists
@@ -149,8 +171,8 @@ exports.createCourse = async (req, res) => {
         }
       });
       
-      // Report duplicate weeks
-      if (duplicateWeeks.length > 0) {
+      // Report duplicate weeks (only relevant for multiple entries)
+      if (isWeekRequired && duplicateWeeks.length > 0) {
         const uniqueDuplicates = [...new Set(duplicateWeeks)];
         validationErrors.push({ 
           field: 'lecture_plan', 
@@ -159,21 +181,16 @@ exports.createCourse = async (req, res) => {
       }
     }
 
-    // Validate references
-    if (!references || !Array.isArray(references)) {
-      validationErrors.push({ field: 'references', message: 'References must be an array' });
-    } else {
-      // Filter out empty or whitespace-only entries
-      const cleanedReferences = references
-        .filter(ref => ref && typeof ref === 'string' && ref.trim())
-        .map(ref => ref.trim());
-      
-      if (cleanedReferences.length === 0) {
-        validationErrors.push({ 
-          field: 'references', 
-          message: 'At least one non-empty reference is required' 
-        });
-      } else {
+    // Validate references (optional, but if provided should not be empty)
+    if (references !== undefined && references !== null) {
+      if (!Array.isArray(references)) {
+        validationErrors.push({ field: 'references', message: 'References must be an array' });
+      } else if (references.length > 0) {
+        // Filter out empty or whitespace-only entries
+        const cleanedReferences = references
+          .filter(ref => ref && typeof ref === 'string' && ref.trim())
+          .map(ref => ref.trim());
+        
         // Update the references array with cleaned values
         req.body.references = cleanedReferences;
       }
@@ -331,6 +348,10 @@ exports.createCourse = async (req, res) => {
         // Step 2: Create course outcomes
         const createdCOs = [];
         for (const coData of courseOutcomes) {
+          console.log(`=== Creating CO: ${coData.co_code} ===`);
+          console.log('CO Data:', JSON.stringify(coData, null, 2));
+          console.log('Taxonomy levels being saved:', coData.taxonomy_levels);
+          
           const [courseOutcome] = await CourseOutcome.create([{
             course: course._id,
             co_code: coData.co_code,
@@ -386,10 +407,30 @@ exports.createCourse = async (req, res) => {
         session.endSession();
 
         console.error('Transaction error:', error);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        
+        // Extract validation errors if available
+        let errorDetails = [];
+        if (error.errors) {
+          errorDetails = Object.entries(error.errors).map(([key, err]) => {
+            return `${key}: ${err.message}`;
+          });
+        }
+        
+        // If it's a validation error with specific field info
+        let userFriendlyMessage = error.message;
+        if (error.errors) {
+          userFriendlyMessage = Object.values(error.errors)
+            .map(e => e.message)
+            .join('; ');
+        }
+        
         return res.status(500).json({
           success: false,
           message: 'Failed to create course with OBE data. Transaction rolled back.',
-          error: error.message
+          error: userFriendlyMessage,
+          details: errorDetails
         });
       }
     } else {
@@ -520,9 +561,12 @@ exports.updateCourse = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      const errorMessages = errors.array().map(e => `${e.path}: ${e.msg}`).join('; ');
       return res.status(400).json({ 
-        success: false, 
-        errors: errors.array() 
+        success: false,
+        message: 'Validation failed',
+        error: errorMessages,
+        errors: errors.array()
       });
     }
 
@@ -580,6 +624,31 @@ exports.updateCourse = async (req, res) => {
       course.courseCode = courseCode;
     }
 
+    // Parity rule: validate last digit of course code against course type
+    {
+      const effectiveCode = courseCode || course.courseCode;
+      const effectiveType = (course_type !== undefined && course_type !== null) ? course_type : course.course_type;
+      if (effectiveCode && effectiveType) {
+        const digits = (effectiveCode.match(/\d+/g) || []).join('');
+        if (digits.length > 0) {
+          const last = parseInt(digits[digits.length - 1], 10);
+          const errorsArr = [];
+          if (effectiveType === 'THEORY' && last % 2 === 0) {
+            errorsArr.push({ field: 'courseCode', message: 'Theory course code must end with an odd digit' });
+          } else if ((effectiveType === 'SESSIONAL' || effectiveType === 'PROJECT/THESIS') && last % 2 !== 0) {
+            errorsArr.push({ field: 'courseCode', message: 'Sessional/Project/Thesis course code must end with an even digit' });
+          }
+          if (errorsArr.length > 0) {
+            return res.status(400).json({
+              success: false,
+              message: 'Validation failed',
+              errors: errorsArr
+            });
+          }
+        }
+      }
+    }
+
     // Validate category and elective_group relationship
     const finalCategory = category !== undefined ? category : course.category;
     const finalElectiveGroup = elective_group !== undefined ? elective_group : course.elective_group;
@@ -634,21 +703,33 @@ exports.updateCourse = async (req, res) => {
       const weeksSeen = new Set();
       const duplicateWeeks = [];
       
+      // Week is only required if there are multiple entries
+      const isWeekRequired = lecture_plan.length > 1;
+      
       // Validate each lecture plan entry
       lecture_plan.forEach((item, index) => {
-        // Check if week field exists
-        if (item.week === undefined || item.week === null) {
-          validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week is missing' });
-        } else if (!Number.isInteger(item.week)) {
-          validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be an integer' });
-        } else if (item.week < 1 || item.week > 13) {
-          validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be between 1 and 13' });
-        } else {
-          // Check for duplicate weeks
-          if (weeksSeen.has(item.week)) {
-            duplicateWeeks.push(item.week);
+        // Check if week field exists (only required for multiple entries)
+        if (isWeekRequired) {
+          if (item.week === undefined || item.week === null) {
+            validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week is missing' });
+          } else if (!Number.isInteger(item.week)) {
+            validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be an integer' });
+          } else if (item.week < 1 || item.week > 13) {
+            validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be between 1 and 13' });
+          } else {
+            // Check for duplicate weeks
+            if (weeksSeen.has(item.week)) {
+              duplicateWeeks.push(item.week);
+            }
+            weeksSeen.add(item.week);
           }
-          weeksSeen.add(item.week);
+        } else if (item.week !== undefined && item.week !== null) {
+          // If week is provided for single entry, still validate it
+          if (!Number.isInteger(item.week)) {
+            validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be an integer' });
+          } else if (item.week < 1 || item.week > 13) {
+            validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be between 1 and 13' });
+          }
         }
         
         // Check if plan field exists
@@ -659,8 +740,8 @@ exports.updateCourse = async (req, res) => {
         }
       });
       
-      // Report duplicate weeks
-      if (duplicateWeeks.length > 0) {
+      // Report duplicate weeks (only relevant for multiple entries)
+      if (isWeekRequired && duplicateWeeks.length > 0) {
         const uniqueDuplicates = [...new Set(duplicateWeeks)];
         validationErrors.push({ 
           field: 'lecture_plan', 
@@ -677,8 +758,8 @@ exports.updateCourse = async (req, res) => {
       }
     }
 
-    // Validate references if provided
-    if (references !== undefined) {
+    // Validate references if provided (optional)
+    if (references !== undefined && references !== null) {
       if (!Array.isArray(references)) {
         return res.status(400).json({
           success: false,
@@ -686,20 +767,15 @@ exports.updateCourse = async (req, res) => {
         });
       }
       
-      // Filter out empty or whitespace-only entries
-      const cleanedReferences = references
-        .filter(ref => ref && typeof ref === 'string' && ref.trim())
-        .map(ref => ref.trim());
-      
-      if (cleanedReferences.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'At least one non-empty reference is required'
-        });
+      if (references.length > 0) {
+        // Filter out empty or whitespace-only entries
+        const cleanedReferences = references
+          .filter(ref => ref && typeof ref === 'string' && ref.trim())
+          .map(ref => ref.trim());
+        
+        // Update the references array with cleaned values
+        req.body.references = cleanedReferences;
       }
-      
-      // Update the references array with cleaned values
-      req.body.references = cleanedReferences;
     }
 
     // Validate OBE data if provided
@@ -969,9 +1045,30 @@ exports.updateCourse = async (req, res) => {
 
   } catch (error) {
     console.error('Update course error:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Extract validation errors if available
+    let errorDetails = [];
+    if (error.errors) {
+      errorDetails = Object.entries(error.errors).map(([key, err]) => {
+        return `${key}: ${err.message}`;
+      });
+    }
+    
+    // If it's a validation error with specific field info
+    let userFriendlyMessage = error.message;
+    if (error.errors) {
+      userFriendlyMessage = Object.values(error.errors)
+        .map(e => e.message)
+        .join('; ');
+    }
+    
     res.status(500).json({
       success: false,
-      message: 'Server error updating course'
+      message: 'Server error updating course',
+      error: userFriendlyMessage,
+      details: errorDetails
     });
   }
 };

@@ -41,6 +41,62 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  profilePicture: {
+    type: String,
+    default: null
+  },
+  signature: {
+    type: String,
+    default: null
+  },
+  father: {
+    type: String,
+    default: ''
+  },
+  mother: {
+    type: String,
+    default: ''
+  },
+  advisor: {
+    type: String,
+    default: ''
+  },
+  phone: {
+    type: String,
+    default: ''
+  },
+  address: {
+    type: String,
+    default: ''
+  },
+  hall: {
+    type: String,
+    default: ''
+  },
+  scholarship: {
+    type: String,
+    default: ''
+  },
+  gender: {
+    type: String,
+    enum: {
+      values: ['male', 'female', 'others'],
+      message: 'Gender must be male, female, or others'
+    },
+    default: 'others'
+  },
+  bloodGroup: {
+    type: String,
+    default: ''
+  },
+  religion: {
+    type: String,
+    enum: {
+      values: ['Islam', 'Hinduism', 'Buddhism', 'Christian', 'Others'],
+      message: 'Religion must be one of Islam, Hinduism, Buddhism, Christian, Others'
+    },
+    default: 'Others'
+  },
   emailVerificationOTP: {
     type: String,
     select: false

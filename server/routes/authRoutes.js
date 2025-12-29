@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const authController = require('../controllers/authController');
+const { authenticateUser } = require('../middlewares/authMiddleware');
 
 // Validation middleware
 const registerValidation = [
@@ -50,5 +51,8 @@ router.post('/login', loginValidation, authController.login);
 // Email verification with OTP
 router.post('/verify-email', authController.verifyEmail);
 router.post('/resend-otp', authController.resendOTP);
+
+// Profile routes (protected)
+router.put('/profile/update', authenticateUser, authController.updateProfile);
 
 module.exports = router;
