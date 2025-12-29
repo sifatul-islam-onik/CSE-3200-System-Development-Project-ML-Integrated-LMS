@@ -162,7 +162,6 @@ const courseSchema = new mongoose.Schema({
     type: [{
       concept_name: {
         type: String,
-        required: [true, 'Concept name is required'],
         trim: true
       },
       concept_description: {
@@ -174,13 +173,12 @@ const courseSchema = new mongoose.Schema({
     validate: {
       validator: function(v) {
         if (!v || v.length === 0) return false;
-        // Ensure no empty concepts
+        // Ensure no empty concepts - only description is required
         return v.every(concept => 
-          concept.concept_name && concept.concept_name.trim() !== '' &&
           concept.concept_description && concept.concept_description.trim() !== ''
         );
       },
-      message: 'Course content must contain at least one concept with valid name and description'
+      message: 'Course content must contain at least one concept with valid description'
     }
   },
   // OBE: Lecture plan (week-by-week plan)
@@ -188,7 +186,6 @@ const courseSchema = new mongoose.Schema({
     type: [{
       week: {
         type: Number,
-        required: [true, 'Week number is required'],
         min: [1, 'Week must be at least 1'],
         max: [13, 'Week must be at most 13'],
         validate: {
@@ -215,6 +212,18 @@ const courseSchema = new mongoose.Schema({
           return v && v.length <= 13;
         },
         message: 'Maximum 13 lecture plan entries allowed'
+      },
+      {
+        validator: function(v) {
+          if (!v || v.length === 0) return true;
+          // Week is only required if there are multiple entries
+          if (v.length > 1) {
+            // Check all entries have week numbers
+            return v.every(item => item.week !== undefined && item.week !== null);
+          }
+          return true; // Single entry doesn't require week
+        },
+        message: 'Week number is required for each entry when there are multiple lecture plan entries'
       },
       {
         validator: function(v) {

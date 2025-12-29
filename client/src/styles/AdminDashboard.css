@@ -51,14 +51,23 @@
 }
 
 .logo-icon {
-  font-size: 2rem;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 48px;
+  height: 48px;
 }
 
 .sidebar.closed .logo-icon {
-  font-size: 1.5rem;
+  width: 36px;
+  height: 36px;
+}
+
+.logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
 }
 
 .sidebar-header h1 {
@@ -523,8 +532,9 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
+  background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+  border: 2px solid #999;
+  color: #333;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -605,6 +615,50 @@
 .status-badge.unverified {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.status-badge.approved {
+  background-color: #e5f5e5;
+  color: #155724;
+}
+
+.status-badge.unapproved {
+  background-color: #ffe5e5;
+  color: #721c24;
+}
+
+.status-badge.active {
+  background-color: #e5f5e5;
+  color: #155724;
+}
+
+.status-badge.inactive {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+/* Users Filter Bar */
+.users-filter-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.users-filter-bar .filter-input {
+  flex: 1;
+  padding: 12px 14px;
+  border: 2px solid #e0e4e8;
+  border-radius: 8px;
+  font-size: 14px;
+  background-color: #fafbfc;
+}
+
+.users-filter-bar .filter-input:focus {
+  outline: none;
+  border-color: #666;
+  background-color: #fff;
+  box-shadow: 0 0 0 4px rgba(102, 102, 102, 0.1);
 }
 
 .status-badge.published {
@@ -798,6 +852,16 @@
     justify-content: center;
   }
 
+  /* Hide sidebar toggle arrow on mobile since we have the mobile menu button */
+  .sidebar-toggle {
+    display: none;
+  }
+
+  /* Adjust sidebar header for mobile to avoid overlap with hamburger button */
+  .sidebar-header {
+    padding-top: 4rem;
+  }
+
   /* Show sidebar overlay when open */
   .sidebar-overlay {
     display: block;
@@ -855,17 +919,6 @@
   .users-grid,
   .courses-grid {
     grid-template-columns: 1fr;
-  }
-
-  /* Hide desktop sidebar toggle in mobile */
-  .sidebar-toggle {
-    display: none;
-  }
-
-  /* Adjust sidebar header for mobile to avoid overlap with hamburger button */
-  .sidebar-header {
-    justify-content: center;
-    padding-top: 4rem;
   }
 }
 

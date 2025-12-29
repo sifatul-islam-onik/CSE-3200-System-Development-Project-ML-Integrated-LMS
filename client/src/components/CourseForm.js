@@ -30,7 +30,7 @@ const deriveCourseMeta = (rawCode = '') => {
   };
 };
 
-const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMode = false }) => {
+const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMode = false, error = '', onErrorChange }) => {
   const [formData, setFormData] = useState(() => {
     const baseState = initialData ? {
       courseCode: initialData.courseCode || '',
@@ -42,7 +42,6 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
       elective_group: initialData.elective_group || '',
       term: initialData.term || '',
       contactHours: initialData.contactHours || '',
-      academicYear: initialData.academicYear ? initialData.academicYear.split('-')[0] : '',
       yearLevel: initialData.yearLevel || '',
       prerequisites: initialData.prerequisites || [],
       course_content: initialData.course_content || [],
@@ -65,7 +64,6 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
       elective_group: '',
       term: '',
       contactHours: '',
-      academicYear: '',
       yearLevel: '',
       prerequisites: [],
       course_content: [],
@@ -92,6 +90,47 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
   const [referencesErrors, setReferencesErrors] = useState([]);
   const [isCOValidationValid, setIsCOValidationValid] = useState(true);
 
+  // Helper function to check if form data has any changes
+  const hasFieldChanges = () => {
+    if (!isEditMode || !initialData) return true; // Skip for create mode
+    
+    // Normalize value for comparison (convert to string for numbers, handle nulls)
+    const normalizeVal = (val) => {
+      if (val === null || val === undefined) return '';
+      return String(val).trim();
+    };
+    
+    // Check each field except reason (which is handled separately)
+    const fieldsToCheck = [
+      'courseCode', 'courseTitle', 'course_type', 'credit', 'course_offered_to',
+      'category', 'elective_group', 'term', 'contactHours', 'yearLevel'
+    ];
+    
+    for (let field of fieldsToCheck) {
+      if (normalizeVal(formData[field]) !== normalizeVal(initialData[field])) {
+        return true;
+      }
+    }
+    
+    // Check arrays
+    const arrayFields = [
+      'prerequisites', 'course_content', 'kpa_mapping', 'lecture_plan',
+      'references', 'courseOutcomes', 'learningObjectives', 'knowledge_required', 'course_objectives'
+    ];
+    
+    for (let field of arrayFields) {
+      const initialVal = initialData[field] || [];
+      const currentVal = formData[field] || [];
+      
+      // Deep comparison for arrays
+      if (JSON.stringify(initialVal) !== JSON.stringify(currentVal)) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     
@@ -103,15 +142,6 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
         term: derived.term || '',
         yearLevel: derived.yearLevel || ''
       });
-    } else if (name === 'academicYear') {
-    // Special handling for academicYear to enforce 4-digit year
-      // Allow empty or only accept 4-digit numbers >= 1967
-      if (value === '' || (/^\d{0,4}$/.test(value))) {
-        setFormData({
-          ...formData,
-          [name]: value
-        });
-      }
     } else {
       setFormData({
         ...formData,
@@ -344,6 +374,11 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
 
   const validate = () => {
     const newErrors = {};
+
+    // Check if in edit mode and no fields have changed (excluding reason for update)
+    if (isEditMode && !hasFieldChanges()) {
+      newErrors.noChanges = 'Please update at least one field to create an update proposal';
+    }
     const codeMeta = deriveCourseMeta(formData.courseCode);
     const maxYearLevel = formData.course_offered_to === 'ARCH' ? 5 : 4;
 
@@ -360,6 +395,15 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
       }
       if (!newErrors.courseCode && (codeMeta.yearLevel < 1 || codeMeta.yearLevel > maxYearLevel)) {
         newErrors.courseCode = `The first digit sets year level and must be between 1-${maxYearLevel} for ${formData.course_offered_to || 'this department'}`;
+      }
+      // Parity rule: last digit must match course type
+      if (!newErrors.courseCode) {
+        const lastDigit = parseInt(codeMeta.digits[3], 10);
+          if (formData.course_type === 'THEORY' && lastDigit % 2 === 0) {
+            newErrors.courseCode = 'Theory course code must end with an odd digit';
+          } else if ((formData.course_type === 'SESSIONAL' || formData.course_type === 'PROJECT/THESIS') && lastDigit % 2 !== 0) {
+            newErrors.courseCode = 'Sessional/Project/Thesis course code must end with an even digit';
+        }
       }
     }
 
@@ -411,19 +455,17 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
       newErrors.contactHours = 'Valid contact hours is required';
     }
 
-    if (!formData.academicYear || formData.academicYear.toString().length !== 4 || formData.academicYear < 1967) {
-      newErrors.academicYear = 'Valid 4-digit academic year (≥1967) is required';
-    }
+    // Academic Year removed
 
     // Validate course_content
     if (!formData.course_content || formData.course_content.length === 0) {
       newErrors.course_content = 'At least one course content item is required';
     } else {
       const hasIncomplete = formData.course_content.some(
-        item => !item.concept_name?.trim() || !item.concept_description?.trim()
+        item => !item.concept_description?.trim()
       );
       if (hasIncomplete) {
-        newErrors.course_content = 'All course content rows must have both concept name and description';
+        newErrors.course_content = 'All course content rows must have a description';
       }
     }
 
@@ -434,14 +476,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
 
     // Validate lecture_plan
     if (!formData.lecture_plan || formData.lecture_plan.length === 0) {
-      newErrors.lecture_plan = formData.course_type === 'PROJECT/THESIS' 
-        ? 'Project/thesis plan is required'
-        : 'At least one lecture plan entry is required';
-    } else if (formData.course_type === 'PROJECT/THESIS') {
-      // For PROJECT/THESIS, check if the plan text is not empty
-      if (!formData.lecture_plan[0]?.plan || !formData.lecture_plan[0].plan.trim()) {
-        newErrors.lecture_plan = 'Project/thesis plan cannot be empty';
-      }
+      newErrors.lecture_plan = 'At least one lecture plan entry is required';
     } else if (formData.lecture_plan.length > 13) {
       newErrors.lecture_plan = 'Maximum 13 lecture plan entries allowed';
     } else {
@@ -451,15 +486,12 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
       }
     }
 
-    // Validate references
-    if (!formData.references || formData.references.length === 0) {
-      // References are now optional
-    } else {
-      // Check if all references are empty
-      const allEmpty = formData.references.every(ref => !ref || !ref.trim());
-      if (allEmpty) {
-        newErrors.references = 'At least one non-empty reference is required';
-      } else {
+    // Validate references (optional)
+    if (formData.references && formData.references.length > 0) {
+      // Check if there are any non-empty references
+      const hasNonEmpty = formData.references.some(ref => ref && ref.trim());
+      if (hasNonEmpty) {
+        // If there are non-empty references, validate that all are valid
         const isValid = validateReferences();
         if (!isValid) {
           newErrors.references = 'Some references are empty. Please fill or remove them';
@@ -482,8 +514,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
         courseCode: codeMeta.formattedCode,
         term: codeMeta.term,
         yearLevel: codeMeta.yearLevel,
-        // Convert academicYear to integer
-        academicYear: formData.academicYear ? parseInt(formData.academicYear) : undefined,
+        // Academic Year removed from payload
         // Convert empty elective_group to null when category is COMPULSORY
         elective_group: formData.category === 'COMPULSORY' 
           ? null 
@@ -543,6 +574,50 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
         </div>
 
         <form onSubmit={handleSubmit} className="course-form">
+          {error && (
+            <div className="form-error-alert" style={{
+              backgroundColor: '#f8d7da',
+              border: '1px solid #f5c6cb',
+              color: '#721c24',
+              padding: '12px 16px',
+              borderRadius: '4px',
+              marginBottom: '20px',
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              justifyContent: 'space-between'
+            }}>
+              <span style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                <span style={{fontSize: '18px'}}>⚠️</span>
+                <span>{error}</span>
+              </span>
+              <button 
+                type="button"
+                onClick={() => onErrorChange && onErrorChange('')}
+                style={{background: 'none', border: 'none', color: '#721c24', cursor: 'pointer', fontSize: '20px', padding: '0'}}
+              >
+                ×
+              </button>
+            </div>
+          )}
+          {errors.noChanges && (
+            <div className="form-error-alert" style={{
+              backgroundColor: '#f8d7da',
+              border: '1px solid #f5c6cb',
+              color: '#721c24',
+              padding: '12px 16px',
+              borderRadius: '4px',
+              marginBottom: '20px',
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span style={{fontSize: '18px'}}>⚠️</span>
+              <span>{errors.noChanges}</span>
+            </div>
+          )}
           <div className="form-row">
             <div className="form-group">
               <label htmlFor="courseCode">Course Code *</label>
@@ -710,31 +785,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                 />
                 {errors.contactHours && <span className="error-text">{errors.contactHours}</span>}
               </div>
-              <div className="form-group">
-                <label htmlFor="academicYear">Academic Year *</label>
-                <input
-                  type="text"
-                  id="academicYear"
-                  name="academicYear"
-                  value={formData.academicYear}
-                  onChange={handleChange}
-                  placeholder="e.g., 2024"
-                  pattern="\d{4}"
-                  maxLength="4"
-                  disabled={loading}
-                  required
-                />
-                {formData.academicYear && formData.academicYear.length === 4 && parseInt(formData.academicYear) >= 1967 ? (
-                  <small style={{ color: '#28a745', marginTop: '4px', display: 'block', fontWeight: '500', textAlign: 'left' }}>
-                    ✓ Format: {formData.academicYear}-{String(parseInt(formData.academicYear) + 1).slice(-2)}
-                  </small>
-                ) : formData.academicYear && formData.academicYear.length > 0 ? (
-                  <small style={{ color: '#dc3545', marginTop: '4px', display: 'block', textAlign: 'left' }}>
-                    Enter a valid 4-digit year (≥1967)
-                  </small>
-                ) : null}
-                {errors.academicYear && <span className="error-text">{errors.academicYear}</span>}
-              </div>
+              {/* Academic Year field removed */}
             </div>
           </div>
 
@@ -816,7 +867,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
             {formData.course_content.map((content, index) => (
               <div key={index} className="course-content-item" style={{marginBottom: '15px', padding: '15px', border: '1px solid #ddd', borderRadius: '4px', textAlign: 'left'}}>
                 <div className="form-group" style={{marginBottom: '10px'}}>
-                  <label style={{textAlign: 'left', display: 'block'}}>Concept Name *</label>
+                  <label style={{textAlign: 'left', display: 'block'}}>Concept Name</label>
                   <input
                     type="text"
                     value={content.concept_name}
@@ -913,54 +964,22 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
 
           {/* Lecture Plan */}
           <div className="form-section">
-            {formData.course_type === 'PROJECT/THESIS' ? (
-              // For PROJECT/THESIS - Single text field
-              <>
-                <div className="course-section-header">
-                  <label className="section-label">Lecture Plan *</label>
-                </div>
-                {errors.lecture_plan && <span className="error-text" style={{display: 'block', marginBottom: '10px', textAlign: 'left'}}>{errors.lecture_plan}</span>}
-                <textarea
-                  value={formData.lecture_plan && formData.lecture_plan[0] ? formData.lecture_plan[0].plan : ''}
-                  onChange={(e) => {
-                    setFormData({
-                      ...formData,
-                      lecture_plan: [{ week: 1, plan: e.target.value }]
-                    });
-                  }}
-                  placeholder="Describe the project/thesis plan, objectives, timeline, deliverables, and milestones..."
-                  disabled={loading}
-                  rows="8"
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '4px',
-                    border: '1px solid #ccc',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                    fontSize: '14px'
-                  }}
-                />
-              </>
-            ) : (
-              // For THEORY/SESSIONAL - Week-by-week plan
-              <>
-                <div className="course-section-header">
-                  <label className="section-label">Lecture Plan (Week 1-13) *</label>
-                  <button 
-                    type="button" 
-                    className="btn-add-small" 
-                    onClick={addLecturePlan} 
-                    disabled={loading || formData.lecture_plan.length >= 13}
-                    title={formData.lecture_plan.length >= 13 ? 'Maximum 13 entries allowed' : 'Add lecture plan entry'}
-                  >
-                    + Add Week
-                  </button>
-                </div>
-                {errors.lecture_plan && <span className="error-text" style={{display: 'block', marginBottom: '10px', textAlign: 'left'}}>{errors.lecture_plan}</span>}
-                {formData.lecture_plan.length === 0 && (
-                  <p className="info-text" style={{color: '#666', fontSize: '14px', marginBottom: '10px', textAlign: 'left'}}>No lecture plan entries yet. Click "+ Add Week" to start.</p>
-                )}
+            <div className="course-section-header">
+              <label className="section-label">Lecture Plan (Week 1-13) *</label>
+              <button 
+                type="button" 
+                className="btn-add-small" 
+                onClick={addLecturePlan} 
+                disabled={loading || formData.lecture_plan.length >= 13}
+                title={formData.lecture_plan.length >= 13 ? 'Maximum 13 entries allowed' : 'Add lecture plan entry'}
+              >
+                + Add Week
+              </button>
+            </div>
+            {errors.lecture_plan && <span className="error-text" style={{display: 'block', marginBottom: '10px', textAlign: 'left'}}>{errors.lecture_plan}</span>}
+            {formData.lecture_plan.length === 0 && (
+              <p className="info-text" style={{color: '#666', fontSize: '14px', marginBottom: '10px', textAlign: 'left'}}>No lecture plan entries yet. Click "+ Add Week" to start.</p>
+            )}
             {formData.lecture_plan.map((item, index) => {
               const usedWeeks = formData.lecture_plan
                 .map((lp, i) => i !== index ? parseInt(lp.week) : null)
@@ -1049,8 +1068,6 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                 </div>
               );
             })}
-              </>
-            )}
           </div>
 
           {/* References */}
@@ -1161,10 +1178,9 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
               disabled={
                 loading || 
                 (formData.courseOutcomes.length > 0 && !isCOValidationValid) ||
-                (formData.course_type !== 'PROJECT/THESIS' && formData.lecture_plan.length > 0 && lecturePlanErrors.some(err => err.week || err.plan)) ||
+                formData.lecture_plan.length > 0 && lecturePlanErrors.some(err => err.week || err.plan) ||
                 formData.lecture_plan.length === 0 ||
-                (formData.course_type !== 'PROJECT/THESIS' && formData.lecture_plan.length > 13) ||
-                (formData.course_type === 'PROJECT/THESIS' && (!formData.lecture_plan[0]?.plan || !formData.lecture_plan[0].plan.trim())) ||
+                formData.lecture_plan.length > 13 ||
                 referencesErrors.some(err => err !== null)
               }
               title={

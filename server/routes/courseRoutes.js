@@ -65,11 +65,11 @@ const courseValidation = [
     .notEmpty()
     .withMessage('Plan description is required'),
   body('references')
-    .notEmpty()
-    .withMessage('At least one reference is required')
-    .isArray({ min: 1 })
-    .withMessage('References must be an array with at least 1 item'),
+    .optional()
+    .isArray()
+    .withMessage('References must be an array'),
   body('references.*')
+    .optional()
     .trim()
     .notEmpty()
     .withMessage('Reference must not be empty')

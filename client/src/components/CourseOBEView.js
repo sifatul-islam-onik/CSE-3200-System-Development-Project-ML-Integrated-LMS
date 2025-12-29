@@ -93,12 +93,6 @@ const CourseOBEView = ({ course, onClose }) => {
               <span className="info-value">Year {course.yearLevel}</span>
             </div>
           )}
-          {course.academicYear && (
-            <div className="info-item">
-              <label>Academic Year:</label>
-              <span className="info-value">{course.academicYear}</span>
-            </div>
-          )}
           {course.contactHours && (
             <div className="info-item">
               <label>Contact Hours:</label>
@@ -240,16 +234,18 @@ const CourseOBEView = ({ course, onClose }) => {
           <h3 className="section-title">Lecture Plan</h3>
           <div className="lecture-plan-table">
             <table>
-              <thead>
-                <tr>
-                  <th>Week</th>
-                  <th>Plan</th>
-                </tr>
-              </thead>
+              {course.lecture_plan.length > 1 && (
+                <thead>
+                  <tr>
+                    <th>Week</th>
+                    <th>Plan</th>
+                  </tr>
+                </thead>
+              )}
               <tbody>
                 {course.lecture_plan.map((lecture, idx) => (
                   <tr key={idx}>
-                    <td className="week-cell">Week {lecture.week}</td>
+                    {course.lecture_plan.length > 1 && <td className="week-cell">Week {lecture.week}</td>}
                     <td>{lecture.plan}</td>
                   </tr>
                 ))}
@@ -329,15 +325,6 @@ const CourseOBEView = ({ course, onClose }) => {
               </tr>
             </tbody>
           </table>
-        </div>
-        <div className="legend">
-          <h5>Mapping Strength:</h5>
-          <div className="legend-items">
-            <span className="legend-item"><span className="level-box level-0">0</span> None</span>
-            <span className="legend-item"><span className="level-box level-1">1</span> Low</span>
-            <span className="legend-item"><span className="level-box level-2">2</span> Medium</span>
-            <span className="legend-item"><span className="level-box level-3">3</span> High</span>
-          </div>
         </div>
       </div>
     );

@@ -361,3 +361,170 @@ exports.resendOTP = async (req, res) => {
     });
   }
 };
+// @desc    Update user profile
+// @route   PUT /api/auth/profile/update
+// @access  Protected
+exports.updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { 
+      name,
+      email,
+      profilePicture,
+      signature,
+      father,
+      mother,
+      advisor,
+      phone,
+      address,
+      hall,
+      scholarship,
+      gender,
+      bloodGroup,
+      religion,
+      currentPassword,
+      newPassword
+    } = req.body;
+
+    // If changing password, include password in query
+    const user = await User.findById(userId).select(currentPassword && newPassword ? '+password' : '');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update name if provided
+    if (name !== undefined) {
+      if (!name || !name.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Name is required'
+        });
+      }
+
+      if (name.trim().length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: 'Name must be at least 2 characters'
+        });
+      }
+      user.name = name.trim();
+    }
+
+    // Update profile picture if provided (base64 string)
+    if (profilePicture !== undefined) {
+      user.profilePicture = profilePicture;
+    }
+
+    // Update signature if provided (base64 string)
+    if (signature !== undefined) {
+      user.signature = signature;
+    }
+
+    // Update simple text fields if provided
+    if (father !== undefined) user.father = father;
+    if (mother !== undefined) user.mother = mother;
+    if (advisor !== undefined) user.advisor = advisor;
+    if (phone !== undefined) user.phone = phone;
+    if (address !== undefined) user.address = address;
+    if (hall !== undefined) user.hall = hall;
+    if (scholarship !== undefined) user.scholarship = scholarship;
+    if (bloodGroup !== undefined) user.bloodGroup = bloodGroup;
+    // Update religion if provided and valid; map to canonical case
+    if (religion !== undefined) {
+      const rRaw = String(religion || '').trim().toLowerCase();
+      const allowedReligions = ['islam', 'hinduism', 'buddhism', 'christian', 'others'];
+      if (!allowedReligions.includes(rRaw)) {
+        return res.status(400).json({ success: false, message: 'Invalid religion value' });
+      }
+      const canonicalReligionMap = {
+        islam: 'Islam',
+        hinduism: 'Hinduism',
+        buddhism: 'Buddhism',
+        christian: 'Christian',
+        others: 'Others'
+      };
+      user.religion = canonicalReligionMap[rRaw];
+    }
+
+    // Update gender if provided and valid
+    if (gender !== undefined) {
+      const g = String(gender || '').toLowerCase();
+      if (!['male', 'female', 'others'].includes(g)) {
+        return res.status(400).json({ success: false, message: 'Invalid gender value' });
+      }
+      user.gender = g;
+    }
+
+    // Update email if provided
+    if (email !== undefined) {
+      const normalized = String(email).trim().toLowerCase();
+      const emailRegex = /^\S+@\S+\.\S+$/;
+      if (!emailRegex.test(normalized)) {
+        return res.status(400).json({ success: false, message: 'Please enter a valid email' });
+      }
+      // Ensure email uniqueness
+      const existing = await User.findOne({ email: normalized, _id: { $ne: userId } });
+      if (existing) {
+        return res.status(409).json({ success: false, message: 'Email already in use' });
+      }
+      user.email = normalized;
+    }
+
+    // Handle password change if requested
+    if (currentPassword !== undefined || newPassword !== undefined) {
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ success: false, message: 'Current and new password are required' });
+      }
+      if (!user.password) {
+        return res.status(400).json({ success: false, message: 'Password not available for comparison' });
+      }
+      const isValid = await user.comparePassword(currentPassword);
+      if (!isValid) {
+        return res.status(401).json({ success: false, message: 'Current password is incorrect' });
+      }
+      if (String(newPassword).length < 6) {
+        return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
+      }
+      user.password = newPassword; // pre-save hook will hash
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: {
+        _id: user._id,
+        name: user.name,
+        father: user.father,
+        mother: user.mother,
+        advisor: user.advisor,
+        phone: user.phone,
+        address: user.address,
+        hall: user.hall,
+        scholarship: user.scholarship,
+        gender: user.gender,
+        bloodGroup: user.bloodGroup,
+        religion: user.religion,
+        email: user.email,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified,
+        isApprovedByAdmin: user.isApprovedByAdmin,
+        isActive: user.isActive,
+        profilePicture: user.profilePicture,
+        signature: user.signature,
+        createdAt: user.createdAt
+      }
+    });
+
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating profile'
+    });
+  }
+};

@@ -5,10 +5,11 @@ import Home from './pages/Home';
 import Register from './pages/Register';
 import Login from './pages/Login';
 import VerifyEmail from './pages/VerifyEmail';
+import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import StudentDashboard from './pages/StudentDashboard';
-import { PublicRoute, RoleBasedRoute } from './components/ProtectedRoute';
+import { PublicRoute, RoleBasedRoute, ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
   return (
@@ -22,7 +23,17 @@ function App() {
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/verify-email" element={<VerifyEmail />} />
 
-          {/* Protected routes - role-based access */}
+          {/* Protected routes - accessible to all authenticated users */}
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Role-based protected routes */}
           <Route 
             path="/admin/dashboard" 
             element={
