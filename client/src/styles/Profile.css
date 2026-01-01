@@ -192,6 +192,31 @@
   border-color: #e0e4e8;
 }
 
+.readonly-field {
+  background-color: #f3f4f6 !important;
+  color: #4b5563;
+  border: 1px dashed #d1d5db;
+  cursor: not-allowed;
+}
+
+.readonly-field:focus {
+  outline: none;
+  box-shadow: none;
+  border-color: #d1d5db;
+}
+
+.readonly-select {
+  background-color: #f3f4f6 !important;
+  color: #4b5563;
+  border: 1px dashed #d1d5db;
+}
+
+.readonly-select:focus {
+  outline: none;
+  box-shadow: none;
+  border-color: #d1d5db;
+}
+
 .form-group small {
   display: block;
   margin-top: 6px;

@@ -41,3 +41,43 @@ export const toggleUserStatus = async (userId) => {
   const response = await axios.put(`${API_URL}/admin/users/${userId}/toggle-status`, {}, getAuthHeader());
   return response.data;
 };
+
+// Set user status explicitly
+export const setUserStatus = async (userId, isActive) => {
+  const response = await axios.put(`${API_URL}/admin/users/${userId}/status`, { isActive }, getAuthHeader());
+  return response.data;
+};
+
+// Delete a user
+export const deleteUser = async (userId) => {
+  const response = await axios.delete(`${API_URL}/admin/users/${userId}`, getAuthHeader());
+  return response.data;
+};
+
+// Import students from Excel
+export const importStudentsFromExcel = async (formData) => {
+  const token = localStorage.getItem('token');
+  const response = await axios.post(`${API_URL}/admin/users/import`, formData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'multipart/form-data'
+    }
+  });
+  return response.data;
+};
+
+// Export student credentials
+export const exportStudentCredentials = async (batchYear, deptCode) => {
+  const token = localStorage.getItem('token');
+  const response = await axios.post(
+    `${API_URL}/admin/users/export-credentials`, 
+    { batchYear, deptCode },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      responseType: 'blob'
+    }
+  );
+  return response.data;
+};

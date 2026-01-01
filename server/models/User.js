@@ -7,6 +7,12 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Name is required'],
     trim: true
   },
+  roll: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
+  },
   email: {
     type: String,
     required: [true, 'Email is required'],
@@ -20,6 +26,12 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Password is required'],
     minlength: [6, 'Password must be at least 6 characters'],
     select: false
+  },
+  // Stores the original password set during registration/import (plaintext)
+  initialPassword: {
+    type: String,
+    select: false,
+    default: null
   },
   role: {
     type: String,

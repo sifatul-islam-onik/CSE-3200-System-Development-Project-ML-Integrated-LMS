@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faHourglass, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
-import { getPendingUsers, approveUser, rejectUser, getAllUsers } from '../services/adminService';
+import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials } from '../services/adminService';
 import { createCourse, getAllCourses, updateCourse, deleteCourse } from '../services/courseService';
 import { getAllProposals, getProposalById, approveProposal, rejectProposal } from '../services/courseProposalService';
 import CourseForm from '../components/CourseForm';
@@ -21,9 +21,23 @@ const AdminDashboard = () => {
   const [pendingUsers, setPendingUsers] = useState([]);
   const [users, setUsers] = useState([]);
   const [userSearch, setUserSearch] = useState('');
+  const [importFile, setImportFile] = useState(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importMessage, setImportMessage] = useState('');
+  const [importError, setImportError] = useState('');
+  const [exportBatchYear, setExportBatchYear] = useState('');
+  const [exportDeptCode, setExportDeptCode] = useState('');
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportMessage, setExportMessage] = useState('');
+  const [exportError, setExportError] = useState('');
+  const [userLookupInput, setUserLookupInput] = useState('');
+  const [lookupUser, setLookupUser] = useState(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState('');
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [userActionLoading, setUserActionLoading] = useState(null);
   const [error, setError] = useState('');
   const [usersError, setUsersError] = useState('');
   const [selectedUserRole, setSelectedUserRole] = useState(null);
@@ -199,6 +213,87 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleImportStudents = async () => {
+    if (!importFile) {
+      setImportError('Please select an Excel file');
+      setTimeout(() => setImportError(''), 3000);
+      return;
+    }
+
+    setImportLoading(true);
+    setImportError('');
+    setImportMessage('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+      const result = await importStudentsFromExcel(formData);
+
+      const created = result.created || 0;
+      const skipped = (result.skipped || []).length;
+      const errors = (result.errors || []).length;
+      let summary = `Imported ${created} students.`;
+      if (skipped) summary += ` Skipped ${skipped} duplicate/invalid rows.`;
+      if (errors) summary += ` ${errors} rows had errors.`;
+      setImportMessage(summary);
+
+      // Refresh users list to include new students
+      fetchAllUsers();
+    } catch (err) {
+      setImportError(err.response?.data?.message || 'Failed to import students');
+    } finally {
+      setImportLoading(false);
+      setImportFile(null);
+    }
+  };
+
+  const handleExportCredentials = async () => {
+    if (!exportBatchYear || !exportDeptCode) {
+      setExportError('Please enter batch year and select department');
+      setTimeout(() => setExportError(''), 3000);
+      return;
+    }
+
+    if (!/^\d{4}$/.test(exportBatchYear)) {
+      setExportError('Batch year must be 4 digits (e.g., 2019)');
+      setTimeout(() => setExportError(''), 3000);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Export original credentials for batch ${exportBatchYear} (dept ${exportDeptCode}). Proceed?`
+    );
+    if (!confirmed) return;
+
+    setExportLoading(true);
+    setExportError('');
+    setExportMessage('');
+
+    try {
+      const blob = await exportStudentCredentials(exportBatchYear, exportDeptCode);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `students_${exportBatchYear}_${exportDeptCode}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      setExportMessage('Credentials exported successfully.');
+      setExportBatchYear('');
+      setExportDeptCode('');
+      setTimeout(() => setExportMessage(''), 5000);
+    } catch (err) {
+      setExportError(err.response?.data?.message || 'Failed to export credentials');
+      setTimeout(() => setExportError(''), 5000);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   const handleSectionChange = (section) => {
     setActiveSection(section);
     // Close sidebar on mobile after selecting a section
@@ -228,6 +323,133 @@ const AdminDashboard = () => {
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to reject user');
       setTimeout(() => setError(''), 3000);
+    }
+  };
+
+  const handleUserStatusChange = async (member, isActive) => {
+    if ((member.role || '').toLowerCase() === 'admin') {
+      setUsersError('Cannot modify admin users');
+      setTimeout(() => setUsersError(''), 3000);
+      return;
+    }
+
+    setUserActionLoading(member._id);
+    try {
+      await setUserStatus(member._id, isActive);
+      setSuccessMessage(`User ${isActive ? 'activated' : 'deactivated'} successfully`);
+      fetchAllUsers();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      setUsersError(err.response?.data?.message || 'Failed to update user status');
+      setTimeout(() => setUsersError(''), 3000);
+    } finally {
+      setUserActionLoading(null);
+    }
+  };
+
+  const handleDeleteUserAccount = async (member) => {
+    if ((member.role || '').toLowerCase() === 'admin') {
+      setUsersError('Cannot delete admin users');
+      setTimeout(() => setUsersError(''), 3000);
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete ${member.name || 'this user'}? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setUserActionLoading(member._id);
+    try {
+      await deleteUser(member._id);
+      setSuccessMessage('User deleted successfully');
+      setUsers(users.filter(u => u._id !== member._id));
+      fetchAllUsers();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      setUsersError(err.response?.data?.message || 'Failed to delete user');
+      setTimeout(() => setUsersError(''), 3000);
+    } finally {
+      setUserActionLoading(null);
+    }
+  };
+
+  const handleLookupUser = async () => {
+    if (!userLookupInput.trim()) {
+      setLookupError('Please enter email, roll number, or user ID');
+      setTimeout(() => setLookupError(''), 3000);
+      return;
+    }
+
+    setLookupLoading(true);
+    setLookupError('');
+    setLookupUser(null);
+
+    try {
+      const response = await getAllUsers();
+      const allUsers = response.data || [];
+      
+      const searchTerm = userLookupInput.trim().toLowerCase();
+      const foundUser = allUsers.find(u => 
+        (u.email || '').toLowerCase() === searchTerm ||
+        (u.roll || '').toLowerCase() === searchTerm ||
+        (u._id || '').toLowerCase() === searchTerm
+      );
+
+      if (foundUser) {
+        setLookupUser(foundUser);
+      } else {
+        setLookupError('User not found');
+      }
+    } catch (err) {
+      setLookupError('Failed to search user');
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
+  const handleLookupUserAction = async (action) => {
+    if (!lookupUser) return;
+
+    if (lookupUser.role === 'admin') {
+      setLookupError('Cannot modify admin users');
+      setTimeout(() => setLookupError(''), 3000);
+      return;
+    }
+
+    if (action === 'delete') {
+      const confirmed = window.confirm(
+        `Delete ${lookupUser.name || 'this user'}? This cannot be undone.`
+      );
+      if (!confirmed) return;
+
+      setLookupLoading(true);
+      try {
+        await deleteUser(lookupUser._id);
+        setSuccessMessage('User deleted successfully');
+        setLookupUser(null);
+        setUserLookupInput('');
+        fetchAllUsers();
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } catch (err) {
+        setLookupError(err.response?.data?.message || 'Failed to delete user');
+        setTimeout(() => setLookupError(''), 3000);
+      } finally {
+        setLookupLoading(false);
+      }
+    } else if (action === 'toggle') {
+      setLookupLoading(true);
+      try {
+        const newStatus = !lookupUser.isActive;
+        await setUserStatus(lookupUser._id, newStatus);
+        setSuccessMessage(`User ${newStatus ? 'activated' : 'deactivated'} successfully`);
+        setLookupUser({ ...lookupUser, isActive: newStatus });
+        fetchAllUsers();
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } catch (err) {
+        setLookupError(err.response?.data?.message || 'Failed to update user status');
+        setTimeout(() => setLookupError(''), 3000);
+      } finally {
+        setLookupLoading(false);
+      }
     }
   };
 
@@ -1057,18 +1279,10 @@ const AdminDashboard = () => {
 
       case 'users':
         // Group users by role and support drill-down view
-        const normalizedSearch = userSearch.trim().toLowerCase();
-        const filteredUsers = normalizedSearch
-          ? users.filter(u =>
-              (u.name || '').toLowerCase().includes(normalizedSearch) ||
-              (u.email || '').toLowerCase().includes(normalizedSearch)
-            )
-          : users;
         const groupedUsers = [
-          { role: 'admin', members: filteredUsers.filter(u => (u.role || '').toLowerCase() === 'admin') },
-          { role: 'teacher', members: filteredUsers.filter(u => (u.role || '').toLowerCase() === 'teacher') },
-          { role: 'student', members: filteredUsers.filter(u => (u.role || '').toLowerCase() === 'student') },
-        ].filter(g => g.members.length > 0);
+          { role: 'teacher', members: users.filter(u => (u.role || '').toLowerCase() === 'teacher') },
+          { role: 'student', members: users.filter(u => (u.role || '').toLowerCase() === 'student') },
+        ];
 
         return (
           <div className="section-container">
@@ -1079,14 +1293,78 @@ const AdminDashboard = () => {
             <div className="section-body">
               {usersError && <div className="alert alert-error">{usersError}</div>}
 
-              <div className="users-filter-bar">
-                <input
-                  className="filter-input"
-                  type="text"
-                  placeholder="Search name or email..."
-                  value={userSearch}
-                  onChange={(e) => setUserSearch(e.target.value)}
-                />
+              <div className="proposal-card" style={{ marginBottom: '16px' }}>
+                <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '16px' }}>Manage Specific User</h3>
+                    <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Search by email, roll number, or user ID to deactivate or delete an account</p>
+                  </div>
+                </div>
+                <div className="proposal-body" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    placeholder="Email, Roll, or User ID"
+                    value={userLookupInput}
+                    onChange={(e) => {
+                      setUserLookupInput(e.target.value);
+                      setLookupError('');
+                    }}
+                    style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', minWidth: '250px', flex: '1' }}
+                  />
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleLookupUser}
+                    disabled={lookupLoading}
+                  >
+                    {lookupLoading ? 'Searching...' : 'Search'}
+                  </button>
+                </div>
+                {lookupUser && (
+                  <div style={{ marginTop: '16px' }}>
+                    <div className="user-card" style={{ maxWidth: '500px' }}>
+                      <div className="user-card-header">
+                        <div className="user-avatar">{lookupUser.name?.charAt(0)?.toUpperCase()}</div>
+                        <div className="user-info">
+                          <h3>{lookupUser.name}</h3>
+                          <p className="user-email">{lookupUser.email}</p>
+                        </div>
+                      </div>
+                      <div className="user-card-body">
+                        <div className="user-meta">
+                          <span className={`role-badge ${(lookupUser.role || '').toLowerCase()}`}>{(lookupUser.role || '').toLowerCase()}</span>
+                          {lookupUser.roll && <span className="user-date">Roll: {lookupUser.roll}</span>}
+                          {lookupUser.createdAt && (
+                            <span className="user-date">Joined {new Date(lookupUser.createdAt).toLocaleDateString()}</span>
+                          )}
+                        </div>
+                        <div className="user-status">
+                          <span className={`status-badge ${lookupUser.isActive ? 'active' : 'inactive'}`}>{lookupUser.isActive ? 'Active' : 'Inactive'}</span>
+                        </div>
+                      </div>
+                      <div className="user-card-actions">
+                        <button
+                          className={`btn btn-sm ${lookupUser.isActive ? 'btn-secondary' : 'btn-approve'}`}
+                          onClick={() => handleLookupUserAction('toggle')}
+                          disabled={lookupLoading}
+                        >
+                          {lookupLoading ? 'Working...' : lookupUser.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => handleLookupUserAction('delete')}
+                          disabled={lookupLoading}
+                        >
+                          {lookupLoading ? 'Working...' : 'Delete'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {(lookupError) && (
+                  <div style={{ marginTop: '10px' }}>
+                    <div className="alert alert-error">{lookupError}</div>
+                  </div>
+                )}
               </div>
 
               {usersLoading ? (
@@ -1099,42 +1377,111 @@ const AdminDashboard = () => {
                   <div className="breadcrumb-nav" style={{marginBottom: '12px'}}>
                     <button className="breadcrumb-btn" onClick={goBackUserGroups}>← Back</button>
                   </div>
-                  {groupedUsers
-                    .filter(g => g.role === selectedUserRole)
-                    .map(group => (
-                      <div key={group.role}>
-                        <div className="users-grid">
-                          {group.members.length === 0 ? (
-                            <p>No users in this group.</p>
-                          ) : (
-                            group.members.map(member => (
-                              <div key={member._id} className="user-card">
-                                <div className="user-card-header">
-                                  <div className="user-avatar">{member.name?.charAt(0)?.toUpperCase()}</div>
-                                  <div className="user-info">
-                                    <h3>{member.name}</h3>
-                                    <p className="user-email">{member.email}</p>
-                                  </div>
-                                </div>
-                                <div className="user-card-body">
-                                  <div className="user-meta">
-                                    <span className={`role-badge ${(member.role || '').toLowerCase()}`}>{(member.role || '').toLowerCase()}</span>
-                                    {member.createdAt && (
-                                      <span className="user-date">Joined {new Date(member.createdAt).toLocaleDateString()}</span>
-                                    )}
-                                  </div>
-                                  <div className="user-status">
-                                    <span className={`status-badge ${member.isEmailVerified ? 'verified' : 'unverified'}`}>{member.isEmailVerified ? 'Email Verified' : 'Email Unverified'}</span>
-                                    <span className={`status-badge ${member.isApprovedByAdmin ? 'approved' : 'unapproved'}`}>{member.isApprovedByAdmin ? 'Approved' : 'Unapproved'}</span>
-                                    <span className={`status-badge ${member.isActive ? 'active' : 'inactive'}`}>{member.isActive ? 'Active' : 'Inactive'}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))
-                          )}
+                  {selectedUserRole === 'student' && (
+                    <>
+                      <div className="proposal-card" style={{ marginBottom: '16px' }}>
+                        <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '16px' }}>Import Students from Excel</h3>
+                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Columns: Roll, Name, Advisor, Father, Mother, Hall, Scholarship</p>
+                          </div>
                         </div>
+                        <div className="proposal-body" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <input
+                            type="file"
+                            accept=".xlsx,.xls"
+                            onChange={(e) => {
+                              setImportFile(e.target.files[0] || null);
+                              setImportError('');
+                              setImportMessage('');
+                            }}
+                          />
+                          <button
+                            className="btn btn-primary"
+                            onClick={handleImportStudents}
+                            disabled={importLoading}
+                          >
+                            {importLoading ? 'Importing...' : 'Import Students'}
+                          </button>
+                        </div>
+                        {(importMessage || importError) && (
+                          <div style={{ marginTop: '10px' }}>
+                            {importMessage && <div className="alert alert-success">{importMessage}</div>}
+                            {importError && <div className="alert alert-error">{importError}</div>}
+                          </div>
+                        )}
                       </div>
-                    ))}
+
+                      <div className="proposal-card" style={{ marginBottom: '16px' }}>
+                        <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '16px' }}>Export Student Credentials</h3>
+                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Export emails and original passwords for a specific batch and department</p>
+                          </div>
+                        </div>
+                        <div className="proposal-body" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <input
+                            type="text"
+                            placeholder="Batch Year (e.g., 2019)"
+                            value={exportBatchYear}
+                            onChange={(e) => {
+                              setExportBatchYear(e.target.value);
+                              setExportError('');
+                              setExportMessage('');
+                            }}
+                            style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', width: '180px' }}
+                          />
+                          <select
+                            value={exportDeptCode}
+                            onChange={(e) => {
+                              setExportDeptCode(e.target.value);
+                              setExportError('');
+                              setExportMessage('');
+                            }}
+                            style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', width: '200px' }}
+                          >
+                            <option value="">Select Department</option>
+                            <option value="07">CSE-07</option>
+                            <option value="03">EEE-03</option>
+                            <option value="05">ME-05</option>
+                            <option value="01">CE-01</option>
+                            <option value="09">ECE-09</option>
+                            <option value="11">IEM-11</option>
+                            <option value="13">ESE-13</option>
+                            <option value="15">BME-15</option>
+                            <option value="17">URP-17</option>
+                            <option value="19">LE-19</option>
+                            <option value="27">MSE-27</option>
+                            <option value="31">MTE-31</option>
+                            <option value="23">BECM-23</option>
+                            <option value="25">ARCH-25</option>
+                            <option value="21">TE-21</option>
+                            <option value="29">CHE-29</option>
+                          </select>
+                          <button
+                            className="btn btn-primary"
+                            onClick={handleExportCredentials}
+                            disabled={exportLoading}
+                          >
+                            {exportLoading ? 'Exporting...' : 'Export Credentials'}
+                          </button>
+                        </div>
+                        {(exportMessage || exportError) && (
+                          <div style={{ marginTop: '10px' }}>
+                            {exportMessage && <div className="alert alert-success">{exportMessage}</div>}
+                            {exportError && <div className="alert alert-error">{exportError}</div>}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  {selectedUserRole === 'teacher' && (
+                    <div className="empty-state">
+                      <div className="empty-icon"><FontAwesomeIcon icon={faUsers} /></div>
+                      <h3>Teacher Management</h3>
+                      <p>Teacher management features coming soon</p>
+                    </div>
+                  )}
                 </div>
               ) : groupedUsers.length === 0 ? (
                 <div className="empty-state">
@@ -1296,7 +1643,7 @@ const AdminDashboard = () => {
                     </div>
                     <div className="profile-field">
                       <label>Email</label>
-                      <input type="email" value={adminProfileForm.email} onChange={(e) => setAdminProfileForm({ ...adminProfileForm, email: e.target.value })} />
+                      <input type="email" className="readonly-field" value={adminProfileForm.email} disabled readOnly />
                     </div>
                   </div>
 
@@ -1318,7 +1665,17 @@ const AdminDashboard = () => {
                     </div>
                     <div className="profile-field">
                       <label>Blood Group</label>
-                      <input type="text" value={adminProfileForm.bloodGroup} onChange={(e) => setAdminProfileForm({ ...adminProfileForm, bloodGroup: e.target.value })} />
+                      <select value={adminProfileForm.bloodGroup} onChange={(e) => setAdminProfileForm({ ...adminProfileForm, bloodGroup: e.target.value })}>
+                        <option value="">Select Blood Group</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                      </select>
                     </div>
                     <div className="profile-field">
                       <label>Religion</label>
