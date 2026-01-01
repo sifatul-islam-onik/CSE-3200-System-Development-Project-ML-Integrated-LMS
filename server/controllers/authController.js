@@ -43,11 +43,19 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Force role to be either teacher or student - no other values accepted
-    if (role !== 'teacher' && role !== 'student') {
+    // Disallow student self-registration; only teachers may self-register
+    if (role === 'student') {
+      return res.status(403).json({
+        success: false,
+        message: 'Student accounts cannot be created via self-registration. Please contact an administrator.'
+      });
+    }
+
+    // Force role to be teacher only at this endpoint
+    if (role !== 'teacher') {
       return res.status(400).json({
         success: false,
-        message: 'Invalid role. Only teacher and student roles are allowed.'
+        message: 'Invalid role. Only teacher self-registration is allowed.'
       });
     }
 
@@ -69,6 +77,7 @@ exports.register = async (req, res) => {
       name,
       email,
       password,
+      initialPassword: password,
       role
     });
 
@@ -195,9 +204,24 @@ exports.login = async (req, res) => {
         userId: user._id,
         name: user.name,
         email: user.email,
+        roll: user.roll,
+        father: user.father,
+        mother: user.mother,
+        advisor: user.advisor,
+        phone: user.phone,
+        address: user.address,
+        hall: user.hall,
+        scholarship: user.scholarship,
+        gender: user.gender,
+        bloodGroup: user.bloodGroup,
+        religion: user.religion,
+        profilePicture: user.profilePicture,
+        signature: user.signature,
         role: user.role,
         isEmailVerified: user.isEmailVerified,
-        isApprovedByAdmin: user.isApprovedByAdmin
+        isApprovedByAdmin: user.isApprovedByAdmin,
+        isActive: user.isActive,
+        createdAt: user.createdAt
       }
     });
 

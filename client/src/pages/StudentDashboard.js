@@ -306,30 +306,35 @@ const StudentDashboard = () => {
                   <div className="profile-grid">
                     <div className="profile-field">
                       <label>Name</label>
-                      <input type="text" value={profileForm.name} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} />
+                      <input type="text" className="readonly-field" value={profileForm.name} disabled readOnly />
                     </div>
                     <div className="profile-field">
                       <label>Email</label>
-                      <input type="email" value={profileForm.email} onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })} />
+                      <input type="email" className="readonly-field" value={profileForm.email} disabled readOnly />
                     </div>
                   </div>
 
                   <div className="profile-grid">
                     <div className="profile-field">
                       <label>Father</label>
-                      <input type="text" value={profileForm.father} onChange={(e) => setProfileForm({ ...profileForm, father: e.target.value })} />
+                      <input type="text" className="readonly-field" value={profileForm.father} disabled readOnly />
                     </div>
                     <div className="profile-field">
                       <label>Mother</label>
-                      <input type="text" value={profileForm.mother} onChange={(e) => setProfileForm({ ...profileForm, mother: e.target.value })} />
+                      <input type="text" className="readonly-field" value={profileForm.mother} disabled readOnly />
                     </div>
                     <div className="profile-field">
                       <label>Advisor</label>
-                      <input type="text" value={profileForm.advisor} onChange={(e) => setProfileForm({ ...profileForm, advisor: e.target.value })} />
+                      <input type="text" className="readonly-field" value={profileForm.advisor} disabled readOnly />
                     </div>
                     <div className="profile-field">
                       <label>Hall</label>
-                      <select value={profileForm.hall} onChange={(e) => setProfileForm({ ...profileForm, hall: e.target.value })}>
+                      <select
+                        className="readonly-select"
+                        value={profileForm.hall}
+                        onChange={() => setProfileForm({ ...profileForm, hall: profileForm.hall })}
+                        title="Hall is fixed"
+                      >
                         <option value="">Select Hall</option>
                         <option value="Amar Ekushey Hall">Amar Ekushey Hall</option>
                         <option value="Dr. M.A Rashid Hall">Dr. M.A Rashid Hall</option>
@@ -342,7 +347,7 @@ const StudentDashboard = () => {
                     </div>
                     <div className="profile-field">
                       <label>Scholarship</label>
-                      <input type="text" value={profileForm.scholarship} onChange={(e) => setProfileForm({ ...profileForm, scholarship: e.target.value })} />
+                      <input type="text" className="readonly-field" value={profileForm.scholarship} disabled readOnly />
                     </div>
                     <div className="profile-field">
                       <label>Phone</label>
@@ -354,7 +359,17 @@ const StudentDashboard = () => {
                     </div>
                     <div className="profile-field">
                       <label>Blood Group</label>
-                      <input type="text" value={profileForm.bloodGroup} onChange={(e) => setProfileForm({ ...profileForm, bloodGroup: e.target.value })} />
+                      <select value={profileForm.bloodGroup} onChange={(e) => setProfileForm({ ...profileForm, bloodGroup: e.target.value })}>
+                        <option value="">Select Blood Group</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                      </select>
                     </div>
                     <div className="profile-field">
                       <label>Religion</label>

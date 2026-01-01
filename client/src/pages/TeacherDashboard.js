@@ -621,11 +621,11 @@ const TeacherDashboard = () => {
                   <div className="profile-grid">
                     <div className="profile-field">
                       <label>Name</label>
-                      <input type="text" value={profileForm.name} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} />
+                      <input type="text" className="readonly-field" value={profileForm.name} disabled readOnly />
                     </div>
                     <div className="profile-field">
                       <label>Email</label>
-                      <input type="email" value={profileForm.email} onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })} />
+                      <input type="email" className="readonly-field" value={profileForm.email} disabled readOnly />
                     </div>
                   </div>
 
@@ -640,7 +640,17 @@ const TeacherDashboard = () => {
                     </div>
                     <div className="profile-field">
                       <label>Blood Group</label>
-                      <input type="text" value={profileForm.bloodGroup} onChange={(e) => setProfileForm({ ...profileForm, bloodGroup: e.target.value })} />
+                      <select value={profileForm.bloodGroup} onChange={(e) => setProfileForm({ ...profileForm, bloodGroup: e.target.value })}>
+                        <option value="">Select Blood Group</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                      </select>
                     </div>
                     <div className="profile-field">
                       <label>Religion</label>
