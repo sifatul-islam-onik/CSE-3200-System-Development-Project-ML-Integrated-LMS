@@ -259,7 +259,6 @@ exports.approveProposal = async (req, res) => {
       data.prerequisites = trimArray(data.prerequisites);
       data.knowledge_required = trimArray(data.knowledge_required);
       data.course_objectives = trimArray(data.course_objectives);
-      data.learningObjectives = trimArray(data.learningObjectives);
       data.references = trimArray(data.references);
       // Ensure course_content items have trimmed strings
       if (Array.isArray(data.course_content)) {

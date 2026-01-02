@@ -47,13 +47,9 @@ exports.createCourse = async (req, res) => {
       prerequisites,
       knowledge_required,
       course_objectives,
-      learningObjectives,
-      syllabusOutline,
       course_content,
       lecture_plan,
       references,
-      assessmentPlan,
-      textbooks,
       // New OBE data (optional)
       courseOutcomes,  // Array of { co_code, description, po_mappings }
       withOBEData      // Flag to enable transaction mode
@@ -323,10 +319,6 @@ exports.createCourse = async (req, res) => {
     if (semester !== undefined) courseData.semester = semester;
     if (yearLevel !== undefined) courseData.yearLevel = yearLevel;
     if (prerequisites) courseData.prerequisites = prerequisites;
-    if (learningObjectives) courseData.learningObjectives = learningObjectives;
-    if (syllabusOutline) courseData.syllabusOutline = syllabusOutline;
-    if (assessmentPlan) courseData.assessmentPlan = assessmentPlan;
-    if (textbooks) courseData.textbooks = textbooks;
 
     console.log('=== CREATE COURSE DEBUG ===');
     console.log('courseOutcomes:', courseOutcomes);
@@ -588,14 +580,9 @@ exports.updateCourse = async (req, res) => {
       semester,
       yearLevel,
       prerequisites,
-      learningObjectives,
-      syllabusOutline,
       course_content,
       lecture_plan,
       references,
-      assessmentPlan,
-      textbooks,
-      accreditationStatus,
       knowledge_required,
       course_objectives,
       // New OBE update fields
@@ -862,14 +849,9 @@ exports.updateCourse = async (req, res) => {
         if (prerequisites !== undefined) course.prerequisites = prerequisites;
         if (knowledge_required !== undefined) course.knowledge_required = knowledge_required;
         if (course_objectives !== undefined) course.course_objectives = course_objectives;
-        if (learningObjectives !== undefined) course.learningObjectives = learningObjectives;
-        if (syllabusOutline !== undefined) course.syllabusOutline = syllabusOutline;
         if (course_content !== undefined) course.course_content = course_content;
         if (lecture_plan !== undefined) course.lecture_plan = lecture_plan;
         if (references !== undefined) course.references = references;
-        if (assessmentPlan !== undefined) course.assessmentPlan = assessmentPlan;
-        if (textbooks !== undefined) course.textbooks = textbooks;
-        if (accreditationStatus !== undefined) course.accreditationStatus = accreditationStatus;
 
         // Track review
         course.lastReviewed = Date.now();
@@ -1020,14 +1002,9 @@ exports.updateCourse = async (req, res) => {
       if (prerequisites !== undefined) course.prerequisites = prerequisites;
       if (knowledge_required !== undefined) course.knowledge_required = knowledge_required;
       if (course_objectives !== undefined) course.course_objectives = course_objectives;
-      if (learningObjectives !== undefined) course.learningObjectives = learningObjectives;
-      if (syllabusOutline !== undefined) course.syllabusOutline = syllabusOutline;
       if (course_content !== undefined) course.course_content = course_content;
       if (lecture_plan !== undefined) course.lecture_plan = lecture_plan;
       if (references !== undefined) course.references = references;
-      if (assessmentPlan !== undefined) course.assessmentPlan = assessmentPlan;
-      if (textbooks !== undefined) course.textbooks = textbooks;
-      if (accreditationStatus !== undefined) course.accreditationStatus = accreditationStatus;
 
       // Track review
       course.lastReviewed = Date.now();

@@ -146,17 +146,6 @@ const courseSchema = new mongoose.Schema({
       message: 'Course objectives must contain at least one non-empty objective'
     }
   },
-  // OBE: Learning objectives
-  learningObjectives: [{
-    type: String,
-    trim: true
-  }],
-  // OBE: Course content/syllabus outline
-  syllabusOutline: [{
-    week: Number,
-    topic: String,
-    learningActivities: String
-  }],
   // OBE: Course content concepts
   course_content: {
     type: [{
@@ -257,34 +246,6 @@ const courseSchema = new mongoose.Schema({
       message: 'References must contain only non-empty items'
     }
   },
-  // OBE: Assessment plan
-  assessmentPlan: {
-    continuous: {
-      type: Number,
-      min: 0,
-      max: 100,
-      default: 40
-    },
-    midterm: {
-      type: Number,
-      min: 0,
-      max: 100,
-      default: 30
-    },
-    final: {
-      type: Number,
-      min: 0,
-      max: 100,
-      default: 30
-    }
-  },
-  // OBE: Reference materials
-  textbooks: [{
-    title: String,
-    author: String,
-    edition: String,
-    type: { type: String, enum: ['Primary', 'Reference'], default: 'Reference' }
-  }],
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -315,11 +276,6 @@ const courseSchema = new mongoose.Schema({
       },
       message: 'At least one KPA mapping value must be selected'
     }
-  },
-  accreditationStatus: {
-    type: String,
-    enum: ['Draft', 'Under Review', 'Approved', 'Needs Revision'],
-    default: 'Draft'
   },
   createdAt: {
     type: Date,
@@ -390,7 +346,6 @@ courseSchema.index({ courseCode: 1 }, { unique: true });
 courseSchema.index({ course_offered_to: 1 });
 courseSchema.index({ semester: 1 });
 courseSchema.index({ yearLevel: 1 });
-courseSchema.index({ accreditationStatus: 1 });
 courseSchema.index({ course_type: 1 });
 courseSchema.index({ category: 1 });
 courseSchema.index({ elective_group: 1 });
