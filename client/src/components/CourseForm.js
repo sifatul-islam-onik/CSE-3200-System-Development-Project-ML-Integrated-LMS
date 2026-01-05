@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import CourseOutcomeEditor from './CourseOutcomeEditor';
+import { getAllCourses } from '../services/courseService';
 import '../styles/CourseForm.css';
 import '../styles/spinner.css';
 
@@ -89,41 +90,114 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
   const [lecturePlanErrors, setLecturePlanErrors] = useState([]);
   const [referencesErrors, setReferencesErrors] = useState([]);
   const [isCOValidationValid, setIsCOValidationValid] = useState(true);
+  const [courseSuggestions, setCourseSuggestions] = useState([]);
+  const [allCourses, setAllCourses] = useState([]);
+  const [activePrereqIndex, setActivePrereqIndex] = useState(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestionsRef = useRef(null);
+
+  // Ensure prerequisites stay unique (case-insensitive, trimmed)
+  const validatePrereqUniqueness = (list) => {
+    const normalized = list
+      .map(p => p.trim().toLowerCase())
+      .filter(Boolean);
+    const hasDuplicate = new Set(normalized).size !== normalized.length;
+    setErrors((prev) => {
+      if (hasDuplicate) return { ...prev, prerequisites: 'Each prerequisite must be unique' };
+      if (!prev.prerequisites) return prev;
+      const { prerequisites, ...rest } = prev;
+      return rest;
+    });
+    return !hasDuplicate;
+  };
+
+  // Fetch all courses for autocomplete
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const response = await getAllCourses();
+        const sortedCourses = [...(response.data || [])].sort((a, b) =>
+          (a.courseCode || '').localeCompare(b.courseCode || '', undefined, { numeric: true, sensitivity: 'base' })
+        );
+        setAllCourses(sortedCourses);
+      } catch (error) {
+        console.error('Error fetching courses:', error);
+      }
+    };
+    fetchCourses();
+  }, []);
+
+  // Handle click outside suggestions dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Helper function to check if form data has any changes
   const hasFieldChanges = () => {
     if (!isEditMode || !initialData) return true; // Skip for create mode
     
-    // Normalize value for comparison (convert to string for numbers, handle nulls)
-    const normalizeVal = (val) => {
-      if (val === null || val === undefined) return '';
-      return String(val).trim();
+    // Deep equality check that ignores _id, __v, and normalizes values
+    const deepEqual = (obj1, obj2) => {
+      // Handle null/undefined
+      if (obj1 === obj2) return true;
+      if (obj1 == null || obj2 == null) return false;
+      
+      // Handle primitives
+      if (typeof obj1 !== 'object' || typeof obj2 !== 'object') {
+        const str1 = String(obj1 || '').trim();
+        const str2 = String(obj2 || '').trim();
+        return str1 === str2;
+      }
+      
+      // Handle arrays
+      if (Array.isArray(obj1) && Array.isArray(obj2)) {
+        if (obj1.length !== obj2.length) return false;
+        for (let i = 0; i < obj1.length; i++) {
+          if (!deepEqual(obj1[i], obj2[i])) return false;
+        }
+        return true;
+      }
+      
+      if (Array.isArray(obj1) !== Array.isArray(obj2)) return false;
+      
+      // Handle objects - ignore _id and __v fields
+      const keys1 = Object.keys(obj1).filter(k => k !== '_id' && k !== '__v');
+      const keys2 = Object.keys(obj2).filter(k => k !== '_id' && k !== '__v');
+      
+      const allKeys = new Set([...keys1, ...keys2]);
+      for (let key of allKeys) {
+        if (!deepEqual(obj1[key], obj2[key])) return false;
+      }
+      
+      return true;
     };
     
-    // Check each field except reason (which is handled separately)
+    // Check simple fields
     const fieldsToCheck = [
       'courseCode', 'courseTitle', 'course_type', 'credit', 'course_offered_to',
       'category', 'elective_group', 'term', 'contactHours', 'yearLevel'
     ];
     
     for (let field of fieldsToCheck) {
-      if (normalizeVal(formData[field]) !== normalizeVal(initialData[field])) {
+      if (!deepEqual(formData[field], initialData[field])) {
         return true;
       }
     }
     
-    // Check arrays
+    // Check array fields
     const arrayFields = [
       'prerequisites', 'course_content', 'kpa_mapping', 'lecture_plan',
       'references', 'courseOutcomes', 'learningObjectives', 'knowledge_required', 'course_objectives'
     ];
     
     for (let field of arrayFields) {
-      const initialVal = initialData[field] || [];
-      const currentVal = formData[field] || [];
-      
-      // Deep comparison for arrays
-      if (JSON.stringify(initialVal) !== JSON.stringify(currentVal)) {
+      if (!deepEqual(formData[field] || [], initialData[field] || [])) {
         return true;
       }
     }
@@ -173,11 +247,40 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
     const updated = [...formData.prerequisites];
     updated[index] = value;
     setFormData({ ...formData, prerequisites: updated });
+    validatePrereqUniqueness(updated);
+    
+    // Filter courses based on input
+    if (value.trim()) {
+      const filtered = allCourses.filter(course => {
+        const searchTerm = value.toLowerCase();
+        return (
+          course.courseCode?.toLowerCase().includes(searchTerm) ||
+          course.courseTitle?.toLowerCase().includes(searchTerm)
+        );
+      }).slice(0, 10); // Limit to 10 suggestions
+      setCourseSuggestions(filtered);
+      setActivePrereqIndex(index);
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+      setCourseSuggestions([]);
+    }
+  };
+
+  const selectCourseSuggestion = (index, courseCode, courseTitle) => {
+    const updated = [...formData.prerequisites];
+    updated[index] = `${courseCode} - ${courseTitle}`;
+    setFormData({ ...formData, prerequisites: updated });
+    validatePrereqUniqueness(updated);
+    setShowSuggestions(false);
+    setCourseSuggestions([]);
+    setActivePrereqIndex(null);
   };
 
   const removePrerequisite = (index) => {
     const updated = formData.prerequisites.filter((_, i) => i !== index);
     setFormData({ ...formData, prerequisites: updated });
+    validatePrereqUniqueness(updated);
   };
 
   const addCourseContent = () => {
@@ -411,8 +514,8 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
       newErrors.courseTitle = 'Course title is required';
     }
 
-    if (!formData.credit || formData.credit < 0) {
-      newErrors.credit = 'Valid credit is required';
+    if (!formData.credit || formData.credit < 0.75 || formData.credit > 4) {
+      newErrors.credit = 'Credit must be between 0.75 and 4';
     }
 
     if (!formData.course_offered_to || !formData.course_offered_to.trim()) {
@@ -431,15 +534,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
       newErrors.elective_group = 'Elective group is required for optional courses';
     }
 
-    // Validate knowledge_required
-    if (!formData.knowledge_required || formData.knowledge_required.length === 0) {
-      newErrors.knowledge_required = 'At least one knowledge required entry is required';
-    } else {
-      const hasEmpty = formData.knowledge_required.some(k => !k?.trim());
-      if (hasEmpty) {
-        newErrors.knowledge_required = 'All knowledge required entries must be non-empty';
-      }
-    }
+    // Knowledge_required is optional - no validation needed
 
     // Validate course_objectives
     if (!formData.course_objectives || formData.course_objectives.length === 0) {
@@ -451,7 +546,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
       }
     }
 
-    if (!formData.contactHours || formData.contactHours < 0) {
+    if (!formData.contactHours || parseFloat(formData.contactHours) < 0) {
       newErrors.contactHours = 'Valid contact hours is required';
     }
 
@@ -508,6 +603,19 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
     if (validate()) {
       const codeMeta = deriveCourseMeta(formData.courseCode);
 
+      // Determine which existing COs were removed so the backend can delete them
+      const initialCOIds = new Set(
+        (initialData?.courseOutcomes || [])
+          .filter(co => co && co._id)
+          .map(co => co._id)
+      );
+      const currentCOIds = new Set(
+        (formData.courseOutcomes || [])
+          .filter(co => co && co._id)
+          .map(co => co._id)
+      );
+      const deletedCOIds = [...initialCOIds].filter(id => !currentCOIds.has(id));
+
       // Prepare payload with properly structured data
       const payload = {
         ...formData,
@@ -549,9 +657,12 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
           .filter(obj => obj !== '')
       };
       
-      // Always include courseOutcomes if they exist
-      if (formData.courseOutcomes.length > 0) {
-        payload.courseOutcomes = formData.courseOutcomes;
+      // Always include courseOutcomes so removals propagate during edits
+      payload.courseOutcomes = formData.courseOutcomes || [];
+
+      // Include deleted CO IDs for admin update flow (soft/hard delete logic on server)
+      if (deletedCOIds.length > 0) {
+        payload.deletedCOIds = deletedCOIds;
       }
       
       // Include course ID if editing
@@ -642,8 +753,9 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                 value={formData.credit}
                 onChange={handleChange}
                 placeholder="e.g., 3"
-                min="0"
-                step="0.5"
+                min="0.75"
+                max="4"
+                step="0.25"
                 disabled={loading}
               />
               {errors.credit && <span className="error-text">{errors.credit}</span>}
@@ -760,27 +872,10 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                   name="contactHours"
                   value={formData.contactHours}
                   onChange={handleChange}
-                  onKeyDown={(e) => {
-                    // Prevent 'e', 'E', '+', '-', '.'
-                    if (['e', 'E', '+', '-', '.'].includes(e.key)) {
-                      e.preventDefault();
-                    }
-                  }}
-                  onInput={(e) => {
-                    // Limit to single digit (0-9)
-                    if (e.target.value.length > 1) {
-                      e.target.value = e.target.value.slice(0, 1);
-                    }
-                    // Ensure value is between 0-9
-                    if (e.target.value !== '' && (parseInt(e.target.value) < 0 || parseInt(e.target.value) > 9)) {
-                      e.target.value = '';
-                    }
-                  }}
                   min="0"
-                  max="9"
-                  step="1"
+                  step="0.5"
                   disabled={loading}
-                  placeholder="e.g., 3"
+                  placeholder="e.g., 3 or 3.5"
                   required
                 />
                 {errors.contactHours && <span className="error-text">{errors.contactHours}</span>}
@@ -792,7 +887,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
           {/* Knowledge Required */}
           <div className="form-section">
             <div className="course-section-header">
-              <label className="section-label">Knowledge Required *</label>
+              <label className="section-label">Knowledge Required</label>
               <button type="button" className="btn-add-small" onClick={addKnowledgeRequired} disabled={loading}>
                 + Add Knowledge
               </button>
@@ -855,10 +950,10 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
             ))}
           </div>
 
-          {/* Course Content */}
+          {/* Course Details */}
           <div className="form-section">
             <div className="course-section-header">
-              <label className="section-label">Course Content *</label>
+              <label className="section-label">Course Details *</label>
               <button type="button" className="btn-add-small" onClick={addCourseContent} disabled={loading}>
                 + Add Content
               </button>
@@ -867,7 +962,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
             {formData.course_content.map((content, index) => (
               <div key={index} className="course-content-item" style={{marginBottom: '15px', padding: '15px', border: '1px solid #ddd', borderRadius: '4px', textAlign: 'left'}}>
                 <div className="form-group" style={{marginBottom: '10px'}}>
-                  <label style={{textAlign: 'left', display: 'block'}}>Concept Name</label>
+                  <label style={{textAlign: 'left', display: 'block'}}>Content Name</label>
                   <input
                     type="text"
                     value={content.concept_name}
@@ -877,7 +972,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                   />
                 </div>
                 <div className="form-group" style={{marginBottom: '10px'}}>
-                  <label style={{textAlign: 'left', display: 'block'}}>Concept Description *</label>
+                  <label style={{textAlign: 'left', display: 'block'}}>Content Description *</label>
                   <textarea
                     value={content.concept_description}
                     onChange={(e) => updateCourseContent(index, 'concept_description', e.target.value)}
@@ -900,7 +995,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
             ))}
             {formData.course_content.length === 0 && (
               <p className="info-text" style={{color: '#666', fontStyle: 'italic', marginTop: '10px', textAlign: 'left'}}>
-                No course content added yet. Click "+ Add Content" to begin.
+                No course details added yet. Click "+ Add Content" to begin.
               </p>
             )}
           </div>
@@ -1135,14 +1230,26 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                 + Add
               </button>
             </div>
+            {errors.prerequisites && (
+              <span className="error-text" style={{display: 'block', marginBottom: '10px', textAlign: 'left'}}>
+                {errors.prerequisites}
+              </span>
+            )}
             {formData.prerequisites.map((prereq, index) => (
-              <div key={index} className="array-item">
+              <div key={index} className="array-item" style={{ position: 'relative' }}>
                 <input
                   type="text"
                   value={prereq}
                   onChange={(e) => updatePrerequisite(index, e.target.value)}
-                  placeholder="e.g., CSE1101"
+                  onFocus={() => {
+                    if (prereq.trim() && courseSuggestions.length > 0) {
+                      setActivePrereqIndex(index);
+                      setShowSuggestions(true);
+                    }
+                  }}
+                  placeholder="e.g., CSE 1101 or start typing course name"
                   disabled={loading}
+                  autoComplete="off"
                 />
                 <button
                   type="button"
@@ -1152,6 +1259,19 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                 >
                   ✕
                 </button>
+                {showSuggestions && activePrereqIndex === index && courseSuggestions.length > 0 && (
+                  <div ref={suggestionsRef} className="autocomplete-suggestions">
+                    {courseSuggestions.map((course, idx) => (
+                      <div
+                        key={idx}
+                        className="suggestion-item"
+                        onClick={() => selectCourseSuggestion(index, course.courseCode, course.courseTitle)}
+                      >
+                        <strong>{course.courseCode}</strong> - {course.courseTitle}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1178,7 +1298,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
               disabled={
                 loading || 
                 (formData.courseOutcomes.length > 0 && !isCOValidationValid) ||
-                formData.lecture_plan.length > 0 && lecturePlanErrors.some(err => err.week || err.plan) ||
+                (formData.lecture_plan.length > 0 && lecturePlanErrors.some(err => err.week || err.plan)) ||
                 formData.lecture_plan.length === 0 ||
                 formData.lecture_plan.length > 13 ||
                 referencesErrors.some(err => err !== null)

@@ -121,14 +121,17 @@ const courseSchema = new mongoose.Schema({
       type: String,
       trim: true
     }],
-    required: [true, 'Knowledge required is required'],
+    default: [],
     validate: {
       validator: function(v) {
-        if (!v || v.length === 0) return false;
-        // Ensure no empty knowledge items
-        return v.every(knowledge => knowledge && knowledge.trim() !== '');
+        // If array is provided, ensure no empty items
+        if (v && v.length > 0) {
+          return v.every(knowledge => knowledge && knowledge.trim() !== '');
+        }
+        // Empty array is allowed
+        return true;
       },
-      message: 'Knowledge required must contain at least one non-empty item'
+      message: 'All knowledge required entries must be non-empty'
     }
   },
   // OBE: Course objectives

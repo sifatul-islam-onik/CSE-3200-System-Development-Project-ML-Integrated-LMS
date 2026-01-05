@@ -13,6 +13,29 @@ import '../styles/spinner.css';
 import '../styles/Profile.css';
 
 const TeacherDashboard = () => {
+  // Helper: sort courses by courseCode ascending (numeric + case-insensitive)
+  const sortCoursesByCode = (list = []) => {
+    const normalize = (code = '') => {
+      const trimmed = code.trim();
+      const match = trimmed.match(/^([A-Za-z]+)\s*(\d+)/);
+      if (!match) return { prefix: trimmed.toUpperCase(), num: Number.MAX_SAFE_INTEGER, raw: trimmed };
+      return { prefix: match[1].toUpperCase(), num: parseInt(match[2], 10), raw: trimmed };
+    };
+
+    return [...list].sort((a, b) => {
+      const aNorm = normalize(a.courseCode || '');
+      const bNorm = normalize(b.courseCode || '');
+
+      if (aNorm.prefix !== bNorm.prefix) {
+        return aNorm.prefix.localeCompare(bNorm.prefix);
+      }
+      if (aNorm.num !== bNorm.num) {
+        return aNorm.num - bNorm.num;
+      }
+      return (aNorm.raw || '').localeCompare(bNorm.raw || '', undefined, { sensitivity: 'base' });
+    });
+  };
+
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [activeSection, setActiveSection] = useState('overview');
@@ -60,15 +83,31 @@ const TeacherDashboard = () => {
   const getOrganizedCourses = () => {
     const organized = {};
     courses.forEach(course => {
-      const year = course.yearLevel || 'Other';
-      const term = course.term || 'Other';
+      const year = course.yearLevel !== null && course.yearLevel !== undefined ? course.yearLevel : 'Other';
+      const term = course.term !== null && course.term !== undefined ? course.term : 'Other';
       const type = course.course_type || 'THEORY';
-      const yearSemKey = `${year}-${term}`;
       
-      if (!organized[yearSemKey]) organized[yearSemKey] = {};
-      if (!organized[yearSemKey][type]) organized[yearSemKey][type] = [];
-      
-      organized[yearSemKey][type].push(course);
+      // If term is 0, add course to both semester 1 and 2 of that year
+      if (term === 0) {
+        [1, 2].forEach(sem => {
+          const yearSemKey = `${year}-${sem}`;
+          if (!organized[yearSemKey]) organized[yearSemKey] = {};
+          if (!organized[yearSemKey][type]) organized[yearSemKey][type] = [];
+          organized[yearSemKey][type].push(course);
+        });
+      } else {
+        const yearSemKey = `${year}-${term}`;
+        if (!organized[yearSemKey]) organized[yearSemKey] = {};
+        if (!organized[yearSemKey][type]) organized[yearSemKey][type] = [];
+        organized[yearSemKey][type].push(course);
+      }
+    });
+
+    // Sort each type bucket by course code ascending to ensure consistent order in the UI
+    Object.keys(organized).forEach((yearSemKey) => {
+      Object.keys(organized[yearSemKey]).forEach((type) => {
+        organized[yearSemKey][type] = sortCoursesByCode(organized[yearSemKey][type]);
+      });
     });
     return organized;
   };
@@ -134,7 +173,7 @@ const TeacherDashboard = () => {
     setError('');
     try {
       const response = await getAllCourses();
-      setCourses(response.data || []);
+      setCourses(sortCoursesByCode(response.data || []));
     } catch (err) {
       setError(err.message || 'Failed to fetch courses');
     } finally {
@@ -430,9 +469,10 @@ const TeacherDashboard = () => {
                       const yearSem = `${parts[0]}-${parts[1]}`;
                       const type = parts[2];
                       const typeCourses = organizedCourses[yearSem]?.[type] || [];
+                      const sortedTypeCourses = sortCoursesByCode(typeCourses);
                       return (
                         <div className="tree-content">
-                          {typeCourses.map((course) => (
+                          {sortedTypeCourses.map((course) => (
                             <div key={course._id} className="course-item">
                               <div className="course-item-header">
                                 <div className="course-info">
@@ -446,7 +486,9 @@ const TeacherDashboard = () => {
                                   className="btn btn-sm btn-secondary"
                                   onClick={() => {
                                     setSelectedCourse(course);
-                                    setShowOBEView(true);
+                                    // Extract semester from courseGroupPath (e.g., "3-1" -> 1, "3-2" -> 2)
+                                    const semesterMatch = courseGroupPath ? courseGroupPath.split('-')[1] : null;
+                                    setShowOBEView(semesterMatch ? parseInt(semesterMatch) : true);
                                   }}
                                 >
                                   <FontAwesomeIcon icon={faEye} /> View
@@ -888,6 +930,7 @@ const TeacherDashboard = () => {
       {showOBEView && selectedCourse && (
         <CourseOBEView
           course={selectedCourse}
+          viewingSemester={typeof showOBEView === 'number' ? showOBEView : null}
           onClose={() => {
             setShowOBEView(false);
             setSelectedCourse(null);

@@ -364,6 +364,7 @@ exports.approveProposal = async (req, res) => {
         }
 
         const updateData = { ...normalizeCourseData(proposal.proposedData) };
+        const hasCourseOutcomes = Object.prototype.hasOwnProperty.call(updateData, 'courseOutcomes');
         const courseOutcomes = updateData.courseOutcomes;
         delete updateData.courseOutcomes;
 
@@ -377,8 +378,8 @@ exports.approveProposal = async (req, res) => {
           await course.save();
         }
 
-        // Handle course outcomes if provided
-        if (courseOutcomes && courseOutcomes.length > 0) {
+        // Handle course outcomes if the field was provided (including empty array to clear)
+        if (hasCourseOutcomes) {
           // Delete existing outcomes and mappings
           const existingCOs = useSession
             ? await CourseOutcome.find({ course: course._id }).session(session)
@@ -396,36 +397,38 @@ exports.approveProposal = async (req, res) => {
             await CourseOutcome.deleteMany({ course: course._id });
           }
 
-          // Create new outcomes
-          for (const coData of courseOutcomes) {
-            let courseOutcome;
-            if (useSession) {
-              const createdCO = await CourseOutcome.create([{
-                course: course._id,
-                co_code: coData.co_code,
-                description: coData.description,
-                taxonomy_levels: coData.taxonomy_levels || []
-              }], { session });
-              courseOutcome = createdCO[0];
-            } else {
-              courseOutcome = await CourseOutcome.create({
-                course: course._id,
-                co_code: coData.co_code,
-                description: coData.description,
-                taxonomy_levels: coData.taxonomy_levels || []
-              });
-            }
-
-            if (coData.po_mappings && coData.po_mappings.length > 0) {
-              const mappingsToCreate = coData.po_mappings.map(mapping => ({
-                course_outcome: courseOutcome._id,
-                program_outcome_code: mapping.program_outcome_code.toUpperCase(),
-                level: Number(mapping.level)
-              }));
+          // Re-create outcomes only when the array is non-empty
+          if (Array.isArray(courseOutcomes) && courseOutcomes.length > 0) {
+            for (const coData of courseOutcomes) {
+              let courseOutcome;
               if (useSession) {
-                await COPOMapping.create(mappingsToCreate, { session, ordered: true });
+                const createdCO = await CourseOutcome.create([{
+                  course: course._id,
+                  co_code: coData.co_code,
+                  description: coData.description,
+                  taxonomy_levels: coData.taxonomy_levels || []
+                }], { session });
+                courseOutcome = createdCO[0];
               } else {
-                await COPOMapping.create(mappingsToCreate);
+                courseOutcome = await CourseOutcome.create({
+                  course: course._id,
+                  co_code: coData.co_code,
+                  description: coData.description,
+                  taxonomy_levels: coData.taxonomy_levels || []
+                });
+              }
+
+              if (coData.po_mappings && coData.po_mappings.length > 0) {
+                const mappingsToCreate = coData.po_mappings.map(mapping => ({
+                  course_outcome: courseOutcome._id,
+                  program_outcome_code: mapping.program_outcome_code.toUpperCase(),
+                  level: Number(mapping.level)
+                }));
+                if (useSession) {
+                  await COPOMapping.create(mappingsToCreate, { session, ordered: true });
+                } else {
+                  await COPOMapping.create(mappingsToCreate);
+                }
               }
             }
           }
