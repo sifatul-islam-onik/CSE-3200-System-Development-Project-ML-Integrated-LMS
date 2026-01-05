@@ -89,15 +89,24 @@ const AdminDashboard = () => {
   const getOrganizedCourses = () => {
     const organized = {};
     courses.forEach(course => {
-      const year = course.yearLevel || 'Other';
-      const term = course.term || 'Other';
+      const year = course.yearLevel !== null && course.yearLevel !== undefined ? course.yearLevel : 'Other';
+      const term = course.term !== null && course.term !== undefined ? course.term : 'Other';
       const type = course.course_type || 'THEORY';
-      const yearSemKey = `${year}-${term}`;
       
-      if (!organized[yearSemKey]) organized[yearSemKey] = {};
-      if (!organized[yearSemKey][type]) organized[yearSemKey][type] = [];
-      
-      organized[yearSemKey][type].push(course);
+      // If term is 0, add course to both semester 1 and 2 of that year
+      if (term === 0) {
+        [1, 2].forEach(sem => {
+          const yearSemKey = `${year}-${sem}`;
+          if (!organized[yearSemKey]) organized[yearSemKey] = {};
+          if (!organized[yearSemKey][type]) organized[yearSemKey][type] = [];
+          organized[yearSemKey][type].push(course);
+        });
+      } else {
+        const yearSemKey = `${year}-${term}`;
+        if (!organized[yearSemKey]) organized[yearSemKey] = {};
+        if (!organized[yearSemKey][type]) organized[yearSemKey][type] = [];
+        organized[yearSemKey][type].push(course);
+      }
     });
     return organized;
   };
@@ -1244,7 +1253,9 @@ const AdminDashboard = () => {
                                   className="btn btn-sm btn-secondary"
                                   onClick={() => {
                                     setSelectedCourse(course);
-                                    setShowOBEView(true);
+                                    // Extract semester from courseGroupPath (e.g., "3-1" -> 1, "3-2" -> 2)
+                                    const semesterMatch = courseGroupPath ? courseGroupPath.split('-')[1] : null;
+                                    setShowOBEView(semesterMatch ? parseInt(semesterMatch) : true);
                                   }}
                                 >
                                   <FontAwesomeIcon icon={faEye} /> View
@@ -1933,6 +1944,7 @@ const AdminDashboard = () => {
       {showOBEView && selectedCourse && (
         <CourseOBEView 
           course={selectedCourse}
+          viewingSemester={typeof showOBEView === 'number' ? showOBEView : null}
           onClose={() => {
             setShowOBEView(false);
             setSelectedCourse(null);
@@ -2221,7 +2233,7 @@ const AdminDashboard = () => {
                     )
                 )}
 
-                {/* Course Content */}
+                {/* Course Details */}
                 {(selectedProposal.proposedData.course_content && selectedProposal.proposedData.course_content.length > 0) && (
                   selectedProposal.proposalType === 'UPDATE' && selectedProposal.existingCourse
                     ? (() => {
@@ -2241,7 +2253,7 @@ const AdminDashboard = () => {
 
                         return (
                           <div style={{marginTop: '20px'}}>
-                            <h4>Course Content {hasChanges && <span style={{color: '#ffc107', fontSize: '14px', marginLeft: '8px'}}>✦ Modified</span>}</h4>
+                            <h4>Course Details {hasChanges && <span style={{color: '#ffc107', fontSize: '14px', marginLeft: '8px'}}>✦ Modified</span>}</h4>
                             {hasChanges && (
                               <div style={{
                                 backgroundColor: '#fff3cd',
@@ -2315,7 +2327,7 @@ const AdminDashboard = () => {
                       })()
                     : (
                       <div style={{marginTop: '20px'}}>
-                        <h4>Course Content</h4>
+                        <h4>Course Details</h4>
                         <div style={{marginTop: '10px'}}>
                           {selectedProposal.proposedData.course_content.map((content, idx) => (
                             <div key={idx} style={{marginBottom: '15px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px'}}>

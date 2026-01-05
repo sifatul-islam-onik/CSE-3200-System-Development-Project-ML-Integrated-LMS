@@ -478,7 +478,11 @@ exports.getAllCourses = async (req, res) => {
     // Populate course outcomes with their PO mappings for each course
     const coursesWithOutcomes = await Promise.all(
       courses.map(async (course) => {
-        const courseOutcomes = await CourseOutcome.find({ course: course._id });
+        // Exclude soft-deleted COs so removals are reflected in the UI
+        const courseOutcomes = await CourseOutcome.find({ 
+          course: course._id, 
+          is_deleted: { $ne: true }
+        });
         
         // For each CO, fetch its PO mappings
         const outcomesWithMappings = await Promise.all(

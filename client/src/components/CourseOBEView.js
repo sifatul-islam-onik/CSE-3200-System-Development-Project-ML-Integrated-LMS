@@ -12,7 +12,7 @@ const formatPOCode = (code) => {
   return code;
 };
 
-const CourseOBEView = ({ course, onClose }) => {
+const CourseOBEView = ({ course, onClose, viewingSemester = null }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [copoMatrix, setCopoMatrix] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -75,7 +75,7 @@ const CourseOBEView = ({ course, onClose }) => {
               <span className="info-value">{course.elective_group}</span>
             </div>
           )}
-          {course.term && (
+          {course.term !== null && course.term !== undefined && course.term !== 0 && (
             <div className="info-item">
               <label>Term:</label>
               <span className="info-value">Term {course.term}</span>
@@ -109,6 +109,27 @@ const CourseOBEView = ({ course, onClose }) => {
           )}
         </div>
       </div>
+
+      {/* Continuation Message for Term 0 Courses */}
+      {course.term === 0 && viewingSemester && (
+        <div className="section-card" style={{
+          backgroundColor: '#e3f2fd',
+          borderLeft: '4px solid #1976d2',
+          padding: '16px',
+          marginBottom: '20px'
+        }}>
+          <p style={{
+            margin: 0,
+            color: '#1565c0',
+            fontWeight: 500,
+            fontSize: '15px'
+          }}>
+            {viewingSemester === 1 
+              ? 'The project/thesis selected in this term is to be continued in the next term'
+              : 'The project/thesis selected in the previous term is to be continued in this term'}
+          </p>
+        </div>
+      )}
 
       {/* KPA Mapping */}
       <div className="section-card">
@@ -147,16 +168,18 @@ const CourseOBEView = ({ course, onClose }) => {
             </div>
           </div>
         )}
-        {course.knowledge_required && course.knowledge_required.length > 0 && (
-          <div className="section-card half-width">
-            <h3 className="section-title">Knowledge Required</h3>
+        <div className="section-card half-width">
+          <h3 className="section-title">Knowledge Required</h3>
+          {course.knowledge_required && course.knowledge_required.length > 0 ? (
             <ul className="bullet-list">
               {course.knowledge_required.map((knowledge, idx) => (
                 <li key={idx}>{knowledge}</li>
               ))}
             </ul>
-          </div>
-        )}
+          ) : (
+            <span className="info-value">N/A</span>
+          )}
+        </div>
       </div>
 
       {/* Course Objectives */}
@@ -171,10 +194,10 @@ const CourseOBEView = ({ course, onClose }) => {
         </div>
       )}
 
-      {/* Course Content */}
+      {/* Course Details */}
       {course.course_content && course.course_content.length > 0 && (
         <div className="section-card">
-          <h3 className="section-title">Course Content</h3>
+          <h3 className="section-title">Course Details</h3>
           <div className="content-list">
             {course.course_content.map((content, idx) => (
               <div key={idx} className="content-item">
@@ -334,7 +357,7 @@ const CourseOBEView = ({ course, onClose }) => {
     <div className="obe-view-overlay">
       <div className="obe-view-container">
         <div className="obe-view-header">
-          <h3>OBE Details: {course.courseCode}</h3>
+          <h3>{course.courseCode} - {course.courseTitle}</h3>
           <button className="close-btn" onClick={onClose}>✕</button>
         </div>
 

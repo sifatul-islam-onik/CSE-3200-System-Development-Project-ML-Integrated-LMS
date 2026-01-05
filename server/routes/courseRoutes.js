@@ -29,8 +29,8 @@ const courseValidation = [
     .withMessage('Credit is required')
     .isNumeric()
     .withMessage('Credit must be a number')
-    .custom((value) => value >= 0)
-    .withMessage('Credit cannot be negative'),
+    .custom((value) => value >= 0.75 && value <= 4)
+    .withMessage('Credit must be between 0.75 and 4'),
   body('course_offered_to')
     .trim()
     .notEmpty()
