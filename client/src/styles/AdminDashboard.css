@@ -1790,3 +1790,122 @@
 .proposals-list .proposal-actions .btn {
   min-width: 100px;
 }
+
+/* ===== Teacher Import Styles ===== */
+.import-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.import-box {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.import-box h3 {
+  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: #1f2937;
+}
+
+.import-info {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.import-box .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.import-box input[type="file"] {
+  display: block;
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.import-box input[type="file"]:hover {
+  border-color: #3b82f6;
+}
+
+.file-selected {
+  font-size: 0.875rem;
+  color: #10b981;
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
+.export-section {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.export-section h3 {
+  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: #1f2937;
+}
+
+.export-section .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.export-section select {
+  display: block;
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background-color: white;
+  cursor: pointer;
+}
+
+.export-section select:hover {
+  border-color: #10b981;
+}
+
+.export-section select:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.875rem;
+}
+
+.btn-success:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-success:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1024px) {
+  .import-section {
+    grid-template-columns: 1fr;
+  }
+}
+

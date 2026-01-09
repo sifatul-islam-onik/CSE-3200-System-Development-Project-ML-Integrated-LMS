@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBook, faPlus, faHourglass, faCheckCircle, faTimesCircle, faEye, faTrash, faEdit, faSignOutAlt, faChevronDown, faChevronRight, faClipboardList } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
+import { getProfile } from '../services/authService';
 import { getMyProposals, createCourseProposal, deleteProposal } from '../services/courseProposalService';
 import { getAllCourses } from '../services/courseService';
 import CourseForm from '../components/CourseForm';
@@ -125,6 +126,7 @@ const TeacherDashboard = () => {
         address: userData.address || '',
         hall: userData.hall || '',
         email: userData.email || '',
+        designation: userData.designation || 'Lecturer',
         scholarship: userData.scholarship || '',
         gender: userData.gender || 'others',
         bloodGroup: userData.bloodGroup || '',
@@ -146,6 +148,40 @@ const TeacherDashboard = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Refresh user profile when opening Profile section to reflect admin changes
+  useEffect(() => {
+    const refreshProfile = async () => {
+      if (activeSection === 'profile') {
+        try {
+          const resp = await getProfile();
+          if (resp?.success && resp.data) {
+            setUser(resp.data);
+            localStorage.setItem('user', JSON.stringify(resp.data));
+            setProfileForm((prev) => ({
+              ...prev,
+              name: resp.data.name || '',
+              father: resp.data.father || '',
+              mother: resp.data.mother || '',
+              advisor: resp.data.advisor || '',
+              phone: resp.data.phone || '',
+              address: resp.data.address || '',
+              hall: resp.data.hall || '',
+              email: resp.data.email || '',
+              designation: resp.data.designation || 'Lecturer',
+              scholarship: resp.data.scholarship || '',
+              gender: resp.data.gender || 'others',
+              bloodGroup: resp.data.bloodGroup || '',
+              religion: resp.data.religion || ''
+            }));
+          }
+        } catch (e) {
+          // silently ignore; keep local state
+        }
+      }
+    };
+    refreshProfile();
+  }, [activeSection]);
 
   useEffect(() => {
     if (activeSection === 'proposals') {
@@ -668,6 +704,10 @@ const TeacherDashboard = () => {
                     <div className="profile-field">
                       <label>Email</label>
                       <input type="email" className="readonly-field" value={profileForm.email} disabled readOnly />
+                    </div>
+                    <div className="profile-field">
+                      <label>Designation</label>
+                      <input type="text" className="readonly-field" value={profileForm.designation || 'Lecturer'} disabled readOnly />
                     </div>
                   </div>
 

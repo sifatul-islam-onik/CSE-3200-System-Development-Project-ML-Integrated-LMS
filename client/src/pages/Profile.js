@@ -330,6 +330,12 @@ const Profile = () => {
                     </div>
                   </>
                 )}
+                {user.role === 'teacher' && (
+                  <div className="form-group">
+                    <label>Designation</label>
+                    <input name="designation" className="readonly-field" value={editData.designation || 'Lecturer'} disabled readOnly />
+                  </div>
+                )}
                 <div className="form-group">
                   <label>Phone</label>
                   <input name="phone" value={editData.phone || ''} onChange={handleEditChange} />
@@ -475,6 +481,9 @@ const Profile = () => {
                     <div className="profile-field"><label>Hall</label><p>{user.hall || '-'}</p></div>
                     <div className="profile-field"><label>Scholarship</label><p>{user.scholarship || '-'}</p></div>
                   </>
+                )}
+                {user.role === 'teacher' && (
+                  <div className="profile-field"><label>Designation</label><p>{user.designation || 'Lecturer'}</p></div>
                 )}
                 <div className="profile-field"><label>Phone</label><p>{user.phone || '-'}</p></div>
                 <div className="profile-field"><label>Address</label><p>{user.address || '-'}</p></div>
