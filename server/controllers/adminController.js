@@ -984,3 +984,73 @@ exports.getAssignedTeachers = async (req, res) => {
   }
 };
 
+// @desc    Update user profile
+// @route   PUT /api/admin/users/:userId/profile
+// @access  Admin only
+exports.updateUserProfile = async (req, res) => {
+  try {
+    // Verify admin role
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    const { userId } = req.params;
+    const updateData = req.body;
+
+    // Validate user exists
+    const user = await User.findById(userId).select('-password');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Prevent updating admin users
+    if (user.role === 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot update admin users'
+      });
+    }
+
+    // Fields allowed to update
+    const allowedFields = [
+      'name', 'email', 'roll', 'father', 'mother', 'advisor',
+      'phone', 'address', 'hall', 'scholarship', 'gender',
+      'bloodGroup', 'religion', 'designation'
+    ];
+
+    // Filter and update only allowed fields
+    const updates = {};
+    allowedFields.forEach(field => {
+      if (updateData[field] !== undefined) {
+        updates[field] = updateData[field];
+      }
+    });
+
+    // Update user
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    res.status(200).json({
+      success: true,
+      message: 'User profile updated successfully',
+      data: updatedUser
+    });
+
+  } catch (error) {
+    console.error('Update user profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating user profile'
+    });
+  }
+};
+

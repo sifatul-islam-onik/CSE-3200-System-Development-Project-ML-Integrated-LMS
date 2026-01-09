@@ -20,6 +20,7 @@ router.put('/users/:userId/toggle-status', adminController.toggleUserStatus);
 router.put('/users/:userId/status', adminController.setUserStatus);
 router.put('/users/:userId/designation', adminController.setUserDesignation);
 router.delete('/users/:userId', adminController.deleteUser);
+router.put('/users/:userId/profile', adminController.updateUserProfile);
 router.post('/users/import', upload.single('file'), adminController.importStudentsFromExcel);
 router.post('/users/export-credentials', adminController.exportStudentCredentials);
 router.post('/teachers/import', upload.single('file'), adminController.importTeachersFromExcel);

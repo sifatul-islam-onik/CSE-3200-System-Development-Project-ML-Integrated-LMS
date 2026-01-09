@@ -54,6 +54,12 @@ export const deleteUser = async (userId) => {
   return response.data;
 };
 
+// Update user profile
+export const updateUserProfile = async (userId, profileData) => {
+  const response = await axios.put(`${API_URL}/admin/users/${userId}/profile`, profileData, getAuthHeader());
+  return response.data;
+};
+
 // Set teacher designation
 export const setUserDesignation = async (userId, designation) => {
   const response = await axios.put(
