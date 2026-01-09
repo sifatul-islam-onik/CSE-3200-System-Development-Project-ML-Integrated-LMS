@@ -5,9 +5,10 @@ import { faBook, faPlus, faHourglass, faCheckCircle, faTimesCircle, faEye, faTra
 import { getUser, logout } from '../components/ProtectedRoute';
 import { getProfile } from '../services/authService';
 import { getMyProposals, createCourseProposal, deleteProposal } from '../services/courseProposalService';
-import { getAllCourses } from '../services/courseService';
+import { getAllCourses, getCourseStudents } from '../services/courseService';
 import CourseForm from '../components/CourseForm';
 import CourseOBEView from '../components/CourseOBEView';
+import MarkEntry from '../components/MarkEntry';
 import '../styles/Dashboard.css';
 import '../styles/AdminDashboard.css';
 import '../styles/spinner.css';
@@ -60,6 +61,10 @@ const TeacherDashboard = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showMarkEntry, setShowMarkEntry] = useState(false);
+  const [markEntryCourse, setMarkEntryCourse] = useState(null);
+  const [markEntrySection, setMarkEntrySection] = useState(null);
+  const [courseStudents, setCourseStudents] = useState([]);
 
   // Navigate to a course group (drill-down)
   const navigateToGroup = (groupKey) => {
@@ -530,6 +535,40 @@ const TeacherDashboard = () => {
                                   <FontAwesomeIcon icon={faEye} /> View
                                 </button>
                                 <button
+                                  className="btn btn-sm btn-success"
+                                  onClick={async () => {
+                                    // Find teacher's section for this course
+                                    const assignment = course.assignedTeachers?.find(at => {
+                                      const teacherId = at.teacher?._id || at.teacher;
+                                      return teacherId.toString() === user._id;
+                                    });
+                                    const section = assignment?.section || null;
+                                    
+                                    // Fetch students
+                                    try {
+                                      setLoading(true);
+                                      const response = await getCourseStudents(course._id, section);
+                                      if (response.success && response.data.length > 0) {
+                                        setCourseStudents(response.data);
+                                        setMarkEntryCourse(course);
+                                        setMarkEntrySection(section);
+                                        setShowMarkEntry(true);
+                                      } else {
+                                        setError('No students enrolled in this course');
+                                        setTimeout(() => setError(''), 3000);
+                                      }
+                                    } catch (err) {
+                                      console.error('Error fetching students:', err);
+                                      setError('Failed to fetch students');
+                                      setTimeout(() => setError(''), 3000);
+                                    } finally {
+                                      setLoading(false);
+                                    }
+                                  }}
+                                >
+                                  <FontAwesomeIcon icon={faClipboardList} /> Enter Marks
+                                </button>
+                                <button
                                   className="btn btn-sm btn-primary"
                                   onClick={() => openEditProposal(course)}
                                 >
@@ -974,6 +1013,20 @@ const TeacherDashboard = () => {
           onClose={() => {
             setShowOBEView(false);
             setSelectedCourse(null);
+          }}
+        />
+      )}
+
+      {showMarkEntry && markEntryCourse && courseStudents.length > 0 && (
+        <MarkEntry
+          course={markEntryCourse}
+          students={courseStudents}
+          section={markEntrySection}
+          onClose={() => {
+            setShowMarkEntry(false);
+            setMarkEntryCourse(null);
+            setMarkEntrySection(null);
+            setCourseStudents([]);
           }}
         />
       )}

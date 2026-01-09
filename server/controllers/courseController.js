@@ -1272,4 +1272,100 @@ exports.getCurriculumBySemester = async (req, res) => {
 
 // Note: PO attainment summary removed - can be reimplemented using CourseOutcome model
 
+// @desc    Get students enrolled in a course
+// @route   GET /api/courses/:courseId/students
+// @access  Teacher (for assigned courses)
+exports.getCourseStudents = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { section } = req.query; // Optional section filter for theory courses
+
+    // Verify course exists
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+
+    // For teachers, verify they are assigned to this course
+    if (req.user.role === 'teacher') {
+      const isAssigned = course.assignedTeachers.some(assignment => {
+        const teacherId = assignment.teacher?._id || assignment.teacher;
+        const matches = teacherId.toString() === req.user._id.toString();
+        // If section is provided, also check section match
+        if (section && matches) {
+          return assignment.section === section;
+        }
+        return matches;
+      });
+
+      if (!isAssigned) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You are not assigned to this course.'
+        });
+      }
+    }
+
+    // Get all students assigned to batches for this course
+    const User = require('../models/User');
+    const assignedBatches = course.assignedBatches || [];
+    
+    if (assignedBatches.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'No batches assigned to this course yet',
+        data: []
+      });
+    }
+
+    // Find students whose roll numbers match the assigned batches
+    const students = await User.find({
+      role: 'student',
+      isActive: true,
+      isEmailVerified: true,
+      isApprovedByAdmin: true
+    }).select('name roll email department');
+
+    // Filter students based on roll number format (BBDDRRR)
+    const enrolledStudents = students.filter(student => {
+      if (!student.roll || student.roll.length < 4) return false;
+      
+      const batch = student.roll.substring(0, 2);
+      const deptCode = student.roll.substring(2, 4);
+      
+      return assignedBatches.some(assignment => 
+        assignment.batch === batch && assignment.deptCode === deptCode
+      );
+    });
+
+    // Sort by roll number
+    enrolledStudents.sort((a, b) => {
+      if (!a.roll) return 1;
+      if (!b.roll) return -1;
+      return a.roll.localeCompare(b.roll);
+    });
+
+    res.status(200).json({
+      success: true,
+      count: enrolledStudents.length,
+      courseInfo: {
+        courseCode: course.courseCode,
+        courseTitle: course.courseTitle,
+        course_type: course.course_type
+      },
+      data: enrolledStudents
+    });
+
+  } catch (error) {
+    console.error('Get course students error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching students'
+    });
+  }
+};
+
 
