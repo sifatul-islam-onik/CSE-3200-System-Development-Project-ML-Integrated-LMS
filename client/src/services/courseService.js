@@ -68,3 +68,10 @@ export const getPOSummary = async () => {
   const response = await axios.get(`${API_URL}/courses/reports/po-summary`, getAuthHeader());
   return response.data;
 };
+
+// Get students enrolled in a course
+export const getCourseStudents = async (courseId, section = null) => {
+  const params = section ? `?section=${section}` : '';
+  const response = await axios.get(`${API_URL}/courses/${courseId}/students${params}`, getAuthHeader());
+  return response.data;
+};

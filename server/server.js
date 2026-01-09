@@ -39,6 +39,7 @@ const courseOutcomeRoutes = require('./routes/courseOutcomeRoutes');
 const programOutcomeRoutes = require('./routes/programOutcomeRoutes');
 const copoMappingRoutes = require('./routes/copoMappingRoutes');
 const courseProposalRoutes = require('./routes/courseProposalRoutes');
+const termExamMarksRoutes = require('./routes/termExamMarksRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
@@ -47,6 +48,7 @@ app.use('/api/courses', courseOutcomeRoutes);
 app.use('/api/program-outcomes', programOutcomeRoutes);
 app.use('/api', copoMappingRoutes);
 app.use('/api/course-proposals', courseProposalRoutes);
+app.use('/api/term-exam-marks', termExamMarksRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;

@@ -89,4 +89,7 @@ router.delete('/:id', authorizeAdmin, courseController.deleteCourse);
 router.get('/:id/validate-obe', courseController.validateCourseOBE);
 router.get('/curriculum/semester/:semester', courseController.getCurriculumBySemester);
 
+// Student management routes
+router.get('/:courseId/students', courseController.getCourseStudents); // Teachers can view students in their assigned courses
+
 module.exports = router;

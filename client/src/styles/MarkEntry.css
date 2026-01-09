@@ -1,0 +1,380 @@
+.mark-entry-modal {
+  max-width: 1000px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mark-entry-modal .modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.mark-entry-modal .modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.mark-entry-body {
+  padding: 24px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.mark-entry-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-top: 1px solid #e5e7eb;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.student-info-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.student-info-card h4 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.student-info-card p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.student-navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.student-progress {
+  font-size: 20px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 8px 16px;
+  border-radius: 20px;
+}
+
+.student-selector {
+  background: rgba(255, 255, 255, 0.95);
+  color: #1f2937;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  max-width: 250px;
+  transition: all 0.2s;
+}
+
+.student-selector::placeholder {
+  color: #6b7280;
+  font-weight: 400;
+}
+
+.student-selector:hover {
+  background: rgba(255, 255, 255, 1);
+  border-color: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.student-selector:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 1);
+  border-color: rgba(255, 255, 255, 1);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+/* Image Upload Section */
+.image-upload-section {
+  text-align: center;
+  padding: 32px;
+  background: #f9fafb;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.image-upload-section h4 {
+  margin: 0 0 20px;
+  color: #1f2937;
+}
+
+.upload-options {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Camera Section */
+.camera-section {
+  margin-bottom: 24px;
+  text-align: center;
+  position: relative;
+}
+
+.camera-section video {
+  width: 100%;
+  max-width: 640px;
+  max-height: 480px;
+  border-radius: 8px;
+  background: #000;
+  display: block;
+  margin: 0 auto;
+}
+
+.camera-controls {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+/* Image Preview */
+.image-preview-section {
+  margin-bottom: 24px;
+}
+
+.image-preview-section h4 {
+  margin: 0 0 12px;
+  color: #1f2937;
+}
+
+.captured-image {
+  width: 100%;
+  max-height: 400px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  margin-bottom: 12px;
+}
+
+.image-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.processing-text {
+  text-align: center;
+  color: #3b82f6;
+  font-weight: 500;
+  margin-top: 12px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Marks Form */
+.marks-form-section {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 0;
+  overflow: hidden;
+}
+
+.marks-form-section h4 {
+  margin: 0 0 20px;
+  color: #1f2937;
+  font-size: 18px;
+}
+
+.marks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.question-marks {
+  background: #f9fafb;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.question-marks h5 {
+  margin: 0 0 12px;
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.parts-grid {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+
+.mark-input-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.mark-input-group label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.mark-input-group input {
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 14px;
+  text-align: center;
+  transition: all 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.mark-input-group input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.total-marks {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 8px;
+  font-size: 18px;
+}
+
+.total-value {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+/* Footer */
+.mark-entry-footer button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mark-entry-footer button {
+  white-space: nowrap;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .mark-entry-modal {
+    max-width: 95vw;
+    max-height: 95vh;
+  }
+
+  .mark-entry-modal .modal-header {
+    padding: 16px 20px;
+  }
+
+  .mark-entry-body {
+    padding: 20px;
+  }
+
+  .mark-entry-footer {
+    padding: 12px 20px;
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .marks-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .question-marks {
+    padding: 12px;
+  }
+
+  .marks-form-section {
+    padding: 16px;
+  }
+
+  .upload-options {
+    flex-direction: column;
+  }
+
+  .upload-options button {
+    width: 100%;
+  }
+
+  .student-info-card {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .student-navigation {
+    align-items: center;
+    width: 100%;
+  }
+
+  .student-selector {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .camera-section video {
+    max-height: 300px;
+  }
+}
+
+@media (max-width: 480px) {
+  .mark-entry-body {
+    padding: 16px;
+  }
+
+  .marks-form-section {
+    padding: 12px;
+  }
+
+  .question-marks {
+    padding: 10px;
+  }
+
+  .parts-grid {
+    gap: 8px;
+  }
+
+  .mark-input-group input {
+    padding: 6px;
+    font-size: 13px;
+  }
+}
