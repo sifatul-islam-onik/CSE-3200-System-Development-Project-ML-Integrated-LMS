@@ -717,3 +717,270 @@ exports.setUserDesignation = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error setting designation' });
   }
 };
+
+// @desc    Assign a teacher to a course
+// @route   POST /api/admin/courses/:courseId/assign-teacher
+// @access  Admin only
+exports.assignTeacherToCourse = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    const { courseId } = req.params;
+    const { teacherId, section } = req.body;
+
+    if (!teacherId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Teacher ID is required'
+      });
+    }
+
+    // Validate course exists
+    const Course = require('../models/Course');
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+
+    // Validate teacher exists and is a teacher
+    const teacher = await User.findById(teacherId);
+    if (!teacher) {
+      return res.status(404).json({
+        success: false,
+        message: 'Teacher not found'
+      });
+    }
+
+    if (teacher.role !== 'teacher') {
+      return res.status(400).json({
+        success: false,
+        message: 'User is not a teacher'
+      });
+    }
+
+    // For theory courses, section is required
+    if (course.course_type === 'THEORY' && !section) {
+      return res.status(400).json({
+        success: false,
+        message: 'Section (A or B) is required for theory courses'
+      });
+    }
+
+    // Validate section value
+    if (section && !['A', 'B'].includes(section)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Section must be A or B'
+      });
+    }
+
+    // Initialize assignedTeachers if needed
+    if (!course.assignedTeachers) {
+      course.assignedTeachers = [];
+    }
+
+    // Normalize assignedTeachers to new format if needed (handle legacy data)
+    course.assignedTeachers = course.assignedTeachers.map(item => {
+      // If item doesn't have a 'teacher' property, it's in old format (just an ObjectId)
+      if (!item.teacher) {
+        return { teacher: item, section: null };
+      }
+      return item;
+    });
+
+    // Check if teacher is already assigned to this section
+    const existingAssignment = course.assignedTeachers.find(
+      a => {
+        const teacherId_item = a.teacher?._id || a.teacher;
+        const teacherIdStr = teacherId_item.toString();
+        return teacherIdStr === teacherId.toString() && a.section === section;
+      }
+    );
+
+    if (existingAssignment) {
+      return res.status(400).json({
+        success: false,
+        message: `Teacher is already assigned to ${section ? `section ${section}` : 'this course'}`
+      });
+    }
+
+    // Check if section is already taken by another teacher
+    if (section) {
+      const sectionTaken = course.assignedTeachers.find(a => a.section === section);
+      if (sectionTaken) {
+        return res.status(400).json({
+          success: false,
+          message: `Section ${section} is already assigned to another teacher`
+        });
+      }
+    }
+
+    // Add teacher to assignedTeachers array
+    course.assignedTeachers.push({
+      teacher: teacherId,
+      section: course.course_type === 'THEORY' ? section : null
+    });
+    await course.save();
+
+    // Populate teacher info for response
+    await course.populate('assignedTeachers.teacher', 'name email designation');
+
+    res.status(200).json({
+      success: true,
+      message: 'Teacher assigned to course successfully',
+      data: {
+        courseId: course._id,
+        courseCode: course.courseCode,
+        courseTitle: course.courseTitle,
+        assignedTeachers: course.assignedTeachers
+      }
+    });
+
+  } catch (error) {
+    console.error('Assign teacher to course error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error assigning teacher to course'
+    });
+  }
+};
+
+// @desc    Unassign a teacher from a course
+// @route   DELETE /api/admin/courses/:courseId/unassign-teacher/:teacherId
+// @access  Admin only
+exports.unassignTeacherFromCourse = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    const { courseId, teacherId } = req.params;
+    const { section } = req.query;
+
+    // Validate course exists
+    const Course = require('../models/Course');
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+
+    // Check if teacher is assigned
+    if (!course.assignedTeachers || course.assignedTeachers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Teacher is not assigned to this course'
+      });
+    }
+
+    // Normalize assignedTeachers to new format if needed (handle legacy data)
+    course.assignedTeachers = course.assignedTeachers.map(item => {
+      // If item doesn't have a 'teacher' property, it's in old format (just an ObjectId)
+      if (!item.teacher) {
+        return { teacher: item, section: null };
+      }
+      return item;
+    });
+
+    // Find and remove the assignment
+    const initialLength = course.assignedTeachers.length;
+    course.assignedTeachers = course.assignedTeachers.filter(
+      a => {
+        const teacherId_item = a.teacher?._id || a.teacher;
+        const teacherIdStr = teacherId_item.toString();
+        return !(teacherIdStr === teacherId.toString() && 
+               (section ? a.section === section : true));
+      }
+    );
+
+    if (course.assignedTeachers.length === initialLength) {
+      return res.status(400).json({
+        success: false,
+        message: 'Teacher assignment not found'
+      });
+    }
+
+    await course.save();
+
+    // Populate teacher info for response
+    await course.populate('assignedTeachers.teacher', 'name email designation');
+
+    res.status(200).json({
+      success: true,
+      message: 'Teacher unassigned from course successfully',
+      data: {
+        courseId: course._id,
+        courseCode: course.courseCode,
+        courseTitle: course.courseTitle,
+        assignedTeachers: course.assignedTeachers
+      }
+    });
+
+  } catch (error) {
+    console.error('Unassign teacher from course error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error unassigning teacher from course'
+    });
+  }
+};
+
+// @desc    Get all teachers assigned to a course
+// @route   GET /api/admin/courses/:courseId/assigned-teachers
+// @access  Admin only
+exports.getAssignedTeachers = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    const { courseId } = req.params;
+
+    // Validate course exists
+    const Course = require('../models/Course');
+    const course = await Course.findById(courseId)
+      .populate('assignedTeachers.teacher', 'name email designation isActive');
+    
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        courseId: course._id,
+        courseCode: course.courseCode,
+        courseTitle: course.courseTitle,
+        courseType: course.course_type,
+        assignedTeachers: course.assignedTeachers || []
+      }
+    });
+
+  } catch (error) {
+    console.error('Get assigned teachers error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error getting assigned teachers'
+    });
+  }
+};
+

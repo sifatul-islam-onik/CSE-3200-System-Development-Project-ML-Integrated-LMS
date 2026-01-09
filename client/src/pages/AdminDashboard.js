@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faHourglass, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
-import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation } from '../services/adminService';
+import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers } from '../services/adminService';
 import { createCourse, getAllCourses, updateCourse, deleteCourse } from '../services/courseService';
 import { getAllProposals, getProposalById, approveProposal, rejectProposal } from '../services/courseProposalService';
 import CourseForm from '../components/CourseForm';
@@ -76,6 +76,12 @@ const AdminDashboard = () => {
   const [teacherExportMessage, setTeacherExportMessage] = useState('');
   const [teacherExportError, setTeacherExportError] = useState('');
   const [availableDepartments, setAvailableDepartments] = useState([]);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [selectedCourseForAssignment, setSelectedCourseForAssignment] = useState(null);
+  const [assignmentLoading, setAssignmentLoading] = useState(false);
+  const [assignmentError, setAssignmentError] = useState('');
+  const [assignmentSuccess, setAssignmentSuccess] = useState('');
+  const [teacherFilter, setTeacherFilter] = useState('');
 
   // Navigate to a course group (drill-down)
   const navigateToGroup = (groupKey) => {
@@ -701,6 +707,82 @@ const AdminDashboard = () => {
   const openDeleteModal = (course) => {
     setCourseToDelete(course);
     setShowDeleteModal(true);
+  };
+
+  const openAssignmentModal = async (course) => {
+    setSelectedCourseForAssignment(course);
+    setShowAssignmentModal(true);
+    setAssignmentError('');
+    setAssignmentSuccess('');
+    setTeacherFilter('');
+    
+    // Fetch users if not already loaded
+    if (users.length === 0) {
+      try {
+        const response = await getAllUsers();
+        setUsers(response.data || []);
+      } catch (err) {
+        setAssignmentError('Failed to load teachers');
+      }
+    }
+  };
+
+  const handleAssignTeacher = async (teacherId, section = null) => {
+    if (!selectedCourseForAssignment) return;
+    
+    setAssignmentLoading(true);
+    setAssignmentError('');
+    setAssignmentSuccess('');
+    
+    try {
+      const response = await assignTeacherToCourse(selectedCourseForAssignment._id, teacherId, section);
+      setAssignmentSuccess(`Teacher assigned successfully${section ? ` to section ${section}` : ''}`);
+      
+      // Update the selected course with the new assignment data
+      if (response.data?.assignedTeachers) {
+        setSelectedCourseForAssignment(prev => ({
+          ...prev,
+          assignedTeachers: response.data.assignedTeachers
+        }));
+      }
+      
+      fetchCourses(); // Refresh courses list
+      setTimeout(() => setAssignmentSuccess(''), 3000);
+    } catch (err) {
+      setAssignmentError(err.response?.data?.message || 'Failed to assign teacher');
+      setTimeout(() => setAssignmentError(''), 3000);
+    } finally {
+      setAssignmentLoading(false);
+    }
+  };
+
+  const handleUnassignTeacher = async (teacherId, section = null) => {
+    if (!selectedCourseForAssignment) return;
+    
+    setAssignmentLoading(true);
+    setAssignmentError('');
+    setAssignmentSuccess('');
+    
+    try {
+      const response = await unassignTeacherFromCourse(selectedCourseForAssignment._id, teacherId, section);
+      setAssignmentSuccess(`Teacher unassigned successfully${section ? ` from section ${section}` : ''}`);
+      
+      // Update the selected course with the new assignment data
+      if (response.data?.assignedTeachers) {
+        setSelectedCourseForAssignment(prev => ({
+          ...prev,
+          assignedTeachers: response.data.assignedTeachers
+        }));
+      }
+      
+      fetchCourses(); // Refresh courses list
+      setTimeout(() => setAssignmentSuccess(''), 3000);
+    } catch (err) {
+      setAssignmentError(err.response?.data?.message || 'Failed to unassign teacher');
+      setTimeout(() => setAssignmentError(''), 3000);
+    } finally {
+      setAssignmentLoading(false);
+    }
   };
 
   const handleViewProposal = async (proposalId) => {
@@ -1370,6 +1452,18 @@ const AdminDashboard = () => {
                                   <span className="course-code">{course.courseCode}</span>
                                   <span className="course-title">{course.courseTitle}</span>
                                   <span className="course-credit">{course.credit} Cr</span>
+                                  {course.assignedTeachers && course.assignedTeachers.length > 0 && (
+                                    <span className="course-assigned" style={{ 
+                                      fontSize: '12px', 
+                                      color: '#059669', 
+                                      backgroundColor: '#d1fae5',
+                                      padding: '2px 8px',
+                                      borderRadius: '4px',
+                                      marginLeft: '8px'
+                                    }}>
+                                      <FontAwesomeIcon icon={faUsers} /> {course.assignedTeachers.length} Teacher{course.assignedTeachers.length !== 1 ? 's' : ''}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                               <div className="course-item-actions">
@@ -1383,6 +1477,17 @@ const AdminDashboard = () => {
                                   }}
                                 >
                                   <FontAwesomeIcon icon={faEye} /> View
+                                </button>
+                                <button
+                                  className="btn btn-sm"
+                                  style={{
+                                    backgroundColor: '#8b5cf6',
+                                    color: 'white',
+                                    border: 'none'
+                                  }}
+                                  onClick={() => openAssignmentModal(course)}
+                                >
+                                  <FontAwesomeIcon icon={faUsers} /> Assign
                                 </button>
                                 <button
                                   className="btn btn-sm btn-primary"
@@ -2243,6 +2348,277 @@ const AdminDashboard = () => {
                     <FontAwesomeIcon icon={faTrash} /> Delete Course
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Course Teacher Assignment Modal */}
+      {showAssignmentModal && selectedCourseForAssignment && (
+        <div className="modal-overlay" onClick={() => !assignmentLoading && setShowAssignmentModal(false)}>
+          <div className="modal-content assignment-modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '600px'}}>
+            <div className="modal-header">
+              <h3>Assign Teachers to Course</h3>
+              <button 
+                className="close-btn" 
+                onClick={() => setShowAssignmentModal(false)}
+                disabled={assignmentLoading}
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{marginBottom: '20px', padding: '12px', backgroundColor: '#f3f4f6', borderRadius: '8px'}}>
+                <h4 style={{margin: '0 0 8px 0', fontSize: '16px', color: '#1f2937'}}>
+                  {selectedCourseForAssignment.courseCode}
+                </h4>
+                <p style={{margin: 0, color: '#6b7280', fontSize: '14px'}}>
+                  {selectedCourseForAssignment.courseTitle}
+                </p>
+                <p style={{margin: '4px 0 0 0', color: '#6b7280', fontSize: '12px'}}>
+                  Type: <strong>{selectedCourseForAssignment.course_type}</strong>
+                  {selectedCourseForAssignment.course_type === 'THEORY' && ' • Requires Section Selection'}
+                </p>
+              </div>
+
+              {assignmentSuccess && (
+                <div className="alert alert-success" style={{marginBottom: '16px'}}>
+                  <span className="alert-icon"><FontAwesomeIcon icon={faCheck} /></span>
+                  {assignmentSuccess}
+                </div>
+              )}
+
+              {assignmentError && (
+                <div className="alert alert-error" style={{marginBottom: '16px'}}>
+                  <span className="alert-icon"><FontAwesomeIcon icon={faTimes} /></span>
+                  {assignmentError}
+                </div>
+              )}
+
+              {/* Currently Assigned Teachers */}
+              <div style={{marginBottom: '24px'}}>
+                <h4 style={{fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: '#374151'}}>
+                  Currently Assigned Teachers
+                  {selectedCourseForAssignment.course_type === 'THEORY' && (
+                    <span style={{fontSize: '12px', fontWeight: 400, color: '#6b7280', marginLeft: '8px'}}>
+                      (Sections A & B)
+                    </span>
+                  )}
+                </h4>
+                {selectedCourseForAssignment.assignedTeachers && selectedCourseForAssignment.assignedTeachers.length > 0 ? (
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                    {selectedCourseForAssignment.assignedTeachers.map((assignment, idx) => {
+                      const teacher = assignment.teacher || assignment;
+                      const section = assignment.section;
+                      return (
+                        <div 
+                          key={`${teacher._id}-${section || idx}`}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '10px 12px',
+                            backgroundColor: '#fff',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '6px'
+                          }}
+                        >
+                          <div style={{flex: 1}}>
+                            <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                              <span style={{fontWeight: 500, fontSize: '14px', color: '#1f2937'}}>
+                                {teacher.name}
+                              </span>
+                              {section && (
+                                <span style={{
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  color: '#fff',
+                                  backgroundColor: section === 'A' ? '#3b82f6' : '#10b981',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px'
+                                }}>
+                                  Section {section}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{fontSize: '12px', color: '#6b7280', marginTop: '2px'}}>
+                              {teacher.email}
+                              {teacher.designation && ` • ${teacher.designation}`}
+                            </div>
+                          </div>
+                          <button
+                            className="btn btn-sm btn-danger"
+                            onClick={() => handleUnassignTeacher(teacher._id, section)}
+                            disabled={assignmentLoading}
+                            style={{fontSize: '12px', padding: '6px 12px'}}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: '16px',
+                    backgroundColor: '#fef3c7',
+                    border: '1px solid #fbbf24',
+                    borderRadius: '6px',
+                    textAlign: 'center',
+                    color: '#92400e',
+                    fontSize: '13px'
+                  }}>
+                    No teachers assigned yet
+                  </div>
+                )}
+              </div>
+
+              {/* Available Teachers to Assign */}
+              <div>
+                <h4 style={{fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: '#374151'}}>
+                  Available Teachers
+                </h4>
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or designation..."
+                  value={teacherFilter}
+                  onChange={(e) => setTeacherFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    marginBottom: '12px',
+                    outline: 'none',
+                    transition: 'border-color 0.2s ease'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                  onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                />
+                {(() => {
+                  const assignedTeacherIds = (selectedCourseForAssignment.assignedTeachers || []).map(a => {
+                    const teacher = a.teacher || a;
+                    return teacher._id;
+                  });
+                  
+                  // Get assigned sections for theory courses
+                  const assignedSections = selectedCourseForAssignment.course_type === 'THEORY'
+                    ? (selectedCourseForAssignment.assignedTeachers || []).map(a => a.section)
+                    : [];
+                  
+                  let availableTeachers = users.filter(u => 
+                    u.role === 'teacher' && 
+                    u.isActive &&
+                    !assignedTeacherIds.includes(u._id)
+                  );
+                  
+                  // Apply filter
+                  if (teacherFilter.trim()) {
+                    const filterLower = teacherFilter.toLowerCase();
+                    availableTeachers = availableTeachers.filter(teacher => 
+                      teacher.name?.toLowerCase().includes(filterLower) ||
+                      teacher.email?.toLowerCase().includes(filterLower) ||
+                      teacher.designation?.toLowerCase().includes(filterLower)
+                    );
+                  }
+
+                  if (availableTeachers.length === 0) {
+                    return (
+                      <div style={{
+                        padding: '16px',
+                        backgroundColor: '#f3f4f6',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        textAlign: 'center',
+                        color: '#6b7280',
+                        fontSize: '13px'
+                      }}>
+                        No available teachers to assign
+                      </div>
+                    );
+                  }
+
+                  const isTheory = selectedCourseForAssignment.course_type?.toUpperCase() === 'THEORY';
+                  
+                  console.log('Course type:', selectedCourseForAssignment.course_type, 'isTheory:', isTheory);
+
+                  return (
+                    <div style={{
+                      maxHeight: '250px',
+                      overflowY: 'auto',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}>
+                      {availableTeachers.map((teacher) => (
+                        <div 
+                          key={teacher._id}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '10px 12px',
+                            backgroundColor: '#fff',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '6px'
+                          }}
+                        >
+                          <div style={{flex: 1}}>
+                            <div style={{fontWeight: 500, fontSize: '14px', color: '#1f2937'}}>
+                              {teacher.name}
+                            </div>
+                            <div style={{fontSize: '12px', color: '#6b7280'}}>
+                              {teacher.email}
+                              {teacher.designation && ` • ${teacher.designation}`}
+                            </div>
+                          </div>
+                          {isTheory ? (
+                            <div style={{display: 'flex', gap: '6px'}}>
+                              <button
+                                className="btn btn-sm btn-primary"
+                                onClick={() => handleAssignTeacher(teacher._id, 'A')}
+                                disabled={assignmentLoading || assignedSections.includes('A')}
+                                style={{fontSize: '12px', padding: '6px 10px', minWidth: '65px'}}
+                                title={assignedSections.includes('A') ? 'Section A already assigned' : 'Assign to Section A'}
+                              >
+                                Sec A
+                              </button>
+                              <button
+                                className="btn btn-sm btn-primary"
+                                onClick={() => handleAssignTeacher(teacher._id, 'B')}
+                                disabled={assignmentLoading || assignedSections.includes('B')}
+                                style={{fontSize: '12px', padding: '6px 10px', minWidth: '65px'}}
+                                title={assignedSections.includes('B') ? 'Section B already assigned' : 'Assign to Section B'}
+                              >
+                                Sec B
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={() => handleAssignTeacher(teacher._id, null)}
+                              disabled={assignmentLoading}
+                              style={{fontSize: '12px', padding: '6px 12px'}}
+                            >
+                              Assign
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="btn btn-outline"
+                onClick={() => setShowAssignmentModal(false)}
+                disabled={assignmentLoading}
+              >
+                Close
               </button>
             </div>
           </div>

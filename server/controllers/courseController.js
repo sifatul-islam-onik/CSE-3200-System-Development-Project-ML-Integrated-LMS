@@ -471,8 +471,14 @@ exports.getAllCourses = async (req, res) => {
     if (term) filter.term = parseInt(term);
     if (status) filter.status = status;
 
+    // If user is a teacher, filter by assigned courses only
+    if (req.user && req.user.role === 'teacher') {
+      filter['assignedTeachers.teacher'] = req.user._id;
+    }
+
     const courses = await Course.find(filter)
       .populate('createdBy', 'name email')
+      .populate('assignedTeachers.teacher', 'name email designation')
       .sort({ createdAt: -1 });
 
     // Populate course outcomes with their PO mappings for each course

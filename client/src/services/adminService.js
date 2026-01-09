@@ -119,3 +119,35 @@ export const exportTeacherCredentials = async (dept) => {
   );
   return response.data;
 };
+
+// Course assignment functions
+
+// Assign a teacher to a course
+export const assignTeacherToCourse = async (courseId, teacherId, section = null) => {
+  const response = await axios.post(
+    `${API_URL}/admin/courses/${courseId}/assign-teacher`,
+    { teacherId, section },
+    getAuthHeader()
+  );
+  return response.data;
+};
+
+// Unassign a teacher from a course
+export const unassignTeacherFromCourse = async (courseId, teacherId, section = null) => {
+  const params = section ? `?section=${section}` : '';
+  const response = await axios.delete(
+    `${API_URL}/admin/courses/${courseId}/unassign-teacher/${teacherId}${params}`,
+    getAuthHeader()
+  );
+  return response.data;
+};
+
+// Get all teachers assigned to a course
+export const getAssignedTeachers = async (courseId) => {
+  const response = await axios.get(
+    `${API_URL}/admin/courses/${courseId}/assigned-teachers`,
+    getAuthHeader()
+  );
+  return response.data;
+};
+

@@ -25,4 +25,9 @@ router.post('/users/export-credentials', adminController.exportStudentCredential
 router.post('/teachers/import', upload.single('file'), adminController.importTeachersFromExcel);
 router.post('/teachers/export-credentials', adminController.exportTeacherCredentials);
 
+// Course assignment routes
+router.post('/courses/:courseId/assign-teacher', adminController.assignTeacherToCourse);
+router.delete('/courses/:courseId/unassign-teacher/:teacherId', adminController.unassignTeacherFromCourse);
+router.get('/courses/:courseId/assigned-teachers', adminController.getAssignedTeachers);
+
 module.exports = router;
