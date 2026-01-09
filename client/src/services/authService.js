@@ -19,3 +19,12 @@ export const verifyEmail = async (token) => {
   const response = await axios.get(`${API_URL}/auth/verify-email/${token}`);
   return response.data;
 };
+
+// Get current user profile
+export const getProfile = async () => {
+  const token = localStorage.getItem('token');
+  const response = await axios.get(`${API_URL}/auth/profile`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};

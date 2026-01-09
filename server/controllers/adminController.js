@@ -2,6 +2,7 @@ const User = require('../models/User');
 const { sendApprovalEmail } = require('../utils/emailService');
 const XLSX = require('xlsx');
 const crypto = require('crypto');
+const { bulkImportTeachers } = require('../utils/bulkTeacherImport');
 
 // Helper function to generate random password
 const generateRandomPassword = () => {
@@ -503,5 +504,216 @@ exports.exportStudentCredentials = async (req, res) => {
       success: false,
       message: 'Server error exporting credentials'
     });
+  }
+};
+
+// @desc    Bulk import teachers from Excel
+// @route   POST /api/admin/teachers/import
+// @access  Admin only
+exports.importTeachersFromExcel = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    
+    if (!sheet) {
+      return res.status(400).json({ success: false, message: 'No sheet found in workbook' });
+    }
+
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    if (!rows.length) {
+      return res.status(400).json({ success: false, message: 'Sheet is empty' });
+    }
+
+    // Import teachers
+    const results = await bulkImportTeachers(rows);
+
+    // Return results with created teachers' credentials
+    res.status(200).json({
+      success: results.errors.length === 0,
+      message: `Teachers import completed: ${results.created} created, ${results.skipped.length} skipped`,
+      data: {
+        created: results.created,
+        skipped: results.skipped,
+        errors: results.errors,
+        createdTeachers: results.createdTeachers // Include credentials for admin to save/print
+      }
+    });
+  } catch (error) {
+    console.error('Import teachers error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error importing teachers'
+    });
+  }
+};
+
+exports.exportTeacherCredentials = async (req, res) => {
+  try {
+    const { department } = req.body;
+
+    if (!department) {
+      return res.status(400).json({ success: false, message: 'Department is required' });
+    }
+
+    console.log('Exporting credentials for department:', department);
+
+    // Get all teachers in the department, matching either the department field
+    // or the email subdomain (format: name@DEPT.kuet.ac.bd)
+    const deptRegex = new RegExp(`@${department}\\.kuet\\.ac\\.bd$`, 'i');
+    const teachers = await User.find({
+      role: 'teacher',
+      $or: [
+        // Match department field case-insensitively
+        { department: { $regex: new RegExp(`^${department}$`, 'i') } },
+        // Or infer from email domain sub-part
+        { email: { $regex: deptRegex } }
+      ]
+    })
+    .select('name email department +initialPassword')
+    .lean();
+
+    console.log(`Found ${teachers.length} teachers for department: ${department}`);
+    
+    // Log first teacher to debug initialPassword field
+    if (teachers.length > 0) {
+      console.log('Sample teacher data:', {
+        name: teachers[0].name,
+        email: teachers[0].email,
+        department: teachers[0].department,
+        hasInitialPassword: !!teachers[0].initialPassword,
+        initialPasswordValue: teachers[0].initialPassword ? '[SET]' : '[NOT SET]'
+      });
+    }
+
+    // If no teachers found, return an error as JSON
+    if (teachers.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `No teachers found for department: ${department}`
+      });
+    }
+
+    // Create workbook
+    const workbook = XLSX.utils.book_new();
+    
+    // Count how many teachers have initialPassword set
+    const withPassword = teachers.filter(t => t.initialPassword).length;
+    const withoutPassword = teachers.length - withPassword;
+    
+    if (withoutPassword > 0) {
+      console.log(`Warning: ${withoutPassword} of ${teachers.length} teachers don't have initial passwords recorded`);
+    }
+    
+    // Prepare data with actual initial passwords
+    const exportData = teachers.map(t => ({
+      'Full Name': t.name || '',
+      'Email': t.email || '',
+      'Password': t.initialPassword || '[Not Available - Created before password tracking]',
+      'Department': t.department || department
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    
+    // Add a note at the top if some passwords are missing
+    if (withoutPassword > 0) {
+      XLSX.utils.sheet_add_aoa(worksheet, [[
+        'Note:', 
+        `${withoutPassword} teachers were created before password tracking was implemented.`,
+        'Their passwords are not available.',
+        'Consider resetting their passwords if needed.'
+      ]], { origin: -1 });
+    }
+    
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 25 },  // Full Name
+      { wch: 30 },  // Email
+      { wch: 20 },  // Password
+      { wch: 15 }   // Department
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Teacher Credentials');
+    
+    // Generate file and send
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `teacher_credentials_${department}_${timestamp}.xlsx`;
+    
+    const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+    
+    res.set({
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    
+    res.send(buffer);
+  } catch (error) {
+    console.error('Export teacher credentials error:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code
+    });
+    res.status(500).json({
+      success: false,
+      message: `Server error exporting teacher credentials: ${error.message}`
+    });
+  }
+};
+
+// @desc    Set a teacher's designation
+// @route   PUT /api/admin/users/:userId/designation
+// @access  Admin only
+exports.setUserDesignation = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    let { designation } = req.body;
+
+    if (!designation) {
+      return res.status(400).json({ success: false, message: 'Designation is required' });
+    }
+
+    // Normalize and validate designation
+    const allowed = ['Professor', 'Assistant Professor', 'Lecturer'];
+    const normalized = String(designation).trim();
+    if (!allowed.includes(normalized)) {
+      return res.status(400).json({ success: false, message: 'Invalid designation value' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.role !== 'teacher') {
+      return res.status(400).json({ success: false, message: 'Designation can only be set for teachers' });
+    }
+
+    user.designation = normalized;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Designation updated successfully',
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        designation: user.designation,
+        isActive: user.isActive,
+        isApprovedByAdmin: user.isApprovedByAdmin,
+        isEmailVerified: user.isEmailVerified,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Set designation error:', error);
+    res.status(500).json({ success: false, message: 'Server error setting designation' });
   }
 };

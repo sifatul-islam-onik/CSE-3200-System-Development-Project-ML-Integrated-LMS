@@ -217,6 +217,7 @@ exports.login = async (req, res) => {
         religion: user.religion,
         profilePicture: user.profilePicture,
         signature: user.signature,
+        designation: user.designation,
         role: user.role,
         isEmailVerified: user.isEmailVerified,
         isApprovedByAdmin: user.isApprovedByAdmin,
@@ -534,6 +535,7 @@ exports.updateProfile = async (req, res) => {
         bloodGroup: user.bloodGroup,
         religion: user.religion,
         email: user.email,
+        designation: user.designation,
         role: user.role,
         isEmailVerified: user.isEmailVerified,
         isApprovedByAdmin: user.isApprovedByAdmin,
@@ -550,5 +552,47 @@ exports.updateProfile = async (req, res) => {
       success: false,
       message: 'Server error updating profile'
     });
+  }
+};
+
+// @desc    Get current user profile
+// @route   GET /api/auth/profile
+// @access  Protected
+exports.getProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    res.status(200).json({
+      success: true,
+      data: {
+        _id: user._id,
+        name: user.name,
+        father: user.father,
+        mother: user.mother,
+        advisor: user.advisor,
+        phone: user.phone,
+        address: user.address,
+        hall: user.hall,
+        scholarship: user.scholarship,
+        gender: user.gender,
+        bloodGroup: user.bloodGroup,
+        religion: user.religion,
+        email: user.email,
+        designation: user.designation,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified,
+        isApprovedByAdmin: user.isApprovedByAdmin,
+        isActive: user.isActive,
+        profilePicture: user.profilePicture,
+        signature: user.signature,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching profile' });
   }
 };

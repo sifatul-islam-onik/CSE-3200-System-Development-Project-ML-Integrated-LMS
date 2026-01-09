@@ -109,6 +109,11 @@ const userSchema = new mongoose.Schema({
     },
     default: 'Others'
   },
+  // Designation for teachers (fixed default)
+  designation: {
+    type: String,
+    default: 'Lecturer'
+  },
   emailVerificationOTP: {
     type: String,
     select: false
@@ -116,6 +121,10 @@ const userSchema = new mongoose.Schema({
   emailVerificationExpires: {
     type: Date,
     select: false
+  },
+  department: {
+    type: String,
+    default: ''
   },
   createdAt: {
     type: Date,

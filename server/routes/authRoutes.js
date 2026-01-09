@@ -54,5 +54,6 @@ router.post('/resend-otp', authController.resendOTP);
 
 // Profile routes (protected)
 router.put('/profile/update', authenticateUser, authController.updateProfile);
+router.get('/profile', authenticateUser, authController.getProfile);
 
 module.exports = router;

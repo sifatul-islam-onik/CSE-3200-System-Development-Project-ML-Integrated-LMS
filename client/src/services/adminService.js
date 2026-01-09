@@ -54,6 +54,16 @@ export const deleteUser = async (userId) => {
   return response.data;
 };
 
+// Set teacher designation
+export const setUserDesignation = async (userId, designation) => {
+  const response = await axios.put(
+    `${API_URL}/admin/users/${userId}/designation`,
+    { designation },
+    getAuthHeader()
+  );
+  return response.data;
+};
+
 // Import students from Excel
 export const importStudentsFromExcel = async (formData) => {
   const token = localStorage.getItem('token');
@@ -72,6 +82,34 @@ export const exportStudentCredentials = async (batchYear, deptCode) => {
   const response = await axios.post(
     `${API_URL}/admin/users/export-credentials`, 
     { batchYear, deptCode },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      responseType: 'blob'
+    }
+  );
+  return response.data;
+};
+
+// Import teachers from Excel
+export const importTeachersFromExcel = async (formData) => {
+  const token = localStorage.getItem('token');
+  const response = await axios.post(`${API_URL}/admin/teachers/import`, formData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'multipart/form-data'
+    }
+  });
+  return response.data;
+};
+
+// Export teacher credentials by department
+export const exportTeacherCredentials = async (dept) => {
+  const token = localStorage.getItem('token');
+  const response = await axios.post(
+    `${API_URL}/admin/teachers/export-credentials`,
+    { department: dept },
     {
       headers: {
         Authorization: `Bearer ${token}`

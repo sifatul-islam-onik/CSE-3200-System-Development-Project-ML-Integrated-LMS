@@ -141,13 +141,6 @@ const Login = () => {
                 >
                   Register as Student
                 </button>
-                <span className="separator">or</span>
-                <button 
-                  onClick={() => navigate('/register/teacher')}
-                  className="link-button"
-                >
-                  Register as Teacher
-                </button>
               </div>
             </div>
           </div>

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faHourglass, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
-import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials } from '../services/adminService';
+import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation } from '../services/adminService';
 import { createCourse, getAllCourses, updateCourse, deleteCourse } from '../services/courseService';
 import { getAllProposals, getProposalById, approveProposal, rejectProposal } from '../services/courseProposalService';
 import CourseForm from '../components/CourseForm';
@@ -34,6 +34,8 @@ const AdminDashboard = () => {
   const [lookupUser, setLookupUser] = useState(null);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState('');
+  const [lookupDesignation, setLookupDesignation] = useState('Lecturer');
+  const [lookupDesignationSaving, setLookupDesignationSaving] = useState(false);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -65,6 +67,15 @@ const AdminDashboard = () => {
   const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
   const [adminProfileSaving, setAdminProfileSaving] = useState(false);
   const [adminProfileMessage, setAdminProfileMessage] = useState('');
+  const [teacherImportFile, setTeacherImportFile] = useState(null);
+  const [teacherImportLoading, setTeacherImportLoading] = useState(false);
+  const [teacherImportMessage, setTeacherImportMessage] = useState('');
+  const [teacherImportError, setTeacherImportError] = useState('');
+  const [teacherExportDept, setTeacherExportDept] = useState('');
+  const [teacherExportLoading, setTeacherExportLoading] = useState(false);
+  const [teacherExportMessage, setTeacherExportMessage] = useState('');
+  const [teacherExportError, setTeacherExportError] = useState('');
+  const [availableDepartments, setAvailableDepartments] = useState([]);
 
   // Navigate to a course group (drill-down)
   const navigateToGroup = (groupKey) => {
@@ -215,6 +226,20 @@ const AdminDashboard = () => {
     try {
       const response = await getAllUsers();
       setUsers(response.data || []);
+      
+      // Extract unique departments from teacher accounts
+      const teachers = (response.data || []).filter(u => u.role === 'teacher');
+      const depts = new Set();
+      teachers.forEach(t => {
+        if (t.department) {
+          depts.add(t.department);
+        } else if (t.email && t.email.includes('@') && t.email.includes('.kuet.ac.bd')) {
+          // Extract from email format: name@DEPT.kuet.ac.bd
+          const match = t.email.match(/@([^.]+)\.kuet\.ac\.bd/);
+          if (match) depts.add(match[1].toUpperCase());
+        }
+      });
+      setAvailableDepartments(Array.from(depts).sort());
     } catch (err) {
       setUsersError(err.response?.data?.message || 'Failed to fetch users');
     } finally {
@@ -300,6 +325,101 @@ const AdminDashboard = () => {
       setTimeout(() => setExportError(''), 5000);
     } finally {
       setExportLoading(false);
+    }
+  };
+
+  const handleImportTeachers = async () => {
+    if (!teacherImportFile) {
+      setTeacherImportError('Please select an Excel file');
+      setTimeout(() => setTeacherImportError(''), 3000);
+      return;
+    }
+
+    setTeacherImportLoading(true);
+    setTeacherImportError('');
+    setTeacherImportMessage('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', teacherImportFile);
+      const result = await importTeachersFromExcel(formData);
+
+      const created = result.data?.created || 0;
+      const skipped = (result.data?.skipped || []).length;
+      const errors = (result.data?.errors || []).length;
+      let summary = `✅ Successfully imported ${created} teachers.`;
+      if (skipped) summary += ` (${skipped} rows skipped)`;
+      if (errors) summary += ` (${errors} rows had errors)`;
+      setTeacherImportMessage(summary);
+      
+      // Refresh users list and departments dropdown
+      if (created > 0) {
+        await fetchAllUsers();
+      }
+    } catch (err) {
+      setTeacherImportError(err.response?.data?.message || 'Failed to import teachers');
+    } finally {
+      setTeacherImportLoading(false);
+      setTeacherImportFile(null);
+    }
+  };
+
+  const handleExportTeachers = async () => {
+    if (!teacherExportDept) {
+      setTeacherExportError('Please select a department');
+      setTimeout(() => setTeacherExportError(''), 3000);
+      return;
+    }
+
+    setTeacherExportLoading(true);
+    setTeacherExportError('');
+    setTeacherExportMessage('');
+
+    try {
+      const blob = await exportTeacherCredentials(teacherExportDept);
+      
+      // Check if blob is valid
+      if (!blob || blob.size === 0) {
+        setTeacherExportError('No data received from server');
+        setTimeout(() => setTeacherExportError(''), 5000);
+        return;
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `teacher_credentials_${teacherExportDept}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      setTeacherExportMessage('Teacher credentials exported successfully.');
+      setTeacherExportDept('');
+      setTimeout(() => setTeacherExportMessage(''), 5000);
+    } catch (err) {
+      console.error('Export error:', err);
+      
+      // Try to extract error message from blob if it's a JSON error response
+      let errorMessage = 'Failed to export teacher credentials';
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const errorData = JSON.parse(text);
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseErr) {
+          // If parsing fails, use default message
+        }
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setTeacherExportError(errorMessage);
+      setTimeout(() => setTeacherExportError(''), 5000);
+    } finally {
+      setTeacherExportLoading(false);
     }
   };
 
@@ -405,6 +525,10 @@ const AdminDashboard = () => {
 
       if (foundUser) {
         setLookupUser(foundUser);
+        // Initialize designation selector for teachers when a user is found
+        if ((foundUser.role || '').toLowerCase() === 'teacher') {
+          setLookupDesignation(foundUser.designation || 'Lecturer');
+        }
       } else {
         setLookupError('User not found');
       }
@@ -1348,6 +1472,44 @@ const AdminDashboard = () => {
                             <span className="user-date">Joined {new Date(lookupUser.createdAt).toLocaleDateString()}</span>
                           )}
                         </div>
+                        {(lookupUser.role || '').toLowerCase() === 'teacher' && (
+                          <div style={{ marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <label style={{ fontSize: '12px', color: '#6b7280' }}>Designation:</label>
+                            <select
+                              value={lookupDesignation}
+                              onChange={(e) => setLookupDesignation(e.target.value)}
+                              style={{ padding: '6px 10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                              disabled={lookupDesignationSaving}
+                            >
+                              <option value="Professor">Professor</option>
+                              <option value="Assistant Professor">Assistant Professor</option>
+                              <option value="Lecturer">Lecturer</option>
+                            </select>
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={async () => {
+                                try {
+                                  setLookupDesignationSaving(true);
+                                  const result = await setUserDesignation(lookupUser._id, lookupDesignation);
+                                  // Update local state and users list
+                                  const updated = { ...lookupUser, designation: result.data?.designation || lookupDesignation };
+                                  setLookupUser(updated);
+                                  // Also update users list entry
+                                  setUsers(prev => prev.map(u => u._id === updated._id ? { ...u, designation: updated.designation } : u));
+                                  setSuccessMessage('Designation updated');
+                                  setTimeout(() => setSuccessMessage(''), 3000);
+                                } catch (err) {
+                                  setLookupError(err.response?.data?.message || 'Failed to update designation');
+                                } finally {
+                                  setLookupDesignationSaving(false);
+                                }
+                              }}
+                              disabled={lookupDesignationSaving}
+                            >
+                              {lookupDesignationSaving ? 'Saving...' : 'Save'}
+                            </button>
+                          </div>
+                        )}
                         <div className="user-status">
                           <span className={`status-badge ${lookupUser.isActive ? 'active' : 'inactive'}`}>{lookupUser.isActive ? 'Active' : 'Inactive'}</span>
                         </div>
@@ -1487,11 +1649,92 @@ const AdminDashboard = () => {
                     </>
                   )}
                   {selectedUserRole === 'teacher' && (
-                    <div className="empty-state">
-                      <div className="empty-icon"><FontAwesomeIcon icon={faUsers} /></div>
-                      <h3>Teacher Management</h3>
-                      <p>Teacher management features coming soon</p>
-                    </div>
+                    <>
+                      {teacherImportMessage && (
+                        <div className="alert alert-success" style={{ marginBottom: '16px' }}>
+                          {teacherImportMessage}
+                        </div>
+                      )}
+
+                      {teacherImportError && (
+                        <div className="alert alert-error" style={{ marginBottom: '16px' }}>
+                          {teacherImportError}
+                        </div>
+                      )}
+
+                      <div className="proposal-card" style={{ marginBottom: '16px' }}>
+                        <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '16px' }}>Import Teachers from Excel</h3>
+                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Columns: Full Name, Name (for email), and Dept</p>
+                          </div>
+                        </div>
+                        <div className="proposal-body" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <input
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            onChange={(e) => {
+                              setTeacherImportFile(e.target.files?.[0] || null);
+                              setTeacherImportError('');
+                              setTeacherImportMessage('');
+                            }}
+                            disabled={teacherImportLoading}
+                          />
+                          <button
+                            className="btn btn-primary"
+                            onClick={handleImportTeachers}
+                            disabled={teacherImportLoading || !teacherImportFile}
+                          >
+                            {teacherImportLoading ? 'Importing...' : 'Import Teachers'}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="proposal-card" style={{ marginBottom: '16px' }}>
+                        <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '16px' }}>Export Teacher Credentials</h3>
+                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Select a department and export teacher emails and passwords</p>
+                          </div>
+                        </div>
+                        <div className="proposal-body" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <select
+                            value={teacherExportDept}
+                            onChange={(e) => {
+                              setTeacherExportDept(e.target.value);
+                              setTeacherExportError('');
+                              setTeacherExportMessage('');
+                            }}
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '6px',
+                              border: '1px solid #d1d5db',
+                              fontSize: '14px',
+                              minWidth: '200px'
+                            }}
+                            disabled={teacherExportLoading}
+                          >
+                            <option value="">-- Select Department --</option>
+                            {availableDepartments.map(dept => (
+                              <option key={dept} value={dept}>{dept}</option>
+                            ))}
+                          </select>
+                          <button
+                            className="btn btn-primary"
+                            onClick={handleExportTeachers}
+                            disabled={teacherExportLoading || !teacherExportDept}
+                          >
+                            {teacherExportLoading ? 'Exporting...' : 'Export Credentials'}
+                          </button>
+                        </div>
+                        {(teacherExportMessage || teacherExportError) && (
+                          <div style={{ marginTop: '10px' }}>
+                            {teacherExportMessage && <div className="alert alert-success">{teacherExportMessage}</div>}
+                            {teacherExportError && <div className="alert alert-error">{teacherExportError}</div>}
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               ) : groupedUsers.length === 0 ? (

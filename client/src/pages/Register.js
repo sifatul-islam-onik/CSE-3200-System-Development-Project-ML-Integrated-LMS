@@ -140,7 +140,6 @@ const Register = () => {
                     disabled={loading}
                   >
                     <option value="student">Student</option>
-                    <option value="teacher">Teacher</option>
                   </select>
                 </div>
 
