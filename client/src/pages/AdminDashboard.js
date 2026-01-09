@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faHourglass, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
-import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers } from '../services/adminService';
+import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers, updateUserProfile } from '../services/adminService';
 import { createCourse, getAllCourses, updateCourse, deleteCourse } from '../services/courseService';
 import { getAllProposals, getProposalById, approveProposal, rejectProposal } from '../services/courseProposalService';
 import CourseForm from '../components/CourseForm';
@@ -82,6 +82,13 @@ const AdminDashboard = () => {
   const [assignmentError, setAssignmentError] = useState('');
   const [assignmentSuccess, setAssignmentSuccess] = useState('');
   const [teacherFilter, setTeacherFilter] = useState('');
+  const [userListFilter, setUserListFilter] = useState('');
+  const [showUserProfileModal, setShowUserProfileModal] = useState(false);
+  const [selectedUserProfile, setSelectedUserProfile] = useState(null);
+  const [userProfileForm, setUserProfileForm] = useState({});
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [profileSuccess, setProfileSuccess] = useState('');
 
   // Navigate to a course group (drill-down)
   const navigateToGroup = (groupKey) => {
@@ -220,10 +227,12 @@ const AdminDashboard = () => {
 
   const toggleUserGroup = (role) => {
     setSelectedUserRole(role);
+    setUserListFilter('');
   };
 
   const goBackUserGroups = () => {
     setSelectedUserRole(null);
+    setUserListFilter('');
   };
 
   const fetchAllUsers = async () => {
@@ -782,6 +791,71 @@ const AdminDashboard = () => {
       setTimeout(() => setAssignmentError(''), 3000);
     } finally {
       setAssignmentLoading(false);
+    }
+  };
+
+  const openUserProfileModal = (user) => {
+    setSelectedUserProfile(user);
+    setUserProfileForm({
+      name: user.name || '',
+      email: user.email || '',
+      roll: user.roll || '',
+      father: user.father || '',
+      mother: user.mother || '',
+      advisor: user.advisor || '',
+      phone: user.phone || '',
+      address: user.address || '',
+      hall: user.hall || '',
+      scholarship: user.scholarship || '',
+      gender: user.gender || 'others',
+      bloodGroup: user.bloodGroup || '',
+      religion: user.religion || '',
+      designation: user.designation || ''
+    });
+    setShowUserProfileModal(true);
+    setProfileError('');
+    setProfileSuccess('');
+  };
+
+  const handleUpdateUserProfile = async () => {
+    if (!selectedUserProfile) return;
+    
+    setProfileSaving(true);
+    setProfileError('');
+    setProfileSuccess('');
+    
+    try {
+      // Call API to update user profile
+      const response = await fetch(`http://localhost:5000/api/admin/users/${selectedUserProfile._id}/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(userProfileForm)
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setProfileSuccess('Profile updated successfully');
+        // Update users list
+        setUsers(prev => prev.map(u => u._id === selectedUserProfile._id ? { ...u, ...userProfileForm } : u));
+        // Update lookup user if it's the same
+        if (lookupUser && lookupUser._id === selectedUserProfile._id) {
+          setLookupUser({ ...lookupUser, ...userProfileForm });
+        }
+        setTimeout(() => {
+          setProfileSuccess('');
+          setShowUserProfileModal(false);
+        }, 2000);
+      } else {
+        setProfileError(data.message || 'Failed to update profile');
+      }
+    } catch (err) {
+      setProfileError('Failed to update profile');
+    } finally {
+      setProfileSaving(false);
     }
   };
 
@@ -1533,118 +1607,6 @@ const AdminDashboard = () => {
             <div className="section-body">
               {usersError && <div className="alert alert-error">{usersError}</div>}
 
-              <div className="proposal-card" style={{ marginBottom: '16px' }}>
-                <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '16px' }}>Manage Specific User</h3>
-                    <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Search by email, roll number, or user ID to deactivate or delete an account</p>
-                  </div>
-                </div>
-                <div className="proposal-body" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <input
-                    type="text"
-                    placeholder="Email, Roll, or User ID"
-                    value={userLookupInput}
-                    onChange={(e) => {
-                      setUserLookupInput(e.target.value);
-                      setLookupError('');
-                    }}
-                    style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', minWidth: '250px', flex: '1' }}
-                  />
-                  <button
-                    className="btn btn-primary"
-                    onClick={handleLookupUser}
-                    disabled={lookupLoading}
-                  >
-                    {lookupLoading ? 'Searching...' : 'Search'}
-                  </button>
-                </div>
-                {lookupUser && (
-                  <div style={{ marginTop: '16px' }}>
-                    <div className="user-card" style={{ maxWidth: '500px' }}>
-                      <div className="user-card-header">
-                        <div className="user-avatar">{lookupUser.name?.charAt(0)?.toUpperCase()}</div>
-                        <div className="user-info">
-                          <h3>{lookupUser.name}</h3>
-                          <p className="user-email">{lookupUser.email}</p>
-                        </div>
-                      </div>
-                      <div className="user-card-body">
-                        <div className="user-meta">
-                          <span className={`role-badge ${(lookupUser.role || '').toLowerCase()}`}>{(lookupUser.role || '').toLowerCase()}</span>
-                          {lookupUser.roll && <span className="user-date">Roll: {lookupUser.roll}</span>}
-                          {lookupUser.createdAt && (
-                            <span className="user-date">Joined {new Date(lookupUser.createdAt).toLocaleDateString()}</span>
-                          )}
-                        </div>
-                        {(lookupUser.role || '').toLowerCase() === 'teacher' && (
-                          <div style={{ marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <label style={{ fontSize: '12px', color: '#6b7280' }}>Designation:</label>
-                            <select
-                              value={lookupDesignation}
-                              onChange={(e) => setLookupDesignation(e.target.value)}
-                              style={{ padding: '6px 10px', border: '1px solid #ddd', borderRadius: '4px' }}
-                              disabled={lookupDesignationSaving}
-                            >
-                              <option value="Professor">Professor</option>
-                              <option value="Assistant Professor">Assistant Professor</option>
-                              <option value="Lecturer">Lecturer</option>
-                            </select>
-                            <button
-                              className="btn btn-sm btn-primary"
-                              onClick={async () => {
-                                try {
-                                  setLookupDesignationSaving(true);
-                                  const result = await setUserDesignation(lookupUser._id, lookupDesignation);
-                                  // Update local state and users list
-                                  const updated = { ...lookupUser, designation: result.data?.designation || lookupDesignation };
-                                  setLookupUser(updated);
-                                  // Also update users list entry
-                                  setUsers(prev => prev.map(u => u._id === updated._id ? { ...u, designation: updated.designation } : u));
-                                  setSuccessMessage('Designation updated');
-                                  setTimeout(() => setSuccessMessage(''), 3000);
-                                } catch (err) {
-                                  setLookupError(err.response?.data?.message || 'Failed to update designation');
-                                } finally {
-                                  setLookupDesignationSaving(false);
-                                }
-                              }}
-                              disabled={lookupDesignationSaving}
-                            >
-                              {lookupDesignationSaving ? 'Saving...' : 'Save'}
-                            </button>
-                          </div>
-                        )}
-                        <div className="user-status">
-                          <span className={`status-badge ${lookupUser.isActive ? 'active' : 'inactive'}`}>{lookupUser.isActive ? 'Active' : 'Inactive'}</span>
-                        </div>
-                      </div>
-                      <div className="user-card-actions">
-                        <button
-                          className={`btn btn-sm ${lookupUser.isActive ? 'btn-secondary' : 'btn-approve'}`}
-                          onClick={() => handleLookupUserAction('toggle')}
-                          disabled={lookupLoading}
-                        >
-                          {lookupLoading ? 'Working...' : lookupUser.isActive ? 'Deactivate' : 'Activate'}
-                        </button>
-                        <button
-                          className="btn btn-sm btn-danger"
-                          onClick={() => handleLookupUserAction('delete')}
-                          disabled={lookupLoading}
-                        >
-                          {lookupLoading ? 'Working...' : 'Delete'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {(lookupError) && (
-                  <div style={{ marginTop: '10px' }}>
-                    <div className="alert alert-error">{lookupError}</div>
-                  </div>
-                )}
-              </div>
-
               {usersLoading ? (
                 <div className="loading-container">
                   <div className="spinner spinner-large"></div>
@@ -1841,6 +1803,113 @@ const AdminDashboard = () => {
                       </div>
                     </>
                   )}
+
+                  {/* User List */}
+                  <div className="user-groups-container" style={{ marginTop: '20px' }}>
+                    <h3 style={{ fontSize: '18px', marginBottom: '16px', textTransform: 'capitalize' }}>
+                      {selectedUserRole}s ({users.filter(u => {
+                        if ((u.role || '').toLowerCase() !== selectedUserRole) return false;
+                        if (!userListFilter.trim()) return true;
+                        const filterLower = userListFilter.toLowerCase();
+                        return u.name?.toLowerCase().includes(filterLower) ||
+                               u.email?.toLowerCase().includes(filterLower) ||
+                               u.roll?.toLowerCase().includes(filterLower) ||
+                               u.designation?.toLowerCase().includes(filterLower);
+                      }).length})
+                    </h3>
+                    
+                    {/* Search Input */}
+                    <input
+                      type="text"
+                      placeholder={`Search ${selectedUserRole}s by name, email${selectedUserRole === 'student' ? ', or roll' : ', or designation'}...`}
+                      value={userListFilter}
+                      onChange={(e) => setUserListFilter(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        marginBottom: '16px',
+                        outline: 'none'
+                      }}
+                    />
+
+                    <div className="proposals-grid">
+                      {users
+                        .filter(u => {
+                          if ((u.role || '').toLowerCase() !== selectedUserRole) return false;
+                          if (!userListFilter.trim()) return true;
+                          const filterLower = userListFilter.toLowerCase();
+                          return u.name?.toLowerCase().includes(filterLower) ||
+                                 u.email?.toLowerCase().includes(filterLower) ||
+                                 u.roll?.toLowerCase().includes(filterLower) ||
+                                 u.designation?.toLowerCase().includes(filterLower);
+                        })
+                        .map(user => (
+                          <div key={user._id} className="proposal-card">
+                            <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <div style={{ flex: 1 }}>
+                                <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>{user.name}</h4>
+                                <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '13px' }}>{user.email}</p>
+                                {user.roll && <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '13px' }}>Roll: {user.roll}</p>}
+                                {user.role === 'teacher' && user.designation && <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '13px' }}>Designation: {user.designation}</p>}
+                              </div>
+                              <span className={`status-badge ${user.isActive ? 'active' : 'inactive'}`}>
+                                {user.isActive ? 'Active' : 'Inactive'}
+                              </span>
+                            </div>
+                            <div className="proposal-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              <button
+                                className="btn btn-sm btn-primary"
+                                onClick={() => openUserProfileModal(user)}
+                                style={{ flex: '1 1 auto' }}
+                              >
+                                <FontAwesomeIcon icon={faUser} /> View Profile
+                              </button>
+                              <button
+                                className={`btn btn-sm ${user.isActive ? 'btn-secondary' : 'btn-approve'}`}
+                                onClick={async () => {
+                                  try {
+                                    const newStatus = !user.isActive;
+                                    await setUserStatus(user._id, newStatus);
+                                    setSuccessMessage(`User ${newStatus ? 'activated' : 'deactivated'} successfully`);
+                                    setUsers(prev => prev.map(u => u._id === user._id ? { ...u, isActive: newStatus } : u));
+                                    setTimeout(() => setSuccessMessage(''), 3000);
+                                  } catch (err) {
+                                    setUsersError(err.response?.data?.message || 'Failed to update user status');
+                                    setTimeout(() => setUsersError(''), 3000);
+                                  }
+                                }}
+                              >
+                                {user.isActive ? 'Deactivate' : 'Activate'}
+                              </button>
+                              <button
+                                className="btn btn-sm btn-danger"
+                                onClick={async () => {
+                                  const confirmed = window.confirm(
+                                    `Delete ${user.name}? This cannot be undone.`
+                                  );
+                                  if (!confirmed) return;
+
+                                  try {
+                                    await deleteUser(user._id);
+                                    setSuccessMessage('User deleted successfully');
+                                    setUsers(prev => prev.filter(u => u._id !== user._id));
+                                    setTimeout(() => setSuccessMessage(''), 3000);
+                                  } catch (err) {
+                                    setUsersError(err.response?.data?.message || 'Failed to delete user');
+                                    setTimeout(() => setUsersError(''), 3000);
+                                  }
+                                }}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
                 </div>
               ) : groupedUsers.length === 0 ? (
                 <div className="empty-state">
@@ -2619,6 +2688,381 @@ const AdminDashboard = () => {
                 disabled={assignmentLoading}
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Profile Modal */}
+      {showUserProfileModal && selectedUserProfile && (
+        <div className="modal-overlay" onClick={() => !profileSaving && setShowUserProfileModal(false)}>
+          <div className="modal-content assignment-modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '700px', maxHeight: '90vh'}}>
+            <div className="modal-header">
+              <h3>User Profile - {selectedUserProfile.name}</h3>
+              <button 
+                className="close-btn" 
+                onClick={() => setShowUserProfileModal(false)}
+                disabled={profileSaving}
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+            <div className="modal-body" style={{maxHeight: 'calc(90vh - 180px)', overflowY: 'auto'}}>
+              {profileSuccess && (
+                <div className="alert alert-success" style={{marginBottom: '16px'}}>
+                  <span className="alert-icon"><FontAwesomeIcon icon={faCheck} /></span>
+                  {profileSuccess}
+                </div>
+              )}
+
+              {profileError && (
+                <div className="alert alert-error" style={{marginBottom: '16px'}}>
+                  <span className="alert-icon"><FontAwesomeIcon icon={faTimes} /></span>
+                  {profileError}
+                </div>
+              )}
+
+              <div style={{marginBottom: '20px', padding: '12px', backgroundColor: '#f3f4f6', borderRadius: '8px'}}>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                  <div>
+                    <span className={`role-badge ${(selectedUserProfile.role || '').toLowerCase()}`} style={{marginRight: '8px'}}>
+                      {(selectedUserProfile.role || '').toLowerCase()}
+                    </span>
+                    <span className={`status-badge ${selectedUserProfile.isActive ? 'active' : 'inactive'}`}>
+                      {selectedUserProfile.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div style={{fontSize: '12px', color: '#6b7280'}}>
+                    ID: {selectedUserProfile._id}
+                  </div>
+                </div>
+              </div>
+
+              {/* Profile Form */}
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px'}}>
+                <div>
+                  <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                    Full Name <span style={{color: '#dc2626'}}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={userProfileForm.name}
+                    onChange={(e) => setUserProfileForm({ ...userProfileForm, name: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    disabled={profileSaving}
+                  />
+                </div>
+
+                <div>
+                  <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                    Email <span style={{color: '#dc2626'}}>*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={userProfileForm.email}
+                    onChange={(e) => setUserProfileForm({ ...userProfileForm, email: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    disabled={profileSaving}
+                  />
+                </div>
+
+                {selectedUserProfile.role === 'student' && (
+                  <div>
+                    <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                      Roll Number
+                    </label>
+                    <input
+                      type="text"
+                      value={userProfileForm.roll}
+                      onChange={(e) => setUserProfileForm({ ...userProfileForm, roll: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                      disabled={profileSaving}
+                    />
+                  </div>
+                )}
+
+                {selectedUserProfile.role === 'teacher' && (
+                  <div>
+                    <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                      Designation
+                    </label>
+                    <select
+                      value={userProfileForm.designation}
+                      onChange={(e) => setUserProfileForm({ ...userProfileForm, designation: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                      disabled={profileSaving}
+                    >
+                      <option value="">Select Designation</option>
+                      <option value="Professor">Professor</option>
+                      <option value="Assistant Professor">Assistant Professor</option>
+                      <option value="Lecturer">Lecturer</option>
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={userProfileForm.phone}
+                    onChange={(e) => setUserProfileForm({ ...userProfileForm, phone: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    disabled={profileSaving}
+                  />
+                </div>
+
+                <div>
+                  <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                    Gender
+                  </label>
+                  <select
+                    value={userProfileForm.gender}
+                    onChange={(e) => setUserProfileForm({ ...userProfileForm, gender: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    disabled={profileSaving}
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                    Blood Group
+                  </label>
+                  <select
+                    value={userProfileForm.bloodGroup}
+                    onChange={(e) => setUserProfileForm({ ...userProfileForm, bloodGroup: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    disabled={profileSaving}
+                  >
+                    <option value="">Select Blood Group</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                    Religion
+                  </label>
+                  <select
+                    value={userProfileForm.religion}
+                    onChange={(e) => setUserProfileForm({ ...userProfileForm, religion: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    disabled={profileSaving}
+                  >
+                    <option value="">Select Religion</option>
+                    <option value="Islam">Islam</option>
+                    <option value="Hinduism">Hinduism</option>
+                    <option value="Buddhism">Buddhism</option>
+                    <option value="Christianity">Christianity</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                {selectedUserProfile.role === 'student' && (
+                  <>
+                    <div>
+                      <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                        Father's Name
+                      </label>
+                      <input
+                        type="text"
+                        value={userProfileForm.father}
+                        onChange={(e) => setUserProfileForm({ ...userProfileForm, father: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          fontSize: '14px'
+                        }}
+                        disabled={profileSaving}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                        Mother's Name
+                      </label>
+                      <input
+                        type="text"
+                        value={userProfileForm.mother}
+                        onChange={(e) => setUserProfileForm({ ...userProfileForm, mother: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          fontSize: '14px'
+                        }}
+                        disabled={profileSaving}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                        Advisor
+                      </label>
+                      <input
+                        type="text"
+                        value={userProfileForm.advisor}
+                        onChange={(e) => setUserProfileForm({ ...userProfileForm, advisor: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          fontSize: '14px'
+                        }}
+                        disabled={profileSaving}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                        Hall Name
+                      </label>
+                      <input
+                        type="text"
+                        value={userProfileForm.hall}
+                        onChange={(e) => setUserProfileForm({ ...userProfileForm, hall: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          fontSize: '14px'
+                        }}
+                        disabled={profileSaving}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                        Scholarship
+                      </label>
+                      <input
+                        type="text"
+                        value={userProfileForm.scholarship}
+                        onChange={(e) => setUserProfileForm({ ...userProfileForm, scholarship: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          fontSize: '14px'
+                        }}
+                        disabled={profileSaving}
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div style={{gridColumn: '1 / -1'}}>
+                  <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                    Address
+                  </label>
+                  <textarea
+                    value={userProfileForm.address}
+                    onChange={(e) => setUserProfileForm({ ...userProfileForm, address: e.target.value })}
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      resize: 'vertical'
+                    }}
+                    disabled={profileSaving}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="btn btn-outline"
+                onClick={() => setShowUserProfileModal(false)}
+                disabled={profileSaving}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary"
+                onClick={handleUpdateUserProfile}
+                disabled={profileSaving}
+              >
+                {profileSaving ? (
+                  <>
+                    <div className="spinner spinner-small"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <FontAwesomeIcon icon={faCheck} /> Save Changes
+                  </>
+                )}
               </button>
             </div>
           </div>
