@@ -1054,3 +1054,206 @@ exports.updateUserProfile = async (req, res) => {
   }
 };
 
+// @desc    Assign batch to a course
+// @route   POST /api/admin/courses/:courseId/assign-batch
+// @access  Admin only
+exports.assignBatchToCourse = async (req, res) => {
+  try {
+    // Verify admin role
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    const { courseId } = req.params;
+    const { batch, deptCode } = req.body;
+
+    // Validate inputs
+    if (!batch || !deptCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Batch and department code are required'
+      });
+    }
+
+    // Validate batch format (2 digits)
+    if (!/^\d{2}$/.test(batch)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Batch must be 2 digits (e.g., "21" for 2021)'
+      });
+    }
+
+    // Validate department code
+    const validDeptCodes = ['01', '03', '05', '07', '09', '11', '13', '15', '17', '19', '21', '23', '25', '27', '29', '31'];
+    if (!validDeptCodes.includes(deptCode)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid department code'
+      });
+    }
+
+    // Validate course exists
+    const Course = require('../models/Course');
+    const course = await Course.findById(courseId);
+    
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+
+    // Check if this batch+dept combination is already assigned
+    const alreadyAssigned = course.assignedBatches.some(
+      ab => ab.batch === batch && ab.deptCode === deptCode
+    );
+
+    if (alreadyAssigned) {
+      return res.status(400).json({
+        success: false,
+        message: 'This batch and department combination is already assigned to the course'
+      });
+    }
+
+    // Add the batch assignment
+    course.assignedBatches.push({ batch, deptCode });
+    await course.save();
+
+    // Populate and return updated course
+    const updatedCourse = await Course.findById(courseId)
+      .populate('assignedTeachers.teacher', 'name email designation');
+
+    res.status(200).json({
+      success: true,
+      message: 'Batch assigned to course successfully',
+      data: {
+        courseId: updatedCourse._id,
+        courseCode: updatedCourse.courseCode,
+        courseTitle: updatedCourse.courseTitle,
+        assignedBatches: updatedCourse.assignedBatches
+      }
+    });
+
+  } catch (error) {
+    console.error('Assign batch to course error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error assigning batch to course'
+    });
+  }
+};
+
+// @desc    Unassign batch from a course
+// @route   DELETE /api/admin/courses/:courseId/unassign-batch
+// @access  Admin only
+exports.unassignBatchFromCourse = async (req, res) => {
+  try {
+    // Verify admin role
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    const { courseId } = req.params;
+    const { batch, deptCode } = req.body;
+
+    // Validate inputs
+    if (!batch || !deptCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Batch and department code are required'
+      });
+    }
+
+    // Validate course exists
+    const Course = require('../models/Course');
+    const course = await Course.findById(courseId);
+    
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+
+    // Remove the batch assignment
+    course.assignedBatches = course.assignedBatches.filter(
+      ab => !(ab.batch === batch && ab.deptCode === deptCode)
+    );
+
+    await course.save();
+
+    // Populate and return updated course
+    const updatedCourse = await Course.findById(courseId)
+      .populate('assignedTeachers.teacher', 'name email designation');
+
+    res.status(200).json({
+      success: true,
+      message: 'Batch unassigned from course successfully',
+      data: {
+        courseId: updatedCourse._id,
+        courseCode: updatedCourse.courseCode,
+        courseTitle: updatedCourse.courseTitle,
+        assignedBatches: updatedCourse.assignedBatches
+      }
+    });
+
+  } catch (error) {
+    console.error('Unassign batch from course error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error unassigning batch from course'
+    });
+  }
+};
+
+// @desc    Get assigned batches for a course
+// @route   GET /api/admin/courses/:courseId/assigned-batches
+// @access  Admin only
+exports.getAssignedBatches = async (req, res) => {
+  try {
+    // Verify admin role
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    const { courseId } = req.params;
+
+    // Validate course exists
+    const Course = require('../models/Course');
+    const course = await Course.findById(courseId);
+    
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        courseId: course._id,
+        courseCode: course.courseCode,
+        courseTitle: course.courseTitle,
+        assignedBatches: course.assignedBatches || []
+      }
+    });
+
+  } catch (error) {
+    console.error('Get assigned batches error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error getting assigned batches'
+    });
+  }
+};
+

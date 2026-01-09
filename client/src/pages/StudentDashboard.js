@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBook, faSignOutAlt, faClipboardList, faGraduationCap, faCalendarAlt, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
+import { getAllCourses } from '../services/courseService';
+import CourseOBEView from '../components/CourseOBEView';
 import '../styles/Dashboard.css';
 import '../styles/AdminDashboard.css';
 import '../styles/Profile.css';
@@ -12,6 +14,11 @@ const StudentDashboard = () => {
   const [user, setUser] = useState(null);
   const [activeSection, setActiveSection] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 1024);
+  const [courses, setCourses] = useState([]);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+  const [coursesError, setCoursesError] = useState('');
+  const [showCourseDetail, setShowCourseDetail] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState(null);
   const [profileForm, setProfileForm] = useState({
     name: '', father: '', mother: '', advisor: '', phone: '', address: '', hall: '', email: '', scholarship: '', gender: 'others', bloodGroup: '', religion: ''
   });
@@ -50,6 +57,32 @@ const StudentDashboard = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Fetch courses
+  const fetchCourses = async () => {
+    setCoursesLoading(true);
+    setCoursesError('');
+    try {
+      const response = await getAllCourses();
+      setCourses(response.data || []);
+    } catch (err) {
+      console.error('Error fetching courses:', err);
+      setCoursesError(err.response?.data?.message || 'Failed to load courses');
+    } finally {
+      setCoursesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSection === 'courses') {
+      fetchCourses();
+    }
+  }, [activeSection]);
+
+  const handleViewCourseDetail = (course) => {
+    setSelectedCourse(course);
+    setShowCourseDetail(true);
+  };
 
   const handleLogout = () => {
     logout();
@@ -101,6 +134,20 @@ const StudentDashboard = () => {
           </div>
         );
       case 'courses':
+        // Organize courses by year-semester
+        const organizedCourses = {};
+        courses.forEach(course => {
+          const year = course.yearLevel || 'Other';
+          const term = course.term || 'Other';
+          const yearSemKey = `${year}-${term}`;
+          if (!organizedCourses[yearSemKey]) {
+            organizedCourses[yearSemKey] = [];
+          }
+          organizedCourses[yearSemKey].push(course);
+        });
+
+        const yearSemKeys = Object.keys(organizedCourses).sort();
+
         return (
           <div className="section-container">
             <div className="section-header">
@@ -110,11 +157,134 @@ const StudentDashboard = () => {
               </div>
             </div>
             <div className="section-body">
-              <div className="empty-state">
-                <div className="empty-icon">📚</div>
-                <h3>No courses linked yet</h3>
-                <p>Your enrolled courses will appear here.</p>
-              </div>
+              {coursesError && (
+                <div className="alert alert-error" style={{ marginBottom: '16px' }}>
+                  {coursesError}
+                </div>
+              )}
+
+              {coursesLoading ? (
+                <div className="loading-container">
+                  <div className="spinner spinner-large"></div>
+                  <p>Loading courses...</p>
+                </div>
+              ) : courses.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-icon">📚</div>
+                  <h3>No courses assigned yet</h3>
+                  <p>Courses assigned to your batch will appear here.</p>
+                  {user?.roll && (
+                    <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '8px' }}>
+                      Your batch: 20{user.roll.substring(0, 2)} • Department: {user.roll.substring(2, 4)}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  {yearSemKeys.map(yearSemKey => {
+                    const [year, term] = yearSemKey.split('-');
+                    const coursesInSem = organizedCourses[yearSemKey];
+                    
+                    return (
+                      <div key={yearSemKey} style={{ marginBottom: '24px' }}>
+                        <h3 style={{ 
+                          fontSize: '18px', 
+                          fontWeight: 600, 
+                          marginBottom: '16px',
+                          color: '#1f2937',
+                          borderBottom: '2px solid #e5e7eb',
+                          paddingBottom: '8px'
+                        }}>
+                          Year {year} - Semester {term}
+                        </h3>
+                        <div className="proposals-grid">
+                          {coursesInSem.map(course => (
+                            <div key={course._id} className="proposal-card">
+                              <div className="proposal-header">
+                                <div style={{ flex: 1 }}>
+                                  <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#1f2937' }}>
+                                    {course.courseCode}
+                                  </h4>
+                                  <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '14px' }}>
+                                    {course.courseTitle}
+                                  </p>
+                                </div>
+                                <span 
+                                  className="proposal-type-badge" 
+                                  style={{ 
+                                    backgroundColor: course.course_type === 'THEORY' ? '#3b82f6' : 
+                                                     course.course_type === 'SESSIONAL' ? '#10b981' : '#8b5cf6'
+                                  }}
+                                >
+                                  {course.course_type}
+                                </span>
+                              </div>
+                              <div className="proposal-body">
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
+                                  <div>
+                                    <span style={{ color: '#6b7280' }}>Credit: </span>
+                                    <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.credit}</span>
+                                  </div>
+                                  <div>
+                                    <span style={{ color: '#6b7280' }}>Category: </span>
+                                    <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.category}</span>
+                                  </div>
+                                  {course.contactHours && (
+                                    <div>
+                                      <span style={{ color: '#6b7280' }}>Contact Hours: </span>
+                                      <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.contactHours}</span>
+                                    </div>
+                                  )}
+                                  {course.academicYear && (
+                                    <div>
+                                      <span style={{ color: '#6b7280' }}>Academic Year: </span>
+                                      <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.academicYear}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                {course.assignedTeachers && course.assignedTeachers.length > 0 && (
+                                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb' }}>
+                                    <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>Instructor(s):</span>
+                                    <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                      {course.assignedTeachers.map((assignment, idx) => {
+                                        const teacher = assignment.teacher || assignment;
+                                        return (
+                                          <span 
+                                            key={idx}
+                                            style={{
+                                              fontSize: '12px',
+                                              padding: '4px 8px',
+                                              backgroundColor: '#f3f4f6',
+                                              borderRadius: '4px',
+                                              color: '#374151'
+                                            }}
+                                          >
+                                            {teacher.name}
+                                            {assignment.section && ` (Sec ${assignment.section})`}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="proposal-actions">
+                                <button
+                                  className="btn btn-sm btn-primary"
+                                  onClick={() => handleViewCourseDetail(course)}
+                                  style={{ width: '100%' }}
+                                >
+                                  <FontAwesomeIcon icon={faBook} /> View Details
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         );
@@ -538,6 +708,16 @@ const StudentDashboard = () => {
           {renderSection()}
         </div>
       </main>
+
+      {showCourseDetail && selectedCourse && (
+        <CourseOBEView
+          course={selectedCourse}
+          onClose={() => {
+            setShowCourseDetail(false);
+            setSelectedCourse(null);
+          }}
+        />
+      )}
     </div>
   );
 };

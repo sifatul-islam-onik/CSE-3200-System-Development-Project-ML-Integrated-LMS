@@ -31,4 +31,9 @@ router.post('/courses/:courseId/assign-teacher', adminController.assignTeacherTo
 router.delete('/courses/:courseId/unassign-teacher/:teacherId', adminController.unassignTeacherFromCourse);
 router.get('/courses/:courseId/assigned-teachers', adminController.getAssignedTeachers);
 
+// Batch assignment routes
+router.post('/courses/:courseId/assign-batch', adminController.assignBatchToCourse);
+router.delete('/courses/:courseId/unassign-batch', adminController.unassignBatchFromCourse);
+router.get('/courses/:courseId/assigned-batches', adminController.getAssignedBatches);
+
 module.exports = router;
