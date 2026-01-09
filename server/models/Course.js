@@ -254,6 +254,19 @@ const courseSchema = new mongoose.Schema({
     ref: 'User',
     required: [true, 'Creator is required']
   },
+  // Assigned teachers who can access this course
+  assignedTeachers: [{
+    teacher: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    section: {
+      type: String,
+      enum: ['A', 'B', null],
+      default: null
+    }
+  }],
   // OBE: Accreditation tracking
   lastReviewed: {
     type: Date

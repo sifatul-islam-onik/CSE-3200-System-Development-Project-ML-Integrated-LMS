@@ -1099,6 +1099,62 @@
   transform: translateY(0);
 }
 
+/* ===== Assignment Modal ===== */
+.assignment-modal .modal-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.assignment-modal .modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.assignment-modal .close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.assignment-modal .close-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.assignment-modal .close-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.assignment-modal .modal-body {
+  padding: 1.5rem;
+  max-height: calc(90vh - 200px);
+  overflow-y: auto;
+}
+
+.assignment-modal .modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
 .btn-danger:disabled {
   opacity: 0.6;
   cursor: not-allowed;
