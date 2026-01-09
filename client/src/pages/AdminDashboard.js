@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faHourglass, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
-import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers, updateUserProfile } from '../services/adminService';
+import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers, updateUserProfile, assignBatchToCourse, unassignBatchFromCourse, getAssignedBatches } from '../services/adminService';
 import { createCourse, getAllCourses, updateCourse, deleteCourse } from '../services/courseService';
 import { getAllProposals, getProposalById, approveProposal, rejectProposal } from '../services/courseProposalService';
 import CourseForm from '../components/CourseForm';
@@ -83,6 +83,13 @@ const AdminDashboard = () => {
   const [assignmentSuccess, setAssignmentSuccess] = useState('');
   const [teacherFilter, setTeacherFilter] = useState('');
   const [userListFilter, setUserListFilter] = useState('');
+  const [showBatchAssignmentModal, setShowBatchAssignmentModal] = useState(false);
+  const [selectedCourseForBatch, setSelectedCourseForBatch] = useState(null);
+  const [batchAssignmentLoading, setBatchAssignmentLoading] = useState(false);
+  const [batchAssignmentError, setBatchAssignmentError] = useState('');
+  const [batchAssignmentSuccess, setBatchAssignmentSuccess] = useState('');
+  const [batchInput, setBatchInput] = useState('');
+  const [deptCodeInput, setDeptCodeInput] = useState('');
   const [showUserProfileModal, setShowUserProfileModal] = useState(false);
   const [selectedUserProfile, setSelectedUserProfile] = useState(null);
   const [userProfileForm, setUserProfileForm] = useState({});
@@ -859,6 +866,113 @@ const AdminDashboard = () => {
     }
   };
 
+  // Department mapping
+  const departmentMap = {
+    '01': 'CE',
+    '03': 'EEE',
+    '05': 'ME',
+    '07': 'CSE',
+    '09': 'ECE',
+    '11': 'IEM',
+    '13': 'ESE',
+    '15': 'BME',
+    '17': 'URP',
+    '19': 'LE',
+    '21': 'TE',
+    '23': 'BECM',
+    '25': 'ARCH',
+    '27': 'MSE',
+    '29': 'CHE',
+    '31': 'MTE'
+  };
+
+  // Open batch assignment modal
+  const openBatchAssignmentModal = async (course) => {
+    setSelectedCourseForBatch(course);
+    setShowBatchAssignmentModal(true);
+    setBatchAssignmentError('');
+    setBatchAssignmentSuccess('');
+    setBatchInput('');
+    setDeptCodeInput('');
+  };
+
+  // Handle assign batch to course
+  const handleAssignBatch = async () => {
+    if (!batchInput || !deptCodeInput) {
+      setBatchAssignmentError('Please enter both batch and department code');
+      return;
+    }
+
+    setBatchAssignmentLoading(true);
+    setBatchAssignmentError('');
+    setBatchAssignmentSuccess('');
+
+    try {
+      const response = await assignBatchToCourse(selectedCourseForBatch._id, batchInput, deptCodeInput);
+      setBatchAssignmentSuccess('Batch assigned successfully');
+      
+      // Update local state
+      setSelectedCourseForBatch(prev => ({
+        ...prev,
+        assignedBatches: response.data.assignedBatches
+      }));
+
+      // Also update the courses list
+      setCourses(prevCourses => 
+        prevCourses.map(c => 
+          c._id === selectedCourseForBatch._id 
+            ? { ...c, assignedBatches: response.data.assignedBatches }
+            : c
+        )
+      );
+
+      // Clear inputs
+      setBatchInput('');
+      setDeptCodeInput('');
+      
+      setTimeout(() => setBatchAssignmentSuccess(''), 3000);
+    } catch (err) {
+      setBatchAssignmentError(err.response?.data?.message || 'Failed to assign batch');
+      setTimeout(() => setBatchAssignmentError(''), 5000);
+    } finally {
+      setBatchAssignmentLoading(false);
+    }
+  };
+
+  // Handle unassign batch from course
+  const handleUnassignBatch = async (batch, deptCode) => {
+    setBatchAssignmentLoading(true);
+    setBatchAssignmentError('');
+    setBatchAssignmentSuccess('');
+
+    try {
+      const response = await unassignBatchFromCourse(selectedCourseForBatch._id, batch, deptCode);
+      setBatchAssignmentSuccess('Batch unassigned successfully');
+      
+      // Update local state
+      setSelectedCourseForBatch(prev => ({
+        ...prev,
+        assignedBatches: response.data.assignedBatches
+      }));
+
+      // Also update the courses list
+      setCourses(prevCourses => 
+        prevCourses.map(c => 
+          c._id === selectedCourseForBatch._id 
+            ? { ...c, assignedBatches: response.data.assignedBatches }
+            : c
+        )
+      );
+
+      setTimeout(() => setBatchAssignmentSuccess(''), 3000);
+    } catch (err) {
+      setBatchAssignmentError(err.response?.data?.message || 'Failed to unassign batch');
+      setTimeout(() => setBatchAssignmentError(''), 5000);
+    } finally {
+      setBatchAssignmentLoading(false);
+    }
+  };
+
   const handleViewProposal = async (proposalId) => {
     setLoading(true);
     try {
@@ -1561,7 +1675,18 @@ const AdminDashboard = () => {
                                   }}
                                   onClick={() => openAssignmentModal(course)}
                                 >
-                                  <FontAwesomeIcon icon={faUsers} /> Assign
+                                  <FontAwesomeIcon icon={faUsers} /> Assign Teachers
+                                </button>
+                                <button
+                                  className="btn btn-sm"
+                                  style={{
+                                    backgroundColor: '#10b981',
+                                    color: 'white',
+                                    border: 'none'
+                                  }}
+                                  onClick={() => openBatchAssignmentModal(course)}
+                                >
+                                  <FontAwesomeIcon icon={faUsers} /> Assign Batch
                                 </button>
                                 <button
                                   className="btn btn-sm btn-primary"
@@ -3063,6 +3188,183 @@ const AdminDashboard = () => {
                     <FontAwesomeIcon icon={faCheck} /> Save Changes
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Assignment Modal */}
+      {showBatchAssignmentModal && selectedCourseForBatch && (
+        <div className="modal-overlay" onClick={() => !batchAssignmentLoading && setShowBatchAssignmentModal(false)}>
+          <div className="modal-content assignment-modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '600px'}}>
+            <div className="modal-header">
+              <h3>Assign Batches to Course</h3>
+              <button 
+                className="close-btn" 
+                onClick={() => setShowBatchAssignmentModal(false)}
+                disabled={batchAssignmentLoading}
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{marginBottom: '20px', padding: '12px', backgroundColor: '#f3f4f6', borderRadius: '8px'}}>
+                <h4 style={{margin: '0 0 8px 0', fontSize: '16px', color: '#1f2937'}}>
+                  {selectedCourseForBatch.courseCode}
+                </h4>
+                <p style={{margin: 0, color: '#6b7280', fontSize: '14px'}}>
+                  {selectedCourseForBatch.courseTitle}
+                </p>
+              </div>
+
+              {batchAssignmentSuccess && (
+                <div className="alert alert-success" style={{marginBottom: '16px'}}>
+                  <span className="alert-icon"><FontAwesomeIcon icon={faCheck} /></span>
+                  {batchAssignmentSuccess}
+                </div>
+              )}
+
+              {batchAssignmentError && (
+                <div className="alert alert-error" style={{marginBottom: '16px'}}>
+                  <span className="alert-icon"><FontAwesomeIcon icon={faTimes} /></span>
+                  {batchAssignmentError}
+                </div>
+              )}
+
+              {/* Currently Assigned Batches */}
+              <div style={{marginBottom: '24px'}}>
+                <h4 style={{fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: '#374151'}}>
+                  Currently Assigned Batches
+                </h4>
+                {selectedCourseForBatch.assignedBatches && selectedCourseForBatch.assignedBatches.length > 0 ? (
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                    {selectedCourseForBatch.assignedBatches.map((assignment, idx) => (
+                      <div 
+                        key={`${assignment.batch}-${assignment.deptCode}`}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '10px 12px',
+                          backgroundColor: '#fff',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '6px'
+                        }}
+                      >
+                        <div style={{flex: 1}}>
+                          <div style={{fontWeight: 500, fontSize: '14px', color: '#1f2937'}}>
+                            Batch: 20{assignment.batch} • {departmentMap[assignment.deptCode]} ({assignment.deptCode})
+                          </div>
+                          <div style={{fontSize: '12px', color: '#6b7280', marginTop: '2px'}}>
+                            Students with roll starting with {assignment.batch}{assignment.deptCode}
+                          </div>
+                        </div>
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => handleUnassignBatch(assignment.batch, assignment.deptCode)}
+                          disabled={batchAssignmentLoading}
+                          style={{fontSize: '12px', padding: '6px 12px'}}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: '16px',
+                    backgroundColor: '#fef3c7',
+                    border: '1px solid #fbbf24',
+                    borderRadius: '6px',
+                    textAlign: 'center',
+                    color: '#92400e',
+                    fontSize: '13px'
+                  }}>
+                    No batches assigned yet
+                  </div>
+                )}
+              </div>
+
+              {/* Assign New Batch */}
+              <div>
+                <h4 style={{fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: '#374151'}}>
+                  Assign New Batch
+                </h4>
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '10px', alignItems: 'end'}}>
+                  <div>
+                    <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                      Batch (2 digits)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g., 21"
+                      value={batchInput}
+                      onChange={(e) => setBatchInput(e.target.value)}
+                      maxLength={2}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                      disabled={batchAssignmentLoading}
+                    />
+                  </div>
+                  <div>
+                    <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                      Department
+                    </label>
+                    <select
+                      value={deptCodeInput}
+                      onChange={(e) => setDeptCodeInput(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                      disabled={batchAssignmentLoading}
+                    >
+                      <option value="">Select Dept</option>
+                      <option value="07">CSE-07</option>
+                      <option value="03">EEE-03</option>
+                      <option value="05">ME-05</option>
+                      <option value="01">CE-01</option>
+                      <option value="09">ECE-09</option>
+                      <option value="11">IEM-11</option>
+                      <option value="13">ESE-13</option>
+                      <option value="15">BME-15</option>
+                      <option value="17">URP-17</option>
+                      <option value="19">LE-19</option>
+                      <option value="27">MSE-27</option>
+                      <option value="31">MTE-31</option>
+                      <option value="23">BECM-23</option>
+                      <option value="25">ARCH-25</option>
+                      <option value="21">TE-21</option>
+                      <option value="29">CHE-29</option>
+                    </select>
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleAssignBatch}
+                    disabled={batchAssignmentLoading || !batchInput || !deptCodeInput}
+                    style={{fontSize: '14px', padding: '8px 16px'}}
+                  >
+                    {batchAssignmentLoading ? 'Assigning...' : 'Assign'}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="btn btn-outline"
+                onClick={() => setShowBatchAssignmentModal(false)}
+                disabled={batchAssignmentLoading}
+              >
+                Close
               </button>
             </div>
           </div>

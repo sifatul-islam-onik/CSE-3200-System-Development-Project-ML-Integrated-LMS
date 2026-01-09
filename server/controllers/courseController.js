@@ -476,6 +476,31 @@ exports.getAllCourses = async (req, res) => {
       filter['assignedTeachers.teacher'] = req.user._id;
     }
 
+    // If user is a student, filter by assigned batches
+    if (req.user && req.user.role === 'student') {
+      // Extract batch and deptCode from student's roll number
+      // Format: BBDDRRR (e.g., 2107016 -> batch: 21, deptCode: 07)
+      if (req.user.roll && req.user.roll.length >= 4) {
+        const batch = req.user.roll.substring(0, 2);
+        const deptCode = req.user.roll.substring(2, 4);
+        
+        // Filter courses where assignedBatches contains this batch+dept combination
+        filter['assignedBatches'] = {
+          $elemMatch: {
+            batch: batch,
+            deptCode: deptCode
+          }
+        };
+      } else {
+        // If roll format is invalid, return no courses
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          data: []
+        });
+      }
+    }
+
     const courses = await Course.find(filter)
       .populate('createdBy', 'name email')
       .populate('assignedTeachers.teacher', 'name email designation')

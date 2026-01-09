@@ -267,6 +267,25 @@ const courseSchema = new mongoose.Schema({
       default: null
     }
   }],
+  // Assigned batches (students) who can access this course
+  assignedBatches: [{
+    batch: {
+      type: String,
+      required: true,
+      validate: {
+        validator: function(v) {
+          return /^\d{2}$/.test(v); // 2-digit batch year (e.g., "21" for 2021)
+        },
+        message: 'Batch must be 2 digits (e.g., "21" for 2021)'
+      }
+    },
+    deptCode: {
+      type: String,
+      required: true,
+      enum: ['01', '03', '05', '07', '09', '11', '13', '15', '17', '19', '21', '23', '25', '27', '29', '31'],
+      message: 'Department code must be valid'
+    }
+  }],
   // OBE: Accreditation tracking
   lastReviewed: {
     type: Date

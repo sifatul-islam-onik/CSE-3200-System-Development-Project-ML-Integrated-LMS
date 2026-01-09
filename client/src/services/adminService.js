@@ -157,3 +157,33 @@ export const getAssignedTeachers = async (courseId) => {
   return response.data;
 };
 
+// Batch assignment functions
+
+// Assign a batch to a course
+export const assignBatchToCourse = async (courseId, batch, deptCode) => {
+  const response = await axios.post(
+    `${API_URL}/admin/courses/${courseId}/assign-batch`,
+    { batch, deptCode },
+    getAuthHeader()
+  );
+  return response.data;
+};
+
+// Unassign a batch from a course
+export const unassignBatchFromCourse = async (courseId, batch, deptCode) => {
+  const response = await axios.delete(
+    `${API_URL}/admin/courses/${courseId}/unassign-batch`,
+    { ...getAuthHeader(), data: { batch, deptCode } }
+  );
+  return response.data;
+};
+
+// Get all batches assigned to a course
+export const getAssignedBatches = async (courseId) => {
+  const response = await axios.get(
+    `${API_URL}/admin/courses/${courseId}/assigned-batches`,
+    getAuthHeader()
+  );
+  return response.data;
+};
+
