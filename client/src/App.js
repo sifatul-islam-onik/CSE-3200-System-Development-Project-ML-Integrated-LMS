@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import './styles/App.css';
 import Home from './pages/Home';
@@ -10,8 +10,14 @@ import AdminDashboard from './pages/AdminDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import { PublicRoute, RoleBasedRoute, ProtectedRoute } from './components/ProtectedRoute';
+import { setupTokenInterceptor } from './utils/tokenUtils';
 
 function App() {
+  useEffect(() => {
+    // Setup axios interceptor for token errors
+    setupTokenInterceptor();
+  }, []);
+
   return (
     <Router>
       <div className="app">

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faHourglass, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
-import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers, updateUserProfile, assignBatchToCourse, unassignBatchFromCourse, getAssignedBatches } from '../services/adminService';
+import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers, updateUserProfile, assignBatchToCourse, unassignBatchFromCourse, getAssignedBatches, getStudentBatches } from '../services/adminService';
 import { createCourse, getAllCourses, updateCourse, deleteCourse } from '../services/courseService';
 import { getAllProposals, getProposalById, approveProposal, rejectProposal } from '../services/courseProposalService';
 import CourseForm from '../components/CourseForm';
@@ -76,13 +76,19 @@ const AdminDashboard = () => {
   const [teacherExportMessage, setTeacherExportMessage] = useState('');
   const [teacherExportError, setTeacherExportError] = useState('');
   const [availableDepartments, setAvailableDepartments] = useState([]);
+  const [availableTeacherDepartments, setAvailableTeacherDepartments] = useState([]);
+  const [availableStudentDepartments, setAvailableStudentDepartments] = useState([]);
+  const [availableStudentBatches, setAvailableStudentBatches] = useState([]);
+  const [teacherFilterDept, setTeacherFilterDept] = useState('');
+  const [teacherFilterDesignation, setTeacherFilterDesignation] = useState('');
+  const [studentFilterDept, setStudentFilterDept] = useState('');
+  const [studentFilterBatch, setStudentFilterBatch] = useState('');
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [selectedCourseForAssignment, setSelectedCourseForAssignment] = useState(null);
   const [assignmentLoading, setAssignmentLoading] = useState(false);
   const [assignmentError, setAssignmentError] = useState('');
   const [assignmentSuccess, setAssignmentSuccess] = useState('');
   const [teacherFilter, setTeacherFilter] = useState('');
-  const [userListFilter, setUserListFilter] = useState('');
   const [showBatchAssignmentModal, setShowBatchAssignmentModal] = useState(false);
   const [selectedCourseForBatch, setSelectedCourseForBatch] = useState(null);
   const [batchAssignmentLoading, setBatchAssignmentLoading] = useState(false);
@@ -234,12 +240,22 @@ const AdminDashboard = () => {
 
   const toggleUserGroup = (role) => {
     setSelectedUserRole(role);
-    setUserListFilter('');
+    if (role === 'student') {
+      // Fetch available batches from server
+      (async () => {
+        try {
+          const resp = await getStudentBatches();
+          setAvailableStudentBatches(Array.isArray(resp.data) ? resp.data : []);
+        } catch (e) {
+          // ignore; keep empty
+          setAvailableStudentBatches([]);
+        }
+      })();
+    }
   };
 
   const goBackUserGroups = () => {
     setSelectedUserRole(null);
-    setUserListFilter('');
   };
 
   const fetchAllUsers = async () => {
@@ -261,7 +277,17 @@ const AdminDashboard = () => {
           if (match) depts.add(match[1].toUpperCase());
         }
       });
-      setAvailableDepartments(Array.from(depts).sort());
+      const teacherDeptList = Array.from(depts).sort();
+      setAvailableDepartments(teacherDeptList);
+      setAvailableTeacherDepartments(teacherDeptList);
+
+      // Extract unique departments from students
+      const students = (response.data || []).filter(u => u.role === 'student');
+      const studentDepts = new Set();
+      students.forEach(s => {
+        if (s.department) studentDepts.add(s.department);
+      });
+      setAvailableStudentDepartments(Array.from(studentDepts).sort());
     } catch (err) {
       setUsersError(err.response?.data?.message || 'Failed to fetch users');
     } finally {
@@ -305,13 +331,7 @@ const AdminDashboard = () => {
 
   const handleExportCredentials = async () => {
     if (!exportBatchYear || !exportDeptCode) {
-      setExportError('Please enter batch year and select department');
-      setTimeout(() => setExportError(''), 3000);
-      return;
-    }
-
-    if (!/^\d{4}$/.test(exportBatchYear)) {
-      setExportError('Batch year must be 4 digits (e.g., 2019)');
+      setExportError('Please select batch year and department');
       setTimeout(() => setExportError(''), 3000);
       return;
     }
@@ -1785,9 +1805,7 @@ const AdminDashboard = () => {
                           </div>
                         </div>
                         <div className="proposal-body" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <input
-                            type="text"
-                            placeholder="Batch Year (e.g., 2019)"
+                          <select
                             value={exportBatchYear}
                             onChange={(e) => {
                               setExportBatchYear(e.target.value);
@@ -1795,7 +1813,12 @@ const AdminDashboard = () => {
                               setExportMessage('');
                             }}
                             style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', width: '180px' }}
-                          />
+                          >
+                            <option value="">Select Batch Year</option>
+                            {availableStudentBatches.map((batch) => (
+                              <option key={batch} value={String(batch)}>{batch}</option>
+                            ))}
+                          </select>
                           <select
                             value={exportDeptCode}
                             onChange={(e) => {
@@ -1838,6 +1861,38 @@ const AdminDashboard = () => {
                           </div>
                         )}
                       </div>
+
+                      {/* Student Filters */}
+                      <div className="proposal-card" style={{ marginBottom: '16px' }}>
+                        <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '16px' }}>Filter Students</h3>
+                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Select Department and Batch (existing only)</p>
+                          </div>
+                        </div>
+                        <div className="proposal-body" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <select
+                            value={studentFilterDept}
+                            onChange={(e) => setStudentFilterDept(e.target.value)}
+                            style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', minWidth: '200px' }}
+                          >
+                            <option value="">All Departments</option>
+                            {availableStudentDepartments.map((dept) => (
+                              <option key={dept} value={dept}>{dept}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={studentFilterBatch}
+                            onChange={(e) => setStudentFilterBatch(e.target.value)}
+                            style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', minWidth: '200px' }}
+                          >
+                            <option value="">All Batches</option>
+                            {availableStudentBatches.map((b) => (
+                              <option key={b} value={String(b)}>{b}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     </>
                   )}
                   {selectedUserRole === 'teacher' && (
@@ -1858,7 +1913,7 @@ const AdminDashboard = () => {
                         <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
                             <h3 style={{ margin: 0, fontSize: '16px' }}>Import Teachers from Excel</h3>
-                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Columns: Full Name, Name (for email), and Dept</p>
+                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Columns: Full Name, Name (for email), Dept, Designation</p>
                           </div>
                         </div>
                         <div className="proposal-body" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1926,6 +1981,38 @@ const AdminDashboard = () => {
                           </div>
                         )}
                       </div>
+
+                      {/* Teacher Filters */}
+                      <div className="proposal-card" style={{ marginBottom: '16px' }}>
+                        <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '16px' }}>Filter Teachers</h3>
+                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Select Department and Designation</p>
+                          </div>
+                        </div>
+                        <div className="proposal-body" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <select
+                            value={teacherFilterDept}
+                            onChange={(e) => setTeacherFilterDept(e.target.value)}
+                            style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', minWidth: '200px' }}
+                          >
+                            <option value="">All Departments</option>
+                            {availableTeacherDepartments.map((dept) => (
+                              <option key={dept} value={dept}>{dept}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={teacherFilterDesignation}
+                            onChange={(e) => setTeacherFilterDesignation(e.target.value)}
+                            style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', minWidth: '200px' }}
+                          >
+                            <option value="">All Designations</option>
+                            <option value="Professor">Professor</option>
+                            <option value="Assistant Professor">Assistant Professor</option>
+                            <option value="Lecturer">Lecturer</option>
+                          </select>
+                        </div>
+                      </div>
                     </>
                   )}
 
@@ -1934,42 +2021,50 @@ const AdminDashboard = () => {
                     <h3 style={{ fontSize: '18px', marginBottom: '16px', textTransform: 'capitalize' }}>
                       {selectedUserRole}s ({users.filter(u => {
                         if ((u.role || '').toLowerCase() !== selectedUserRole) return false;
-                        if (!userListFilter.trim()) return true;
-                        const filterLower = userListFilter.toLowerCase();
-                        return u.name?.toLowerCase().includes(filterLower) ||
-                               u.email?.toLowerCase().includes(filterLower) ||
-                               u.roll?.toLowerCase().includes(filterLower) ||
-                               u.designation?.toLowerCase().includes(filterLower);
+                        if (selectedUserRole === 'teacher') {
+                          if (teacherFilterDept && (u.department || '').toLowerCase() !== teacherFilterDept.toLowerCase()) return false;
+                          if (teacherFilterDesignation && (u.designation || '').toLowerCase() !== teacherFilterDesignation.toLowerCase()) return false;
+                        } else if (selectedUserRole === 'student') {
+                          if (studentFilterDept && (u.department || '').toLowerCase() !== studentFilterDept.toLowerCase()) return false;
+                          if (studentFilterBatch) {
+                            const rollDigits = String(u.roll || '').replace(/\D/g, '');
+                            const prefix = rollDigits.slice(0, 2);
+                            const batchFromRoll = prefix ? `20${prefix}` : '';
+                            if (String(studentFilterBatch) !== batchFromRoll) return false;
+                          }
+                        }
+                        return true;
                       }).length})
                     </h3>
-                    
-                    {/* Search Input */}
-                    <input
-                      type="text"
-                      placeholder={`Search ${selectedUserRole}s by name, email${selectedUserRole === 'student' ? ', or roll' : ', or designation'}...`}
-                      value={userListFilter}
-                      onChange={(e) => setUserListFilter(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        marginBottom: '16px',
-                        outline: 'none'
-                      }}
-                    />
 
                     <div className="proposals-grid">
                       {users
                         .filter(u => {
                           if ((u.role || '').toLowerCase() !== selectedUserRole) return false;
-                          if (!userListFilter.trim()) return true;
-                          const filterLower = userListFilter.toLowerCase();
-                          return u.name?.toLowerCase().includes(filterLower) ||
-                                 u.email?.toLowerCase().includes(filterLower) ||
-                                 u.roll?.toLowerCase().includes(filterLower) ||
-                                 u.designation?.toLowerCase().includes(filterLower);
+                          // Apply role-specific filters only
+                          if (selectedUserRole === 'teacher') {
+                            if (teacherFilterDept && (u.department || '').toLowerCase() !== teacherFilterDept.toLowerCase()) return false;
+                            if (teacherFilterDesignation && (u.designation || '').toLowerCase() !== teacherFilterDesignation.toLowerCase()) return false;
+                          } else if (selectedUserRole === 'student') {
+                            if (studentFilterDept && (u.department || '').toLowerCase() !== studentFilterDept.toLowerCase()) return false;
+                            if (studentFilterBatch) {
+                              const rollDigits = String(u.roll || '').replace(/\D/g, '');
+                              const prefix = rollDigits.slice(0, 2);
+                              const batchFromRoll = prefix ? `20${prefix}` : '';
+                              if (String(studentFilterBatch) !== batchFromRoll) return false;
+                            }
+                          }
+                          return true;
+                        })
+                        .sort((a, b) => {
+                          // For students, sort by roll number
+                          if (selectedUserRole === 'student') {
+                            const rollA = parseInt(String(a.roll || '0').replace(/\D/g, ''), 10);
+                            const rollB = parseInt(String(b.roll || '0').replace(/\D/g, ''), 10);
+                            return rollA - rollB;
+                          }
+                          // For teachers, sort by name
+                          return (a.name || '').localeCompare(b.name || '');
                         })
                         .map(user => (
                           <div key={user._id} className="proposal-card">
@@ -2865,7 +2960,8 @@ const AdminDashboard = () => {
               </div>
 
               {/* Profile Form */}
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px'}}>
+              <div style={{display: 'grid', gridTemplateColumns: selectedUserProfile.role === 'teacher' ? '1fr 1fr' : '1fr 1fr', gap: '16px'}}>
+                {/* Always show Name and Email */}
                 <div>
                   <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
                     Full Name <span style={{color: '#dc2626'}}>*</span>
@@ -2885,46 +2981,7 @@ const AdminDashboard = () => {
                   />
                 </div>
 
-                <div>
-                  <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
-                    Email <span style={{color: '#dc2626'}}>*</span>
-                  </label>
-                  <input
-                    type="email"
-                    value={userProfileForm.email}
-                    onChange={(e) => setUserProfileForm({ ...userProfileForm, email: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                    disabled={profileSaving}
-                  />
-                </div>
-
-                {selectedUserProfile.role === 'student' && (
-                  <div>
-                    <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
-                      Roll Number
-                    </label>
-                    <input
-                      type="text"
-                      value={userProfileForm.roll}
-                      onChange={(e) => setUserProfileForm({ ...userProfileForm, roll: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '14px'
-                      }}
-                      disabled={profileSaving}
-                    />
-                  </div>
-                )}
-
+                {/* For Teacher: Only show Designation */}
                 {selectedUserProfile.role === 'teacher' && (
                   <div>
                     <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
@@ -2950,219 +3007,137 @@ const AdminDashboard = () => {
                   </div>
                 )}
 
-                <div>
-                  <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    value={userProfileForm.phone}
-                    onChange={(e) => setUserProfileForm({ ...userProfileForm, phone: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                    disabled={profileSaving}
-                  />
-                </div>
-
-                <div>
-                  <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
-                    Gender
-                  </label>
-                  <select
-                    value={userProfileForm.gender}
-                    onChange={(e) => setUserProfileForm({ ...userProfileForm, gender: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                    disabled={profileSaving}
-                  >
-                    <option value="">Select Gender</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
-                    Blood Group
-                  </label>
-                  <select
-                    value={userProfileForm.bloodGroup}
-                    onChange={(e) => setUserProfileForm({ ...userProfileForm, bloodGroup: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                    disabled={profileSaving}
-                  >
-                    <option value="">Select Blood Group</option>
-                    <option value="A+">A+</option>
-                    <option value="A-">A-</option>
-                    <option value="B+">B+</option>
-                    <option value="B-">B-</option>
-                    <option value="AB+">AB+</option>
-                    <option value="AB-">AB-</option>
-                    <option value="O+">O+</option>
-                    <option value="O-">O-</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
-                    Religion
-                  </label>
-                  <select
-                    value={userProfileForm.religion}
-                    onChange={(e) => setUserProfileForm({ ...userProfileForm, religion: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                    disabled={profileSaving}
-                  >
-                    <option value="">Select Religion</option>
-                    <option value="Islam">Islam</option>
-                    <option value="Hinduism">Hinduism</option>
-                    <option value="Buddhism">Buddhism</option>
-                    <option value="Christianity">Christianity</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
+                {/* For Student: Show Roll Number */}
                 {selectedUserProfile.role === 'student' && (
-                  <>
-                    <div>
-                      <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
-                        Father's Name
-                      </label>
-                      <input
-                        type="text"
-                        value={userProfileForm.father}
-                        onChange={(e) => setUserProfileForm({ ...userProfileForm, father: e.target.value })}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          fontSize: '14px'
-                        }}
-                        disabled={profileSaving}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
-                        Mother's Name
-                      </label>
-                      <input
-                        type="text"
-                        value={userProfileForm.mother}
-                        onChange={(e) => setUserProfileForm({ ...userProfileForm, mother: e.target.value })}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          fontSize: '14px'
-                        }}
-                        disabled={profileSaving}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
-                        Advisor
-                      </label>
-                      <input
-                        type="text"
-                        value={userProfileForm.advisor}
-                        onChange={(e) => setUserProfileForm({ ...userProfileForm, advisor: e.target.value })}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          fontSize: '14px'
-                        }}
-                        disabled={profileSaving}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
-                        Hall Name
-                      </label>
-                      <input
-                        type="text"
-                        value={userProfileForm.hall}
-                        onChange={(e) => setUserProfileForm({ ...userProfileForm, hall: e.target.value })}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          fontSize: '14px'
-                        }}
-                        disabled={profileSaving}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
-                        Scholarship
-                      </label>
-                      <input
-                        type="text"
-                        value={userProfileForm.scholarship}
-                        onChange={(e) => setUserProfileForm({ ...userProfileForm, scholarship: e.target.value })}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          fontSize: '14px'
-                        }}
-                        disabled={profileSaving}
-                      />
-                    </div>
-                  </>
+                  <div>
+                    <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                      Roll Number
+                    </label>
+                    <input
+                      type="text"
+                      value={userProfileForm.roll}
+                      onChange={(e) => setUserProfileForm({ ...userProfileForm, roll: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                      disabled={profileSaving}
+                    />
+                  </div>
                 )}
 
-                <div style={{gridColumn: '1 / -1'}}>
-                  <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
-                    Address
-                  </label>
-                  <textarea
-                    value={userProfileForm.address}
-                    onChange={(e) => setUserProfileForm({ ...userProfileForm, address: e.target.value })}
-                    rows={3}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      resize: 'vertical'
-                    }}
-                    disabled={profileSaving}
-                  />
-                </div>
+                {/* For Student: Advisor */}
+                {selectedUserProfile.role === 'student' && (
+                  <div>
+                    <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                      Advisor
+                    </label>
+                    <input
+                      type="text"
+                      value={userProfileForm.advisor}
+                      onChange={(e) => setUserProfileForm({ ...userProfileForm, advisor: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                      disabled={profileSaving}
+                    />
+                  </div>
+                )}
+
+                {/* For Student: Father's Name */}
+                {selectedUserProfile.role === 'student' && (
+                  <div>
+                    <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                      Father's Name
+                    </label>
+                    <input
+                      type="text"
+                      value={userProfileForm.father}
+                      onChange={(e) => setUserProfileForm({ ...userProfileForm, father: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                      disabled={profileSaving}
+                    />
+                  </div>
+                )}
+
+                {/* For Student: Mother's Name */}
+                {selectedUserProfile.role === 'student' && (
+                  <div>
+                    <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                      Mother's Name
+                    </label>
+                    <input
+                      type="text"
+                      value={userProfileForm.mother}
+                      onChange={(e) => setUserProfileForm({ ...userProfileForm, mother: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                      disabled={profileSaving}
+                    />
+                  </div>
+                )}
+
+                {/* For Student: Hall Name */}
+                {selectedUserProfile.role === 'student' && (
+                  <div>
+                    <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                      Hall Name
+                    </label>
+                    <input
+                      type="text"
+                      value={userProfileForm.hall}
+                      onChange={(e) => setUserProfileForm({ ...userProfileForm, hall: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                      disabled={profileSaving}
+                    />
+                  </div>
+                )}
+
+                {/* For Student: Scholarship */}
+                {selectedUserProfile.role === 'student' && (
+                  <div>
+                    <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
+                      Scholarship
+                    </label>
+                    <input
+                      type="text"
+                      value={userProfileForm.scholarship}
+                      onChange={(e) => setUserProfileForm({ ...userProfileForm, scholarship: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                      disabled={profileSaving}
+                    />
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-footer">

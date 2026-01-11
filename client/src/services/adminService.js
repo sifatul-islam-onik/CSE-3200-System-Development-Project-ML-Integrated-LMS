@@ -12,178 +12,289 @@ const getAuthHeader = () => {
   };
 };
 
+// Error handler wrapper
+const handleError = (error) => {
+  console.error('API Error:', error);
+  
+  // Network error - server not reachable
+  if (!error.response) {
+    const err = new Error(`Network Error: Unable to connect to server. Make sure the backend is running at ${API_URL}`);
+    err.success = false;
+    err.data = {
+      success: false,
+      message: `Network Error: Unable to connect to server. Make sure the backend is running at ${API_URL}`
+    };
+    throw err;
+  }
+  
+  // Server error response
+  const err = new Error(error.response?.data?.message || error.message || 'An error occurred');
+  err.success = false;
+  err.data = error.response?.data || {
+    success: false,
+    message: error.message || 'An error occurred'
+  };
+  throw err;
+};
+
 // Get pending users (email verified but not approved)
 export const getPendingUsers = async () => {
-  const response = await axios.get(`${API_URL}/admin/pending-users`, getAuthHeader());
-  return response.data;
+  try {
+    const response = await axios.get(`${API_URL}/admin/pending-users`, getAuthHeader());
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Approve a user
 export const approveUser = async (userId) => {
-  const response = await axios.put(`${API_URL}/admin/approve-user/${userId}`, {}, getAuthHeader());
-  return response.data;
+  try {
+    const response = await axios.put(`${API_URL}/admin/approve-user/${userId}`, {}, getAuthHeader());
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Reject a user
 export const rejectUser = async (userId) => {
-  const response = await axios.put(`${API_URL}/admin/reject-user/${userId}`, {}, getAuthHeader());
-  return response.data;
+  try {
+    const response = await axios.put(`${API_URL}/admin/reject-user/${userId}`, {}, getAuthHeader());
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Get all users
 export const getAllUsers = async () => {
-  const response = await axios.get(`${API_URL}/admin/users`, getAuthHeader());
-  return response.data;
+  try {
+    const response = await axios.get(`${API_URL}/admin/users`, getAuthHeader());
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Toggle user status
 export const toggleUserStatus = async (userId) => {
-  const response = await axios.put(`${API_URL}/admin/users/${userId}/toggle-status`, {}, getAuthHeader());
-  return response.data;
+  try {
+    const response = await axios.put(`${API_URL}/admin/users/${userId}/toggle-status`, {}, getAuthHeader());
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Set user status explicitly
 export const setUserStatus = async (userId, isActive) => {
-  const response = await axios.put(`${API_URL}/admin/users/${userId}/status`, { isActive }, getAuthHeader());
-  return response.data;
+  try {
+    const response = await axios.put(`${API_URL}/admin/users/${userId}/status`, { isActive }, getAuthHeader());
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Delete a user
 export const deleteUser = async (userId) => {
-  const response = await axios.delete(`${API_URL}/admin/users/${userId}`, getAuthHeader());
-  return response.data;
+  try {
+    const response = await axios.delete(`${API_URL}/admin/users/${userId}`, getAuthHeader());
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Update user profile
 export const updateUserProfile = async (userId, profileData) => {
-  const response = await axios.put(`${API_URL}/admin/users/${userId}/profile`, profileData, getAuthHeader());
-  return response.data;
+  try {
+    const response = await axios.put(`${API_URL}/admin/users/${userId}/profile`, profileData, getAuthHeader());
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Set teacher designation
 export const setUserDesignation = async (userId, designation) => {
-  const response = await axios.put(
-    `${API_URL}/admin/users/${userId}/designation`,
-    { designation },
-    getAuthHeader()
-  );
-  return response.data;
+  try {
+    const response = await axios.put(
+      `${API_URL}/admin/users/${userId}/designation`,
+      { designation },
+      getAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
+};
+
+// Get distinct student batches (descending)
+export const getStudentBatches = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/admin/students/batches`, getAuthHeader());
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Import students from Excel
 export const importStudentsFromExcel = async (formData) => {
-  const token = localStorage.getItem('token');
-  const response = await axios.post(`${API_URL}/admin/users/import`, formData, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'multipart/form-data'
-    }
-  });
-  return response.data;
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(`${API_URL}/admin/users/import`, formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Export student credentials
 export const exportStudentCredentials = async (batchYear, deptCode) => {
-  const token = localStorage.getItem('token');
-  const response = await axios.post(
-    `${API_URL}/admin/users/export-credentials`, 
-    { batchYear, deptCode },
-    {
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
-      responseType: 'blob'
-    }
-  );
-  return response.data;
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(
+      `${API_URL}/admin/users/export-credentials`, 
+      { batchYear, deptCode },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        responseType: 'blob'
+      }
+    );
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Import teachers from Excel
 export const importTeachersFromExcel = async (formData) => {
-  const token = localStorage.getItem('token');
-  const response = await axios.post(`${API_URL}/admin/teachers/import`, formData, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'multipart/form-data'
-    }
-  });
-  return response.data;
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(`${API_URL}/admin/teachers/import`, formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Export teacher credentials by department
 export const exportTeacherCredentials = async (dept) => {
-  const token = localStorage.getItem('token');
-  const response = await axios.post(
-    `${API_URL}/admin/teachers/export-credentials`,
-    { department: dept },
-    {
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
-      responseType: 'blob'
-    }
-  );
-  return response.data;
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(
+      `${API_URL}/admin/teachers/export-credentials`,
+      { department: dept },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        responseType: 'blob'
+      }
+    );
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Course assignment functions
 
 // Assign a teacher to a course
 export const assignTeacherToCourse = async (courseId, teacherId, section = null) => {
-  const response = await axios.post(
-    `${API_URL}/admin/courses/${courseId}/assign-teacher`,
-    { teacherId, section },
-    getAuthHeader()
-  );
-  return response.data;
+  try {
+    const response = await axios.post(
+      `${API_URL}/admin/courses/${courseId}/assign-teacher`,
+      { teacherId, section },
+      getAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Unassign a teacher from a course
 export const unassignTeacherFromCourse = async (courseId, teacherId, section = null) => {
-  const params = section ? `?section=${section}` : '';
-  const response = await axios.delete(
-    `${API_URL}/admin/courses/${courseId}/unassign-teacher/${teacherId}${params}`,
-    getAuthHeader()
-  );
-  return response.data;
+  try {
+    const params = section ? `?section=${section}` : '';
+    const response = await axios.delete(
+      `${API_URL}/admin/courses/${courseId}/unassign-teacher/${teacherId}${params}`,
+      getAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Get all teachers assigned to a course
 export const getAssignedTeachers = async (courseId) => {
-  const response = await axios.get(
-    `${API_URL}/admin/courses/${courseId}/assigned-teachers`,
-    getAuthHeader()
-  );
-  return response.data;
+  try {
+    const response = await axios.get(
+      `${API_URL}/admin/courses/${courseId}/assigned-teachers`,
+      getAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Batch assignment functions
 
 // Assign a batch to a course
 export const assignBatchToCourse = async (courseId, batch, deptCode) => {
-  const response = await axios.post(
-    `${API_URL}/admin/courses/${courseId}/assign-batch`,
-    { batch, deptCode },
-    getAuthHeader()
-  );
-  return response.data;
+  try {
+    const response = await axios.post(
+      `${API_URL}/admin/courses/${courseId}/assign-batch`,
+      { batch, deptCode },
+      getAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Unassign a batch from a course
 export const unassignBatchFromCourse = async (courseId, batch, deptCode) => {
-  const response = await axios.delete(
-    `${API_URL}/admin/courses/${courseId}/unassign-batch`,
-    { ...getAuthHeader(), data: { batch, deptCode } }
-  );
-  return response.data;
+  try {
+    const response = await axios.delete(
+      `${API_URL}/admin/courses/${courseId}/unassign-batch`,
+      { ...getAuthHeader(), data: { batch, deptCode } }
+    );
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 
 // Get all batches assigned to a course
 export const getAssignedBatches = async (courseId) => {
-  const response = await axios.get(
-    `${API_URL}/admin/courses/${courseId}/assigned-batches`,
-    getAuthHeader()
-  );
-  return response.data;
+  try {
+    const response = await axios.get(
+      `${API_URL}/admin/courses/${courseId}/assigned-batches`,
+      getAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
 };
 

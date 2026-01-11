@@ -17,6 +17,7 @@ The Excel file must contain the following columns (case-insensitive):
 | **Full Name** | Text | Teacher's complete name | Dr. Ahmed Hassan Khan |
 | **Name** | Text | Short name used for email (first word will be used) | Ahmed |
 | **Dept** | Text | Department code/abbreviation | CSE |
+| **Designation** | Text | Teacher's designation. If empty, defaults to Lecturer | Assistant Professor |
 
 ### Column Name Variations
 
@@ -24,16 +25,17 @@ The system accepts variations of column names:
 - **Full Name**: "Full Name", "full name", "FullName", "fullName"
 - **Name**: "Name", "name" 
 - **Dept**: "Dept", "dept", "Department", "department"
+- **Designation**: "Designation", "designation", and minor variants (spaces/underscores are ignored)
 
 ### Example Data
 
 ```
-Full Name                  | Name      | Dept
----------------------------|-----------|-------
-Dr. Ahmed Hassan Khan      | Ahmed     | CSE
-Prof. Fatima Amin          | Fatima    | EEE
-Mr. Bilal Ahmed Malik      | Bilal     | ME
-Dr. Sara Khan              | Sara      | BTE
+Full Name                  | Name      | Dept | Designation
+---------------------------|-----------|------|--------------------
+Dr. Ahmed Hassan Khan      | Ahmed     | CSE  | Assistant Professor
+Prof. Fatima Amin          | Fatima    | EEE  | Professor
+Mr. Bilal Ahmed Malik      | Bilal     | ME   | Lecturer
+Dr. Sara Khan              | Sara      | BTE  | Lecturer
 ```
 
 ## Auto-Generated Information
@@ -123,14 +125,14 @@ Sample files are provided in the project root:
 
 ### Sample Data Included:
 
-| Full Name | Name | Dept |
-|-----------|------|------|
-| Dr. Ahmed Hassan Khan | Ahmed | CSE |
-| Prof. Fatima Amin | Fatima | EEE |
-| Mr. Bilal Ahmed Malik | Bilal | ME |
-| Dr. Sara Khan | Sara | BTE |
-| Prof. Muhammad Hasan | Hasan | IPE |
-| Dr. Aisha Ahmed | Aisha | CE |
+| Full Name | Name | Dept | Designation |
+|-----------|------|------|-------------|
+| Dr. Ahmed Hassan Khan | Ahmed | CSE | Assistant Professor |
+| Prof. Fatima Amin | Fatima | EEE | Professor |
+| Mr. Bilal Ahmed Malik | Bilal | ME | Lecturer |
+| Dr. Sara Khan | Sara | BTE | Lecturer |
+| Prof. Muhammad Hasan | Hasan | IPE | Professor |
+| Dr. Aisha Ahmed | Aisha | CE | Lecturer |
 
 You can use these files as templates for your own teacher imports or test the import functionality.
 

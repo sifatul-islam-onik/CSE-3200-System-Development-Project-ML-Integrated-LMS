@@ -217,11 +217,25 @@ exports.importStudentsFromExcel = async (req, res) => {
     };
 
     const normalizeVal = (row, keys) => {
+      // Normalize a string for comparison
+      const normalize = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      
+      // Try exact matches first
       for (const key of keys) {
         if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
           return String(row[key]).trim();
         }
       }
+      
+      // If no exact match, try normalized matching against all row keys
+      const targetNorms = keys.map(normalize);
+      for (const [rowKey, rowValue] of Object.entries(row)) {
+        const rowKeyNorm = normalize(rowKey);
+        if (targetNorms.includes(rowKeyNorm) && rowValue !== undefined && rowValue !== null && String(rowValue).trim() !== '') {
+          return String(rowValue).trim();
+        }
+      }
+      
       return '';
     };
 
@@ -285,6 +299,35 @@ exports.importStudentsFromExcel = async (req, res) => {
   } catch (error) {
     console.error('Import students error:', error);
     return res.status(500).json({ success: false, message: 'Server error importing students' });
+  }
+};
+
+// @desc    Get distinct student batches (derived from roll: 20 + first two digits)
+// @route   GET /api/admin/students/batches
+// @access  Admin only
+exports.getStudentBatches = async (req, res) => {
+  try {
+    const students = await User.find({ role: 'student' }).select('roll').lean();
+    const batchSet = new Set();
+
+    for (const s of students) {
+      const roll = String(s.roll || '').trim();
+      if (!roll) continue;
+      const digits = roll.replace(/\D/g, '');
+      if (digits.length < 2) continue;
+      const firstTwo = digits.slice(0, 2);
+      const yearStr = `20${firstTwo}`;
+      const year = parseInt(yearStr, 10);
+      if (!Number.isNaN(year)) {
+        batchSet.add(year);
+      }
+    }
+
+    const batches = Array.from(batchSet).sort((a, b) => b - a);
+    return res.status(200).json({ success: true, data: batches });
+  } catch (error) {
+    console.error('Get student batches error:', error);
+    return res.status(500).json({ success: false, message: 'Server error fetching student batches' });
   }
 };
 

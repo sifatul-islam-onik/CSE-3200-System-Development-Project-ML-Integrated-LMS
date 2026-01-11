@@ -10,32 +10,38 @@ const generateTeacherTemplate = () => {
     {
       'Full Name': 'Dr. Ahmed Hassan Khan',
       'Name': 'Ahmed',
-      'Dept': 'CSE'
+      'Dept': 'CSE',
+      'Designation': 'Assistant Professor'
     },
     {
       'Full Name': 'Prof. Fatima Amin',
       'Name': 'Fatima',
-      'Dept': 'EEE'
+      'Dept': 'EEE',
+      'Designation': 'Professor'
     },
     {
       'Full Name': 'Mr. Bilal Ahmed Malik',
       'Name': 'Bilal',
-      'Dept': 'ME'
+      'Dept': 'ME',
+      'Designation': 'Lecturer'
     },
     {
       'Full Name': 'Dr. Sara Khan',
       'Name': 'Sara',
-      'Dept': 'BTE'
+      'Dept': 'BTE',
+      'Designation': ''
     },
     {
       'Full Name': 'Prof. Muhammad Hasan',
       'Name': 'Hasan',
-      'Dept': 'IPE'
+      'Dept': 'IPE',
+      'Designation': 'Professor'
     },
     {
       'Full Name': 'Dr. Aisha Ahmed',
       'Name': 'Aisha',
-      'Dept': 'CE'
+      'Dept': 'CE',
+      'Designation': 'Lecturer'
     }
   ];
 
@@ -46,7 +52,8 @@ const generateTeacherTemplate = () => {
   worksheet['!cols'] = [
     { wch: 25 },  // Full Name
     { wch: 15 },  // Name
-    { wch: 10 }   // Dept
+    { wch: 10 },  // Dept
+    { wch: 22 }   // Designation
   ];
 
   // Set header background color and bold font
@@ -57,7 +64,7 @@ const generateTeacherTemplate = () => {
   };
 
   // Apply header styles
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     const cellAddress = XLSX.utils.encode_cell({ r: 0, c: i });
     worksheet[cellAddress].s = headerCellStyle;
   }
