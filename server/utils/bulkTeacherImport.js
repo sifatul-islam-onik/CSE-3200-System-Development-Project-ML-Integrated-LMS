@@ -23,14 +23,35 @@ const generatePassword = () => {
   return password.split('').sort(() => Math.random() - 0.5).join('');
 };
 
-// Normalize field value from different possible column names
+// Normalize field value from different possible column names (case/spacing/punctuation tolerant)
+// Returns: { found: boolean, value: string }
+// found: true if column was found (even if empty)
+// value: the trimmed value or empty string
 const normalizeVal = (row, keys) => {
+  const norm = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const entries = Object.entries(row || {});
+  
+  // Try exact matches first
   for (const key of keys) {
-    if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
-      return String(row[key]).trim();
+    for (const [rk, rv] of entries) {
+      if (rk === key) {
+        // Exact match found; return value (may be empty)
+        return { found: true, value: String(rv || '').trim() };
+      }
     }
   }
-  return '';
+  
+  // If no exact match, try normalized matching
+  const targetNorms = keys.map(norm);
+  for (const [rk, rv] of entries) {
+    const rkNorm = norm(rk);
+    if (targetNorms.includes(rkNorm)) {
+      // Normalized match found; return value (may be empty)
+      return { found: true, value: String(rv || '').trim() };
+    }
+  }
+  
+  return { found: false, value: '' };
 };
 
 // Validate teacher data
@@ -38,17 +59,17 @@ const validateTeacherData = (row, index) => {
   const errors = [];
   const rowRef = `Row ${index + 2}`;
   
-  const fullName = normalizeVal(row, ['Full Name', 'full name', 'FullName', 'fullName']);
-  const name = normalizeVal(row, ['Name', 'name']);
-  const dept = normalizeVal(row, ['Dept', 'dept', 'Department', 'department']);
+  const fullNameResult = normalizeVal(row, ['Full Name', 'full name', 'FullName', 'fullName']);
+  const nameResult = normalizeVal(row, ['Name', 'name']);
+  const deptResult = normalizeVal(row, ['Dept', 'dept', 'Department', 'department']);
   
-  if (!fullName) {
+  if (!fullNameResult.value) {
     errors.push(`${rowRef}: Full Name is required`);
   }
-  if (!name) {
+  if (!nameResult.value) {
     errors.push(`${rowRef}: Name is required (will be used for email)`);
   }
-  if (!dept) {
+  if (!deptResult.value) {
     errors.push(`${rowRef}: Dept is required`);
   }
   
@@ -74,9 +95,10 @@ const bulkImportTeachers = async (data) => {
     const rowRef = `Row ${idx + 2}`;
     
     // Get values from different possible column names
-    const fullName = normalizeVal(row, ['Full Name', 'full name', 'FullName', 'fullName']);
-    const nameForEmail = normalizeVal(row, ['Name', 'name']);
-    const dept = normalizeVal(row, ['Dept', 'dept', 'Department', 'department']);
+    const fullNameResult = normalizeVal(row, ['Full Name', 'full name', 'FullName', 'fullName']);
+    const nameForEmailResult = normalizeVal(row, ['Name', 'name']);
+    const deptResult = normalizeVal(row, ['Dept', 'dept', 'Department', 'department']);
+    const designationResult = normalizeVal(row, ['Designation', 'designation']);
 
     // Validate required fields
     const validationErrors = validateTeacherData(row, idx);
@@ -84,6 +106,11 @@ const bulkImportTeachers = async (data) => {
       results.errors.push(...validationErrors);
       continue;
     }
+
+    const fullName = fullNameResult.value;
+    const nameForEmail = nameForEmailResult.value;
+    const dept = deptResult.value;
+    const designationRaw = designationResult.value; // May be empty if column exists but cell is empty
 
     // Extract first word from nameForEmail for email creation
     const emailPrefix = nameForEmail.split(/\s+/)[0].toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -99,10 +126,23 @@ const bulkImportTeachers = async (data) => {
       continue;
     }
 
+    // Resolve designation (default to Lecturer if empty/invalid)
+    let designation = 'Lecturer';
+    if (designationRaw && designationRaw.trim()) {
+      const norm = designationRaw.trim().toLowerCase();
+      if (norm === 'professor') designation = 'Professor';
+      else if (norm === 'assistant professor' || norm === 'assistantprofessor' || norm === 'asst professor' || norm === 'assistant_professor') designation = 'Assistant Professor';
+      else if (norm === 'lecturer') designation = 'Lecturer';
+      else {
+        // Unknown designation; fall back to default
+        designation = 'Lecturer';
+      }
+    }
+
     // Generate random password
     const password = generatePassword();
     
-    console.log(`Creating teacher: ${fullName} (${email}) with password generation`);
+    console.log(`Creating teacher: ${fullName} (${email}) with designation: ${designation}`);
 
     try {
       // Create new teacher user
@@ -113,6 +153,7 @@ const bulkImportTeachers = async (data) => {
         initialPassword: password, // Store plaintext password for export
         role: 'teacher',
         department: dept,
+        designation,
         isEmailVerified: true, // Auto-verify for bulk imported teachers
         isApprovedByAdmin: true, // Auto-approve for bulk imported teachers
         isActive: true
@@ -120,14 +161,15 @@ const bulkImportTeachers = async (data) => {
 
       await teacher.save();
       
-      console.log(`Successfully created teacher: ${email}, initialPassword set: ${!!teacher.initialPassword}`);
+      console.log(`Successfully created teacher: ${email}, designation: ${teacher.designation}, initialPassword set: ${!!teacher.initialPassword}`);
       
       results.created++;
       results.createdTeachers.push({
         name: fullName,
         email,
         password, // Return password so it can be displayed to admin
-        department: dept
+        department: dept,
+        designation
       });
     } catch (err) {
       console.error(`Failed to create teacher ${email}:`, err.message);
