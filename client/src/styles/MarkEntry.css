@@ -159,6 +159,12 @@
   color: #1f2937;
 }
 
+.image-container {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
 .captured-image {
   width: 100%;
   max-height: 400px;
@@ -166,25 +172,55 @@
   border-radius: 8px;
   border: 2px solid #e5e7eb;
   margin-bottom: 12px;
+  display: block;
+}
+
+.processing-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  z-index: 10;
+}
+
+.spinner-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 120px;
+}
+
+.progress-ring {
+  animation: spin 1s linear infinite;
+}
+
+.progress-ring-circle {
+  stroke-linecap: round;
+  stroke-dasharray: 163;
+  stroke-dashoffset: 41;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .image-actions {
   display: flex;
   gap: 12px;
   justify-content: center;
-}
-
-.processing-text {
-  text-align: center;
-  color: #3b82f6;
-  font-weight: 500;
-  margin-top: 12px;
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
 }
 
 /* Marks Form */
@@ -205,8 +241,8 @@
 
 .marks-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
   margin-bottom: 20px;
   width: 100%;
 }
