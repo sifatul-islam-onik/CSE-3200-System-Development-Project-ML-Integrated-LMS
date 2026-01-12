@@ -248,6 +248,7 @@ exports.importStudentsFromExcel = async (req, res) => {
       const mother = normalizeVal(row, ['mother', 'Mother']);
       const hall = normalizeVal(row, ['hall', 'Hall']);
       const scholarship = normalizeVal(row, ['scholarship', 'Scholarship']);
+      const department = normalizeVal(row, ['department', 'Department', 'dept', 'Dept']);
 
       if (!roll || !name) {
         results.errors.push({ row: idx + 2, reason: 'Missing roll or name' });
@@ -267,6 +268,36 @@ exports.importStudentsFromExcel = async (req, res) => {
         continue;
       }
 
+      // Extract department from roll if not provided
+      // KUET roll format typically: YYMMNNN where MM is department code
+      let finalDepartment = department;
+      if (!finalDepartment && roll) {
+        const rollDigits = roll.replace(/\D/g, '');
+        if (rollDigits.length >= 4) {
+          const deptCode = rollDigits.substring(2, 4);
+          // Map KUET department codes to names
+          const departmentMap = {
+            '01': 'CE',
+            '03': 'EEE',
+            '05': 'ME',
+            '07': 'CSE',
+            '09': 'ECE',
+            '11': 'IEM',
+            '13': 'ESE',
+            '15': 'BME',
+            '17': 'URP',
+            '19': 'LE',
+            '21': 'TE',
+            '23': 'BECM',
+            '25': 'ARCH',
+            '27': 'MSE',
+            '29': 'CHE',
+            '31': 'MTE'
+          };
+          finalDepartment = departmentMap[deptCode] || '';
+        }
+      }
+
       // Generate random password
       const randomPassword = generateRandomPassword();
 
@@ -282,6 +313,7 @@ exports.importStudentsFromExcel = async (req, res) => {
         mother,
         hall,
         scholarship,
+        department: finalDepartment,
         isEmailVerified: true,
         isApprovedByAdmin: true,
         isActive: true

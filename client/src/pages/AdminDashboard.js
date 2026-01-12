@@ -83,6 +83,7 @@ const AdminDashboard = () => {
   const [teacherFilterDesignation, setTeacherFilterDesignation] = useState('');
   const [studentFilterDept, setStudentFilterDept] = useState('');
   const [studentFilterBatch, setStudentFilterBatch] = useState('');
+  const [userSearchText, setUserSearchText] = useState('');
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [selectedCourseForAssignment, setSelectedCourseForAssignment] = useState(null);
   const [assignmentLoading, setAssignmentLoading] = useState(false);
@@ -285,7 +286,17 @@ const AdminDashboard = () => {
       const students = (response.data || []).filter(u => u.role === 'student');
       const studentDepts = new Set();
       students.forEach(s => {
-        if (s.department) studentDepts.add(s.department);
+        if (s.department) {
+          studentDepts.add(s.department);
+        } else if (s.roll) {
+          // Extract department from roll number (YYMMNNN format)
+          const rollDigits = String(s.roll).replace(/\D/g, '');
+          if (rollDigits.length >= 4) {
+            const deptCode = rollDigits.substring(2, 4);
+            const dept = departmentMap[deptCode];
+            if (dept) studentDepts.add(dept);
+          }
+        }
       });
       setAvailableStudentDepartments(Array.from(studentDepts).sort());
     } catch (err) {
@@ -348,6 +359,13 @@ const AdminDashboard = () => {
     try {
       const blob = await exportStudentCredentials(exportBatchYear, exportDeptCode);
       
+      // Check if blob is valid
+      if (!blob || blob.size === 0) {
+        setExportError('No data received from server');
+        setTimeout(() => setExportError(''), 5000);
+        return;
+      }
+
       // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -355,15 +373,37 @@ const AdminDashboard = () => {
       link.download = `students_${exportBatchYear}_${exportDeptCode}.xlsx`;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      
+      // Delay cleanup to ensure download starts
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
 
       setExportMessage('Credentials exported successfully.');
       setExportBatchYear('');
       setExportDeptCode('');
       setTimeout(() => setExportMessage(''), 5000);
     } catch (err) {
-      setExportError(err.response?.data?.message || 'Failed to export credentials');
+      console.error('Export error:', err);
+      
+      // Try to extract error message from blob if it's a JSON error response
+      let errorMessage = 'Failed to export credentials';
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const errorData = JSON.parse(text);
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseErr) {
+          // If parsing fails, use default message
+        }
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setExportError(errorMessage);
       setTimeout(() => setExportError(''), 5000);
     } finally {
       setExportLoading(false);
@@ -433,8 +473,12 @@ const AdminDashboard = () => {
       link.download = `teacher_credentials_${teacherExportDept}_${new Date().toISOString().split('T')[0]}.xlsx`;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      
+      // Delay cleanup to ensure download starts
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
 
       setTeacherExportMessage('Teacher credentials exported successfully.');
       setTeacherExportDept('');
@@ -1867,10 +1911,17 @@ const AdminDashboard = () => {
                         <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
                             <h3 style={{ margin: 0, fontSize: '16px' }}>Filter Students</h3>
-                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Select Department and Batch (existing only)</p>
+                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Search by name, email, or roll; filter by department and batch</p>
                           </div>
                         </div>
                         <div className="proposal-body" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <input
+                            type="text"
+                            placeholder="Search by name, email, or roll..."
+                            value={userSearchText}
+                            onChange={(e) => setUserSearchText(e.target.value)}
+                            style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', minWidth: '250px', flex: '1 1 250px' }}
+                          />
                           <select
                             value={studentFilterDept}
                             onChange={(e) => setStudentFilterDept(e.target.value)}
@@ -1987,10 +2038,17 @@ const AdminDashboard = () => {
                         <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
                             <h3 style={{ margin: 0, fontSize: '16px' }}>Filter Teachers</h3>
-                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Select Department and Designation</p>
+                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Search by name or email; filter by department and designation</p>
                           </div>
                         </div>
                         <div className="proposal-body" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <input
+                            type="text"
+                            placeholder="Search by name or email..."
+                            value={userSearchText}
+                            onChange={(e) => setUserSearchText(e.target.value)}
+                            style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', minWidth: '250px', flex: '1 1 250px' }}
+                          />
                           <select
                             value={teacherFilterDept}
                             onChange={(e) => setTeacherFilterDept(e.target.value)}
@@ -2021,11 +2079,30 @@ const AdminDashboard = () => {
                     <h3 style={{ fontSize: '18px', marginBottom: '16px', textTransform: 'capitalize' }}>
                       {selectedUserRole}s ({users.filter(u => {
                         if ((u.role || '').toLowerCase() !== selectedUserRole) return false;
+                        // Text search filter
+                        if (userSearchText) {
+                          const searchLower = userSearchText.toLowerCase();
+                          const nameMatch = (u.name || '').toLowerCase().includes(searchLower);
+                          const emailMatch = (u.email || '').toLowerCase().includes(searchLower);
+                          const rollMatch = selectedUserRole === 'student' && (u.roll || '').toLowerCase().includes(searchLower);
+                          if (!nameMatch && !emailMatch && !rollMatch) return false;
+                        }
                         if (selectedUserRole === 'teacher') {
                           if (teacherFilterDept && (u.department || '').toLowerCase() !== teacherFilterDept.toLowerCase()) return false;
                           if (teacherFilterDesignation && (u.designation || '').toLowerCase() !== teacherFilterDesignation.toLowerCase()) return false;
                         } else if (selectedUserRole === 'student') {
-                          if (studentFilterDept && (u.department || '').toLowerCase() !== studentFilterDept.toLowerCase()) return false;
+                          if (studentFilterDept) {
+                            let userDept = u.department || '';
+                            // Extract from roll if department not set
+                            if (!userDept && u.roll) {
+                              const rollDigits = String(u.roll).replace(/\D/g, '');
+                              if (rollDigits.length >= 4) {
+                                const deptCode = rollDigits.substring(2, 4);
+                                userDept = departmentMap[deptCode] || '';
+                              }
+                            }
+                            if (userDept.toLowerCase() !== studentFilterDept.toLowerCase()) return false;
+                          }
                           if (studentFilterBatch) {
                             const rollDigits = String(u.roll || '').replace(/\D/g, '');
                             const prefix = rollDigits.slice(0, 2);
@@ -2041,12 +2118,31 @@ const AdminDashboard = () => {
                       {users
                         .filter(u => {
                           if ((u.role || '').toLowerCase() !== selectedUserRole) return false;
+                          // Text search filter
+                          if (userSearchText) {
+                            const searchLower = userSearchText.toLowerCase();
+                            const nameMatch = (u.name || '').toLowerCase().includes(searchLower);
+                            const emailMatch = (u.email || '').toLowerCase().includes(searchLower);
+                            const rollMatch = selectedUserRole === 'student' && (u.roll || '').toLowerCase().includes(searchLower);
+                            if (!nameMatch && !emailMatch && !rollMatch) return false;
+                          }
                           // Apply role-specific filters only
                           if (selectedUserRole === 'teacher') {
                             if (teacherFilterDept && (u.department || '').toLowerCase() !== teacherFilterDept.toLowerCase()) return false;
                             if (teacherFilterDesignation && (u.designation || '').toLowerCase() !== teacherFilterDesignation.toLowerCase()) return false;
                           } else if (selectedUserRole === 'student') {
-                            if (studentFilterDept && (u.department || '').toLowerCase() !== studentFilterDept.toLowerCase()) return false;
+                            if (studentFilterDept) {
+                              let userDept = u.department || '';
+                              // Extract from roll if department not set
+                              if (!userDept && u.roll) {
+                                const rollDigits = String(u.roll).replace(/\D/g, '');
+                                if (rollDigits.length >= 4) {
+                                  const deptCode = rollDigits.substring(2, 4);
+                                  userDept = departmentMap[deptCode] || '';
+                                }
+                              }
+                              if (userDept.toLowerCase() !== studentFilterDept.toLowerCase()) return false;
+                            }
                             if (studentFilterBatch) {
                               const rollDigits = String(u.roll || '').replace(/\D/g, '');
                               const prefix = rollDigits.slice(0, 2);

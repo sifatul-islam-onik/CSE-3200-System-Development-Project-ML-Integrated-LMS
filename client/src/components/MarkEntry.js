@@ -8,6 +8,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
   const [capturedImage, setCapturedImage] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
   const [marks, setMarks] = useState({
     question1: { a: '', b: '', c: '', d: '' },
     question2: { a: '', b: '', c: '', d: '' },
@@ -160,6 +161,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     if (!capturedImage || capturedImage === 'skipped') return;
 
     setIsProcessing(true);
+    setProcessingProgress(0);
     
     try {
       // Convert image URL to blob
@@ -169,32 +171,66 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       const formData = new FormData();
       formData.append('image', blob, 'answer-sheet.jpg');
       
-      // Call FastAPI endpoint
-      const response = await fetch('http://localhost:8000/api/extract-marks', {
-        method: 'POST',
-        body: formData
+      // Use XMLHttpRequest to track real upload progress
+      const xhr = new XMLHttpRequest();
+      
+      // Track upload progress (actual progress)
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const uploadProgress = (e.loaded / e.total) * 50; // Upload is 0-50%
+          setProcessingProgress(uploadProgress);
+        }
       });
       
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-      }
+      // Handle response
+      const response = await new Promise((resolve, reject) => {
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch (e) {
+              reject(new Error('Invalid JSON response'));
+            }
+          } else {
+            reject(new Error(`Server returned ${xhr.status}: ${xhr.statusText}`));
+          }
+        });
+        
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error occurred'));
+        });
+        
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Request was aborted'));
+        });
+        
+        // Start processing phase (50-100%)
+        xhr.addEventListener('loadstart', () => {
+          setProcessingProgress(50);
+        });
+        
+        xhr.open('POST', 'http://localhost:8000/api/extract-marks');
+        xhr.send(formData);
+      });
       
-      const data = await response.json();
+      setProcessingProgress(90);
       
-      if (data.success && data.marks) {
+      if (response.success && response.marks) {
         // Set extracted marks
-        setMarks(data.marks);
-        console.log('Marks extracted successfully:', data);
-        console.log('Confidence:', data.confidence);
-        if (data.raw_table) {
-          console.log('Raw table detected:', data.raw_table);
+        setMarks(response.marks);
+        setProcessingProgress(100);
+        console.log('Marks extracted successfully:', response);
+        console.log('Confidence:', response.confidence);
+        if (response.raw_table) {
+          console.log('Raw table detected:', response.raw_table);
         }
       } else {
-        throw new Error(data.message || 'Failed to extract marks from image');
+        throw new Error(response.message || 'Failed to extract marks from image');
       }
 
     } catch (error) {
       console.error('Error processing image:', error);
+      alert(`Failed to process image: ${error.message}. Please enter marks manually.`);
       // Allow manual entry if OCR fails
       setMarks({
         question1: { a: '', b: '', c: '', d: '' },
@@ -203,7 +239,11 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         question4: { a: '', b: '', c: '', d: '' }
       });
     } finally {
-      setIsProcessing(false);
+      setProcessingProgress(100);
+      setTimeout(() => {
+        setIsProcessing(false);
+        setProcessingProgress(0);
+      }, 500);
     }
   };
 
@@ -401,7 +441,26 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           {capturedImage && capturedImage !== 'skipped' && (
             <div className="image-preview-section">
               <h4>Answer Sheet</h4>
-              <img src={capturedImage} alt="Answer sheet" className="captured-image" />
+              <div className="image-container">
+                <img src={capturedImage} alt="Answer sheet" className="captured-image" />
+                {isProcessing && (
+                  <div className="processing-overlay">
+                    <div className="spinner-container">
+                      <svg className="progress-ring" width="60" height="60">
+                        <circle
+                          className="progress-ring-circle"
+                          stroke="#3b82f6"
+                          strokeWidth="4"
+                          fill="transparent"
+                          r="26"
+                          cx="30"
+                          cy="30"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="image-actions">
                 <button className="btn btn-outline" onClick={handleRetake}>
                   <FontAwesomeIcon icon={faCamera} /> Retake
@@ -412,7 +471,6 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                   </button>
                 )}
               </div>
-              {isProcessing && <p className="processing-text">Processing image...</p>}
             </div>
           )}
 
