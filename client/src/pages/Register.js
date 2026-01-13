@@ -130,19 +130,6 @@ const Register = () => {
                   />
                 </div>
 
-                <div className="form-group">
-                  <label htmlFor="role">Register as</label>
-                  <select
-                    id="role"
-                    name="role"
-                    value={formData.role}
-                    onChange={handleChange}
-                    disabled={loading}
-                  >
-                    <option value="student">Student</option>
-                  </select>
-                </div>
-
                 <button 
                   type="submit" 
                   className={`btn-submit ${loading ? 'loading' : ''}`}
@@ -153,18 +140,6 @@ const Register = () => {
                 </button>
               </form>
             )}
-
-            <div className="register-footer">
-              <p>
-                Already have an account?{' '}
-                <button 
-                  onClick={() => navigate('/login')}
-                  className="link-button"
-                >
-                  Login here
-                </button>
-              </p>
-            </div>
           </div>
         </div>
       </main>

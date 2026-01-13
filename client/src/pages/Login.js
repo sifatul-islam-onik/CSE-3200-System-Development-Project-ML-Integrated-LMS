@@ -130,19 +130,7 @@ const Login = () => {
               </button>
             </form>
 
-            <div className="login-footer">
-              <p>
-                Don't have an account?{' '}
-              </p>
-              <div className="register-links">
-                <button 
-                  onClick={() => navigate('/register/student')}
-                  className="link-button"
-                >
-                  Register as Student
-                </button>
-              </div>
-            </div>
+
           </div>
         </div>
       </main>

@@ -25,6 +25,7 @@ const StudentDashboard = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState({});
 
   useEffect(() => {
     const userData = getUser();
@@ -84,6 +85,37 @@ const StudentDashboard = () => {
     setShowCourseDetail(true);
   };
 
+  const toggleGroup = (groupKey) => {
+    // Accordion behavior: close other type groups when opening a new one
+    const types = ['THEORY', 'SESSIONAL', 'PROJECT/THESIS'];
+    
+    if (types.includes(groupKey)) {
+      // If it's a type group, toggle it (allow closing if already open)
+      const isCurrentlyOpen = expandedGroups[groupKey] === true;
+      
+      if (isCurrentlyOpen) {
+        // Close the current group
+        setExpandedGroups(prev => ({
+          ...prev,
+          [groupKey]: false
+        }));
+      } else {
+        // Open this group and close all others
+        const newGroups = {};
+        types.forEach(type => {
+          newGroups[type] = type === groupKey;
+        });
+        setExpandedGroups(newGroups);
+      }
+    } else {
+      // For other groups (if any in future), just toggle
+      setExpandedGroups(prev => ({
+        ...prev,
+        [groupKey]: !prev[groupKey]
+      }));
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -134,19 +166,19 @@ const StudentDashboard = () => {
           </div>
         );
       case 'courses':
-        // Organize courses by year-semester
-        const organizedCourses = {};
+        // Organize courses by type only
+        const organizedCourses = {
+          'THEORY': [],
+          'SESSIONAL': [],
+          'PROJECT/THESIS': []
+        };
+        
         courses.forEach(course => {
-          const year = course.yearLevel || 'Other';
-          const term = course.term || 'Other';
-          const yearSemKey = `${year}-${term}`;
-          if (!organizedCourses[yearSemKey]) {
-            organizedCourses[yearSemKey] = [];
-          }
-          organizedCourses[yearSemKey].push(course);
+          const type = course.course_type || 'THEORY';
+          organizedCourses[type].push(course);
         });
 
-        const yearSemKeys = Object.keys(organizedCourses).sort();
+        const types = ['THEORY', 'SESSIONAL', 'PROJECT/THESIS'];
 
         return (
           <div className="section-container">
@@ -181,105 +213,128 @@ const StudentDashboard = () => {
                 </div>
               ) : (
                 <div>
-                  {yearSemKeys.map(yearSemKey => {
-                    const [year, term] = yearSemKey.split('-');
-                    const coursesInSem = organizedCourses[yearSemKey];
+                  {types.map(type => {
+                    const coursesInType = organizedCourses[type] || [];
+                    if (coursesInType.length === 0) return null;
+                    
+                    const typeLabel = type === 'THEORY' ? 'Theory' : type === 'SESSIONAL' ? 'Sessional' : 'Project/Thesis';
+                    const isTypeExpanded = expandedGroups[type] === true; // Default to collapsed
                     
                     return (
-                      <div key={yearSemKey} style={{ marginBottom: '24px' }}>
-                        <h3 style={{ 
-                          fontSize: '18px', 
-                          fontWeight: 600, 
-                          marginBottom: '16px',
-                          color: '#1f2937',
-                          borderBottom: '2px solid #e5e7eb',
-                          paddingBottom: '8px'
-                        }}>
-                          Year {year} - Semester {term}
-                        </h3>
-                        <div className="proposals-grid">
-                          {coursesInSem.map(course => (
-                            <div key={course._id} className="proposal-card">
-                              <div className="proposal-header">
-                                <div style={{ flex: 1 }}>
-                                  <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#1f2937' }}>
-                                    {course.courseCode}
-                                  </h4>
-                                  <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '14px' }}>
-                                    {course.courseTitle}
-                                  </p>
+                      <div key={type} style={{ marginBottom: '32px' }}>
+                        <button
+                          onClick={() => toggleGroup(type)}
+                          style={{
+                            fontSize: '20px',
+                            fontWeight: 700,
+                            marginBottom: '20px',
+                            color: '#1f2937',
+                            backgroundColor: '#f3f4f6',
+                            padding: '15px 16px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            transition: 'all 0.2s ease',
+                            width: '100%'
+                          }}
+                        >
+                          <FontAwesomeIcon 
+                            icon={faChevronRight} 
+                            style={{
+                              transform: isTypeExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.2s ease'
+                            }}
+                          />
+                          {typeLabel} ({coursesInType.length})
+                        </button>
+                        
+                        {isTypeExpanded && (
+                          <div className="proposals-grid" style={{ marginTop: '12px' }}>
+                            {coursesInType.map(course => (
+                                        <div key={course._id} className="proposal-card">
+                                  <div className="proposal-header">
+                                    <div style={{ flex: 1 }}>
+                                      <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#1f2937' }}>
+                                        {course.courseCode}
+                                      </h4>
+                                      <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '14px' }}>
+                                        {course.courseTitle}
+                                      </p>
+                                    </div>
+                                    <span 
+                                      className="proposal-type-badge" 
+                                      style={{ 
+                                        backgroundColor: course.course_type === 'THEORY' ? '#3b82f6' : 
+                                                         course.course_type === 'SESSIONAL' ? '#10b981' : '#8b5cf6'
+                                      }}
+                                    >
+                                      {course.course_type}
+                                    </span>
+                                  </div>
+                                  <div className="proposal-body">
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
+                                      <div>
+                                        <span style={{ color: '#6b7280' }}>Credit: </span>
+                                        <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.credit}</span>
+                                      </div>
+                                      <div>
+                                        <span style={{ color: '#6b7280' }}>Category: </span>
+                                        <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.category}</span>
+                                      </div>
+                                      {course.contactHours && (
+                                        <div>
+                                          <span style={{ color: '#6b7280' }}>Contact Hours: </span>
+                                          <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.contactHours}</span>
+                                        </div>
+                                      )}
+                                      {course.academicYear && (
+                                        <div>
+                                          <span style={{ color: '#6b7280' }}>Academic Year: </span>
+                                          <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.academicYear}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    {course.assignedTeachers && course.assignedTeachers.length > 0 && (
+                                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb' }}>
+                                        <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>Instructor(s):</span>
+                                        <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                          {course.assignedTeachers.map((assignment, idx) => {
+                                            const teacher = assignment.teacher || assignment;
+                                            return (
+                                              <span 
+                                                key={idx}
+                                                style={{
+                                                  fontSize: '12px',
+                                                  padding: '4px 8px',
+                                                  backgroundColor: '#f3f4f6',
+                                                  borderRadius: '4px',
+                                                  color: '#374151'
+                                                }}
+                                              >
+                                                {teacher.name}
+                                              </span>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="proposal-actions">
+                                    <button
+                                      className="btn btn-sm btn-primary"
+                                      onClick={() => handleViewCourseDetail(course)}
+                                      style={{ width: '100%' }}
+                                    >
+                                      <FontAwesomeIcon icon={faBook} /> View Details
+                                    </button>
+                                  </div>
                                 </div>
-                                <span 
-                                  className="proposal-type-badge" 
-                                  style={{ 
-                                    backgroundColor: course.course_type === 'THEORY' ? '#3b82f6' : 
-                                                     course.course_type === 'SESSIONAL' ? '#10b981' : '#8b5cf6'
-                                  }}
-                                >
-                                  {course.course_type}
-                                </span>
-                              </div>
-                              <div className="proposal-body">
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
-                                  <div>
-                                    <span style={{ color: '#6b7280' }}>Credit: </span>
-                                    <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.credit}</span>
-                                  </div>
-                                  <div>
-                                    <span style={{ color: '#6b7280' }}>Category: </span>
-                                    <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.category}</span>
-                                  </div>
-                                  {course.contactHours && (
-                                    <div>
-                                      <span style={{ color: '#6b7280' }}>Contact Hours: </span>
-                                      <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.contactHours}</span>
-                                    </div>
-                                  )}
-                                  {course.academicYear && (
-                                    <div>
-                                      <span style={{ color: '#6b7280' }}>Academic Year: </span>
-                                      <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.academicYear}</span>
-                                    </div>
-                                  )}
-                                </div>
-                                {course.assignedTeachers && course.assignedTeachers.length > 0 && (
-                                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb' }}>
-                                    <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>Instructor(s):</span>
-                                    <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                      {course.assignedTeachers.map((assignment, idx) => {
-                                        const teacher = assignment.teacher || assignment;
-                                        return (
-                                          <span 
-                                            key={idx}
-                                            style={{
-                                              fontSize: '12px',
-                                              padding: '4px 8px',
-                                              backgroundColor: '#f3f4f6',
-                                              borderRadius: '4px',
-                                              color: '#374151'
-                                            }}
-                                          >
-                                            {teacher.name}
-                                            {assignment.section && ` (Sec ${assignment.section})`}
-                                          </span>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="proposal-actions">
-                                <button
-                                  className="btn btn-sm btn-primary"
-                                  onClick={() => handleViewCourseDetail(course)}
-                                  style={{ width: '100%' }}
-                                >
-                                  <FontAwesomeIcon icon={faBook} /> View Details
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -343,51 +398,52 @@ const StudentDashboard = () => {
           </div>
         );
       case 'profile':
-        const updateProfile = async () => {
-          try {
-            const payload = { ...profileForm };
-            // Password change validation
-            if (currentPassword || newPassword || confirmPassword) {
-              if (!currentPassword || !newPassword || !confirmPassword) {
-                alert('Please fill all password fields');
-                return;
+        return (() => {
+          const updateProfile = async () => {
+            try {
+              const payload = { ...profileForm };
+              // Password change validation
+              if (currentPassword || newPassword || confirmPassword) {
+                if (!currentPassword || !newPassword || !confirmPassword) {
+                  alert('Please fill all password fields');
+                  return;
+                }
+                if (newPassword !== confirmPassword) {
+                  alert('New password and confirm password do not match');
+                  return;
+                }
+                payload.currentPassword = currentPassword;
+                payload.newPassword = newPassword;
               }
-              if (newPassword !== confirmPassword) {
-                alert('New password and confirm password do not match');
-                return;
+              const response = await fetch('http://localhost:5000/api/auth/profile/update', {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(payload)
+              });
+              const data = await response.json();
+              if (data.success) {
+                setUser(data.data);
+                localStorage.setItem('user', JSON.stringify(data.data));
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+              } else {
+                alert(data.message || 'Failed to update profile');
               }
-              payload.currentPassword = currentPassword;
-              payload.newPassword = newPassword;
+            } catch (err) {
+              alert('Failed to update profile');
             }
-            const response = await fetch('http://localhost:5000/api/auth/profile/update', {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-              },
-              body: JSON.stringify(payload)
-            });
-            const data = await response.json();
-            if (data.success) {
-              setUser(data.data);
-              localStorage.setItem('user', JSON.stringify(data.data));
-              setCurrentPassword('');
-              setNewPassword('');
-              setConfirmPassword('');
-            } else {
-              alert(data.message || 'Failed to update profile');
-            }
-          } catch (err) {
-            alert('Failed to update profile');
-          }
-        };
+          };
 
-        return (
-          <div className="section-container">
-            <div className="section-header">
-              <h2>My Profile</h2>
-              <p>Manage your account information</p>
-            </div>
+          return (
+            <div className="section-container">
+              <div className="section-header">
+                <h2>My Profile</h2>
+                <p>Manage your account information</p>
+              </div>
             <div className="section-body">
               <div className="profile-card">
                 <div className="profile-view">
@@ -578,8 +634,9 @@ const StudentDashboard = () => {
                 </div>
               </div>
             </div>
-          </div>
-        );
+            </div>
+          );
+        })();
       default:
         return null;
     }

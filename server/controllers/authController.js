@@ -514,6 +514,7 @@ exports.updateProfile = async (req, res) => {
         return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
       }
       user.password = newPassword; // pre-save hook will hash
+      user.initialPassword = newPassword; // Update initial password for export purposes
     }
 
     await user.save();

@@ -551,7 +551,7 @@ exports.exportStudentCredentials = async (req, res) => {
       });
     }
 
-    // Prepare export data using stored initial passwords (do not reset current passwords)
+    // Prepare export data using current passwords (initialPassword is updated when users change passwords)
     const exportData = students.map((student) => ({
       Roll: student.roll,
       Name: student.name,
@@ -681,10 +681,10 @@ exports.exportTeacherCredentials = async (req, res) => {
     const withoutPassword = teachers.length - withPassword;
     
     if (withoutPassword > 0) {
-      console.log(`Warning: ${withoutPassword} of ${teachers.length} teachers don't have initial passwords recorded`);
+      console.log(`Warning: ${withoutPassword} of ${teachers.length} teachers don't have current passwords recorded`);
     }
     
-    // Prepare data with actual initial passwords
+    // Prepare data with current passwords (initialPassword is updated when users change passwords)
     const exportData = teachers.map(t => ({
       'Full Name': t.name || '',
       'Email': t.email || '',
@@ -793,6 +793,109 @@ exports.setUserDesignation = async (req, res) => {
   }
 };
 
+// @desc    Set a teacher as department head (must be Professor)
+// @route   PUT /api/admin/users/:userId/department-head
+// @access  Admin only
+exports.setDepartmentHead = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.role !== 'teacher') {
+      return res.status(400).json({ success: false, message: 'Only teachers can be department heads' });
+    }
+
+    if (user.designation !== 'Professor') {
+      return res.status(400).json({ success: false, message: 'Only Professors can be department heads' });
+    }
+
+    if (!user.department) {
+      return res.status(400).json({ success: false, message: 'Teacher must have a department assigned' });
+    }
+
+    // Remove department head status from any other teacher in the same department
+    await User.updateMany(
+      { 
+        department: user.department, 
+        _id: { $ne: userId },
+        isDepartmentHead: true 
+      },
+      { isDepartmentHead: false }
+    );
+
+    // Set this teacher as department head
+    user.isDepartmentHead = true;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Department head assigned successfully',
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        designation: user.designation,
+        department: user.department,
+        isDepartmentHead: user.isDepartmentHead,
+        isActive: user.isActive,
+        isApprovedByAdmin: user.isApprovedByAdmin,
+        isEmailVerified: user.isEmailVerified,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Set department head error:', error);
+    res.status(500).json({ success: false, message: 'Server error setting department head' });
+  }
+};
+
+// @desc    Remove department head status from a teacher
+// @route   DELETE /api/admin/users/:userId/department-head
+// @access  Admin only
+exports.removeDepartmentHead = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.role !== 'teacher') {
+      return res.status(400).json({ success: false, message: 'Only teachers can have department head status' });
+    }
+
+    user.isDepartmentHead = false;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Department head status removed successfully',
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        designation: user.designation,
+        department: user.department,
+        isDepartmentHead: user.isDepartmentHead,
+        isActive: user.isActive,
+        isApprovedByAdmin: user.isApprovedByAdmin,
+        isEmailVerified: user.isEmailVerified,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Remove department head error:', error);
+    res.status(500).json({ success: false, message: 'Server error removing department head' });
+  }
+};
+
 // @desc    Assign a teacher to a course
 // @route   POST /api/admin/courses/:courseId/assign-teacher
 // @access  Admin only
@@ -841,15 +944,7 @@ exports.assignTeacherToCourse = async (req, res) => {
       });
     }
 
-    // For theory courses, section is required
-    if (course.course_type === 'THEORY' && !section) {
-      return res.status(400).json({
-        success: false,
-        message: 'Section (A or B) is required for theory courses'
-      });
-    }
-
-    // Validate section value
+    // Validate section value (if provided)
     if (section && !['A', 'B'].includes(section)) {
       return res.status(400).json({
         success: false,
@@ -871,37 +966,34 @@ exports.assignTeacherToCourse = async (req, res) => {
       return item;
     });
 
-    // Check if teacher is already assigned to this section
+    // Check if teacher is already assigned (regardless of section)
     const existingAssignment = course.assignedTeachers.find(
       a => {
         const teacherId_item = a.teacher?._id || a.teacher;
         const teacherIdStr = teacherId_item.toString();
-        return teacherIdStr === teacherId.toString() && a.section === section;
+        return teacherIdStr === teacherId.toString();
       }
     );
 
     if (existingAssignment) {
       return res.status(400).json({
         success: false,
-        message: `Teacher is already assigned to ${section ? `section ${section}` : 'this course'}`
+        message: 'Teacher is already assigned to this course'
       });
     }
 
-    // Check if section is already taken by another teacher
-    if (section) {
-      const sectionTaken = course.assignedTeachers.find(a => a.section === section);
-      if (sectionTaken) {
-        return res.status(400).json({
-          success: false,
-          message: `Section ${section} is already assigned to another teacher`
-        });
-      }
+    // Check if maximum 2 teachers already assigned
+    if (course.assignedTeachers.length >= 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Maximum 2 teachers can be assigned to a course'
+      });
     }
 
     // Add teacher to assignedTeachers array
     course.assignedTeachers.push({
       teacher: teacherId,
-      section: course.course_type === 'THEORY' ? section : null
+      section: section || null
     });
     await course.save();
 

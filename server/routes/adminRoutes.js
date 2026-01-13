@@ -19,6 +19,8 @@ router.get('/users', adminController.getAllUsers);
 router.put('/users/:userId/toggle-status', adminController.toggleUserStatus);
 router.put('/users/:userId/status', adminController.setUserStatus);
 router.put('/users/:userId/designation', adminController.setUserDesignation);
+router.put('/users/:userId/department-head', adminController.setDepartmentHead);
+router.delete('/users/:userId/department-head', adminController.removeDepartmentHead);
 router.delete('/users/:userId', adminController.deleteUser);
 router.put('/users/:userId/profile', adminController.updateUserProfile);
 router.post('/users/import', upload.single('file'), adminController.importStudentsFromExcel);
