@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBook, faPlus, faHourglass, faCheckCircle, faTimesCircle, faEye, faTrash, faEdit, faSignOutAlt, faChevronDown, faChevronRight, faClipboardList } from '@fortawesome/free-solid-svg-icons';
+import { faBook, faPlus, faHourglass, faCheckCircle, faTimesCircle, faEye, faTrash, faEdit, faSignOutAlt, faChevronDown, faChevronRight, faClipboardList, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
 import { getProfile } from '../services/authService';
 import { getMyProposals, createCourseProposal, deleteProposal } from '../services/courseProposalService';
@@ -65,6 +65,54 @@ const TeacherDashboard = () => {
   const [markEntryCourse, setMarkEntryCourse] = useState(null);
   const [markEntrySection, setMarkEntrySection] = useState(null);
   const [courseStudents, setCourseStudents] = useState([]);
+  const [showCTMarksModal, setShowCTMarksModal] = useState(false);
+  const [ctMarksCourse, setCtMarksCourse] = useState(null);
+  const [ctMarksData, setCtMarksData] = useState([]);
+  const [ctMarksLoading, setCtMarksLoading] = useState(false);
+  const [ctCount, setCtCount] = useState(3);
+  const [ctTotalMarks, setCtTotalMarks] = useState([20, 20, 20]);
+  const [isSmallScreen, setIsSmallScreen] = useState(typeof window !== 'undefined' ? window.innerWidth < 640 : false);
+  
+  // Attendance & Assignment Marks state
+  const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+  const [attendanceCourse, setAttendanceCourse] = useState(null);
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [attendanceTotalMarks, setAttendanceTotalMarks] = useState(10);
+  const [assignmentCount, setAssignmentCount] = useState(3);
+  const [assignmentTotalMarks, setAssignmentTotalMarks] = useState([10, 10, 10]);
+
+  // When CT count changes, redistribute totals to sum 60 and resize marks arrays
+  useEffect(() => {
+    const base = Math.floor(60 / ctCount);
+    const rem = 60 % ctCount;
+    const redistributed = Array.from({ length: ctCount }, (_, i) => base + (i < rem ? 1 : 0));
+    setCtTotalMarks(redistributed);
+
+    setCtMarksData((prev) => prev.map((s) => {
+      const newMarks = Array.from({ length: ctCount }, (_, i) => (Array.isArray(s.marks) ? s.marks[i] : undefined) ?? '');
+      return { ...s, marks: newMarks };
+    }));
+  }, [ctCount]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsSmallScreen(window.innerWidth < 640);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // When assignment count changes, redistribute totals and resize marks arrays
+  useEffect(() => {
+    const newTotals = Array.from({ length: assignmentCount }, () => 10);
+    setAssignmentTotalMarks(newTotals);
+
+    setAttendanceData((prev) => prev.map((s) => {
+      const newMarks = Array.from({ length: assignmentCount }, (_, i) => (Array.isArray(s.assignments) ? s.assignments[i] : undefined) ?? '');
+      return { ...s, assignments: newMarks };
+    }));
+  }, [assignmentCount]);
 
   // Navigate to a course group (drill-down)
   const navigateToGroup = (groupKey) => {
@@ -138,50 +186,34 @@ const TeacherDashboard = () => {
         religion: userData.religion || ''
       });
     }
-    // Fetch initial data for badge counts
-    fetchMyProposals();
-
-    // Handle window resize for sidebar behavior
-    const handleResize = () => {
-      if (window.innerWidth > 1024) {
-        setSidebarOpen(true);
-      } else {
-        setSidebarOpen(false);
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Refresh user profile when opening Profile section to reflect admin changes
   useEffect(() => {
     const refreshProfile = async () => {
       if (activeSection === 'profile') {
         try {
           const resp = await getProfile();
           if (resp?.success && resp.data) {
-            setUser(resp.data);
             localStorage.setItem('user', JSON.stringify(resp.data));
             setProfileForm((prev) => ({
               ...prev,
-              name: resp.data.name || '',
-              father: resp.data.father || '',
-              mother: resp.data.mother || '',
-              advisor: resp.data.advisor || '',
-              phone: resp.data.phone || '',
-              address: resp.data.address || '',
-              hall: resp.data.hall || '',
-              email: resp.data.email || '',
-              designation: resp.data.designation || 'Lecturer',
-              scholarship: resp.data.scholarship || '',
-              gender: resp.data.gender || 'others',
-              bloodGroup: resp.data.bloodGroup || '',
-              religion: resp.data.religion || ''
+              name: resp.data.name || prev.name,
+              father: resp.data.father || prev.father,
+              mother: resp.data.mother || prev.mother,
+              advisor: resp.data.advisor || prev.advisor,
+              phone: resp.data.phone || prev.phone,
+              address: resp.data.address || prev.address,
+              hall: resp.data.hall || prev.hall,
+              email: resp.data.email || prev.email,
+              designation: resp.data.designation || prev.designation || 'Lecturer',
+              scholarship: resp.data.scholarship || prev.scholarship,
+              gender: resp.data.gender || prev.gender || 'others',
+              bloodGroup: resp.data.bloodGroup || prev.bloodGroup,
+              religion: resp.data.religion || prev.religion
             }));
           }
         } catch (e) {
-          // silently ignore; keep local state
+          // ignore errors fetching profile
         }
       }
     };
@@ -189,11 +221,33 @@ const TeacherDashboard = () => {
   }, [activeSection]);
 
   useEffect(() => {
-    if (activeSection === 'proposals') {
-      fetchMyProposals();
-    } else if (activeSection === 'courses') {
-      fetchCourses();
-    }
+    const run = async () => {
+      if (activeSection === 'proposals') {
+        setLoading(true);
+        setError('');
+        try {
+          const response = await getMyProposals();
+          setProposals(response.data || []);
+        } catch (err) {
+          setError(err.message || 'Failed to fetch proposals');
+        } finally {
+          setLoading(false);
+        }
+      }
+      if (activeSection === 'courses') {
+        setLoading(true);
+        setError('');
+        try {
+          const response = await getAllCourses();
+          setCourses(sortCoursesByCode(response.data || []));
+        } catch (err) {
+          setError(err.message || 'Failed to fetch courses');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    run();
   }, [activeSection]);
 
   const fetchMyProposals = async () => {
@@ -209,18 +263,7 @@ const TeacherDashboard = () => {
     }
   };
 
-  const fetchCourses = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await getAllCourses();
-      setCourses(sortCoursesByCode(response.data || []));
-    } catch (err) {
-      setError(err.message || 'Failed to fetch courses');
-    } finally {
-      setLoading(false);
-    }
-  };
+  
 
   const handleCreateProposal = async (courseData) => {
     // Validate that changeDescription is provided for UPDATE proposals
@@ -566,7 +609,92 @@ const TeacherDashboard = () => {
                                     }
                                   }}
                                 >
-                                  <FontAwesomeIcon icon={faClipboardList} /> Enter Marks
+                                  <FontAwesomeIcon icon={faClipboardList} /> Enter Term Marks
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-success"
+                                  onClick={async () => {
+                                    // Find teacher's section for this course
+                                    const assignment = course.assignedTeachers?.find(at => {
+                                      const teacherId = at.teacher?._id || at.teacher;
+                                      return teacherId.toString() === user._id;
+                                    });
+                                    const section = assignment?.section || null;
+                                    
+                                    // Fetch students
+                                    try {
+                                      setCtMarksLoading(true);
+                                      const response = await getCourseStudents(course._id, section);
+                                      if (response.success && response.data.length > 0) {
+                                        // Sort students by roll in ascending order
+                                        const sortedStudents = response.data.sort((a, b) => {
+                                          return (a.roll || '').localeCompare(b.roll || '', undefined, { numeric: true });
+                                        });
+                                        setCtMarksData(sortedStudents.map(student => ({
+                                          studentId: student._id,
+                                          roll: student.roll,
+                                          name: student.name,
+                                          marks: []
+                                        })));
+                                        setCtMarksCourse(course);
+                                        setShowCTMarksModal(true);
+                                      } else {
+                                        setError('No students enrolled in this course');
+                                        setTimeout(() => setError(''), 3000);
+                                      }
+                                    } catch (err) {
+                                      console.error('Error fetching students:', err);
+                                      setError('Failed to fetch students');
+                                      setTimeout(() => setError(''), 3000);
+                                    } finally {
+                                      setCtMarksLoading(false);
+                                    }
+                                  }}
+                                >
+                                  <FontAwesomeIcon icon={faClipboardList} /> Enter CT Marks
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-info"
+                                  onClick={async () => {
+                                    // Find teacher's section for this course
+                                    const assignment = course.assignedTeachers?.find(at => {
+                                      const teacherId = at.teacher?._id || at.teacher;
+                                      return teacherId.toString() === user._id;
+                                    });
+                                    const section = assignment?.section || null;
+                                    
+                                    // Fetch students
+                                    try {
+                                      setAttendanceLoading(true);
+                                      const response = await getCourseStudents(course._id, section);
+                                      if (response.success && response.data.length > 0) {
+                                        // Sort students by roll in ascending order
+                                        const sortedStudents = response.data.sort((a, b) => {
+                                          return (a.roll || '').localeCompare(b.roll || '', undefined, { numeric: true });
+                                        });
+                                        setAttendanceData(sortedStudents.map(student => ({
+                                          studentId: student._id,
+                                          roll: student.roll,
+                                          name: student.name,
+                                          attendance: '',
+                                          assignments: []
+                                        })));
+                                        setAttendanceCourse(course);
+                                        setShowAttendanceModal(true);
+                                      } else {
+                                        setError('No students enrolled in this course');
+                                        setTimeout(() => setError(''), 3000);
+                                      }
+                                    } catch (err) {
+                                      console.error('Error fetching students:', err);
+                                      setError('Failed to fetch students');
+                                      setTimeout(() => setError(''), 3000);
+                                    } finally {
+                                      setAttendanceLoading(false);
+                                    }
+                                  }}
+                                >
+                                  <FontAwesomeIcon icon={faClipboardList} /> Attendance & Assignments
                                 </button>
                                 <button
                                   className="btn btn-sm btn-primary"
@@ -1029,6 +1157,417 @@ const TeacherDashboard = () => {
             setCourseStudents([]);
           }}
         />
+      )}
+
+      {/* CT Marks Entry Modal */}
+      {showCTMarksModal && ctMarksCourse && ctMarksData.length > 0 && (
+        <div className="modal-overlay" onClick={() => setShowCTMarksModal(false)}>
+          <div className="modal-content" style={{ width: '95vw', maxWidth: '900px', maxHeight: '90vh', borderRadius: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ padding: '24px', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ margin: 0 }}>Enter CT Marks - {ctMarksCourse.courseCode}</h3>
+              <button 
+                className="close-btn"
+                onClick={() => setShowCTMarksModal(false)}
+                disabled={ctMarksLoading}
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', flex: '1 1 auto' }}>
+              {/* CT Total Marks Configuration */}
+              <div style={{
+                marginBottom: '20px',
+                padding: '16px',
+                backgroundColor: '#efe5ff',
+                border: '1px solid #ddd6fe',
+                borderRadius: '6px',
+              }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
+                  Set Total Marks for Each CT
+                </h4>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>Number of CTs</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={ctCount}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value) || 1;
+                      setCtCount(Math.max(1, Math.min(n, 10)));
+                    }}
+                    style={{ width: '80px', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                  />
+                  <span style={{ fontSize: '12px', color: '#6b7280' }}>Total must be 60</span>
+                </div>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                  gap: '12px' 
+                }}>
+                  {Array.from({ length: ctCount }, (_, ctIndex) => (
+                    <div key={ctIndex}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '6px', color: '#374151' }}>
+                        CT {ctIndex + 1} Total Marks
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={ctTotalMarks[ctIndex]}
+                        onChange={(e) => {
+                          let val = e.target.value ? parseInt(e.target.value) : 0;
+                          if (isNaN(val) || val < 0) val = 0;
+                          const newTotals = [...ctTotalMarks];
+                          const othersSum = newTotals.reduce((sum, m, i) => i === ctIndex ? sum : sum + (m || 0), 0);
+                          const maxForThis = Math.max(0, 60 - othersSum);
+                          newTotals[ctIndex] = Math.min(val, maxForThis);
+                          const totalNow = newTotals.reduce((s, m) => s + (m || 0), 0);
+                          const remainder = Math.max(0, 60 - totalNow);
+                          if (newTotals.length > 0) {
+                            const last = newTotals.length - 1;
+                            if (last !== ctIndex) {
+                              newTotals[last] = remainder;
+                            } else {
+                              newTotals[last] = Math.min(newTotals[last], maxForThis);
+                            }
+                          }
+                          setCtTotalMarks(newTotals);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '4px',
+                          fontSize: '13px'
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ width: '100%', overflowX: 'auto' }}>
+                <table style={{
+                  width: '100%',
+                  minWidth: `${(isSmallScreen ? 200 : 320) + ctCount * 110}px`,
+                  borderCollapse: 'collapse',
+                  fontSize: '14px',
+                  tableLayout: 'fixed'
+                }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '2px solid #d1d5db' }}>
+                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, color: '#1f2937', position: 'sticky', left: 0, backgroundColor: '#f3f4f6', zIndex: 2, minWidth: '110px' }}>Roll</th>
+                    {!isSmallScreen && (
+                      <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, color: '#1f2937' }}>Name</th>
+                    )}
+                    {ctTotalMarks.map((total, i) => (
+                      <th key={i} style={{ padding: '12px', textAlign: 'center', fontWeight: 600, color: '#1f2937' }}>CT {i + 1} ({total})</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {ctMarksData.map((student, idx) => (
+                    <tr key={student.studentId} style={{
+                      borderBottom: '1px solid #e5e7eb',
+                      backgroundColor: idx % 2 === 0 ? '#fff' : '#f9fafb'
+                    }}>
+                      <td style={{ padding: '12px', color: '#1f2937', fontWeight: 500, position: 'sticky', left: 0, backgroundColor: '#fff', zIndex: 1 }}>
+                        {student.roll}
+                      </td>
+                      {!isSmallScreen && (
+                        <td style={{ padding: '12px', color: '#1f2937' }}>
+                          {student.name}
+                        </td>
+                      )}
+                      {Array.from({ length: ctCount }, (_, ctIndex) => (
+                        <td key={ctIndex} style={{ padding: '12px', textAlign: 'center' }}>
+                          <input
+                            type="number"
+                            min="0"
+                            max={ctTotalMarks[ctIndex]}
+                            placeholder="0"
+                            value={(student.marks && student.marks[ctIndex]) ?? ''}
+                            onChange={(e) => {
+                              let value = e.target.value ? parseInt(e.target.value) : '';
+                              // Validate against max marks
+                              if (value && value > ctTotalMarks[ctIndex]) {
+                                value = ctTotalMarks[ctIndex];
+                              }
+                              const newData = [...ctMarksData];
+                              const marks = Array.from({ length: ctCount }, (_, i) => (newData[idx].marks && newData[idx].marks[i]) ?? '');
+                              marks[ctIndex] = value;
+                              newData[idx].marks = marks;
+                              setCtMarksData(newData);
+                            }}
+                            style={{
+                              width: '100%',
+                              maxWidth: '70px',
+                              padding: '6px 8px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '4px',
+                              textAlign: 'center',
+                              fontSize: '13px'
+                            }}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="modal-footer" style={{ padding: '16px 20px', display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'flex-end', width: '100%', boxSizing: 'border-box', backgroundColor: '#fff', borderTop: '1px solid #e5e7eb' }}>
+              <button
+                className="btn btn-outline"
+                onClick={() => setShowCTMarksModal(false)}
+                disabled={ctMarksLoading}
+                style={{ flex: '0 0 auto', width: '120px', whiteSpace: 'nowrap' }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  // Save CT marks logic here
+                  setShowCTMarksModal(false);
+                  setSuccessMessage('CT Marks saved successfully');
+                  setTimeout(() => setSuccessMessage(''), 3000);
+                }}
+                disabled={ctMarksLoading}
+                style={{ flex: '0 0 auto', width: '120px', whiteSpace: 'nowrap' }}
+              >
+                Save CT Marks
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Attendance & Assignment Marks Modal */}
+      {showAttendanceModal && attendanceCourse && attendanceData.length > 0 && (
+        <div className="modal-overlay" onClick={() => setShowAttendanceModal(false)}>
+          <div className="modal-content" style={{ width: '95vw', maxWidth: '900px', maxHeight: '90vh', borderRadius: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ padding: '24px', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ margin: 0 }}>Attendance & Assignments - {attendanceCourse.courseCode}</h3>
+              <button 
+                className="close-btn"
+                onClick={() => setShowAttendanceModal(false)}
+                disabled={attendanceLoading}
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', flex: '1 1 auto' }}>
+              {/* Attendance Configuration */}
+              <div style={{
+                marginBottom: '20px',
+                padding: '16px',
+                backgroundColor: '#fef3c7',
+                border: '1px solid #fde68a',
+                borderRadius: '6px',
+              }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
+                  Set Attendance Total Marks
+                </h4>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>Attendance Total Marks</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={attendanceTotalMarks}
+                    onChange={(e) => {
+                      let val = e.target.value ? parseInt(e.target.value) : 0;
+                      if (isNaN(val) || val < 0) val = 0;
+                      setAttendanceTotalMarks(val);
+                    }}
+                    style={{ width: '100px', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                  />
+                </div>
+              </div>
+
+              {/* Assignment Configuration */}
+              <div style={{
+                marginBottom: '20px',
+                padding: '16px',
+                backgroundColor: '#e0f2fe',
+                border: '1px solid #bae6fd',
+                borderRadius: '6px',
+              }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
+                  Set Assignment Marks
+                </h4>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>Number of Assignments</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={assignmentCount}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value) || 1;
+                      setAssignmentCount(Math.max(1, Math.min(n, 10)));
+                    }}
+                    style={{ width: '80px', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                  />
+                </div>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                  gap: '12px' 
+                }}>
+                  {Array.from({ length: assignmentCount }, (_, assignIndex) => (
+                    <div key={assignIndex}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '6px', color: '#374151' }}>
+                        Assignment {assignIndex + 1} Full Marks
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={assignmentTotalMarks[assignIndex]}
+                        onChange={(e) => {
+                          let val = e.target.value ? parseInt(e.target.value) : 0;
+                          if (isNaN(val) || val < 0) val = 0;
+                          const newTotals = [...assignmentTotalMarks];
+                          newTotals[assignIndex] = val;
+                          setAssignmentTotalMarks(newTotals);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '4px',
+                          fontSize: '13px'
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ width: '100%', overflowX: 'auto' }}>
+                <table style={{
+                  width: '100%',
+                  minWidth: `${(isSmallScreen ? 200 : 320) + 110 + assignmentCount * 110}px`,
+                  borderCollapse: 'collapse',
+                  fontSize: '14px',
+                  tableLayout: 'fixed'
+                }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '2px solid #d1d5db' }}>
+                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, color: '#1f2937', position: 'sticky', left: 0, backgroundColor: '#f3f4f6', zIndex: 2, minWidth: '110px' }}>Roll</th>
+                    {!isSmallScreen && (
+                      <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, color: '#1f2937' }}>Name</th>
+                    )}
+                    <th style={{ padding: '12px', textAlign: 'center', fontWeight: 600, color: '#1f2937' }}>Attendance ({attendanceTotalMarks})</th>
+                    {assignmentTotalMarks.map((total, i) => (
+                      <th key={i} style={{ padding: '12px', textAlign: 'center', fontWeight: 600, color: '#1f2937' }}>Assign {i + 1} ({total})</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {attendanceData.map((student, idx) => (
+                    <tr key={student.studentId} style={{
+                      borderBottom: '1px solid #e5e7eb',
+                      backgroundColor: idx % 2 === 0 ? '#fff' : '#f9fafb'
+                    }}>
+                      <td style={{ padding: '12px', color: '#1f2937', fontWeight: 500, position: 'sticky', left: 0, backgroundColor: idx % 2 === 0 ? '#fff' : '#f9fafb', zIndex: 1 }}>
+                        {student.roll}
+                      </td>
+                      {!isSmallScreen && (
+                        <td style={{ padding: '12px', color: '#1f2937' }}>
+                          {student.name}
+                        </td>
+                      )}
+                      <td style={{ padding: '12px', textAlign: 'center' }}>
+                        <input
+                          type="number"
+                          min="0"
+                          max={attendanceTotalMarks}
+                          placeholder="0"
+                          value={student.attendance ?? ''}
+                          onChange={(e) => {
+                            let value = e.target.value ? parseInt(e.target.value) : '';
+                            if (value && value > attendanceTotalMarks) {
+                              value = attendanceTotalMarks;
+                            }
+                            const newData = [...attendanceData];
+                            newData[idx].attendance = value;
+                            setAttendanceData(newData);
+                          }}
+                          style={{
+                            width: '100%',
+                            maxWidth: '70px',
+                            padding: '6px 8px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            textAlign: 'center',
+                            fontSize: '13px'
+                          }}
+                        />
+                      </td>
+                      {Array.from({ length: assignmentCount }, (_, assignIndex) => (
+                        <td key={assignIndex} style={{ padding: '12px', textAlign: 'center' }}>
+                          <input
+                            type="number"
+                            min="0"
+                            max={assignmentTotalMarks[assignIndex]}
+                            placeholder="0"
+                            value={(student.assignments && student.assignments[assignIndex]) ?? ''}
+                            onChange={(e) => {
+                              let value = e.target.value ? parseInt(e.target.value) : '';
+                              if (value && value > assignmentTotalMarks[assignIndex]) {
+                                value = assignmentTotalMarks[assignIndex];
+                              }
+                              const newData = [...attendanceData];
+                              const assignments = Array.from({ length: assignmentCount }, (_, i) => (newData[idx].assignments && newData[idx].assignments[i]) ?? '');
+                              assignments[assignIndex] = value;
+                              newData[idx].assignments = assignments;
+                              setAttendanceData(newData);
+                            }}
+                            style={{
+                              width: '100%',
+                              maxWidth: '70px',
+                              padding: '6px 8px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '4px',
+                              textAlign: 'center',
+                              fontSize: '13px'
+                            }}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="modal-footer" style={{ padding: '16px 20px', display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'flex-end', width: '100%', boxSizing: 'border-box', backgroundColor: '#fff', borderTop: '1px solid #e5e7eb' }}>
+              <button
+                className="btn btn-outline"
+                onClick={() => setShowAttendanceModal(false)}
+                disabled={attendanceLoading}
+                style={{ flex: '0 0 auto', width: '120px', whiteSpace: 'nowrap' }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  // Save attendance & assignment marks logic here
+                  setShowAttendanceModal(false);
+                  setSuccessMessage('Attendance & Assignment Marks saved successfully');
+                  setTimeout(() => setSuccessMessage(''), 3000);
+                }}
+                disabled={attendanceLoading}
+                style={{ flex: '0 0 auto', width: '120px', whiteSpace: 'nowrap' }}
+              >
+                Save Marks
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

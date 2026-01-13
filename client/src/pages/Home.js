@@ -24,13 +24,6 @@ const Home = () => {
             >
               Login
             </button>
-
-            <button 
-              className="btn btn-secondary"
-              onClick={() => navigate('/register')}
-            >
-              Register
-            </button>
           </div>
         </div>
       </main>

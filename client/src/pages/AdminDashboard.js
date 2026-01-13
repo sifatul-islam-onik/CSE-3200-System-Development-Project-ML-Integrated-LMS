@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faHourglass, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faHourglass, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
-import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers, updateUserProfile, assignBatchToCourse, unassignBatchFromCourse, getAssignedBatches, getStudentBatches } from '../services/adminService';
+import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, setDepartmentHead, removeDepartmentHead, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers, updateUserProfile, assignBatchToCourse, unassignBatchFromCourse, getAssignedBatches, getStudentBatches } from '../services/adminService';
 import { createCourse, getAllCourses, updateCourse, deleteCourse } from '../services/courseService';
 import { getAllProposals, getProposalById, approveProposal, rejectProposal } from '../services/courseProposalService';
 import CourseForm from '../components/CourseForm';
@@ -348,7 +348,7 @@ const AdminDashboard = () => {
     }
 
     const confirmed = window.confirm(
-      `Export original credentials for batch ${exportBatchYear} (dept ${exportDeptCode}). Proceed?`
+      `Export current credentials for batch ${exportBatchYear} (dept ${exportDeptCode}). Proceed?`
     );
     if (!confirmed) return;
 
@@ -807,16 +807,23 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleAssignTeacher = async (teacherId, section = null) => {
+  const handleAssignTeacher = async (teacherId) => {
     if (!selectedCourseForAssignment) return;
     
     setAssignmentLoading(true);
     setAssignmentError('');
     setAssignmentSuccess('');
     
+    console.log('Assigning teacher:', {
+      courseId: selectedCourseForAssignment._id,
+      teacherId,
+      section: null
+    });
+    
     try {
-      const response = await assignTeacherToCourse(selectedCourseForAssignment._id, teacherId, section);
-      setAssignmentSuccess(`Teacher assigned successfully${section ? ` to section ${section}` : ''}`);
+      const response = await assignTeacherToCourse(selectedCourseForAssignment._id, teacherId, null);
+      console.log('Teacher assignment response:', response);
+      setAssignmentSuccess('Teacher assigned successfully');
       
       // Update the selected course with the new assignment data
       if (response.data?.assignedTeachers) {
@@ -829,14 +836,16 @@ const AdminDashboard = () => {
       fetchCourses(); // Refresh courses list
       setTimeout(() => setAssignmentSuccess(''), 3000);
     } catch (err) {
-      setAssignmentError(err.response?.data?.message || 'Failed to assign teacher');
+      console.error('Teacher assignment error:', err);
+      console.error('Error response:', err.response?.data);
+      setAssignmentError(err.response?.data?.message || err.message || 'Failed to assign teacher');
       setTimeout(() => setAssignmentError(''), 3000);
     } finally {
       setAssignmentLoading(false);
     }
   };
 
-  const handleUnassignTeacher = async (teacherId, section = null) => {
+  const handleUnassignTeacher = async (teacherId) => {
     if (!selectedCourseForAssignment) return;
     
     setAssignmentLoading(true);
@@ -844,8 +853,8 @@ const AdminDashboard = () => {
     setAssignmentSuccess('');
     
     try {
-      const response = await unassignTeacherFromCourse(selectedCourseForAssignment._id, teacherId, section);
-      setAssignmentSuccess(`Teacher unassigned successfully${section ? ` from section ${section}` : ''}`);
+      const response = await unassignTeacherFromCourse(selectedCourseForAssignment._id, teacherId, null);
+      setAssignmentSuccess('Teacher unassigned successfully');
       
       // Update the selected course with the new assignment data
       if (response.data?.assignedTeachers) {
@@ -972,23 +981,59 @@ const AdminDashboard = () => {
     setBatchAssignmentSuccess('');
 
     try {
-      const response = await assignBatchToCourse(selectedCourseForBatch._id, batchInput, deptCodeInput);
-      setBatchAssignmentSuccess('Batch assigned successfully');
+      console.log('Assigning batch:', { batch: batchInput, deptCode: deptCodeInput, courseId: selectedCourseForBatch._id });
       
-      // Update local state
-      setSelectedCourseForBatch(prev => ({
-        ...prev,
-        assignedBatches: response.data.assignedBatches
-      }));
+      // Check if this is a group assignment
+      if (selectedCourseForBatch._isGroupAssignment && selectedCourseForBatch._groupCourses) {
+        // Assign batch to all courses in the group
+        const promises = selectedCourseForBatch._groupCourses.map(course => 
+          assignBatchToCourse(course._id, batchInput, deptCodeInput)
+        );
+        
+        await Promise.all(promises);
+        
+        setBatchAssignmentSuccess(`Batch assigned to all ${selectedCourseForBatch._groupCourses.length} courses in ${selectedCourseForBatch._groupName}`);
+        
+        // Update the courses list for all assigned courses
+        setCourses(prevCourses => 
+          prevCourses.map(c => {
+            const assignedCourse = selectedCourseForBatch._groupCourses.find(gc => gc._id === c._id);
+            if (assignedCourse) {
+              return { 
+                ...c, 
+                assignedBatches: [{ batch: batchInput, deptCode: deptCodeInput }]
+              };
+            }
+            return c;
+          })
+        );
+        
+        // Close modal after successful group assignment
+        setTimeout(() => {
+          setShowBatchAssignmentModal(false);
+          setBatchAssignmentSuccess('');
+        }, 2000);
+      } else {
+        // Single course assignment
+        const response = await assignBatchToCourse(selectedCourseForBatch._id, batchInput, deptCodeInput);
+        console.log('Batch assignment response:', response);
+        setBatchAssignmentSuccess('Batch assigned successfully');
+        
+        // Update local state
+        setSelectedCourseForBatch(prev => ({
+          ...prev,
+          assignedBatches: response.data.assignedBatches
+        }));
 
-      // Also update the courses list
-      setCourses(prevCourses => 
-        prevCourses.map(c => 
-          c._id === selectedCourseForBatch._id 
-            ? { ...c, assignedBatches: response.data.assignedBatches }
-            : c
-        )
-      );
+        // Also update the courses list
+        setCourses(prevCourses => 
+          prevCourses.map(c => 
+            c._id === selectedCourseForBatch._id 
+              ? { ...c, assignedBatches: response.data.assignedBatches }
+              : c
+          )
+        );
+      }
 
       // Clear inputs
       setBatchInput('');
@@ -996,7 +1041,8 @@ const AdminDashboard = () => {
       
       setTimeout(() => setBatchAssignmentSuccess(''), 3000);
     } catch (err) {
-      setBatchAssignmentError(err.response?.data?.message || 'Failed to assign batch');
+      console.error('Batch assignment error:', err);
+      setBatchAssignmentError(err.response?.data?.message || err.message || 'Failed to assign batch');
       setTimeout(() => setBatchAssignmentError(''), 5000);
     } finally {
       setBatchAssignmentLoading(false);
@@ -1670,23 +1716,51 @@ const AdminDashboard = () => {
                   ) : organizedCourses[courseGroupPath] ? (
                     (() => {
                       const types = Object.keys(organizedCourses[courseGroupPath] || {});
+                      const allCoursesInGroup = types.flatMap(type => organizedCourses[courseGroupPath][type]);
                       return (
-                        <div className="tree-group">
-                          {types.map((type) => {
-                            const typeCourses = organizedCourses[courseGroupPath][type];
-                            const typeLabel = type === 'THEORY' ? 'Theory' : type === 'SESSIONAL' ? 'Sessional' : 'Project/Thesis';
-                            return (
-                              <button
-                                key={`${courseGroupPath}-${type}`}
-                                className="tree-header tree-type-header"
-                                onClick={() => navigateToGroup(`${courseGroupPath}-${type}`)}
-                              >
-                                <FontAwesomeIcon icon={faChevronRight} />
-                                <span>{typeLabel} ({typeCourses.length})</span>
-                              </button>
-                            );
-                          })}
-                        </div>
+                        <>
+                          <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <button
+                              className="btn btn-sm"
+                              style={{
+                                backgroundColor: '#10b981',
+                                color: 'white',
+                                border: 'none'
+                              }}
+                              onClick={() => {
+                                if (allCoursesInGroup.length > 0) {
+                                  openBatchAssignmentModal({ 
+                                    ...allCoursesInGroup[0], 
+                                    _isGroupAssignment: true,
+                                    _groupCourses: allCoursesInGroup,
+                                    _groupName: `${courseGroupPath} - All Courses`
+                                  });
+                                }
+                              }}
+                            >
+                              <FontAwesomeIcon icon={faUsers} /> Assign {courseGroupPath} to Batch
+                            </button>
+                            <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                              ({allCoursesInGroup.length} course{allCoursesInGroup.length !== 1 ? 's' : ''})
+                            </span>
+                          </div>
+                          <div className="tree-group">
+                            {types.map((type) => {
+                              const typeCourses = organizedCourses[courseGroupPath][type];
+                              const typeLabel = type === 'THEORY' ? 'Theory' : type === 'SESSIONAL' ? 'Sessional' : 'Project/Thesis';
+                              return (
+                                <button
+                                  key={`${courseGroupPath}-${type}`}
+                                  className="tree-header tree-type-header"
+                                  onClick={() => navigateToGroup(`${courseGroupPath}-${type}`)}
+                                >
+                                  <FontAwesomeIcon icon={faChevronRight} />
+                                  <span>{typeLabel} ({typeCourses.length})</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
                       );
                     })()
                   ) : courseGroupPath.includes('-') ? (
@@ -1697,80 +1771,69 @@ const AdminDashboard = () => {
                       const typeCourses = organizedCourses[yearSem]?.[type] || [];
                       return (
                         <div className="tree-content">
-                          {typeCourses.map((course) => (
-                            <div key={course._id} className="course-item">
-                              <div className="course-item-header">
-                                <div className="course-info">
-                                  <span className="course-code">{course.courseCode}</span>
-                                  <span className="course-title">{course.courseTitle}</span>
-                                  <span className="course-credit">{course.credit} Cr</span>
-                                  {course.assignedTeachers && course.assignedTeachers.length > 0 && (
-                                    <span className="course-assigned" style={{ 
-                                      fontSize: '12px', 
-                                      color: '#059669', 
-                                      backgroundColor: '#d1fae5',
-                                      padding: '2px 8px',
-                                      borderRadius: '4px',
-                                      marginLeft: '8px'
-                                    }}>
-                                      <FontAwesomeIcon icon={faUsers} /> {course.assignedTeachers.length} Teacher{course.assignedTeachers.length !== 1 ? 's' : ''}
-                                    </span>
-                                  )}
+                            {typeCourses.map((course) => (
+                              <div key={course._id} className="course-item">
+                                <div className="course-item-header">
+                                  <div className="course-info">
+                                    <span className="course-code">{course.courseCode}</span>
+                                    <span className="course-credit">{course.credit} Cr</span>
+                                    {course.assignedTeachers && course.assignedTeachers.length > 0 && (
+                                      <span className="course-assigned" style={{ 
+                                        fontSize: '12px', 
+                                        color: '#059669', 
+                                        backgroundColor: '#d1fae5',
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        marginLeft: '8px'
+                                      }}>
+                                        <FontAwesomeIcon icon={faUsers} /> {course.assignedTeachers.length} Teacher{course.assignedTeachers.length !== 1 ? 's' : ''}
+                                      </span>
+                                    )}
+                                    <span className="course-title">{course.courseTitle}</span>
+                                  </div>
+                                </div>
+                                <div className="course-item-actions">
+                                  <button
+                                    className="btn btn-sm btn-secondary"
+                                    onClick={() => {
+                                      setSelectedCourse(course);
+                                      // Extract semester from courseGroupPath (e.g., "3-1" -> 1, "3-2" -> 2)
+                                      const semesterMatch = courseGroupPath ? courseGroupPath.split('-')[1] : null;
+                                      setShowOBEView(semesterMatch ? parseInt(semesterMatch) : true);
+                                    }}
+                                  >
+                                    <FontAwesomeIcon icon={faEye} /> View
+                                  </button>
+                                  <button
+                                    className="btn btn-sm"
+                                    style={{
+                                      backgroundColor: '#8b5cf6',
+                                      color: 'white',
+                                      border: 'none'
+                                    }}
+                                    onClick={() => openAssignmentModal(course)}
+                                  >
+                                    <FontAwesomeIcon icon={faUsers} /> Assign Teachers
+                                  </button>
+                                  <button
+                                    className="btn btn-sm btn-primary"
+                                    onClick={() => {
+                                      setEditingCourse(course);
+                                      setShowCourseForm(true);
+                                    }}
+                                  >
+                                    <FontAwesomeIcon icon={faEdit} /> Edit
+                                  </button>
+                                  <button
+                                    className="btn btn-sm btn-danger"
+                                    onClick={() => openDeleteModal(course)}
+                                  >
+                                    <FontAwesomeIcon icon={faTrash} /> Delete
+                                  </button>
                                 </div>
                               </div>
-                              <div className="course-item-actions">
-                                <button
-                                  className="btn btn-sm btn-secondary"
-                                  onClick={() => {
-                                    setSelectedCourse(course);
-                                    // Extract semester from courseGroupPath (e.g., "3-1" -> 1, "3-2" -> 2)
-                                    const semesterMatch = courseGroupPath ? courseGroupPath.split('-')[1] : null;
-                                    setShowOBEView(semesterMatch ? parseInt(semesterMatch) : true);
-                                  }}
-                                >
-                                  <FontAwesomeIcon icon={faEye} /> View
-                                </button>
-                                <button
-                                  className="btn btn-sm"
-                                  style={{
-                                    backgroundColor: '#8b5cf6',
-                                    color: 'white',
-                                    border: 'none'
-                                  }}
-                                  onClick={() => openAssignmentModal(course)}
-                                >
-                                  <FontAwesomeIcon icon={faUsers} /> Assign Teachers
-                                </button>
-                                <button
-                                  className="btn btn-sm"
-                                  style={{
-                                    backgroundColor: '#10b981',
-                                    color: 'white',
-                                    border: 'none'
-                                  }}
-                                  onClick={() => openBatchAssignmentModal(course)}
-                                >
-                                  <FontAwesomeIcon icon={faUsers} /> Assign Batch
-                                </button>
-                                <button
-                                  className="btn btn-sm btn-primary"
-                                  onClick={() => {
-                                    setEditingCourse(course);
-                                    setShowCourseForm(true);
-                                  }}
-                                >
-                                  <FontAwesomeIcon icon={faEdit} /> Edit
-                                </button>
-                                <button
-                                  className="btn btn-sm btn-danger"
-                                  onClick={() => openDeleteModal(course)}
-                                >
-                                  <FontAwesomeIcon icon={faTrash} /> Delete
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                            ))}
+                          </div>
                       );
                     })()
                   ) : null}
@@ -1845,7 +1908,7 @@ const AdminDashboard = () => {
                         <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
                             <h3 style={{ margin: 0, fontSize: '16px' }}>Export Student Credentials</h3>
-                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Export emails and original passwords for a specific batch and department</p>
+                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Export emails and current passwords for a specific batch and department</p>
                           </div>
                         </div>
                         <div className="proposal-body" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1992,7 +2055,7 @@ const AdminDashboard = () => {
                         <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
                             <h3 style={{ margin: 0, fontSize: '16px' }}>Export Teacher Credentials</h3>
-                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Select a department and export teacher emails and passwords</p>
+                            <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '13px' }}>Select a department and export teacher emails and current passwords</p>
                           </div>
                         </div>
                         <div className="proposal-body" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -2076,7 +2139,7 @@ const AdminDashboard = () => {
 
                   {/* User List */}
                   <div className="user-groups-container" style={{ marginTop: '20px' }}>
-                    <h3 style={{ fontSize: '18px', marginBottom: '16px', textTransform: 'capitalize' }}>
+                    <h3 style={{ fontSize: '24px', marginBottom: '16px', textTransform: 'capitalize', fontWeight: '700' }}>
                       {selectedUserRole}s ({users.filter(u => {
                         if ((u.role || '').toLowerCase() !== selectedUserRole) return false;
                         // Text search filter
@@ -2114,113 +2177,214 @@ const AdminDashboard = () => {
                       }).length})
                     </h3>
 
-                    <div className="proposals-grid">
-                      {users
-                        .filter(u => {
-                          if ((u.role || '').toLowerCase() !== selectedUserRole) return false;
-                          // Text search filter
-                          if (userSearchText) {
-                            const searchLower = userSearchText.toLowerCase();
-                            const nameMatch = (u.name || '').toLowerCase().includes(searchLower);
-                            const emailMatch = (u.email || '').toLowerCase().includes(searchLower);
-                            const rollMatch = selectedUserRole === 'student' && (u.roll || '').toLowerCase().includes(searchLower);
-                            if (!nameMatch && !emailMatch && !rollMatch) return false;
-                          }
-                          // Apply role-specific filters only
-                          if (selectedUserRole === 'teacher') {
-                            if (teacherFilterDept && (u.department || '').toLowerCase() !== teacherFilterDept.toLowerCase()) return false;
-                            if (teacherFilterDesignation && (u.designation || '').toLowerCase() !== teacherFilterDesignation.toLowerCase()) return false;
-                          } else if (selectedUserRole === 'student') {
-                            if (studentFilterDept) {
-                              let userDept = u.department || '';
-                              // Extract from roll if department not set
-                              if (!userDept && u.roll) {
-                                const rollDigits = String(u.roll).replace(/\D/g, '');
-                                if (rollDigits.length >= 4) {
-                                  const deptCode = rollDigits.substring(2, 4);
-                                  userDept = departmentMap[deptCode] || '';
+                    <div style={selectedUserRole === 'teacher' ? { display: 'block' } : {}}>
+                      {Object.entries(
+                        users
+                          .filter(u => {
+                            if ((u.role || '').toLowerCase() !== selectedUserRole) return false;
+                            // Text search filter
+                            if (userSearchText) {
+                              const searchLower = userSearchText.toLowerCase();
+                              const nameMatch = (u.name || '').toLowerCase().includes(searchLower);
+                              const emailMatch = (u.email || '').toLowerCase().includes(searchLower);
+                              const rollMatch = selectedUserRole === 'student' && (u.roll || '').toLowerCase().includes(searchLower);
+                              if (!nameMatch && !emailMatch && !rollMatch) return false;
+                            }
+                            // Apply role-specific filters only
+                            if (selectedUserRole === 'teacher') {
+                              if (teacherFilterDept && (u.department || '').toLowerCase() !== teacherFilterDept.toLowerCase()) return false;
+                              if (teacherFilterDesignation && (u.designation || '').toLowerCase() !== teacherFilterDesignation.toLowerCase()) return false;
+                            } else if (selectedUserRole === 'student') {
+                              if (studentFilterDept) {
+                                let userDept = u.department || '';
+                                // Extract from roll if department not set
+                                if (!userDept && u.roll) {
+                                  const rollDigits = String(u.roll).replace(/\D/g, '');
+                                  if (rollDigits.length >= 4) {
+                                    const deptCode = rollDigits.substring(2, 4);
+                                    userDept = departmentMap[deptCode] || '';
+                                  }
                                 }
+                                if (userDept.toLowerCase() !== studentFilterDept.toLowerCase()) return false;
                               }
-                              if (userDept.toLowerCase() !== studentFilterDept.toLowerCase()) return false;
+                              if (studentFilterBatch) {
+                                const rollDigits = String(u.roll || '').replace(/\D/g, '');
+                                const prefix = rollDigits.slice(0, 2);
+                                const batchFromRoll = prefix ? `20${prefix}` : '';
+                                if (String(studentFilterBatch) !== batchFromRoll) return false;
+                              }
                             }
-                            if (studentFilterBatch) {
-                              const rollDigits = String(u.roll || '').replace(/\D/g, '');
-                              const prefix = rollDigits.slice(0, 2);
-                              const batchFromRoll = prefix ? `20${prefix}` : '';
-                              if (String(studentFilterBatch) !== batchFromRoll) return false;
+                            return true;
+                          })
+                          .sort((a, b) => {
+                            // For students, sort by roll number
+                            if (selectedUserRole === 'student') {
+                              const rollA = parseInt(String(a.roll || '0').replace(/\D/g, ''), 10);
+                              const rollB = parseInt(String(b.roll || '0').replace(/\D/g, ''), 10);
+                              return rollA - rollB;
                             }
-                          }
-                          return true;
-                        })
-                        .sort((a, b) => {
-                          // For students, sort by roll number
-                          if (selectedUserRole === 'student') {
-                            const rollA = parseInt(String(a.roll || '0').replace(/\D/g, ''), 10);
-                            const rollB = parseInt(String(b.roll || '0').replace(/\D/g, ''), 10);
-                            return rollA - rollB;
-                          }
-                          // For teachers, sort by name
-                          return (a.name || '').localeCompare(b.name || '');
-                        })
-                        .map(user => (
-                          <div key={user._id} className="proposal-card">
-                            <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <div style={{ flex: 1 }}>
-                                <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>{user.name}</h4>
-                                <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '13px' }}>{user.email}</p>
-                                {user.roll && <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '13px' }}>Roll: {user.roll}</p>}
-                                {user.role === 'teacher' && user.designation && <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '13px' }}>Designation: {user.designation}</p>}
+                            // For teachers, sort by: isDepartmentHead (head first), then designation, then by name
+                            if (a.isDepartmentHead && !b.isDepartmentHead) return -1;
+                            if (!a.isDepartmentHead && b.isDepartmentHead) return 1;
+                            
+                            const designationOrder = { 'Professor': 3, 'Assistant Professor': 2, 'Lecturer': 1 };
+                            const designationA = designationOrder[a.designation] || 0;
+                            const designationB = designationOrder[b.designation] || 0;
+                            if (designationA !== designationB) {
+                              return designationB - designationA;
+                            }
+                            return (a.name || '').localeCompare(b.name || '');
+                          })
+                          .reduce((groups, user) => {
+                            // For teachers, group by status: department head, professors, assistant professors, lecturers
+                            if (selectedUserRole === 'teacher') {
+                              let group = 'Lecturer';
+                              if (user.isDepartmentHead) {
+                                group = 'Head';
+                              } else if (user.designation === 'Professor') {
+                                group = 'Professor';
+                              } else if (user.designation === 'Assistant Professor') {
+                                group = 'Assistant Professor';
+                              }
+                              
+                              if (!groups[group]) {
+                                groups[group] = [];
+                              }
+                              groups[group].push(user);
+                            } else {
+                              // For students, no grouping
+                              if (!groups['all']) {
+                                groups['all'] = [];
+                              }
+                              groups['all'].push(user);
+                            }
+                            return groups;
+                          }, {})
+                      ).map(([groupKey, usersInGroup]) => (
+                          <div key={groupKey}>
+                            {selectedUserRole === 'teacher' && (
+                              <div style={{
+                                fontSize: '18px',
+                                fontWeight: '700',
+                                color: '#374151',
+                                textTransform: 'uppercase',
+                                letterSpacing: '1px',
+                                marginTop: groupKey === 'Head' ? '0' : '32px',
+                                marginBottom: '20px',
+                                padding: '16px 20px',
+                                backgroundColor: '#e5e7eb',
+                                borderRadius: '8px',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                textAlign: 'center'
+                              }}>
+                                {groupKey === 'Head' && 'Department Head'}
+                                {groupKey === 'Professor' && 'Professors'}
+                                {groupKey === 'Assistant Professor' && 'Assistant Professors'}
+                                {groupKey === 'Lecturer' && 'Lecturers'}
                               </div>
-                              <span className={`status-badge ${user.isActive ? 'active' : 'inactive'}`}>
-                                {user.isActive ? 'Active' : 'Inactive'}
-                              </span>
-                            </div>
-                            <div className="proposal-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                              <button
-                                className="btn btn-sm btn-primary"
-                                onClick={() => openUserProfileModal(user)}
-                                style={{ flex: '1 1 auto' }}
-                              >
-                                <FontAwesomeIcon icon={faUser} /> View Profile
-                              </button>
-                              <button
-                                className={`btn btn-sm ${user.isActive ? 'btn-secondary' : 'btn-approve'}`}
-                                onClick={async () => {
-                                  try {
-                                    const newStatus = !user.isActive;
-                                    await setUserStatus(user._id, newStatus);
-                                    setSuccessMessage(`User ${newStatus ? 'activated' : 'deactivated'} successfully`);
-                                    setUsers(prev => prev.map(u => u._id === user._id ? { ...u, isActive: newStatus } : u));
-                                    setTimeout(() => setSuccessMessage(''), 3000);
-                                  } catch (err) {
-                                    setUsersError(err.response?.data?.message || 'Failed to update user status');
-                                    setTimeout(() => setUsersError(''), 3000);
-                                  }
-                                }}
-                              >
-                                {user.isActive ? 'Deactivate' : 'Activate'}
-                              </button>
-                              <button
-                                className="btn btn-sm btn-danger"
-                                onClick={async () => {
-                                  const confirmed = window.confirm(
-                                    `Delete ${user.name}? This cannot be undone.`
-                                  );
-                                  if (!confirmed) return;
+                            )}
+                            <div className="proposals-grid">
+                              {usersInGroup.map(user => (
+                              <div key={user._id} className="proposal-card">
+                                <div className="proposal-header" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                  <div style={{ flex: 1 }}>
+                                    <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>
+                                      {user.name}
+                                    </h4>
+                                    <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '13px' }}>{user.email}</p>
+                                    {user.roll && <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '13px' }}>Roll: {user.roll}</p>}
+                                    {user.role === 'teacher' && user.designation && <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '13px' }}>Designation: {user.designation}{user.isDepartmentHead ? ' (Department Head)' : ''}</p>}
+                                  </div>
+                                  <span className={`status-badge ${user.isActive ? 'active' : 'inactive'}`}>
+                                    {user.isActive ? 'Active' : 'Inactive'}
+                                  </span>
+                                </div>
+                                <div className="proposal-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                  <button
+                                    className="btn btn-sm btn-primary"
+                                    onClick={() => openUserProfileModal(user)}
+                                    style={{ flex: '1 1 auto' }}
+                                  >
+                                    <FontAwesomeIcon icon={faUser} /> View Profile
+                                  </button>
+                                  {selectedUserRole === 'teacher' && user.designation === 'Professor' && (
+                                    (() => {
+                                      // Check if there's already a department head in this department
+                                      const hasAnotherHead = users.some(u => 
+                                        u.isDepartmentHead && 
+                                        u.department === user.department && 
+                                        u._id !== user._id
+                                      );
+                                      // Show button only if user is the head OR no one is the head yet
+                                      if (!user.isDepartmentHead && hasAnotherHead) {
+                                        return null; // Don't show the button
+                                      }
+                                      return (
+                                        <button
+                                          className={`btn btn-sm ${user.isDepartmentHead ? 'btn-danger' : 'btn-approve'}`}
+                                          onClick={async () => {
+                                            try {
+                                              if (user.isDepartmentHead) {
+                                                await removeDepartmentHead(user._id);
+                                                setSuccessMessage('Department head status removed');
+                                              } else {
+                                                await setDepartmentHead(user._id);
+                                                setSuccessMessage('Appointed as department head');
+                                              }
+                                              fetchAllUsers();
+                                              setTimeout(() => setSuccessMessage(''), 3000);
+                                            } catch (err) {
+                                              setUsersError(err.message || 'Failed to update department head');
+                                              setTimeout(() => setUsersError(''), 3000);
+                                            }
+                                          }}
+                                        >
+                                          {user.isDepartmentHead ? 'Remove as Head' : 'Make Head'}
+                                        </button>
+                                      );
+                                    })()
+                                  )}
+                                  <button
+                                    className={`btn btn-sm ${user.isActive ? 'btn-secondary' : 'btn-approve'}`}
+                                    onClick={async () => {
+                                      try {
+                                        const newStatus = !user.isActive;
+                                        await setUserStatus(user._id, newStatus);
+                                        setSuccessMessage(`User ${newStatus ? 'activated' : 'deactivated'} successfully`);
+                                        setUsers(prev => prev.map(u => u._id === user._id ? { ...u, isActive: newStatus } : u));
+                                        setTimeout(() => setSuccessMessage(''), 3000);
+                                      } catch (err) {
+                                        setUsersError(err.response?.data?.message || 'Failed to update user status');
+                                        setTimeout(() => setUsersError(''), 3000);
+                                      }
+                                    }}
+                                  >
+                                    {user.isActive ? 'Deactivate' : 'Activate'}
+                                  </button>
+                                  <button
+                                    className="btn btn-sm btn-danger"
+                                    onClick={async () => {
+                                      const confirmed = window.confirm(
+                                        `Delete ${user.name}? This cannot be undone.`
+                                      );
+                                      if (!confirmed) return;
 
-                                  try {
-                                    await deleteUser(user._id);
-                                    setSuccessMessage('User deleted successfully');
-                                    setUsers(prev => prev.filter(u => u._id !== user._id));
-                                    setTimeout(() => setSuccessMessage(''), 3000);
-                                  } catch (err) {
-                                    setUsersError(err.response?.data?.message || 'Failed to delete user');
-                                    setTimeout(() => setUsersError(''), 3000);
-                                  }
-                                }}
-                              >
-                                Delete
-                              </button>
+                                      try {
+                                        await deleteUser(user._id);
+                                        setSuccessMessage('User deleted successfully');
+                                        setUsers(prev => prev.filter(u => u._id !== user._id));
+                                        setTimeout(() => setSuccessMessage(''), 3000);
+                                      } catch (err) {
+                                        setUsersError(err.response?.data?.message || 'Failed to delete user');
+                                        setTimeout(() => setUsersError(''), 3000);
+                                      }
+                                    }}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
                             </div>
                           </div>
                         ))}
@@ -2785,11 +2949,6 @@ const AdminDashboard = () => {
               <div style={{marginBottom: '24px'}}>
                 <h4 style={{fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: '#374151'}}>
                   Currently Assigned Teachers
-                  {selectedCourseForAssignment.course_type === 'THEORY' && (
-                    <span style={{fontSize: '12px', fontWeight: 400, color: '#6b7280', marginLeft: '8px'}}>
-                      (Sections A & B)
-                    </span>
-                  )}
                 </h4>
                 {selectedCourseForAssignment.assignedTeachers && selectedCourseForAssignment.assignedTeachers.length > 0 ? (
                   <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
@@ -2810,22 +2969,8 @@ const AdminDashboard = () => {
                           }}
                         >
                           <div style={{flex: 1}}>
-                            <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                              <span style={{fontWeight: 500, fontSize: '14px', color: '#1f2937'}}>
-                                {teacher.name}
-                              </span>
-                              {section && (
-                                <span style={{
-                                  fontSize: '11px',
-                                  fontWeight: 600,
-                                  color: '#fff',
-                                  backgroundColor: section === 'A' ? '#3b82f6' : '#10b981',
-                                  padding: '2px 8px',
-                                  borderRadius: '4px'
-                                }}>
-                                  Section {section}
-                                </span>
-                              )}
+                            <div style={{fontWeight: 500, fontSize: '14px', color: '#1f2937'}}>
+                              {teacher.name}
                             </div>
                             <div style={{fontSize: '12px', color: '#6b7280', marginTop: '2px'}}>
                               {teacher.email}
@@ -2834,7 +2979,7 @@ const AdminDashboard = () => {
                           </div>
                           <button
                             className="btn btn-sm btn-danger"
-                            onClick={() => handleUnassignTeacher(teacher._id, section)}
+                            onClick={() => handleUnassignTeacher(teacher._id)}
                             disabled={assignmentLoading}
                             style={{fontSize: '12px', padding: '6px 12px'}}
                           >
@@ -2860,38 +3005,44 @@ const AdminDashboard = () => {
               </div>
 
               {/* Available Teachers to Assign */}
-              <div>
-                <h4 style={{fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: '#374151'}}>
-                  Available Teachers
-                </h4>
-                <input
-                  type="text"
-                  placeholder="Search by name, email, or designation..."
-                  value={teacherFilter}
-                  onChange={(e) => setTeacherFilter(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    marginBottom: '12px',
-                    outline: 'none',
-                    transition: 'border-color 0.2s ease'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                  onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
-                />
+              {(() => {
+                // Check if max 2 teachers already assigned
+                const hasReachedMaxTeachers = (selectedCourseForAssignment.assignedTeachers || []).length >= 2;
+                
+                // Don't show this section if max teachers reached
+                if (hasReachedMaxTeachers) return null;
+                
+                return (
+                  <div>
+                    <h4 style={{fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: '#374151'}}>
+                      Available Teachers
+                    </h4>
+                    <input
+                      type="text"
+                      placeholder="Search by name, email, or designation..."
+                      value={teacherFilter}
+                      onChange={(e) => setTeacherFilter(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        marginBottom: '12px',
+                        outline: 'none',
+                        transition: 'border-color 0.2s ease'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                      onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                    />
                 {(() => {
                   const assignedTeacherIds = (selectedCourseForAssignment.assignedTeachers || []).map(a => {
                     const teacher = a.teacher || a;
                     return teacher._id;
                   });
                   
-                  // Get assigned sections for theory courses
-                  const assignedSections = selectedCourseForAssignment.course_type === 'THEORY'
-                    ? (selectedCourseForAssignment.assignedTeachers || []).map(a => a.section)
-                    : [];
+                  // Check if max 2 teachers already assigned
+                  const hasReachedMaxTeachers = (selectedCourseForAssignment.assignedTeachers || []).length >= 2;
                   
                   let availableTeachers = users.filter(u => 
                     u.role === 'teacher' && 
@@ -2920,14 +3071,10 @@ const AdminDashboard = () => {
                         color: '#6b7280',
                         fontSize: '13px'
                       }}>
-                        No available teachers to assign
+                        {hasReachedMaxTeachers ? 'Maximum 2 teachers already assigned' : 'No available teachers to assign'}
                       </div>
                     );
                   }
-
-                  const isTheory = selectedCourseForAssignment.course_type?.toUpperCase() === 'THEORY';
-                  
-                  console.log('Course type:', selectedCourseForAssignment.course_type, 'isTheory:', isTheory);
 
                   return (
                     <div style={{
@@ -2937,6 +3084,19 @@ const AdminDashboard = () => {
                       flexDirection: 'column',
                       gap: '8px'
                     }}>
+                      {hasReachedMaxTeachers && (
+                        <div style={{
+                          padding: '10px 12px',
+                          backgroundColor: '#fef3c7',
+                          border: '1px solid #fcd34d',
+                          borderRadius: '6px',
+                          color: '#92400e',
+                          fontSize: '13px',
+                          fontWeight: 500
+                        }}>
+                          <FontAwesomeIcon icon={faExclamationTriangle} /> Maximum 2 teachers reached. Remove one to add another.
+                        </div>
+                      )}
                       {availableTeachers.map((teacher) => (
                         <div 
                           key={teacher._id}
@@ -2959,43 +3119,23 @@ const AdminDashboard = () => {
                               {teacher.designation && ` • ${teacher.designation}`}
                             </div>
                           </div>
-                          {isTheory ? (
-                            <div style={{display: 'flex', gap: '6px'}}>
-                              <button
-                                className="btn btn-sm btn-primary"
-                                onClick={() => handleAssignTeacher(teacher._id, 'A')}
-                                disabled={assignmentLoading || assignedSections.includes('A')}
-                                style={{fontSize: '12px', padding: '6px 10px', minWidth: '65px'}}
-                                title={assignedSections.includes('A') ? 'Section A already assigned' : 'Assign to Section A'}
-                              >
-                                Sec A
-                              </button>
-                              <button
-                                className="btn btn-sm btn-primary"
-                                onClick={() => handleAssignTeacher(teacher._id, 'B')}
-                                disabled={assignmentLoading || assignedSections.includes('B')}
-                                style={{fontSize: '12px', padding: '6px 10px', minWidth: '65px'}}
-                                title={assignedSections.includes('B') ? 'Section B already assigned' : 'Assign to Section B'}
-                              >
-                                Sec B
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              className="btn btn-sm btn-primary"
-                              onClick={() => handleAssignTeacher(teacher._id, null)}
-                              disabled={assignmentLoading}
-                              style={{fontSize: '12px', padding: '6px 12px'}}
-                            >
-                              Assign
-                            </button>
-                          )}
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={() => handleAssignTeacher(teacher._id)}
+                            disabled={assignmentLoading || hasReachedMaxTeachers}
+                            style={{fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}
+                            title={hasReachedMaxTeachers ? 'Maximum 2 teachers reached' : 'Assign teacher'}
+                          >
+                            Assign
+                          </button>
                         </div>
                       ))}
                     </div>
                   );
                 })()}
-              </div>
+                  </div>
+                );
+              })()}
             </div>
             <div className="modal-footer">
               <button 
@@ -3270,7 +3410,7 @@ const AdminDashboard = () => {
         <div className="modal-overlay" onClick={() => !batchAssignmentLoading && setShowBatchAssignmentModal(false)}>
           <div className="modal-content assignment-modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '600px'}}>
             <div className="modal-header">
-              <h3>Assign Batches to Course</h3>
+              <h3>{selectedCourseForBatch._isGroupAssignment ? `Assign Batch to ${selectedCourseForBatch._groupName}` : 'Assign Batches to Course'}</h3>
               <button 
                 className="close-btn" 
                 onClick={() => setShowBatchAssignmentModal(false)}
@@ -3280,14 +3420,25 @@ const AdminDashboard = () => {
               </button>
             </div>
             <div className="modal-body">
-              <div style={{marginBottom: '20px', padding: '12px', backgroundColor: '#f3f4f6', borderRadius: '8px'}}>
-                <h4 style={{margin: '0 0 8px 0', fontSize: '16px', color: '#1f2937'}}>
-                  {selectedCourseForBatch.courseCode}
-                </h4>
-                <p style={{margin: 0, color: '#6b7280', fontSize: '14px'}}>
-                  {selectedCourseForBatch.courseTitle}
-                </p>
-              </div>
+              {selectedCourseForBatch._isGroupAssignment ? (
+                <div style={{marginBottom: '20px', padding: '12px', backgroundColor: '#f3f4f6', borderRadius: '8px'}}>
+                  <h4 style={{margin: '0 0 8px 0', fontSize: '16px', color: '#1f2937'}}>
+                    {selectedCourseForBatch._groupName}
+                  </h4>
+                  <p style={{margin: 0, color: '#6b7280', fontSize: '14px'}}>
+                    {selectedCourseForBatch._groupCourses.length} course{selectedCourseForBatch._groupCourses.length !== 1 ? 's' : ''} will be assigned to the selected batch
+                  </p>
+                </div>
+              ) : (
+                <div style={{marginBottom: '20px', padding: '12px', backgroundColor: '#f3f4f6', borderRadius: '8px'}}>
+                  <h4 style={{margin: '0 0 8px 0', fontSize: '16px', color: '#1f2937'}}>
+                    {selectedCourseForBatch.courseCode}
+                  </h4>
+                  <p style={{margin: 0, color: '#6b7280', fontSize: '14px'}}>
+                    {selectedCourseForBatch.courseTitle}
+                  </p>
+                </div>
+              )}
 
               {batchAssignmentSuccess && (
                 <div className="alert alert-success" style={{marginBottom: '16px'}}>
@@ -3303,12 +3454,13 @@ const AdminDashboard = () => {
                 </div>
               )}
 
-              {/* Currently Assigned Batches */}
-              <div style={{marginBottom: '24px'}}>
-                <h4 style={{fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: '#374151'}}>
-                  Currently Assigned Batches
-                </h4>
-                {selectedCourseForBatch.assignedBatches && selectedCourseForBatch.assignedBatches.length > 0 ? (
+              {/* Currently Assigned Batches - Only show for single course assignment */}
+              {!selectedCourseForBatch._isGroupAssignment && (
+                <div style={{marginBottom: '24px'}}>
+                  <h4 style={{fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: '#374151'}}>
+                    Currently Assigned Batches
+                  </h4>
+                  {selectedCourseForBatch.assignedBatches && selectedCourseForBatch.assignedBatches.length > 0 ? (
                   <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                     {selectedCourseForBatch.assignedBatches.map((assignment, idx) => (
                       <div 
@@ -3356,12 +3508,18 @@ const AdminDashboard = () => {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Assign New Batch */}
               <div>
                 <h4 style={{fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: '#374151'}}>
-                  Assign New Batch
+                  {selectedCourseForBatch.assignedBatches && selectedCourseForBatch.assignedBatches.length > 0 ? 'Change Batch' : 'Assign Batch'}
                 </h4>
+                {selectedCourseForBatch.assignedBatches && selectedCourseForBatch.assignedBatches.length > 0 && (
+                  <p style={{fontSize: '12px', color: '#dc2626', marginBottom: '12px', fontStyle: 'italic'}}>
+                    Note: Assigning a new batch will replace the current assignment
+                  </p>
+                )}
                 <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '10px', alignItems: 'end'}}>
                   <div>
                     <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
@@ -3424,7 +3582,7 @@ const AdminDashboard = () => {
                     disabled={batchAssignmentLoading || !batchInput || !deptCodeInput}
                     style={{fontSize: '14px', padding: '8px 16px'}}
                   >
-                    {batchAssignmentLoading ? 'Assigning...' : 'Assign'}
+                    {batchAssignmentLoading ? 'Processing...' : (selectedCourseForBatch.assignedBatches && selectedCourseForBatch.assignedBatches.length > 0 ? 'Change' : 'Assign')}
                   </button>
                 </div>
               </div>

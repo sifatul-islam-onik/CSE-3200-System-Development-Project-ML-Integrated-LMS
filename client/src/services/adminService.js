@@ -131,6 +131,33 @@ export const setUserDesignation = async (userId, designation) => {
   }
 };
 
+// Set teacher as department head
+export const setDepartmentHead = async (userId) => {
+  try {
+    const response = await axios.put(
+      `${API_URL}/admin/users/${userId}/department-head`,
+      {},
+      getAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
+};
+
+// Remove teacher as department head
+export const removeDepartmentHead = async (userId) => {
+  try {
+    const response = await axios.delete(
+      `${API_URL}/admin/users/${userId}/department-head`,
+      getAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
+};
+
 // Get distinct student batches (descending)
 export const getStudentBatches = async () => {
   try {

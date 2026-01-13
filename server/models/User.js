@@ -114,6 +114,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: 'Lecturer'
   },
+  // Whether this teacher is the head of their department (can only be a Professor)
+  isDepartmentHead: {
+    type: Boolean,
+    default: false
+  },
   emailVerificationOTP: {
     type: String,
     select: false
