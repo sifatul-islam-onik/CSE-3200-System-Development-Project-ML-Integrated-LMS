@@ -26,6 +26,22 @@ exports.saveTermExamMarks = async (req, res) => {
       });
     }
 
+    // For theory courses, section is required
+    if (course.course_type === 'THEORY' && !section) {
+      return res.status(400).json({
+        success: false,
+        message: 'Section (A or B) is required for theory courses'
+      });
+    }
+
+    // Validate section value if provided
+    if (section && !['A', 'B'].includes(section)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Section must be A or B'
+      });
+    }
+
     // Verify student exists
     const student = await User.findById(studentId);
     if (!student || student.role !== 'student') {
