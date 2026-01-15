@@ -4,6 +4,7 @@ const { body } = require('express-validator');
 const { authenticateUser } = require('../middlewares/authMiddleware');
 const { authorizeAdmin } = require('../middlewares/roleMiddleware');
 const courseController = require('../controllers/courseController');
+const gradeSummaryController = require('../controllers/gradeSummaryController');
 
 // Validation middleware for course creation/update
 const courseValidation = [
@@ -91,5 +92,6 @@ router.get('/curriculum/semester/:semester', courseController.getCurriculumBySem
 
 // Student management routes
 router.get('/:courseId/students', courseController.getCourseStudents); // Teachers can view students in their assigned courses
+router.get('/:courseId/grade-summary', gradeSummaryController.getCourseResultSummary); // Real-time grade summary aggregation
 
 module.exports = router;

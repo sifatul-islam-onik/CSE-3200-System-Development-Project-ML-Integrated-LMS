@@ -40,6 +40,12 @@ const programOutcomeRoutes = require('./routes/programOutcomeRoutes');
 const copoMappingRoutes = require('./routes/copoMappingRoutes');
 const courseProposalRoutes = require('./routes/courseProposalRoutes');
 const termExamMarksRoutes = require('./routes/termExamMarksRoutes');
+const ctMarksRoutes = require('./routes/ctMarksRoutes');
+const attendanceRoutes = require('./routes/attendanceRoutes');
+const assignmentRoutes = require('./routes/assignmentRoutes');
+const gradeRoutes = require('./routes/gradeRoutes');
+const exportRoutes = require('./routes/exportRoutes');
+const copoAttainmentRoutes = require('./routes/copoAttainmentRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
@@ -49,6 +55,12 @@ app.use('/api/program-outcomes', programOutcomeRoutes);
 app.use('/api', copoMappingRoutes);
 app.use('/api/course-proposals', courseProposalRoutes);
 app.use('/api/term-exam-marks', termExamMarksRoutes);
+app.use('/api/ct-marks', ctMarksRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/assignments', assignmentRoutes);
+app.use('/api/grades', gradeRoutes);
+app.use('/api/export', exportRoutes);
+app.use('/api', copoAttainmentRoutes);
 
 // Error handlers
 process.on('unhandledRejection', (err) => {

@@ -982,6 +982,17 @@ exports.assignTeacherToCourse = async (req, res) => {
       });
     }
 
+    // Check if the target section is already assigned (for Theory courses mainly)
+    if (section) {
+      const sectionOccupied = course.assignedTeachers.find(a => a.section === section);
+      if (sectionOccupied) {
+         return res.status(400).json({
+          success: false,
+          message: `Section ${section} is already assigned to another teacher`
+        });
+      }
+    }
+
     // Check if maximum 2 teachers already assigned
     if (course.assignedTeachers.length >= 2) {
       return res.status(400).json({
