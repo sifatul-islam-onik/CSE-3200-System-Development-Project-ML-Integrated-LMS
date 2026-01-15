@@ -89,6 +89,7 @@ const AdminDashboard = () => {
   const [assignmentLoading, setAssignmentLoading] = useState(false);
   const [assignmentError, setAssignmentError] = useState('');
   const [assignmentSuccess, setAssignmentSuccess] = useState('');
+  const [assignmentSection, setAssignmentSection] = useState('A');
   const [teacherFilter, setTeacherFilter] = useState('');
   const [showBatchAssignmentModal, setShowBatchAssignmentModal] = useState(false);
   const [selectedCourseForBatch, setSelectedCourseForBatch] = useState(null);
@@ -795,6 +796,7 @@ const AdminDashboard = () => {
     setAssignmentError('');
     setAssignmentSuccess('');
     setTeacherFilter('');
+    setAssignmentSection('A');
     
     // Fetch users if not already loaded
     if (users.length === 0) {
@@ -813,15 +815,18 @@ const AdminDashboard = () => {
     setAssignmentLoading(true);
     setAssignmentError('');
     setAssignmentSuccess('');
+
+    // Only assign section for THEORY courses
+    const sectionToAssign = selectedCourseForAssignment.course_type === 'THEORY' ? assignmentSection : null;
     
     console.log('Assigning teacher:', {
       courseId: selectedCourseForAssignment._id,
       teacherId,
-      section: null
+      section: sectionToAssign
     });
     
     try {
-      const response = await assignTeacherToCourse(selectedCourseForAssignment._id, teacherId, null);
+      const response = await assignTeacherToCourse(selectedCourseForAssignment._id, teacherId, sectionToAssign);
       console.log('Teacher assignment response:', response);
       setAssignmentSuccess('Teacher assigned successfully');
       
@@ -2969,8 +2974,22 @@ const AdminDashboard = () => {
                           }}
                         >
                           <div style={{flex: 1}}>
-                            <div style={{fontWeight: 500, fontSize: '14px', color: '#1f2937'}}>
+                            <div style={{fontWeight: 500, fontSize: '14px', color: '#1f2937', display: 'flex', alignItems: 'center'}}>
                               {teacher.name}
+                              {section && (
+                                <span style={{
+                                  marginLeft: '8px', 
+                                  fontSize: '11px', 
+                                  padding: '2px 6px', 
+                                  backgroundColor: '#eff6ff', 
+                                  color: '#1e40af', 
+                                  borderRadius: '4px',
+                                  border: '1px solid #bfdbfe',
+                                  fontWeight: 600
+                                }}>
+                                  Section {section}
+                                </span>
+                              )}
                             </div>
                             <div style={{fontSize: '12px', color: '#6b7280', marginTop: '2px'}}>
                               {teacher.email}
@@ -3014,6 +3033,39 @@ const AdminDashboard = () => {
                 
                 return (
                   <div>
+                    {/* Section Selector for THEORY courses */}
+                    {selectedCourseForAssignment.course_type === 'THEORY' && (
+                      <div style={{marginBottom: '16px', padding: '12px', backgroundColor: '#eff6ff', borderRadius: '6px', border: '1px solid #bfdbfe'}}>
+                        <label style={{display: 'block', fontSize: '14px', fontWeight: 600, color: '#1e40af', marginBottom: '8px'}}>
+                          Select Section for Assignment
+                        </label>
+                        <div style={{display: 'flex', gap: '24px'}}>
+                          <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 500}}>
+                            <input
+                              type="radio"
+                              name="section"
+                              value="A"
+                              checked={assignmentSection === 'A'}
+                              onChange={(e) => setAssignmentSection(e.target.value)}
+                              style={{marginRight: '8px', width: '16px', height: '16px'}}
+                            />
+                            Section A
+                          </label>
+                          <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 500}}>
+                            <input
+                              type="radio"
+                              name="section"
+                              value="B"
+                              checked={assignmentSection === 'B'}
+                              onChange={(e) => setAssignmentSection(e.target.value)}
+                              style={{marginRight: '8px', width: '16px', height: '16px'}}
+                            />
+                            Section B
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
                     <h4 style={{fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: '#374151'}}>
                       Available Teachers
                     </h4>
@@ -3579,12 +3631,29 @@ const AdminDashboard = () => {
                   <button
                     className="btn btn-primary"
                     onClick={handleAssignBatch}
-                    disabled={batchAssignmentLoading || !batchInput || !deptCodeInput}
+                    disabled={batchAssignmentLoading || !batchInput || !deptCodeInput || 
+                      (selectedCourseForBatch.assignedBatches && selectedCourseForBatch.assignedBatches.some(
+                        ab => ab.batch === batchInput && ab.deptCode === deptCodeInput
+                      ))}
                     style={{fontSize: '14px', padding: '8px 16px'}}
                   >
-                    {batchAssignmentLoading ? 'Processing...' : (selectedCourseForBatch.assignedBatches && selectedCourseForBatch.assignedBatches.length > 0 ? 'Change' : 'Assign')}
+                    {batchAssignmentLoading ? 'Processing...' : (selectedCourseForBatch.assignedBatches && selectedCourseForBatch.assignedBatches.length > 0 ? 'Add' : 'Assign')}
                   </button>
                 </div>
+                {batchInput && deptCodeInput && selectedCourseForBatch.assignedBatches && 
+                 selectedCourseForBatch.assignedBatches.some(ab => ab.batch === batchInput && ab.deptCode === deptCodeInput) && (
+                  <div style={{
+                    marginTop: '10px',
+                    padding: '8px 12px',
+                    backgroundColor: '#fee2e2',
+                    border: '1px solid #ef4444',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    color: '#991b1b'
+                  }}>
+                    ⚠️ This batch and department combination is already assigned. Please remove it first or choose a different combination.
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-footer">
