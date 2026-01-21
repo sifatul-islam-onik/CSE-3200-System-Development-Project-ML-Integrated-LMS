@@ -286,11 +286,12 @@ export const getAssignedTeachers = async (courseId) => {
 // Batch assignment functions
 
 // Assign a batch to a course
-export const assignBatchToCourse = async (courseId, batch, deptCode) => {
+export const assignBatchToCourse = async (courseId, batch, deptCode, yearLevel, semester, term) => {
   try {
     const response = await axios.post(
       `${API_URL}/admin/courses/${courseId}/assign-batch`,
-      { batch, deptCode },
+      // Include optional yearLevel/semester/term to allow backend auto-fill
+      { batch, deptCode, yearLevel, semester, term },
       getAuthHeader()
     );
     return response.data;
@@ -317,6 +318,19 @@ export const getAssignedBatches = async (courseId) => {
   try {
     const response = await axios.get(
       `${API_URL}/admin/courses/${courseId}/assigned-batches`,
+      getAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
+};
+
+// Get students for a course's assigned batch
+export const getStudentsForCourse = async (courseId) => {
+  try {
+    const response = await axios.get(
+      `${API_URL}/admin/courses/${courseId}/students`,
       getAuthHeader()
     );
     return response.data;

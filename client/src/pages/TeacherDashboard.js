@@ -5,8 +5,9 @@ import { faBook, faPlus, faHourglass, faCheckCircle, faTimesCircle, faEye, faTra
 import { getUser, logout } from '../components/ProtectedRoute';
 import { getProfile } from '../services/authService';
 import { getMyProposals, createCourseProposal, deleteProposal } from '../services/courseProposalService';
-import { getAllCourses, getCourseStudents } from '../services/courseService';
+import { getAllCourses, getCourseStudents, updateCourse } from '../services/courseService';
 import CourseForm from '../components/CourseForm';
+import AttainmentView from '../components/AttainmentView';
 import CourseOBEView from '../components/CourseOBEView';
 import MarkEntry from '../components/MarkEntry';
 import '../styles/Dashboard.css';
@@ -40,7 +41,7 @@ const TeacherDashboard = () => {
 
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  const [activeSection, setActiveSection] = useState('overview');
+  const [activeSection, setActiveSection] = useState('proposals');
   const [proposals, setProposals] = useState([]);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -357,38 +358,6 @@ const TeacherDashboard = () => {
 
   const renderSection = () => {
     switch (activeSection) {
-      case 'overview':
-        return (
-          <div className="section-container">
-            <div className="section-header">
-              <h2>Welcome, {user?.name}!</h2>
-              <p>Teacher Dashboard - Manage your course proposals</p>
-            </div>
-            <div className="dashboard-grid" style={{marginTop: '2rem'}}>
-              <div className="dashboard-card">
-                <div className="card-icon"><FontAwesomeIcon icon={faPlus} /></div>
-                <h3>Propose New Course</h3>
-                <p>Submit a proposal to create a new course</p>
-                <button className="card-btn" onClick={openCreateProposal}>Create Proposal</button>
-              </div>
-
-              <div className="dashboard-card">
-                <div className="card-icon"><FontAwesomeIcon icon={faEdit} /></div>
-                <h3>Edit Course</h3>
-                <p>Propose changes to existing courses</p>
-                <button className="card-btn" onClick={() => setActiveSection('courses')}>View Courses</button>
-              </div>
-
-              <div className="dashboard-card">
-                <div className="card-icon"><FontAwesomeIcon icon={faHourglass} /></div>
-                <h3>My Proposals</h3>
-                <p>Track status of your submitted proposals</p>
-                <button className="card-btn" onClick={() => setActiveSection('proposals')}>View Proposals</button>
-              </div>
-            </div>
-          </div>
-        );
-
       case 'proposals':
         return (
           <div className="section-container">
@@ -680,6 +649,8 @@ const TeacherDashboard = () => {
                                           assignments: []
                                         })));
                                         setAttendanceCourse(course);
+                                        // Set attendance total marks from course
+                                        setAttendanceTotalMarks(course.attendanceMarks || 10);
                                         setShowAttendanceModal(true);
                                       } else {
                                         setError('No students enrolled in this course');
@@ -932,7 +903,11 @@ const TeacherDashboard = () => {
                     </div>
                   </div>
 
-                  <div className="profile-actions" style={{display: 'flex', justifyContent: 'flex-end', gap: '10px'}}>
+                  <div className="profile-actions" style={{display: 'flex', justifyContent: 'space-between', gap: '10px'}}>
+                    <button className="btn btn-logout" onClick={handleLogout}>
+                      <FontAwesomeIcon icon={faSignOutAlt} style={{marginRight: '8px'}} />
+                      Logout
+                    </button>
                     <button className="btn btn-primary" onClick={updateProfile}>Save Changes</button>
                   </div>
                 </div>
@@ -940,6 +915,9 @@ const TeacherDashboard = () => {
             </div>
           </div>
         );
+
+      case 'attainment':
+        return <AttainmentView />;
 
       default:
         return null;
@@ -988,14 +966,6 @@ const TeacherDashboard = () => {
           </button>
         </div>
         <nav className="sidebar-nav">
-          <button
-            className={`nav-item ${activeSection === 'overview' ? 'active' : ''}`}
-            onClick={() => handleSectionChange('overview')}
-          >
-            <span className="nav-icon"><FontAwesomeIcon icon={faBook} /></span>
-            {sidebarOpen && <span className="nav-label">Overview</span>}
-          </button>
-          
           {/* Collapsible Proposals Section */}
           <div className="nav-group">
             <button
@@ -1047,6 +1017,14 @@ const TeacherDashboard = () => {
             <span className="nav-icon"><FontAwesomeIcon icon={faBook} /></span>
             {sidebarOpen && <span className="nav-label">Browse Courses</span>}
           </button>
+          
+          <button
+            className={`nav-item ${activeSection === 'attainment' ? 'active' : ''}`}
+            onClick={() => handleSectionChange('attainment')}
+          >
+            <span className="nav-icon"><FontAwesomeIcon icon={faClipboardList} /></span>
+            {sidebarOpen && <span className="nav-label">CO Attainment</span>}
+          </button>
         </nav>
         <div className="sidebar-footer">
           {user && (
@@ -1071,14 +1049,6 @@ const TeacherDashboard = () => {
               )}
             </div>
           )}
-          <button 
-            className="btn btn-logout" 
-            onClick={handleLogout}
-            title="Logout"
-          >
-            <span className="logout-icon"><FontAwesomeIcon icon={faSignOutAlt} /></span>
-            {sidebarOpen && <span>Logout</span>}
-          </button>
         </div>
       </aside>
 
@@ -1554,11 +1524,22 @@ const TeacherDashboard = () => {
               </button>
               <button
                 className="btn btn-primary"
-                onClick={() => {
-                  // Save attendance & assignment marks logic here
-                  setShowAttendanceModal(false);
-                  setSuccessMessage('Attendance & Assignment Marks saved successfully');
-                  setTimeout(() => setSuccessMessage(''), 3000);
+                onClick={async () => {
+                  try {
+                    setAttendanceLoading(true);
+                    // Save attendance total marks to course
+                    await updateCourse(attendanceCourse._id, { 
+                      attendanceMarks: attendanceTotalMarks 
+                    });
+                    setShowAttendanceModal(false);
+                    setSuccessMessage('Attendance & Assignment Marks saved successfully');
+                    setTimeout(() => setSuccessMessage(''), 3000);
+                  } catch (err) {
+                    setError(err.error || 'Failed to save marks');
+                    setTimeout(() => setError(''), 3000);
+                  } finally {
+                    setAttendanceLoading(false);
+                  }
                 }}
                 disabled={attendanceLoading}
                 style={{ flex: '0 0 auto', width: '120px', whiteSpace: 'nowrap' }}

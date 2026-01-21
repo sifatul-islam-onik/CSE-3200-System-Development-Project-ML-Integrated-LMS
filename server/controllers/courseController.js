@@ -530,8 +530,13 @@ exports.getAllCourses = async (req, res) => {
           })
         );
         
+        const courseObj = course.toObject();
+        // Sanitize: only one batch assignment per course (take the last as current)
+        if (Array.isArray(courseObj.assignedBatches) && courseObj.assignedBatches.length > 1) {
+          courseObj.assignedBatches = [courseObj.assignedBatches[courseObj.assignedBatches.length - 1]];
+        }
         return {
-          ...course.toObject(),
+          ...courseObj,
           courseOutcomes: outcomesWithMappings
         };
       })
@@ -567,9 +572,14 @@ exports.getCourse = async (req, res) => {
       });
     }
 
+    const courseObj = course.toObject();
+    if (Array.isArray(courseObj.assignedBatches) && courseObj.assignedBatches.length > 1) {
+      courseObj.assignedBatches = [courseObj.assignedBatches[courseObj.assignedBatches.length - 1]];
+    }
+
     res.status(200).json({
       success: true,
-      data: course
+      data: courseObj
     });
 
   } catch (error) {
@@ -1313,6 +1323,9 @@ exports.getCourseStudents = async (req, res) => {
     const User = require('../models/User');
     const assignedBatches = course.assignedBatches || [];
     
+    console.log('[getCourseStudents] Course:', course.courseCode, 'ID:', courseId);
+    console.log('[getCourseStudents] Assigned batches:', JSON.stringify(assignedBatches));
+    
     if (assignedBatches.length === 0) {
       return res.status(200).json({
         success: true,
@@ -1329,34 +1342,74 @@ exports.getCourseStudents = async (req, res) => {
       isApprovedByAdmin: true
     }).select('name roll email department');
 
+    console.log('[getCourseStudents] Total active approved students found:', students.length);
+    
     // Filter students based on roll number format (BBDDRRR)
     const enrolledStudents = students.filter(student => {
-      if (!student.roll || student.roll.length < 4) return false;
+      // Extract roll number from student.roll or email
+      let roll = student.roll;
+      if (!roll && student.email) {
+        // Extract digits from email (e.g., 2101001@student.kuet.ac.bd -> 2101001)
+        const match = student.email.match(/^(\d+)/);
+        if (match) {
+          roll = match[1];
+        }
+      }
       
-      const batch = student.roll.substring(0, 2);
-      const deptCode = student.roll.substring(2, 4);
+      console.log('[getCourseStudents] Checking student:', student.email, 'roll:', roll);
       
-      return assignedBatches.some(assignment => 
+      if (!roll || roll.length < 4) {
+        console.log('[getCourseStudents] Roll too short or missing:', roll);
+        return false;
+      }
+      
+      const batch = roll.substring(0, 2);
+      const deptCode = roll.substring(2, 4);
+      
+      console.log('[getCourseStudents] Student batch:', batch, 'deptCode:', deptCode);
+      
+      const matches = assignedBatches.some(assignment => 
         assignment.batch === batch && assignment.deptCode === deptCode
       );
+      
+      console.log('[getCourseStudents] Matches assigned batch?', matches);
+      
+      return matches;
+    });
+
+    // Map students to include extracted roll number and sort
+    const studentsWithRoll = enrolledStudents.map(student => {
+      let roll = student.roll;
+      if (!roll && student.email) {
+        const match = student.email.match(/^(\d+)/);
+        if (match) {
+          roll = match[1];
+        }
+      }
+      return {
+        ...student.toObject(),
+        roll: roll
+      };
     });
 
     // Sort by roll number
-    enrolledStudents.sort((a, b) => {
+    studentsWithRoll.sort((a, b) => {
       if (!a.roll) return 1;
       if (!b.roll) return -1;
       return a.roll.localeCompare(b.roll);
     });
 
+    console.log('[getCourseStudents] Enrolled students after filtering:', studentsWithRoll.length);
+
     res.status(200).json({
       success: true,
-      count: enrolledStudents.length,
+      count: studentsWithRoll.length,
       courseInfo: {
         courseCode: course.courseCode,
         courseTitle: course.courseTitle,
         course_type: course.course_type
       },
-      data: enrolledStudents
+      data: studentsWithRoll
     });
 
   } catch (error) {

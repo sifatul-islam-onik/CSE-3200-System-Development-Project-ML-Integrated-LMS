@@ -266,3 +266,94 @@ exports.deleteAllCourseOutcomes = async (req, res) => {
     });
   }
 };
+
+/**
+ * Get course outcomes with CO-PO mappings for course profile
+ * GET /api/course-outcomes/profile/:courseCode
+ */
+exports.getCourseProfileData = async (req, res) => {
+  try {
+    const { courseCode } = req.params;
+    const COPOMapping = require('../models/COPOMapping');
+
+    // Find the course
+    const course = await Course.findOne({ courseCode: courseCode.toUpperCase() });
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        error: 'Course not found'
+      });
+    }
+
+    // Get all course outcomes for this course
+    const courseOutcomes = await CourseOutcome.find({ 
+      course: course._id,
+      is_deleted: false 
+    }).sort({ co_code: 1 });
+
+    // Get CO-PO mappings for all COs
+    const coIds = courseOutcomes.map(co => co._id);
+    const copoMappings = await COPOMapping.find({ 
+      course_outcome: { $in: coIds } 
+    });
+
+    // Map PO codes to numbers (PO_A=1, PO_B=2, etc.)
+    const poCodeToNumber = {
+      'PO_A': 1, 'PO_B': 2, 'PO_C': 3, 'PO_D': 4,
+      'PO_E': 5, 'PO_F': 6, 'PO_G': 7, 'PO_H': 8,
+      'PO_I': 9, 'PO_J': 10, 'PO_K': 11, 'PO_L': 12
+    };
+
+    // Transform data for course profile
+    const profileData = courseOutcomes.map(co => {
+      // Extract Bloom's levels from taxonomy_levels array
+      const bloomLevels = {
+        cognitive: '',
+        affective: '',
+        psychomotor: '',
+        social: ''
+      };
+
+      co.taxonomy_levels.forEach(level => {
+        const prefix = level.charAt(0);
+        const number = level.substring(1);
+        
+        if (prefix === 'C') bloomLevels.cognitive = number;
+        else if (prefix === 'A') bloomLevels.affective = number;
+        else if (prefix === 'P') bloomLevels.psychomotor = number;
+        else if (prefix === 'S') bloomLevels.social = number;
+      });
+
+      // Get PO mappings for this CO
+      const coMappings = copoMappings.filter(
+        m => m.course_outcome.toString() === co._id.toString()
+      );
+
+      // Get list of mapped POs as numbers
+      const mappedPos = coMappings
+        .filter(m => m.level === 1)
+        .map(m => poCodeToNumber[m.program_outcome_code])
+        .filter(n => n !== undefined)
+        .sort((a, b) => a - b);
+
+      return {
+        cloNumber: co.co_code.replace('CO', 'CLO'),
+        description: co.description,
+        bloomLevels,
+        ploAssessed: mappedPos.join(', '),
+        cloPloCorrelation: '' // Initially blank, editable
+      };
+    });
+
+    res.json({
+      success: true,
+      data: profileData
+    });
+  } catch (error) {
+    console.error('Error fetching course profile data:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
