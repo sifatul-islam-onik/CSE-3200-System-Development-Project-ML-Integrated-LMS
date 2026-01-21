@@ -969,6 +969,15 @@ const AdminDashboard = () => {
     setDeptCodeInput('');
   };
 
+  // Helper: derive full year from two-digit batch per rule
+  const formatBatchYear = (twoDigits) => {
+    const val = parseInt(String(twoDigits || '').replace(/\D/g, ''), 10);
+    if (Number.isNaN(val) || val < 0 || val > 99) return '';
+    const pivot = new Date().getFullYear() % 100; // e.g., 26 in 2026
+    const century = val <= pivot ? 20 : 19;
+    return `${century}${val.toString().padStart(2, '0')}`;
+  };
+
   // Handle assign batch to course
   const handleAssignBatch = async () => {
     if (!batchInput || !deptCodeInput) {
@@ -981,14 +990,40 @@ const AdminDashboard = () => {
     setBatchAssignmentSuccess('');
 
     try {
-      console.log('Assigning batch:', { batch: batchInput, deptCode: deptCodeInput, courseId: selectedCourseForBatch._id });
+      const normalizedBatch = String(batchInput).replace(/\D/g, '').padStart(2, '0');
+      console.log('Assigning batch:', { batch: normalizedBatch, deptCode: deptCodeInput, courseId: selectedCourseForBatch._id });
       
       // Check if this is a group assignment
       if (selectedCourseForBatch._isGroupAssignment && selectedCourseForBatch._groupCourses) {
+        console.log('[handleAssignBatch] GROUP assignment:', {
+          groupName: selectedCourseForBatch._groupName,
+          groupYear: selectedCourseForBatch._groupYear,
+          groupTerm: selectedCourseForBatch._groupTerm,
+          groupSemester: selectedCourseForBatch._groupSemester,
+          courseCount: selectedCourseForBatch._groupCourses.length
+        });
+        
         // Assign batch to all courses in the group
-        const promises = selectedCourseForBatch._groupCourses.map(course => 
-          assignBatchToCourse(course._id, batchInput, deptCodeInput)
-        );
+        const promises = selectedCourseForBatch._groupCourses.map(course => {
+          const y = Number.isInteger(course.yearLevel) ? course.yearLevel : selectedCourseForBatch._groupYear;
+          const t = Number.isInteger(course.term) ? course.term : selectedCourseForBatch._groupTerm;
+          const s = Number.isInteger(course.semester) ? course.semester : selectedCourseForBatch._groupSemester;
+          
+          console.log('[handleAssignBatch] assigning course:', {
+            courseId: course._id,
+            courseCode: course.courseCode,
+            values: { y, s, t }
+          });
+          
+          return assignBatchToCourse(
+            course._id,
+            normalizedBatch,
+            deptCodeInput,
+            y,
+            s,
+            t
+          );
+        });
         
         await Promise.all(promises);
         
@@ -1001,7 +1036,7 @@ const AdminDashboard = () => {
             if (assignedCourse) {
               return { 
                 ...c, 
-                assignedBatches: [{ batch: batchInput, deptCode: deptCodeInput }]
+                assignedBatches: [{ batch: normalizedBatch, deptCode: deptCodeInput }]
               };
             }
             return c;
@@ -1015,7 +1050,14 @@ const AdminDashboard = () => {
         }, 2000);
       } else {
         // Single course assignment
-        const response = await assignBatchToCourse(selectedCourseForBatch._id, batchInput, deptCodeInput);
+        const response = await assignBatchToCourse(
+          selectedCourseForBatch._id,
+          normalizedBatch,
+          deptCodeInput,
+          selectedCourseForBatch.yearLevel,
+          selectedCourseForBatch.semester,
+          selectedCourseForBatch.term
+        );
         console.log('Batch assignment response:', response);
         setBatchAssignmentSuccess('Batch assigned successfully');
         
@@ -1077,6 +1119,68 @@ const AdminDashboard = () => {
       setTimeout(() => setBatchAssignmentSuccess(''), 3000);
     } catch (err) {
       setBatchAssignmentError(err.response?.data?.message || 'Failed to unassign batch');
+      setTimeout(() => setBatchAssignmentError(''), 5000);
+    } finally {
+      setBatchAssignmentLoading(false);
+    }
+  };
+
+  // Handle remove all batch assignments from group
+  const handleRemoveAllBatches = async () => {
+    if (!selectedCourseForBatch._isGroupAssignment || !selectedCourseForBatch._groupCourses) {
+      return;
+    }
+
+    if (!window.confirm(`Clear batch assignment from all ${selectedCourseForBatch._groupCourses.length} courses in ${selectedCourseForBatch._groupName}?`)) {
+      return;
+    }
+
+    setBatchAssignmentLoading(true);
+    setBatchAssignmentError('');
+    setBatchAssignmentSuccess('');
+
+    try {
+      // Get all courses with their assigned batches
+      const coursesWithBatches = selectedCourseForBatch._groupCourses.filter(
+        course => course.assignedBatches && course.assignedBatches.length > 0
+      );
+
+      if (coursesWithBatches.length === 0) {
+        setBatchAssignmentError('No batch assignment to remove');
+        setTimeout(() => setBatchAssignmentError(''), 3000);
+        return;
+      }
+
+      // Unassign batch from each course
+      const promises = coursesWithBatches.flatMap(course =>
+        course.assignedBatches.map(assignment =>
+          unassignBatchFromCourse(course._id, assignment.batch, assignment.deptCode)
+        )
+      );
+
+      await Promise.all(promises);
+
+      setBatchAssignmentSuccess(`Cleared batch assignment from ${coursesWithBatches.length} course${coursesWithBatches.length !== 1 ? 's' : ''}`);
+
+      // Update courses list to clear assignments
+      setCourses(prevCourses =>
+        prevCourses.map(c => {
+          const unassignedCourse = coursesWithBatches.find(gc => gc._id === c._id);
+          if (unassignedCourse) {
+            return { ...c, assignedBatches: [] };
+          }
+          return c;
+        })
+      );
+
+      // Close modal after successful removal
+      setTimeout(() => {
+        setShowBatchAssignmentModal(false);
+        setBatchAssignmentSuccess('');
+      }, 2000);
+    } catch (err) {
+      console.error('Remove all batches error:', err);
+      setBatchAssignmentError(err.response?.data?.message || err.message || 'Failed to clear batch assignment');
       setTimeout(() => setBatchAssignmentError(''), 5000);
     } finally {
       setBatchAssignmentLoading(false);
@@ -1729,11 +1833,18 @@ const AdminDashboard = () => {
                               }}
                               onClick={() => {
                                 if (allCoursesInGroup.length > 0) {
+                                  const parts = String(courseGroupPath).split('-');
+                                  const grpYear = parseInt(parts[0], 10);
+                                  const grpTerm = parseInt(parts[1], 10);
+                                  const grpSemester = Number.isInteger(grpYear) && Number.isInteger(grpTerm) ? ((grpYear - 1) * 2 + grpTerm) : undefined;
                                   openBatchAssignmentModal({ 
                                     ...allCoursesInGroup[0], 
                                     _isGroupAssignment: true,
                                     _groupCourses: allCoursesInGroup,
-                                    _groupName: `${courseGroupPath} - All Courses`
+                                    _groupName: `${courseGroupPath} - All Courses`,
+                                    _groupYear: grpYear,
+                                    _groupTerm: grpTerm,
+                                    _groupSemester: grpSemester
                                   });
                                 }
                               }}
@@ -2616,7 +2727,11 @@ const AdminDashboard = () => {
                     </div>
                   </div>
 
-                  <div style={{display: 'flex', gap: '10px'}}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', gap: '10px'}}>
+                    <button className="btn btn-logout" onClick={handleLogout}>
+                      <FontAwesomeIcon icon={faSignOutAlt} style={{marginRight: '8px'}} />
+                      Logout
+                    </button>
                     <button 
                       className="btn btn-primary" 
                       onClick={async () => {
@@ -2804,14 +2919,6 @@ const AdminDashboard = () => {
               )}
             </div>
           )}
-          <button 
-            className="btn btn-logout" 
-            onClick={handleLogout}
-            title="Logout"
-          >
-            <span className="logout-icon"><FontAwesomeIcon icon={faSignOutAlt} /></span>
-            {sidebarOpen && <span>Logout</span>}
-          </button>
         </div>
       </aside>
 
@@ -3421,13 +3528,40 @@ const AdminDashboard = () => {
             </div>
             <div className="modal-body">
               {selectedCourseForBatch._isGroupAssignment ? (
-                <div style={{marginBottom: '20px', padding: '12px', backgroundColor: '#f3f4f6', borderRadius: '8px'}}>
-                  <h4 style={{margin: '0 0 8px 0', fontSize: '16px', color: '#1f2937'}}>
-                    {selectedCourseForBatch._groupName}
-                  </h4>
-                  <p style={{margin: 0, color: '#6b7280', fontSize: '14px'}}>
-                    {selectedCourseForBatch._groupCourses.length} course{selectedCourseForBatch._groupCourses.length !== 1 ? 's' : ''} will be assigned to the selected batch
-                  </p>
+                <div>
+                  <div style={{marginBottom: '20px', padding: '12px', backgroundColor: '#f3f4f6', borderRadius: '8px'}}>
+                    <h4 style={{margin: '0 0 8px 0', fontSize: '16px', color: '#1f2937'}}>
+                      {selectedCourseForBatch._groupName}
+                    </h4>
+                    <p style={{margin: 0, color: '#6b7280', fontSize: '14px'}}>
+                      {selectedCourseForBatch._groupCourses.length} course{selectedCourseForBatch._groupCourses.length !== 1 ? 's' : ''} will be assigned to the selected batch
+                    </p>
+                  </div>
+                  
+                  {/* Remove all assignments button for group */}
+                  {selectedCourseForBatch._groupCourses.some(c => c.assignedBatches && c.assignedBatches.length > 0) && (
+                    <div style={{marginBottom: '20px'}}>
+                      <button
+                        className="btn btn-sm"
+                        onClick={handleRemoveAllBatches}
+                        disabled={batchAssignmentLoading}
+                        style={{
+                          backgroundColor: '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          width: '100%',
+                          padding: '10px',
+                          fontSize: '14px'
+                        }}
+                      >
+                        <FontAwesomeIcon icon={faTimes} style={{marginRight: '8px'}} />
+                        Clear Batch Assignment from Group
+                      </button>
+                      <p style={{fontSize: '11px', color: '#6b7280', marginTop: '6px', fontStyle: 'italic'}}>
+                        This will remove the assigned batch from all courses in this group
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div style={{marginBottom: '20px', padding: '12px', backgroundColor: '#f3f4f6', borderRadius: '8px'}}>
@@ -3454,6 +3588,23 @@ const AdminDashboard = () => {
                 </div>
               )}
 
+              {/* Require course yearLevel and semester before assignment */}
+              {!selectedCourseForBatch._isGroupAssignment && (
+                <div style={{marginBottom: '12px'}}>
+                  {(selectedCourseForBatch.yearLevel && selectedCourseForBatch.semester) ? (
+                    <div style={{fontSize: '12px', color: '#374151'}}>
+                      Year-Semester: {selectedCourseForBatch.yearLevel}-{selectedCourseForBatch.semester}
+                    </div>
+                  ) : (
+                    <div style={{
+                      padding: '12px', backgroundColor: '#fee2e2', border: '1px solid #ef4444', borderRadius: '6px', color: '#991b1b', fontSize: '13px'
+                    }}>
+                      Course must have valid yearLevel and semester set before assigning a batch.
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Currently Assigned Batches - Only show for single course assignment */}
               {!selectedCourseForBatch._isGroupAssignment && (
                 <div style={{marginBottom: '24px'}}>
@@ -3477,7 +3628,7 @@ const AdminDashboard = () => {
                       >
                         <div style={{flex: 1}}>
                           <div style={{fontWeight: 500, fontSize: '14px', color: '#1f2937'}}>
-                            Batch: 20{assignment.batch} • {departmentMap[assignment.deptCode]} ({assignment.deptCode})
+                            Batch: {formatBatchYear(assignment.batch)} • {departmentMap[assignment.deptCode]} ({assignment.deptCode})
                           </div>
                           <div style={{fontSize: '12px', color: '#6b7280', marginTop: '2px'}}>
                             Students with roll starting with {assignment.batch}{assignment.deptCode}
@@ -3516,9 +3667,16 @@ const AdminDashboard = () => {
                   {selectedCourseForBatch.assignedBatches && selectedCourseForBatch.assignedBatches.length > 0 ? 'Change Batch' : 'Assign Batch'}
                 </h4>
                 {selectedCourseForBatch.assignedBatches && selectedCourseForBatch.assignedBatches.length > 0 && (
-                  <p style={{fontSize: '12px', color: '#dc2626', marginBottom: '12px', fontStyle: 'italic'}}>
-                    Note: Assigning a new batch will replace the current assignment
-                  </p>
+                  <>
+                    <p style={{fontSize: '12px', color: '#374151', marginBottom: '8px'}}>
+                      Currently assigned: {selectedCourseForBatch.assignedBatches
+                        .map(ab => `${formatBatchYear(ab.batch)} • ${departmentMap[ab.deptCode]} (${ab.deptCode})`)
+                        .join(', ')}
+                    </p>
+                    <p style={{fontSize: '12px', color: '#dc2626', marginBottom: '12px', fontStyle: 'italic'}}>
+                      Note: Assigning a new batch will replace the current assignment
+                    </p>
+                  </>
                 )}
                 <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '10px', alignItems: 'end'}}>
                   <div>
@@ -3579,7 +3737,15 @@ const AdminDashboard = () => {
                   <button
                     className="btn btn-primary"
                     onClick={handleAssignBatch}
-                    disabled={batchAssignmentLoading || !batchInput || !deptCodeInput}
+                    disabled={
+                      batchAssignmentLoading ||
+                      !batchInput ||
+                      !deptCodeInput ||
+                      (!selectedCourseForBatch?._isGroupAssignment && (
+                        !selectedCourseForBatch?.yearLevel ||
+                        !selectedCourseForBatch?.semester
+                      ))
+                    }
                     style={{fontSize: '14px', padding: '8px 16px'}}
                   >
                     {batchAssignmentLoading ? 'Processing...' : (selectedCourseForBatch.assignedBatches && selectedCourseForBatch.assignedBatches.length > 0 ? 'Change' : 'Assign')}

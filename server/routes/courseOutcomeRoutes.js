@@ -5,10 +5,14 @@ const {
   getCourseOutcomes,
   updateCourseOutcome,
   deleteCourseOutcome,
-  deleteAllCourseOutcomes
+  deleteAllCourseOutcomes,
+  getCourseProfileData
 } = require('../controllers/courseOutcomeController');
 const { authenticateUser } = require('../middlewares/authMiddleware');
 const { authorizeAdmin } = require('../middlewares/roleMiddleware');
+
+// Course profile route (must be before /:courseId routes)
+router.get('/profile/:courseCode', getCourseProfileData);
 
 // Course outcome routes
 router.post('/:courseId/outcomes', authenticateUser, authorizeAdmin, createCourseOutcomes);
