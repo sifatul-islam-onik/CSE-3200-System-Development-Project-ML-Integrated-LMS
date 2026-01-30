@@ -968,7 +968,7 @@ exports.assignTeacherToCourse = async (req, res) => {
     }
 
     const { courseId } = req.params;
-    const { teacherId, section } = req.body;
+    const { teacherId } = req.body;
 
     if (!teacherId) {
       return res.status(400).json({
@@ -1000,14 +1000,6 @@ exports.assignTeacherToCourse = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'User is not a teacher'
-      });
-    }
-
-    // Validate section value (if provided)
-    if (section && !['A', 'B'].includes(section)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Section must be A or B'
       });
     }
 
@@ -1052,7 +1044,7 @@ exports.assignTeacherToCourse = async (req, res) => {
     // Add teacher to assignedTeachers array
     course.assignedTeachers.push({
       teacher: teacherId,
-      section: section || null
+      section: null
     });
     await course.save();
 
@@ -1092,7 +1084,6 @@ exports.unassignTeacherFromCourse = async (req, res) => {
     }
 
     const { courseId, teacherId } = req.params;
-    const { section } = req.query;
 
     // Validate course exists
     const Course = require('../models/Course');
@@ -1127,8 +1118,7 @@ exports.unassignTeacherFromCourse = async (req, res) => {
       a => {
         const teacherId_item = a.teacher?._id || a.teacher;
         const teacherIdStr = teacherId_item.toString();
-        return !(teacherIdStr === teacherId.toString() && 
-               (section ? a.section === section : true));
+        return teacherIdStr !== teacherId.toString();
       }
     );
 

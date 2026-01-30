@@ -243,11 +243,11 @@ export const exportTeacherCredentials = async (dept) => {
 // Course assignment functions
 
 // Assign a teacher to a course
-export const assignTeacherToCourse = async (courseId, teacherId, section = null) => {
+export const assignTeacherToCourse = async (courseId, teacherId) => {
   try {
     const response = await axios.post(
       `${API_URL}/admin/courses/${courseId}/assign-teacher`,
-      { teacherId, section },
+      { teacherId },
       getAuthHeader()
     );
     return response.data;
@@ -257,11 +257,10 @@ export const assignTeacherToCourse = async (courseId, teacherId, section = null)
 };
 
 // Unassign a teacher from a course
-export const unassignTeacherFromCourse = async (courseId, teacherId, section = null) => {
+export const unassignTeacherFromCourse = async (courseId, teacherId) => {
   try {
-    const params = section ? `?section=${section}` : '';
     const response = await axios.delete(
-      `${API_URL}/admin/courses/${courseId}/unassign-teacher/${teacherId}${params}`,
+      `${API_URL}/admin/courses/${courseId}/unassign-teacher/${teacherId}`,
       getAuthHeader()
     );
     return response.data;

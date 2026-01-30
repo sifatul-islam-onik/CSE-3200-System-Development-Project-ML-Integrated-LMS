@@ -821,7 +821,7 @@ const AdminDashboard = () => {
     });
     
     try {
-      const response = await assignTeacherToCourse(selectedCourseForAssignment._id, teacherId, null);
+      const response = await assignTeacherToCourse(selectedCourseForAssignment._id, teacherId);
       console.log('Teacher assignment response:', response);
       setAssignmentSuccess('Teacher assigned successfully');
       
@@ -853,7 +853,7 @@ const AdminDashboard = () => {
     setAssignmentSuccess('');
     
     try {
-      const response = await unassignTeacherFromCourse(selectedCourseForAssignment._id, teacherId, null);
+      const response = await unassignTeacherFromCourse(selectedCourseForAssignment._id, teacherId);
       setAssignmentSuccess('Teacher unassigned successfully');
       
       // Update the selected course with the new assignment data
@@ -3034,7 +3034,6 @@ const AdminDashboard = () => {
                 </p>
                 <p style={{margin: '4px 0 0 0', color: '#6b7280', fontSize: '12px'}}>
                   Type: <strong>{selectedCourseForAssignment.course_type}</strong>
-                  {selectedCourseForAssignment.course_type === 'THEORY' && ' • Requires Section Selection'}
                 </p>
               </div>
 

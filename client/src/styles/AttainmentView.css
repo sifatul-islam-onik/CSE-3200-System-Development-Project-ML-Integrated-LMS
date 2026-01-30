@@ -439,3 +439,72 @@ section {
     margin: 0 -10px;
   }
 }
+
+/* Section A Table Styles */
+.section-a-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1200px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.section-a-table th,
+.section-a-table td {
+  padding: 10px 8px;
+  text-align: center;
+  border: 1px solid #ddd;
+  position: relative;
+}
+
+.section-a-table th {
+  background-color: #2980b9;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.section-a-table .co-label {
+  background-color: #ecf0f1;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.section-a-table .co-total {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.section-a-table .footer-label {
+  background-color: #ecf0f1;
+  font-weight: 600;
+  color: #2c3e50;
+  text-align: center;
+}
+
+.section-a-table input[type="number"] {
+  width: 70px;
+  padding: 6px 8px;
+  border: 1px solid #bdc3c7;
+  border-radius: 4px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.section-a-table input[type="number"]:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+  outline: none;
+}
+
+/* Question group dividers */
+.section-a-table th[style*="borderLeft"],
+.section-a-table td[style*="borderLeft"] {
+  border-left: 2px solid #d5d5d5 !important;
+}
+
+.section-a-table tfoot tr:last-child {
+  border-top: 2px solid #d5d5d5;
+}
