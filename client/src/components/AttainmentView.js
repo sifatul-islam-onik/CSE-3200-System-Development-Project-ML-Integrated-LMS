@@ -1041,7 +1041,15 @@ const AttainmentView = () => {
                       <th colSpan="3">Assignment 3</th>
                     </tr>
                     <tr>
-                      <th>({selectedCourse?.attendanceMarks ?? 0})</th>
+                      <th>
+                        <input
+                          type="number"
+                          min={0}
+                          value={attendanceMarks}
+                          onChange={e => setAttendanceMarks(Number(e.target.value))}
+                          style={{width:'80px'}}
+                        />
+                      </th>
                       <th>Q1</th><th>Q2</th><th>Q3</th>
                       <th>Q1</th><th>Q2</th><th>Q3</th>
                       <th>Q1</th><th>Q2</th><th>Q3</th>
@@ -1051,15 +1059,7 @@ const AttainmentView = () => {
                     {assignmentRows.map((row, idx) => (
                       <tr key={row.coNumber || idx}>
                         <td className="co-label">{row.coNumber || '-'}</td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.attendance}
-                            onChange={(e) => handleAssignmentCellChange(idx, 'attendance', e.target.value)}
-                            style={{width:'80px'}}
-                          />
-                        </td>
+                        <td>-</td>
                         {['Assgn1_Q1','Assgn1_Q2','Assgn1_Q3','Assgn2_Q1','Assgn2_Q2','Assgn2_Q3','Assgn3_Q1','Assgn3_Q2','Assgn3_Q3'].map(field => (
                           <td key={field}>
                             <input
@@ -1220,7 +1220,19 @@ const AttainmentView = () => {
                       {attnAssignObtainedRows.length > 0 ? attnAssignObtainedRows.map((row, idx) => (
                         <tr key={row.rollNumber || idx}>
                           <td>{row.rollNumber || '-'}</td>
-                          <td><input type="number" min={0} style={{width:'80px'}} /></td>
+                          <td>
+                            <input
+                              type="number"
+                              min={0}
+                              value={row.attendance || 0}
+                              onChange={e => {
+                                const updatedRows = [...attnAssignObtainedRows];
+                                updatedRows[idx] = { ...row, attendance: Number(e.target.value) };
+                                setAttnAssignObtainedRows(updatedRows);
+                              }}
+                              style={{width:'80px'}}
+                            />
+                          </td>
                           {['Assgn1_Q1','Assgn1_Q2','Assgn1_Q3','Assgn2_Q1','Assgn2_Q2','Assgn2_Q3','Assgn3_Q1','Assgn3_Q2','Assgn3_Q3'].map(field => (
                             <td key={field}><input type="number" min={0} style={{width:'80px'}} /></td>
                           ))}
