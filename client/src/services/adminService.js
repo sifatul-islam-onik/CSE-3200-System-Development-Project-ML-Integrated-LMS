@@ -243,11 +243,11 @@ export const exportTeacherCredentials = async (dept) => {
 // Course assignment functions
 
 // Assign a teacher to a course
-export const assignTeacherToCourse = async (courseId, teacherId, section = null) => {
+export const assignTeacherToCourse = async (courseId, teacherId) => {
   try {
     const response = await axios.post(
       `${API_URL}/admin/courses/${courseId}/assign-teacher`,
-      { teacherId, section },
+      { teacherId },
       getAuthHeader()
     );
     return response.data;
@@ -257,11 +257,10 @@ export const assignTeacherToCourse = async (courseId, teacherId, section = null)
 };
 
 // Unassign a teacher from a course
-export const unassignTeacherFromCourse = async (courseId, teacherId, section = null) => {
+export const unassignTeacherFromCourse = async (courseId, teacherId) => {
   try {
-    const params = section ? `?section=${section}` : '';
     const response = await axios.delete(
-      `${API_URL}/admin/courses/${courseId}/unassign-teacher/${teacherId}${params}`,
+      `${API_URL}/admin/courses/${courseId}/unassign-teacher/${teacherId}`,
       getAuthHeader()
     );
     return response.data;
@@ -286,11 +285,12 @@ export const getAssignedTeachers = async (courseId) => {
 // Batch assignment functions
 
 // Assign a batch to a course
-export const assignBatchToCourse = async (courseId, batch, deptCode) => {
+export const assignBatchToCourse = async (courseId, batch, deptCode, yearLevel, semester, term) => {
   try {
     const response = await axios.post(
       `${API_URL}/admin/courses/${courseId}/assign-batch`,
-      { batch, deptCode },
+      // Include optional yearLevel/semester/term to allow backend auto-fill
+      { batch, deptCode, yearLevel, semester, term },
       getAuthHeader()
     );
     return response.data;
@@ -317,6 +317,19 @@ export const getAssignedBatches = async (courseId) => {
   try {
     const response = await axios.get(
       `${API_URL}/admin/courses/${courseId}/assigned-batches`,
+      getAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
+};
+
+// Get students for a course's assigned batch
+export const getStudentsForCourse = async (courseId) => {
+  try {
+    const response = await axios.get(
+      `${API_URL}/admin/courses/${courseId}/students`,
       getAuthHeader()
     );
     return response.data;

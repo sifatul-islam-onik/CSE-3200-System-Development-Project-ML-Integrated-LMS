@@ -12,7 +12,7 @@ import '../styles/Profile.css';
 const StudentDashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  const [activeSection, setActiveSection] = useState('overview');
+  const [activeSection, setActiveSection] = useState('courses');
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 1024);
   const [courses, setCourses] = useState([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
@@ -130,41 +130,6 @@ const StudentDashboard = () => {
 
   const renderSection = () => {
     switch (activeSection) {
-      case 'overview':
-        return (
-          <div className="section-container">
-            <div className="section-header">
-              <div className="header-content">
-                <h2>Welcome, {user?.name}!</h2>
-                <p>Your student dashboard overview</p>
-              </div>
-            </div>
-            <div className="section-body">
-              <div className="dashboard-grid">
-                <div className="dashboard-card">
-                  <h3>My Courses</h3>
-                  <p>View enrolled courses and materials</p>
-                  <button className="card-btn" onClick={() => handleSectionChange('courses')}>View Courses</button>
-                </div>
-                <div className="dashboard-card">
-                  <h3>Assignments</h3>
-                  <p>View and submit assignments</p>
-                  <button className="card-btn" onClick={() => handleSectionChange('assignments')}>View Assignments</button>
-                </div>
-                <div className="dashboard-card">
-                  <h3>Grades</h3>
-                  <p>Check your grades and performance</p>
-                  <button className="card-btn" onClick={() => handleSectionChange('grades')}>View Grades</button>
-                </div>
-                <div className="dashboard-card">
-                  <h3>Schedule</h3>
-                  <p>View your class schedule and calendar</p>
-                  <button className="card-btn" onClick={() => handleSectionChange('schedule')}>View Schedule</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
       case 'courses':
         // Organize courses by type only
         const organizedCourses = {
@@ -628,7 +593,11 @@ const StudentDashboard = () => {
                     </div>
                   </div>
 
-                  <div style={{display: 'flex', justifyContent: 'flex-end', gap: '10px'}}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', gap: '10px'}}>
+                    <button className="btn btn-logout" onClick={handleLogout}>
+                      <FontAwesomeIcon icon={faSignOutAlt} style={{marginRight: '8px'}} />
+                      Logout
+                    </button>
                     <button className="btn btn-primary" onClick={updateProfile}>Save Changes</button>
                   </div>
                 </div>
@@ -686,14 +655,6 @@ const StudentDashboard = () => {
 
         <nav className="sidebar-nav">
           <button
-            className={`nav-item ${activeSection === 'overview' ? 'active' : ''}`}
-            onClick={() => handleSectionChange('overview')}
-          >
-            <span className="nav-icon"><FontAwesomeIcon icon={faBook} /></span>
-            {sidebarOpen && <span className="nav-label">Overview</span>}
-          </button>
-
-          <button
             className={`nav-item ${activeSection === 'courses' ? 'active' : ''}`}
             onClick={() => handleSectionChange('courses')}
           >
@@ -749,14 +710,6 @@ const StudentDashboard = () => {
               )}
             </div>
           )}
-          <button 
-            className="btn btn-logout" 
-            onClick={handleLogout}
-            title="Logout"
-          >
-            <span className="logout-icon"><FontAwesomeIcon icon={faSignOutAlt} /></span>
-            {sidebarOpen && <span>Logout</span>}
-          </button>
         </div>
       </aside>
 

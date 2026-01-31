@@ -298,14 +298,13 @@ exports.importStudentsFromExcel = async (req, res) => {
         }
       }
 
-      // Generate random password
+      // Generate random password (stored only as hash; no plaintext stored)
       const randomPassword = generateRandomPassword();
 
       const user = new User({
         name,
         email,
         password: randomPassword,
-        initialPassword: randomPassword,
         role: 'student',
         roll,
         advisor,
@@ -334,7 +333,7 @@ exports.importStudentsFromExcel = async (req, res) => {
   }
 };
 
-// @desc    Get distinct student batches (derived from roll: 20 + first two digits)
+// @desc    Get distinct student batches (derived from roll: dynamic century + first two digits)
 // @route   GET /api/admin/students/batches
 // @access  Admin only
 exports.getStudentBatches = async (req, res) => {
@@ -348,8 +347,10 @@ exports.getStudentBatches = async (req, res) => {
       const digits = roll.replace(/\D/g, '');
       if (digits.length < 2) continue;
       const firstTwo = digits.slice(0, 2);
-      const yearStr = `20${firstTwo}`;
-      const year = parseInt(yearStr, 10);
+      const twoVal = parseInt(firstTwo, 10);
+      const pivot = new Date().getFullYear() % 100; // e.g., 26 in 2026
+      const century = twoVal <= pivot ? 20 : 19;
+      const year = parseInt(`${century}${firstTwo}`, 10);
       if (!Number.isNaN(year)) {
         batchSet.add(year);
       }
@@ -360,6 +361,52 @@ exports.getStudentBatches = async (req, res) => {
   } catch (error) {
     console.error('Get student batches error:', error);
     return res.status(500).json({ success: false, message: 'Server error fetching student batches' });
+  }
+};
+
+// @desc    Get students for a course's assigned batch
+// @route   GET /api/admin/courses/:courseId/students
+// @access  Admin/Teacher
+exports.getStudentsForCourse = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const Course = require('../models/Course');
+    
+    const course = await Course.findById(courseId).select('assignedBatches courseCode');
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    if (!course.assignedBatches || course.assignedBatches.length === 0) {
+      return res.status(200).json({ 
+        success: true, 
+        data: [],
+        message: 'No batch assigned to this course'
+      });
+    }
+
+    // Get the assigned batch (should be only one due to constraints)
+    const assignment = course.assignedBatches[0];
+    const { batch, deptCode } = assignment;
+
+    // Find all students whose roll starts with batch+deptCode
+    const prefix = `${batch}${deptCode}`;
+    const students = await User.find({ 
+      role: 'student',
+      roll: { $regex: `^${prefix}`, $options: 'i' }
+    })
+    .select('roll name email')
+    .sort({ roll: 1 })
+    .lean();
+
+    res.status(200).json({ 
+      success: true, 
+      data: students,
+      batch: assignment
+    });
+  } catch (error) {
+    console.error('Get students for course error:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching students' });
   }
 };
 
@@ -503,6 +550,7 @@ exports.deleteUser = async (req, res) => {
 };
 
 // @desc    Export student credentials by batch and department
+//          Regenerates passwords for selected students and exports them
 // @route   POST /api/admin/users/export-credentials
 // @access  Admin only
 exports.exportStudentCredentials = async (req, res) => {
@@ -542,7 +590,7 @@ exports.exportStudentCredentials = async (req, res) => {
     const students = await User.find({
       role: 'student',
       roll: { $regex: `^${rollPrefix}`, $options: 'i' }
-    }).select('name email roll +initialPassword').sort({ roll: 1 });
+    }).select('name email roll').sort({ roll: 1 });
 
     if (students.length === 0) {
       return res.status(404).json({ 
@@ -551,13 +599,24 @@ exports.exportStudentCredentials = async (req, res) => {
       });
     }
 
-    // Prepare export data using current passwords (initialPassword is updated when users change passwords)
-    const exportData = students.map((student) => ({
-      Roll: student.roll,
-      Name: student.name,
-      Email: student.email,
-      Password: student.initialPassword || 'N/A'
-    }));
+    // For privacy, do not store plaintext in DB. Regenerate current passwords now and set them.
+    const exportData = [];
+    for (const student of students) {
+      const newPassword = generateRandomPassword();
+      // Set new password; pre-save hook will hash it
+      const dbUser = await User.findById(student._id).select('+password');
+      if (dbUser) {
+        dbUser.password = newPassword;
+        // Do NOT set or persist any plaintext field like initialPassword
+        await dbUser.save();
+      }
+      exportData.push({
+        Roll: student.roll,
+        Name: student.name,
+        Email: student.email,
+        Password: newPassword
+      });
+    }
 
     // Create Excel workbook
     const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -909,7 +968,7 @@ exports.assignTeacherToCourse = async (req, res) => {
     }
 
     const { courseId } = req.params;
-    const { teacherId, section } = req.body;
+    const { teacherId } = req.body;
 
     if (!teacherId) {
       return res.status(400).json({
@@ -941,14 +1000,6 @@ exports.assignTeacherToCourse = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'User is not a teacher'
-      });
-    }
-
-    // Validate section value (if provided)
-    if (section && !['A', 'B'].includes(section)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Section must be A or B'
       });
     }
 
@@ -993,7 +1044,7 @@ exports.assignTeacherToCourse = async (req, res) => {
     // Add teacher to assignedTeachers array
     course.assignedTeachers.push({
       teacher: teacherId,
-      section: section || null
+      section: null
     });
     await course.save();
 
@@ -1033,7 +1084,6 @@ exports.unassignTeacherFromCourse = async (req, res) => {
     }
 
     const { courseId, teacherId } = req.params;
-    const { section } = req.query;
 
     // Validate course exists
     const Course = require('../models/Course');
@@ -1068,8 +1118,7 @@ exports.unassignTeacherFromCourse = async (req, res) => {
       a => {
         const teacherId_item = a.teacher?._id || a.teacher;
         const teacherIdStr = teacherId_item.toString();
-        return !(teacherIdStr === teacherId.toString() && 
-               (section ? a.section === section : true));
+        return teacherIdStr !== teacherId.toString();
       }
     );
 
@@ -1131,6 +1180,11 @@ exports.getAssignedTeachers = async (req, res) => {
       });
     }
 
+    // Sanitize: ensure only one batch assignment is reported
+    const sanitizedBatches = Array.isArray(course.assignedBatches) && course.assignedBatches.length > 1
+      ? [course.assignedBatches[course.assignedBatches.length - 1]]
+      : (course.assignedBatches || []);
+
     res.status(200).json({
       success: true,
       data: {
@@ -1138,7 +1192,8 @@ exports.getAssignedTeachers = async (req, res) => {
         courseCode: course.courseCode,
         courseTitle: course.courseTitle,
         courseType: course.course_type,
-        assignedTeachers: course.assignedTeachers || []
+        assignedTeachers: course.assignedTeachers || [],
+        assignedBatches: sanitizedBatches
       }
     });
 
@@ -1226,6 +1281,7 @@ exports.updateUserProfile = async (req, res) => {
 // @access  Admin only
 exports.assignBatchToCourse = async (req, res) => {
   try {
+    console.log('[assignBatchToCourse] payload:', req.params, req.body);
     // Verify admin role
     if (req.user.role !== 'admin') {
       return res.status(403).json({
@@ -1273,6 +1329,75 @@ exports.assignBatchToCourse = async (req, res) => {
       });
     }
 
+    // Auto-assign year/semester/term from request (for group assignments like 1-1, 1-2, etc.)
+    const { yearLevel: reqYearLevel, semester: reqSemester, term: reqTerm } = req.body;
+    const reqYearLevelNum = (reqYearLevel !== undefined && reqYearLevel !== null) ? parseInt(reqYearLevel, 10) : undefined;
+    const reqSemesterNum = (reqSemester !== undefined && reqSemester !== null) ? parseInt(reqSemester, 10) : undefined;
+    const reqTermNum = (reqTerm !== undefined && reqTerm !== null) ? parseInt(reqTerm, 10) : undefined;
+
+    console.log('[assignBatchToCourse] course before:', { 
+      courseCode: course.courseCode,
+      yearLevel: course.yearLevel, 
+      semester: course.semester, 
+      term: course.term 
+    });
+    console.log('[assignBatchToCourse] request values:', { reqYearLevelNum, reqSemesterNum, reqTermNum });
+
+    let y = course.yearLevel;
+    let s = course.semester;
+    let t = course.term;
+    let needsSave = false;
+
+    // ALWAYS use request values when provided (for automatic group assignments)
+    if (Number.isInteger(reqYearLevelNum) && (Number.isInteger(reqSemesterNum) || Number.isInteger(reqTermNum))) {
+      y = reqYearLevelNum;
+      s = Number.isInteger(reqSemesterNum) ? reqSemesterNum : ((reqYearLevelNum - 1) * 2) + reqTermNum;
+      t = Number.isInteger(reqTermNum) ? reqTermNum : (s % 2 === 0 ? 2 : 1);
+      
+      course.yearLevel = y;
+      course.semester = s;
+      course.term = t;
+      needsSave = true;
+      
+      console.log('[assignBatchToCourse] SET from request:', { yearLevel: y, semester: s, term: t });
+    }
+    // Fallback 1: course has term and year but not semester
+    else if (Number.isInteger(y) && Number.isInteger(t) && !Number.isInteger(s)) {
+      s = ((y - 1) * 2) + t;
+      course.semester = s;
+      needsSave = true;
+      console.log('[assignBatchToCourse] DERIVED semester from course year/term:', { yearLevel: y, semester: s, term: t });
+    }
+    // Fallback 2: course has semester but not year/term
+    else if (!Number.isInteger(y) && Number.isInteger(s)) {
+      y = Math.ceil(s / 2);
+      t = s % 2 === 0 ? 2 : 1;
+      course.yearLevel = y;
+      course.term = t;
+      needsSave = true;
+      console.log('[assignBatchToCourse] DERIVED year/term from semester:', { yearLevel: y, semester: s, term: t });
+    }
+
+    if (needsSave) {
+      await course.save();
+    }
+
+    // Final check
+    if (!Number.isInteger(y) || !Number.isInteger(s)) {
+      console.error('[assignBatchToCourse] MISSING year/semester:', {
+        courseCode: course.courseCode,
+        yearLevel: y,
+        semester: s,
+        requestHad: { reqYearLevelNum, reqSemesterNum, reqTermNum }
+      });
+      return res.status(400).json({
+        success: false,
+        message: `Cannot assign batch: course ${course.courseCode} is missing year/semester. Request must include yearLevel and (semester or term).`
+      });
+    }
+
+    console.log('[assignBatchToCourse] FINAL values:', { yearLevel: y, semester: s, term: t });
+
     // Check if this batch+dept combination is already assigned
     const alreadyAssigned = course.assignedBatches.some(
       ab => ab.batch === batch && ab.deptCode === deptCode
@@ -1285,8 +1410,48 @@ exports.assignBatchToCourse = async (req, res) => {
       });
     }
 
-    // Add the batch assignment
-    course.assignedBatches.push({ batch, deptCode });
+    // Enforce constraints:
+    // 1) A batch (batch+dept) can be assigned only one semester (year-sem) across the system
+    // 2) A semester (year-sem) can be taught to only one batch at a time for a department
+
+    // y and s are ensured above
+
+    // 1) Find any existing assignments for this batch+dept across all courses
+    const existingForBatch = await Course.find({
+      'assignedBatches.batch': batch,
+      'assignedBatches.deptCode': deptCode
+    }).select('yearLevel semester courseCode');
+    console.log('[assignBatchToCourse] existingForBatch:', existingForBatch.map(c => ({ courseCode: c.courseCode, yearLevel: c.yearLevel, semester: c.semester })));
+
+    const conflictingSemester = existingForBatch.find(c =>
+      Number.isInteger(c.yearLevel) && Number.isInteger(c.semester) && (c.yearLevel !== y || c.semester !== s)
+    );
+
+    if (conflictingSemester) {
+      return res.status(400).json({
+        success: false,
+        message: `Batch ${batch}-${deptCode} is already assigned to semester ${conflictingSemester.yearLevel}-${conflictingSemester.semester}. A batch can only belong to one semester.`
+      });
+    }
+
+    // 2) Ensure no other batch (same department) is assigned to this semester (year-sem)
+    const coursesInSem = await Course.find({ yearLevel: y, semester: s, 'assignedBatches.deptCode': deptCode })
+      .select('assignedBatches courseCode');
+    console.log('[assignBatchToCourse] coursesInSem:', coursesInSem.map(c => ({ courseCode: c.courseCode, batches: c.assignedBatches })));
+
+    const otherBatchInSem = coursesInSem.some(c =>
+      (c.assignedBatches || []).some(ab => ab.deptCode === deptCode && ab.batch !== batch)
+    );
+
+    if (otherBatchInSem) {
+      return res.status(400).json({
+        success: false,
+        message: `Semester ${y}-${s} for department ${deptCode} is already assigned to a different batch. A semester can be taught to only one batch at a time.`
+      });
+    }
+
+    // Replace any existing assignment: a course can be assigned to only one batch
+    course.assignedBatches = [{ batch, deptCode }];
     await course.save();
 
     // Populate and return updated course
@@ -1405,13 +1570,18 @@ exports.getAssignedBatches = async (req, res) => {
       });
     }
 
+    // Sanitize: ensure only one batch assignment is reported
+    const sanitizedBatches = Array.isArray(course.assignedBatches) && course.assignedBatches.length > 1
+      ? [course.assignedBatches[course.assignedBatches.length - 1]]
+      : (course.assignedBatches || []);
+
     res.status(200).json({
       success: true,
       data: {
         courseId: course._id,
         courseCode: course.courseCode,
         courseTitle: course.courseTitle,
-        assignedBatches: course.assignedBatches || []
+        assignedBatches: sanitizedBatches
       }
     });
 
@@ -1420,6 +1590,54 @@ exports.getAssignedBatches = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error getting assigned batches'
+    });
+  }
+};
+
+// @desc    Normalize batch assignments across all courses (keep latest only)
+// @route   POST /api/admin/courses/normalize-batches
+// @access  Admin only
+exports.normalizeBatchAssignments = async (req, res) => {
+  try {
+    // Verify admin role
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    const Course = require('../models/Course');
+    const courses = await Course.find({ 'assignedBatches.1': { $exists: true } }) // length > 1
+      .select('assignedBatches courseCode');
+
+    if (courses.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'No courses require normalization',
+        data: { normalizedCount: 0, affectedCourseIds: [] }
+      });
+    }
+
+    const affectedCourseIds = [];
+    for (const c of courses) {
+      const latest = c.assignedBatches[c.assignedBatches.length - 1];
+      c.assignedBatches = latest ? [latest] : [];
+      await c.save();
+      affectedCourseIds.push(c._id);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Batch assignments normalized (kept latest only) for affected courses',
+      data: { normalizedCount: affectedCourseIds.length, affectedCourseIds }
+    });
+
+  } catch (error) {
+    console.error('Normalize batch assignments error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error normalizing batch assignments'
     });
   }
 };

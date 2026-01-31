@@ -9,6 +9,8 @@ import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import StudentDashboard from './pages/StudentDashboard';
+import AttainmentView from './components/AttainmentView';
+import CourseProfileView from './components/CourseProfileView';
 import { PublicRoute, RoleBasedRoute, ProtectedRoute } from './components/ProtectedRoute';
 import { setupTokenInterceptor } from './utils/tokenUtils';
 
@@ -61,6 +63,26 @@ function App() {
             element={
               <RoleBasedRoute allowedRoles={['student']}>
                 <StudentDashboard />
+              </RoleBasedRoute>
+            } 
+          />
+          
+          {/* Attainment route - accessible to teachers, admins, and students */}
+          <Route 
+            path="/attainment" 
+            element={
+              <RoleBasedRoute allowedRoles={['teacher', 'admin', 'student']}>
+                <AttainmentView />
+              </RoleBasedRoute>
+            } 
+          />
+          
+          {/* Course Profile route - accessible to teachers and admins */}
+          <Route 
+            path="/course-profile" 
+            element={
+              <RoleBasedRoute allowedRoles={['teacher', 'admin']}>
+                <CourseProfileView />
               </RoleBasedRoute>
             } 
           />

@@ -54,7 +54,9 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
       courseOutcomes: initialData.courseOutcomes || [],
       learningObjectives: initialData.learningObjectives || [],
       knowledge_required: initialData.knowledge_required || [],
-      course_objectives: initialData.course_objectives || []
+      course_objectives: initialData.course_objectives || [],
+      attendanceMarks: initialData.attendanceMarks || 10,
+      assignmentMarks: initialData.assignmentMarks || 15
     } : {
       courseCode: '',
       courseTitle: '',
@@ -74,7 +76,9 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
       courseOutcomes: [],
       learningObjectives: [],
       knowledge_required: [],
-      course_objectives: []
+      course_objectives: [],
+      attendanceMarks: 10,
+      assignmentMarks: 15
     };
 
     const derived = deriveCourseMeta(baseState.courseCode);
@@ -881,6 +885,40 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
                 {errors.contactHours && <span className="error-text">{errors.contactHours}</span>}
               </div>
               {/* Academic Year field removed */}
+            </div>
+
+            {/* Assignment and Attendance Marks */}
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="attendanceMarks">Attendance Marks</label>
+                <input
+                  type="number"
+                  id="attendanceMarks"
+                  name="attendanceMarks"
+                  value={formData.attendanceMarks}
+                  onChange={handleChange}
+                  min="0"
+                  max="100"
+                  disabled={loading}
+                  placeholder="e.g., 10"
+                />
+                {errors.attendanceMarks && <span className="error-text">{errors.attendanceMarks}</span>}
+              </div>
+              <div className="form-group">
+                <label htmlFor="assignmentMarks">Assignment Marks</label>
+                <input
+                  type="number"
+                  id="assignmentMarks"
+                  name="assignmentMarks"
+                  value={formData.assignmentMarks}
+                  onChange={handleChange}
+                  min="0"
+                  max="100"
+                  disabled={loading}
+                  placeholder="e.g., 15"
+                />
+                {errors.assignmentMarks && <span className="error-text">{errors.assignmentMarks}</span>}
+              </div>
             </div>
           </div>
 
