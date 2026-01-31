@@ -31,9 +31,6 @@ export const getCourse = async (courseId) => {
   return response.data;
 };
 
-// Alias for getCourse (for compatibility)
-export const getCourseById = getCourse;
-
 // Update course
 export const updateCourse = async (courseId, courseData) => {
   const response = await axios.put(`${API_URL}/courses/${courseId}`, courseData, getAuthHeader());

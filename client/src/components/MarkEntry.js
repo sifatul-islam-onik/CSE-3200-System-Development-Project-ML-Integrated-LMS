@@ -20,21 +20,12 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   const [showCamera, setShowCamera] = useState(false);
   const [stream, setStream] = useState(null);
   const [isLoadingMarks, setIsLoadingMarks] = useState(false);
-  const [maxTermExamMarks, setMaxTermExamMarks] = useState(105); // Maximum possible marks for term exam
   
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
   const currentStudent = students[currentStudentIndex];
-
-  // Debug check on mount
-  useEffect(() => {
-    if (course.course_type === 'THEORY' && !section) {
-       console.warn('MarkEntry mounted with NULL section for THEORY course!');
-       // Optional: alert('Warning: No section detected. Marks might not save correctly.');
-    }
-  }, [course, section]);
 
   // Load saved data when student changes
   useEffect(() => {
@@ -51,16 +42,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       // Fetch from database
       setIsLoadingMarks(true);
       try {
-        console.log('=== FRONTEND: Loading marks ===');
-        console.log('studentId:', studentId);
-        console.log('courseId:', course._id);
-        console.log('section:', section);
-        console.log('section type:', typeof section);
-        
         const response = await getTermExamMarks(studentId, course._id, section);
-        
-        console.log('Response:', response);
-        
         if (response.success && response.data) {
           setMarks(response.data.marks);
           // Only set image if it's a valid URL (not a blob URL from previous bad saves)
@@ -78,7 +60,6 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       } catch (error) {
         // No marks found in database - reset to empty
         console.log('No existing marks found for student:', currentStudent.name);
-        console.error('Error:', error.response?.data || error.message);
         setMarks({
           question1: { a: '', b: '', c: '', d: '' },
           question2: { a: '', b: '', c: '', d: '' },
@@ -295,31 +276,20 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   const handleNext = async () => {
     // Save current student's data to database
     const studentId = currentStudent._id;
-    const marksObtained = calculateTotal();
+    const totalMarks = calculateTotal();
     
     try {
-      console.log('=== FRONTEND: Saving marks ===');
-      console.log('studentId:', studentId);
-      console.log('courseId:', course._id);
-      console.log('section:', section);
-      console.log('section type:', typeof section);
-      console.log('marks:', marks);
-      console.log('marksObtained:', marksObtained);
-      console.log('totalMarks (max):', maxTermExamMarks);
-      
       await saveTermExamMarks({
         studentId: studentId,
         courseId: course._id,
         section: section,
-        academicYear: new Date().getFullYear().toString(), // Current academic year
         marks: marks,
-        marksObtained: parseFloat(marksObtained),
-        totalMarks: maxTermExamMarks, // Maximum possible marks
+        totalMarks: parseFloat(totalMarks),
         // Don't save blob URLs to database as they expire
         imageUrl: capturedImage && !capturedImage.startsWith('blob:') && capturedImage !== 'skipped' ? capturedImage : null
       });
       
-      console.log('✓ Marks saved for', currentStudent.name, '- Obtained:', marksObtained, '/', maxTermExamMarks);
+      console.log('✓ Marks saved for', currentStudent.name, '- Total:', totalMarks);
       
       // Update in-memory cache
       setStudentData(prev => ({
@@ -332,9 +302,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       
     } catch (error) {
       console.error('Error saving marks:', error);
-      alert(`Error saving marks: ${error.response?.data?.message || error.message}. \n\nCheck console for details.`);
-      // We do NOT move into next student if save failed, so user knows!
-      return; 
+      // Continue anyway - marks saved in memory
     }
     
     if (currentStudentIndex < students.length - 1) {
@@ -401,7 +369,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       <div className="modal-content mark-entry-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <h3>{course.courseCode} - Term Exam Marks Entry {section && <span className="badge bg-primary">Section {section}</span>}</h3>
+            <h3>{course.courseCode} - Term Exam Marks Entry</h3>
             <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#6b7280' }}>
               {section ? `Section ${section}` : ''} • Student {currentStudentIndex + 1} of {students.length}
             </p>
@@ -509,18 +477,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           {/* Marks Entry Form */}
           {(capturedImage || showCamera === false) && (
             <div className="marks-form-section">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h4 style={{ margin: 0 }}>Enter Marks</h4>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <label style={{ fontSize: '14px', fontWeight: '500' }}>Max Marks:</label>
-                  <input
-                    type="number"
-                    value={maxTermExamMarks}
-                    onChange={(e) => setMaxTermExamMarks(parseFloat(e.target.value) || 0)}
-                    style={{ width: '80px', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
-                  />
-                </div>
-              </div>
+              <h4>Enter Marks</h4>
               <div className="marks-grid">
                 {[1, 2, 3, 4].map(qNum => (
                   <div key={qNum} className="question-marks">
@@ -545,8 +502,8 @@ const MarkEntry = ({ course, students, section, onClose }) => {
               
               {/* Total Marks */}
               <div className="total-marks">
-                <strong>Marks Obtained:</strong>
-                <span className="total-value">{calculateTotal()} / {maxTermExamMarks}</span>
+                <strong>Total Marks:</strong>
+                <span className="total-value">{calculateTotal()}</span>
               </div>
             </div>
           )}

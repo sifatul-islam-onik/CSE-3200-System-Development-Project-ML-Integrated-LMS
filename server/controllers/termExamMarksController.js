@@ -7,17 +7,7 @@ const User = require('../models/User');
 // @access  Teacher
 exports.saveTermExamMarks = async (req, res) => {
   try {
-    const { studentId, courseId, section, marks, totalMarks, marksObtained, imageUrl, academicYear } = req.body;
-
-    console.log('=== SAVE TERM EXAM MARKS ===');
-    console.log('studentId:', studentId);
-    console.log('courseId:', courseId);
-    console.log('section:', section);
-    console.log('academicYear:', academicYear);
-    console.log('marksObtained:', marksObtained);
-    console.log('totalMarks (max):', totalMarks);
-    console.log('section type:', typeof section);
-    console.log('section || null:', section || null);
+    const { studentId, courseId, section, marks, totalMarks, imageUrl } = req.body;
 
     // Validate required fields
     if (!studentId || !courseId || !marks) {
@@ -61,28 +51,23 @@ exports.saveTermExamMarks = async (req, res) => {
       });
     }
 
-    // For teachers, verify assignment and restrict to their section
+    // For teachers, verify they are assigned to this course
     if (req.user.role === 'teacher') {
-      const assignment = course.assignedTeachers.find(a => {
-        const teacherId = a.teacher?._id || a.teacher;
-        return teacherId.toString() === req.user._id.toString();
+      const isAssigned = course.assignedTeachers.some(assignment => {
+        const teacherId = assignment.teacher?._id || assignment.teacher;
+        const matches = teacherId.toString() === req.user._id.toString();
+        // If section is provided, also check section match
+        if (section && matches) {
+          return assignment.section === section;
+        }
+        return matches;
       });
 
-      if (!assignment) {
+      if (!isAssigned) {
         return res.status(403).json({
           success: false,
           message: 'Access denied. You are not assigned to this course.'
         });
-      }
-
-      // If assigned to a specific section, force that section check
-      if (assignment.section) {
-        if (section && section !== assignment.section) {
-          return res.status(403).json({
-            success: false,
-            message: `Access denied. You are only assigned to Section ${assignment.section}.`
-          });
-        }
       }
     }
 
@@ -91,15 +76,12 @@ exports.saveTermExamMarks = async (req, res) => {
       { 
         student: studentId, 
         course: courseId,
-        section: section || null,
-        academicYear: academicYear || null
+        section: section || null
       },
       {
         marks,
         totalMarks: totalMarks || 0,
-        marksObtained: marksObtained !== undefined ? marksObtained : (totalMarks || 0), // Use marksObtained if provided, else fallback to totalMarks
         imageUrl: imageUrl || null,
-        academicYear: academicYear || null,
         enteredBy: req.user._id,
         lastModified: Date.now()
       },
@@ -109,13 +91,6 @@ exports.saveTermExamMarks = async (req, res) => {
         runValidators: true
       }
     );
-
-    console.log('Saved with query:', { student: studentId, course: courseId, section: section || null });
-    console.log('Saved result:', {
-      _id: termExamMarks._id,
-      section: termExamMarks.section,
-      hasMarks: !!termExamMarks.marks
-    });
 
     res.status(200).json({
       success: true,
@@ -149,13 +124,6 @@ exports.getTermExamMarks = async (req, res) => {
     const { studentId, courseId } = req.params;
     const { section } = req.query;
 
-    console.log('=== GET TERM EXAM MARKS ===');
-    console.log('studentId:', studentId);
-    console.log('courseId:', courseId);
-    console.log('section (query):', section);
-    console.log('section type:', typeof section);
-    console.log('section || null:', section || null);
-
     // Students can only view their own marks
     if (req.user.role === 'student' && req.user._id.toString() !== studentId) {
       return res.status(403).json({
@@ -174,23 +142,19 @@ exports.getTermExamMarks = async (req, res) => {
         });
       }
 
-      const assignment = course.assignedTeachers.find(a => {
-        const teacherId = a.teacher?._id || a.teacher;
-        return teacherId.toString() === req.user._id.toString();
+      const isAssigned = course.assignedTeachers.some(assignment => {
+        const teacherId = assignment.teacher?._id || assignment.teacher;
+        const matches = teacherId.toString() === req.user._id.toString();
+        if (section && matches) {
+          return assignment.section === section;
+        }
+        return matches;
       });
 
-      if (!assignment) {
+      if (!isAssigned) {
         return res.status(403).json({
           success: false,
           message: 'Access denied. You are not assigned to this course.'
-        });
-      }
-
-      // If teacher is assigned to a specific section, enforce it
-      if (assignment.section && section && assignment.section !== section) {
-        return res.status(403).json({
-          success: false,
-          message: `Access denied. You are only assigned to Section ${assignment.section}.`
         });
       }
     }
@@ -203,16 +167,6 @@ exports.getTermExamMarks = async (req, res) => {
     .populate('student', 'name roll email')
     .populate('course', 'courseCode courseTitle')
     .populate('enteredBy', 'name email');
-
-    console.log('Query:', { student: studentId, course: courseId, section: section || null });
-    console.log('Found marks:', marks ? 'YES' : 'NO');
-    if (marks) {
-      console.log('Marks data:', {
-        _id: marks._id,
-        section: marks.section,
-        hasMarks: !!marks.marks
-      });
-    }
 
     if (!marks) {
       return res.status(404).json({
@@ -241,9 +195,7 @@ exports.getTermExamMarks = async (req, res) => {
 exports.getCourseTermExamMarks = async (req, res) => {
   try {
     const { courseId } = req.params;
-    const { section, academicYear } = req.query;
-
-    console.log('[getCourseTermExamMarks] Request:', { courseId, section, academicYear, userId: req.user?._id });
+    const { section } = req.query;
 
     // Verify course exists
     const course = await Course.findById(courseId);
@@ -254,61 +206,34 @@ exports.getCourseTermExamMarks = async (req, res) => {
       });
     }
 
-    const query = { course: courseId };
-    if (academicYear) query.academicYear = academicYear;
-
-    // For teachers, verify assignment and restrict to their section
+    // For teachers, verify they are assigned to this course
     if (req.user.role === 'teacher') {
-      const isAssigned = course.assignedTeachers.some(assign => {
-        const teacherId = assign.teacher?._id || assign.teacher;
+      const isAssigned = course.assignedTeachers.some(assignment => {
+        const teacherId = assignment.teacher?._id || assignment.teacher;
         const matches = teacherId.toString() === req.user._id.toString();
-        // If section is provided in query, and teacher is assigned to a SPECIFIC section, they must match.
-        // If teacher is assigned generic (null section), they can access any provided section.
-        if (section && matches && assign.section) {
-            return assign.section === section;
+        if (section && matches) {
+          return assignment.section === section;
         }
         return matches;
       });
 
       if (!isAssigned) {
-        console.log('[getCourseTermExamMarks] Teacher not assigned');
         return res.status(403).json({
           success: false,
-          message: 'Access denied. You are not assigned to this course/section.'
+          message: 'Access denied. You are not assigned to this course.'
         });
       }
-
-      // Filter query based on assignment
-      // Find the specific assignment for this teacher to determine restrictions
-      const assignment = course.assignedTeachers.find(assign => 
-        (assign.teacher?._id || assign.teacher).toString() === req.user._id.toString()
-      );
-
-      if (assignment?.section) {
-        query.section = assignment.section;
-      } else if (section) {
-        query.section = section;
-      }
-    } else {
-      // Admin/others
-      if (section) query.section = section;
     }
 
-    console.log('[getCourseTermExamMarks] Query:', query);
-
-    let allMarks = [];
-    try {
-      allMarks = await TermExamMarks.find(query)
-        .populate('student', 'name roll email')
-        .populate('enteredBy', 'name email')
-        .sort({ 'student.roll': 1 });
-    } catch (populateError) {
-      console.error('[getCourseTermExamMarks] Populate error:', populateError);
-      // Try without populate if it fails
-      allMarks = await TermExamMarks.find(query).sort({ createdAt: -1 });
+    const query = { course: courseId };
+    if (section) {
+      query.section = section;
     }
 
-    console.log('[getCourseTermExamMarks] Found:', allMarks.length, 'records');
+    const allMarks = await TermExamMarks.find(query)
+      .populate('student', 'name roll email')
+      .populate('enteredBy', 'name email')
+      .sort({ 'student.roll': 1 });
 
     res.status(200).json({
       success: true,
@@ -318,11 +243,9 @@ exports.getCourseTermExamMarks = async (req, res) => {
 
   } catch (error) {
     console.error('Get course term exam marks error:', error);
-    console.error('Stack:', error.stack);
     res.status(500).json({
       success: false,
-      message: 'Server error fetching marks',
-      error: error.message
+      message: 'Server error fetching marks'
     });
   }
 };

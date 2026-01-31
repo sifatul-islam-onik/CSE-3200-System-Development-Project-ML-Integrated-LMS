@@ -9,8 +9,6 @@ import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import StudentDashboard from './pages/StudentDashboard';
-import WorkbookLayout from './components/WorkbookLayout';
-import MarksNavigator from './pages/MarksNavigator';
 import { PublicRoute, RoleBasedRoute, ProtectedRoute } from './components/ProtectedRoute';
 import { setupTokenInterceptor } from './utils/tokenUtils';
 
@@ -55,22 +53,6 @@ function App() {
             element={
               <RoleBasedRoute allowedRoles={['teacher']}>
                 <TeacherDashboard />
-              </RoleBasedRoute>
-            } 
-          />
-          <Route 
-            path="/teacher/marks" 
-            element={
-              <RoleBasedRoute allowedRoles={['teacher', 'admin']}>
-                <MarksNavigator />
-              </RoleBasedRoute>
-            } 
-          />
-          <Route 
-            path="/teacher/course/:courseId/marks" 
-            element={
-              <RoleBasedRoute allowedRoles={['teacher', 'admin']}>
-                <WorkbookLayout />
               </RoleBasedRoute>
             } 
           />
