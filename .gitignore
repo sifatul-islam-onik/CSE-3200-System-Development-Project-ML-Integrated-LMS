@@ -1,7 +1,7 @@
 # Dependencies
 node_modules/
 venv
-ml_server/models
+models
 
 # Environment variables
 .env
