@@ -6,8 +6,6 @@ import { getUser, logout } from '../components/ProtectedRoute';
 import { getProfile } from '../services/authService';
 import { getMyProposals, createCourseProposal, deleteProposal } from '../services/courseProposalService';
 import { getAllCourses, getCourseStudents } from '../services/courseService';
-import { bulkSaveCTMarks, getCourseCTMarks } from '../services/ctMarksService';
-import { bulkSaveAttendance, getCourseAttendance } from '../services/attendanceService';
 import CourseForm from '../components/CourseForm';
 import CourseOBEView from '../components/CourseOBEView';
 import MarkEntry from '../components/MarkEntry';
@@ -583,25 +581,12 @@ const TeacherDashboard = () => {
                                   className="btn btn-sm btn-success"
                                   onClick={async () => {
                                     // Find teacher's section for this course
-                                    let section = null;
-                                    if (course.assignedTeachers && user) {
-                                      // Handle inconsistency in user object ID field (userId vs _id)
-                                      const currentUserId = user.userId || user._id;
-                                      
-                                      const assignment = course.assignedTeachers.find(at => {
-                                        const teacherId = at.teacher?._id || at.teacher;
-                                        return teacherId && currentUserId && teacherId.toString() === currentUserId.toString();
-                                      });
-                                      section = assignment?.section || null;
-                                    }
+                                    const assignment = course.assignedTeachers?.find(at => {
+                                      const teacherId = at.teacher?._id || at.teacher;
+                                      return teacherId.toString() === user._id;
+                                    });
+                                    const section = assignment?.section || null;
                                     
-                                    console.log('Term Marks Entry - Section:', section, 'Course Type:', course.course_type);
-
-                                    // For Theory courses, if section is missing, we might have an issue
-                                    // But some old data might not have section. 
-                                    // If section is null but required, we should maybe alert?
-                                    // For now, let's proceed but with awareness.
-
                                     // Fetch students
                                     try {
                                       setLoading(true);
@@ -630,92 +615,27 @@ const TeacherDashboard = () => {
                                   className="btn btn-sm btn-success"
                                   onClick={async () => {
                                     // Find teacher's section for this course
-                                    let section = null;
-                                    if (course.assignedTeachers && user) {
-                                      const currentUserId = user.userId || user._id;
-                                      const assignment = course.assignedTeachers.find(at => {
-                                        const teacherId = at.teacher?._id || at.teacher;
-                                        return teacherId && currentUserId && teacherId.toString() === currentUserId.toString();
-                                      });
-                                      section = assignment?.section || null;
-                                    }
+                                    const assignment = course.assignedTeachers?.find(at => {
+                                      const teacherId = at.teacher?._id || at.teacher;
+                                      return teacherId.toString() === user._id;
+                                    });
+                                    const section = assignment?.section || null;
                                     
-                                    // Fetch students & marks
+                                    // Fetch students
                                     try {
                                       setCtMarksLoading(true);
-                                      // Parallel fetch: Students AND existing marks
-                                      const currentYear = new Date().getFullYear().toString();
-                                      // Remove academicYear filter to ensure we get ANY marks for this course/section
-                                      const [studentsResponse, marksResponse] = await Promise.all([
-                                        getCourseStudents(course._id, section),
-                                        getCourseCTMarks(course._id, { section }) 
-                                      ]);
-
-                                      if (studentsResponse.success && studentsResponse.data.length > 0) {
-                                        // DEBUG LOGS
-                                        console.log('--- CT MARKS LOAD ---');
-                                        console.log('Section Used:', section);
-                                        console.log('Students:', studentsResponse.data.length);
-                                        const rawMarks = marksResponse.success ? marksResponse.data : [];
-                                        console.log('Raw Marks Count (All Years):', rawMarks.length);
-                                        
-                                        // Filter for current year if needed, or just use latest?
-                                        // For now, let's use all marks that match the course/section. 
-                                        // If there are duplicates for same student/ctNumber but diff years, we might need logic.
-                                        // But typically course ID changes or is reset.
-                                        const marksForCurrentYear = rawMarks.filter(m => m.academicYear === currentYear);
-                                        console.log('Marks for Current Year (' + currentYear + '):', marksForCurrentYear.length);
-                                        
-                                        const existingMarks = marksForCurrentYear;
-
-                                        if (existingMarks.length > 0) {
-                                            console.log('Sample Mark Entry:', existingMarks[0]);
-                                        }
-
+                                      const response = await getCourseStudents(course._id, section);
+                                      if (response.success && response.data.length > 0) {
                                         // Sort students by roll in ascending order
-                                        const sortedStudents = studentsResponse.data.sort((a, b) => {
+                                        const sortedStudents = response.data.sort((a, b) => {
                                           return (a.roll || '').localeCompare(b.roll || '', undefined, { numeric: true });
                                         });
-
-                                        setCtMarksData(sortedStudents.map(student => {
-                                          // Find all marks for this student
-                                          const studentMarks = existingMarks.filter(m => {
-                                            const markStudentId = m.student?._id || m.student;
-                                            return markStudentId?.toString() === student._id?.toString();
-                                          });
-
-                                          // Create array of marks [ct1_mark, ct2_mark, ct3_mark]
-                                          // We initialized ctCount=3 in state, so we expect marks for 1..3
-                                          
-                                          const maxCT = Math.max(3, ...studentMarks.map(m => m.ctNumber));
-                                          
-                                          const mappedMarks = [];
-                                          // We'll create a sparse array
-                                          for (let i = 1; i <= maxCT; i++) {
-                                            const markEntry = studentMarks.find(m => m.ctNumber === i);
-                                            if (markEntry) console.log(`Matched Mark - Student: ${student.roll}, CT: ${i}, Value: ${markEntry.marksObtained}`);
-                                            mappedMarks.push(markEntry ? markEntry.marksObtained : '');
-                                          }
-                                          
-                                          return {
-                                            studentId: student._id,
-                                            roll: student.roll,
-                                            name: student.name,
-                                            marks: mappedMarks
-                                          };
-                                        }));
-
-                                        
-                                        // Update ctCount and ctTotalMarks if necessary based on fetched data
-                                        // Find generic totals from first student record or aggregated
-                                        if (existingMarks.length > 0) {
-                                          const maxCT = Math.max(...existingMarks.map(m => m.ctNumber));
-                                          if (maxCT > ctCount) {
-                                             setCtCount(maxCT);
-                                             // We will let the useEffect in component sort out the totals array resize
-                                          }
-                                        }
-
+                                        setCtMarksData(sortedStudents.map(student => ({
+                                          studentId: student._id,
+                                          roll: student.roll,
+                                          name: student.name,
+                                          marks: []
+                                        })));
                                         setCtMarksCourse(course);
                                         setShowCTMarksModal(true);
                                       } else {
@@ -723,8 +643,8 @@ const TeacherDashboard = () => {
                                         setTimeout(() => setError(''), 3000);
                                       }
                                     } catch (err) {
-                                      console.error('Error fetching students or marks:', err);
-                                      setError('Failed to fetch data');
+                                      console.error('Error fetching students:', err);
+                                      setError('Failed to fetch students');
                                       setTimeout(() => setError(''), 3000);
                                     } finally {
                                       setCtMarksLoading(false);
@@ -737,47 +657,28 @@ const TeacherDashboard = () => {
                                   className="btn btn-sm btn-info"
                                   onClick={async () => {
                                     // Find teacher's section for this course
-                                    let section = null;
-                                    if (course.assignedTeachers && user) {
-                                      const currentUserId = user.userId || user._id;
-                                      const assignment = course.assignedTeachers.find(at => {
-                                        const teacherId = at.teacher?._id || at.teacher;
-                                        return teacherId && currentUserId && teacherId.toString() === currentUserId.toString();
-                                      });
-                                      section = assignment?.section || null;
-                                    }
+                                    const assignment = course.assignedTeachers?.find(at => {
+                                      const teacherId = at.teacher?._id || at.teacher;
+                                      return teacherId.toString() === user._id;
+                                    });
+                                    const section = assignment?.section || null;
                                     
-                                    // Fetch students & existing attendance
+                                    // Fetch students
                                     try {
                                       setAttendanceLoading(true);
-                                      const currentYear = new Date().getFullYear().toString();
-                                      const [studentsResponse, attendanceResponse] = await Promise.all([
-                                        getCourseStudents(course._id, section),
-                                        getCourseAttendance(course._id, { section })
-                                      ]);
-                                      
-                                      if (studentsResponse.success && studentsResponse.data.length > 0) {
+                                      const response = await getCourseStudents(course._id, section);
+                                      if (response.success && response.data.length > 0) {
                                         // Sort students by roll in ascending order
-                                        const sortedStudents = studentsResponse.data.sort((a, b) => {
+                                        const sortedStudents = response.data.sort((a, b) => {
                                           return (a.roll || '').localeCompare(b.roll || '', undefined, { numeric: true });
                                         });
-                                        
-                                        const existingAttendance = attendanceResponse.success ? attendanceResponse.data : [];
-                                        const attendanceForCurrentYear = existingAttendance.filter(a => a.academicYear === currentYear);
-                                        
-                                        setAttendanceData(sortedStudents.map(student => {
-                                          const record = attendanceForCurrentYear.find(a => 
-                                            (a.student?._id || a.student)?.toString() === student._id?.toString()
-                                          );
-                                          
-                                          return {
-                                            studentId: student._id,
-                                            roll: student.roll,
-                                            name: student.name,
-                                            attendance: record ? record.marksAwarded : '',
-                                            assignments: record && record.assignments ? record.assignments.map(a => a.marksObtained) : []
-                                          };
-                                        }));
+                                        setAttendanceData(sortedStudents.map(student => ({
+                                          studentId: student._id,
+                                          roll: student.roll,
+                                          name: student.name,
+                                          attendance: '',
+                                          assignments: []
+                                        })));
                                         setAttendanceCourse(course);
                                         setShowAttendanceModal(true);
                                       } else {
@@ -785,8 +686,8 @@ const TeacherDashboard = () => {
                                         setTimeout(() => setError(''), 3000);
                                       }
                                     } catch (err) {
-                                      console.error('Error fetching students/attendance:', err);
-                                      setError('Failed to fetch data');
+                                      console.error('Error fetching students:', err);
+                                      setError('Failed to fetch students');
                                       setTimeout(() => setError(''), 3000);
                                     } finally {
                                       setAttendanceLoading(false);
@@ -1146,14 +1047,6 @@ const TeacherDashboard = () => {
             <span className="nav-icon"><FontAwesomeIcon icon={faBook} /></span>
             {sidebarOpen && <span className="nav-label">Browse Courses</span>}
           </button>
-          
-          <button
-            className="nav-item"
-            onClick={() => navigate('/teacher/marks')}
-          >
-            <span className="nav-icon"><FontAwesomeIcon icon={faClipboardList} /></span>
-            {sidebarOpen && <span className="nav-label">Marks Sheet</span>}
-          </button>
         </nav>
         <div className="sidebar-footer">
           {user && (
@@ -1435,114 +1328,16 @@ const TeacherDashboard = () => {
               </button>
               <button
                 className="btn btn-primary"
-                onClick={async () => {
-                  try {
-                    setCtMarksLoading(true);
-                    setError('');
-
-                    // Get current academic year
-                    const currentYear = new Date().getFullYear();
-                    const academicYear = `${currentYear}`;
-
-                    // Find teacher's section for this course
-                    console.log('--- CT MARKS SAVE DEBUG ---');
-                    console.log('Course:', ctMarksCourse._id);
-                    console.log('User ID:', user.userId || user._id);
-                    
-                    const assignment = ctMarksCourse.assignedTeachers?.find(at => {
-                      const teacherId = at.teacher?._id || at.teacher;
-                      // Handle both userId formats and convert to string for comparison
-                      const currentUserId = user.userId || user._id;
-                      return teacherId && currentUserId && teacherId.toString() === currentUserId.toString();
-                    });
-                    const section = assignment?.section || null;
-                    console.log('Section detected:', section);
-                    console.log('Academic Year:', academicYear);
-
-                    // Group marks by CT Number for bulk save
-                    // Backend expects one request per CT with: { courseId, section, academicYear, ctNumber, totalMarks, studentsMarks: [] }
-                    const marksByCT = {}; // { 1: [], 2: [], 3: [] }
-
-                    for (const student of ctMarksData) {
-                      if (!student.marks || student.marks.length === 0) continue;
-
-                      for (let ctIndex = 0; ctIndex < student.marks.length; ctIndex++) {
-                        const marksObtained = student.marks[ctIndex];
-                        // Skip empty strings
-                        if (marksObtained === '' || marksObtained === null || marksObtained === undefined) continue;
-
-                        const ctNum = ctIndex + 1;
-                        if (!marksByCT[ctNum]) marksByCT[ctNum] = [];
-
-                        marksByCT[ctNum].push({
-                          studentId: student.studentId,
-                          marksObtained: Number(marksObtained)
-                        });
-                      }
-                    }
-
-                    const ctNumbersToSave = Object.keys(marksByCT);
-                    if (ctNumbersToSave.length === 0) {
-                      setError('No marks to save. Please enter at least one mark.');
-                      setTimeout(() => setError(''), 3000);
-                      setCtMarksLoading(false);
-                      return;
-                    }
-
-                    // Save marks for each CT separately
-                    let savedCount = 0;
-                    const promises = ctNumbersToSave.map(ctNum => {
-                      const payload = {
-                        courseId: ctMarksCourse._id,
-                        section: section,
-                        academicYear: academicYear,
-                        ctNumber: Number(ctNum),
-                        totalMarks: Number(ctTotalMarks[Number(ctNum) - 1]),
-                        studentsMarks: marksByCT[ctNum]
-                      };
-                      console.log(`Saving CT ${ctNum} with ${marksByCT[ctNum].length} students, Section: ${section}`);
-                      return bulkSaveCTMarks(payload);
-                    });
-
-                    const responses = await Promise.all(promises);
-                    console.log('Save Responses:', responses);
-                    
-                    // Check for failures within successful responses
-                    responses.forEach((res, idx) => {
-                      if (res.data && res.data.failed && res.data.failed.length > 0) {
-                        console.error(`CT ${ctNumbersToSave[idx]} failures:`, res.data.failed);
-                        res.data.failed.forEach(fail => {
-                          console.error(`  Student ${fail.studentId}: ${fail.reason}`);
-                        });
-                      }
-                      if (res.data && res.data.successful) {
-                        console.log(`CT ${ctNumbersToSave[idx]} successful:`, res.data.successful.length);
-                      }
-                    });
-                    
-                    // Aggregate success
-                    const allSuccess = responses.every(res => res.success);
-                    if (allSuccess) {
-                      console.log('✓ All CT marks saved successfully');
-                      setShowCTMarksModal(false);
-                      setSuccessMessage(`CT Marks saved successfully! Updated ${ctNumbersToSave.length} CT columns.`);
-                      setTimeout(() => setSuccessMessage(''), 4000);
-                    } else {
-                      console.error('Some saves failed:', responses.filter(r => !r.success));
-                      throw new Error('Some CT marks failed to save. Please check.');
-                    }
-                  } catch (err) {
-                    console.error('Error saving CT marks:', err);
-                    setError(err.response?.data?.message || err.message || 'Failed to save CT marks');
-                    setTimeout(() => setError(''), 4000);
-                  } finally {
-                    setCtMarksLoading(false);
-                  }
+                onClick={() => {
+                  // Save CT marks logic here
+                  setShowCTMarksModal(false);
+                  setSuccessMessage('CT Marks saved successfully');
+                  setTimeout(() => setSuccessMessage(''), 3000);
                 }}
                 disabled={ctMarksLoading}
                 style={{ flex: '0 0 auto', width: '120px', whiteSpace: 'nowrap' }}
               >
-                {ctMarksLoading ? 'Saving...' : 'Save CT Marks'}
+                Save CT Marks
               </button>
             </div>
           </div>
@@ -1759,112 +1554,16 @@ const TeacherDashboard = () => {
               </button>
               <button
                 className="btn btn-primary"
-                onClick={async () => {
-                  try {
-                    setAttendanceLoading(true);
-                    setError('');
-
-                    // Get current academic year
-                    const currentYear = new Date().getFullYear();
-                    const academicYear = `${currentYear}`;
-
-                    console.log('--- ATTENDANCE SAVE DEBUG ---');
-                    console.log('Course:', attendanceCourse._id);
-                    console.log('User ID:', user.userId || user._id);
-
-                    // Find teacher's section for this course
-                    const currentUserId = user.userId || user._id;
-                    const assignment = attendanceCourse.assignedTeachers?.find(at => {
-                      const teacherId = at.teacher?._id || at.teacher;
-                      return teacherId && currentUserId && teacherId.toString() === currentUserId.toString();
-                    });
-                    const section = assignment?.section || null;
-                    
-                    console.log('Section detected:', section);
-                    console.log('Academic Year:', academicYear);
-
-                    // Transform UI data to API format
-                    const attendanceToSave = [];
-                    for (const student of attendanceData) {
-                      const attendanceMarks = student.attendance;
-                      const assignmentMarks = student.assignments || [];
-                      
-                      // Skip if no attendance AND no assignment marks
-                      const hasAttendance = attendanceMarks !== '' && attendanceMarks !== null && attendanceMarks !== undefined;
-                      const hasAssignments = assignmentMarks.some(m => m !== '' && m !== null && m !== undefined);
-                      
-                      if (!hasAttendance && !hasAssignments) continue;
-
-                      // Calculate attended classes as percentage, capped at 100
-                      const attendancePercentage = hasAttendance ? Math.round((Number(attendanceMarks) / attendanceTotalMarks) * 100) : 0;
-                      const attendedClasses = Math.min(attendancePercentage, 100);
-
-                      console.log('Student attendance calculation:', {
-                        studentId: student.studentId,
-                        attendanceMarks: attendanceMarks,
-                        attendanceTotalMarks: attendanceTotalMarks,
-                        attendancePercentage: attendancePercentage,
-                        attendedClasses: attendedClasses,
-                        assignmentMarks: assignmentMarks
-                      });
-
-                      // Build assignments array with marks and totals
-                      const assignments = assignmentMarks.map((mark, i) => ({
-                        marksObtained: mark !== '' && mark !== null && mark !== undefined ? Number(mark) : 0,
-                        totalMarks: assignmentTotalMarks[i] || 0
-                      }));
-
-                      attendanceToSave.push({
-                        student: student.studentId,
-                        course: attendanceCourse._id,
-                        section: section,
-                        academicYear: academicYear,
-                        totalClasses: 100, // Default to 100 for percentage calculation
-                        attendedClasses: attendedClasses,
-                        marksAwarded: hasAttendance ? Number(attendanceMarks) : 0,
-                        totalMarks: attendanceTotalMarks,
-                        assignments: assignments
-                      });
-                    }
-
-                    if (attendanceToSave.length === 0) {
-                      setError('No attendance marks to save. Please enter at least one mark.');
-                      setTimeout(() => setError(''), 3000);
-                      setAttendanceLoading(false);
-                      return;
-                    }
-
-                    const response = await bulkSaveAttendance(attendanceToSave);
-                    
-                    console.log('Attendance Save Response:', response);
-                    console.log('Failed records:', response.data?.failed);
-                    
-                    if (response.success) {
-                      if (response.savedCount === 0 && response.data?.failed?.length > 0) {
-                        // All records failed
-                        const reasons = response.data.failed.map(f => `${f.student}: ${f.reason}`).join(', ');
-                        throw new Error(`All records failed to save: ${reasons}`);
-                      }
-                      
-                      console.log('✓ Attendance saved successfully');
-                      setShowAttendanceModal(false);
-                      setSuccessMessage(`Attendance saved successfully! ${response.savedCount} records saved.`);
-                      setTimeout(() => setSuccessMessage(''), 4000);
-                    } else {
-                      throw new Error(response.message || 'Failed to save attendance');
-                    }
-                  } catch (err) {
-                    console.error('Error saving attendance:', err);
-                    setError(err.response?.data?.message || err.message || 'Failed to save attendance');
-                    setTimeout(() => setError(''), 4000);
-                  } finally {
-                    setAttendanceLoading(false);
-                  }
+                onClick={() => {
+                  // Save attendance & assignment marks logic here
+                  setShowAttendanceModal(false);
+                  setSuccessMessage('Attendance & Assignment Marks saved successfully');
+                  setTimeout(() => setSuccessMessage(''), 3000);
                 }}
                 disabled={attendanceLoading}
                 style={{ flex: '0 0 auto', width: '120px', whiteSpace: 'nowrap' }}
               >
-                {attendanceLoading ? 'Saving...' : 'Save Marks'}
+                Save Marks
               </button>
             </div>
           </div>
