@@ -66,6 +66,11 @@ const courseSchema = new mongoose.Schema({
     },
     default: 'ACTIVE'
   },
+  // Attendance marks for OBE
+  attendanceMarks: {
+    type: Number,
+    default: 0
+  },
   // OBE: Curriculum details
   academicYear: {
     type: String,
@@ -293,8 +298,19 @@ const courseSchema = new mongoose.Schema({
   reviewedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
+  },  // OBE: Assignment and Attendance marks configuration
+  attendanceMarks: {
+    type: Number,
+    default: 10,
+    min: [0, 'Attendance marks cannot be negative'],
+    max: [100, 'Attendance marks cannot exceed 100']
   },
-  // OBE: KPA mapping (Knowledge, Performance, Attitude)
+  assignmentMarks: {
+    type: Number,
+    default: 15,
+    min: [0, 'Assignment marks cannot be negative'],
+    max: [100, 'Assignment marks cannot exceed 100']
+  },  // OBE: KPA mapping (Knowledge, Performance, Attitude)
   kpa_mapping: {
     type: [{
       type: String,
@@ -341,6 +357,11 @@ courseSchema.pre('save', function(next) {
   // Sort lecture_plan by week number
   if (this.lecture_plan && this.lecture_plan.length > 0) {
     this.lecture_plan.sort((a, b) => a.week - b.week);
+  }
+
+  // Enforce: only one batch assignment per course
+  if (Array.isArray(this.assignedBatches) && this.assignedBatches.length > 1) {
+    this.assignedBatches = [this.assignedBatches[this.assignedBatches.length - 1]];
   }
   
   next();

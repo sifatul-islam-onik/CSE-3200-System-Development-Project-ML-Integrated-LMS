@@ -26,6 +26,25 @@ const connectDB = async () => {
 
 connectDB();
 
+// Startup normalization: collapse multiple batch assignments to a single latest entry
+(async () => {
+  try {
+    const Course = require('./models/Course');
+    const toFix = await Course.find({ 'assignedBatches.1': { $exists: true } }).select('assignedBatches courseCode');
+    if (toFix.length > 0) {
+      console.log(`Normalizing batch assignments for ${toFix.length} course(s)...`);
+      for (const c of toFix) {
+        const latest = c.assignedBatches[c.assignedBatches.length - 1];
+        c.assignedBatches = latest ? [latest] : [];
+        await c.save();
+      }
+      console.log('Batch assignment normalization complete.');
+    }
+  } catch (err) {
+    console.error('Batch normalization error (startup):', err.message);
+  }
+})();
+
 // Routes
 app.get('/', (req, res) => {
   res.json({ message: 'LMS API Server' });
@@ -40,15 +59,21 @@ const programOutcomeRoutes = require('./routes/programOutcomeRoutes');
 const copoMappingRoutes = require('./routes/copoMappingRoutes');
 const courseProposalRoutes = require('./routes/courseProposalRoutes');
 const termExamMarksRoutes = require('./routes/termExamMarksRoutes');
+const attainmentRoutes = require('./routes/attainmentRoutes');
+const courseProfileRoutes = require('./routes/courseProfileRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/courses', courseOutcomeRoutes);
+// Also expose course outcome routes under a distinct base to avoid conflicts
+app.use('/api/course-outcomes', courseOutcomeRoutes);
 app.use('/api/program-outcomes', programOutcomeRoutes);
 app.use('/api', copoMappingRoutes);
 app.use('/api/course-proposals', courseProposalRoutes);
 app.use('/api/term-exam-marks', termExamMarksRoutes);
+app.use('/api/attainment', attainmentRoutes);
+app.use('/api/course-profile', courseProfileRoutes);
 
 // Error handlers
 process.on('unhandledRejection', (err) => {
