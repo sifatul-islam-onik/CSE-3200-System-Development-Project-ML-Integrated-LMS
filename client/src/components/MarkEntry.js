@@ -20,6 +20,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   const [showCamera, setShowCamera] = useState(false);
   const [stream, setStream] = useState(null);
   const [isLoadingMarks, setIsLoadingMarks] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
   
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
@@ -85,17 +86,49 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     };
   }, [stream]);
 
+  // Setup video stream when stream is available
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+      
+      const handleCanPlay = () => {
+        console.log('Video can play');
+        setVideoReady(true);
+      };
+
+      const handleLoadedMetadata = () => {
+        console.log('Video metadata loaded');
+        // Give it a moment to ensure video is actually ready
+        setTimeout(() => {
+          setVideoReady(true);
+        }, 500);
+      };
+
+      videoRef.current.addEventListener('canplay', handleCanPlay);
+      videoRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
+
+      return () => {
+        if (videoRef.current) {
+          videoRef.current.removeEventListener('canplay', handleCanPlay);
+          videoRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        }
+      };
+    }
+  }, [stream, showCamera]);
+
   // Initialize camera
   const startCamera = async () => {
     try {
+      setVideoReady(false);
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
       });
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
       setShowCamera(true);
+      setStream(mediaStream);
     } catch (error) {
       console.error('Error accessing camera:', error);
       alert('Unable to access camera. Please check permissions.');
@@ -109,6 +142,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       setStream(null);
     }
     setShowCamera(false);
+    setVideoReady(false);
   };
 
   // Capture photo from camera
@@ -117,6 +151,13 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       const canvas = canvasRef.current;
       const video = videoRef.current;
       
+      // Check if video is ready and has valid dimensions
+      if (!video.videoWidth || !video.videoHeight) {
+        console.error('Video not ready or has invalid dimensions');
+        alert('Video is not ready yet. Please wait a moment and try again.');
+        return;
+      }
+      
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
@@ -124,9 +165,14 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       ctx.drawImage(video, 0, 0);
       
       canvas.toBlob((blob) => {
-        const imageUrl = URL.createObjectURL(blob);
-        setCapturedImage(imageUrl);
-        stopCamera();
+        if (blob) {
+          const imageUrl = URL.createObjectURL(blob);
+          setCapturedImage(imageUrl);
+          stopCamera();
+        } else {
+          console.error('Failed to create blob from canvas');
+          alert('Failed to capture image. Please try again.');
+        }
       }, 'image/jpeg', 0.95);
     }
   };
@@ -209,7 +255,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           setProcessingProgress(50);
         });
         
-        xhr.open('POST', 'http://localhost:8000/api/extract-marks');
+        xhr.open('POST', '/ml-api/extract-marks');
         xhr.send(formData);
       });
       
@@ -424,13 +470,27 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           {/* Camera View */}
           {showCamera && (
             <div className="camera-section">
-              <video ref={videoRef} autoPlay playsInline />
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                muted
+                style={{ width: '100%', maxWidth: '600px', borderRadius: '8px' }}
+              />
               <canvas ref={canvasRef} style={{ display: 'none' }} />
+              {!videoReady && (
+                <div style={{ textAlign: 'center', margin: '10px 0', color: '#666' }}>
+                  Initializing camera...
+                </div>
+              )}
               <div className="camera-controls">
                 <button className="btn btn-outline" onClick={stopCamera}>
                   Cancel
                 </button>
-                <button className="btn btn-primary" onClick={capturePhoto}>
+                <button 
+                  className="btn btn-primary" 
+                  onClick={capturePhoto}
+                  disabled={!videoReady}>
                   <FontAwesomeIcon icon={faCamera} /> Capture
                 </button>
               </div>

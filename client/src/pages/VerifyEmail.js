@@ -26,7 +26,7 @@ const VerifyEmail = () => {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/verify-email', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL || '/api'}/auth/verify-email`, {
         email,
         otp
       });
@@ -48,7 +48,7 @@ const VerifyEmail = () => {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/resend-otp', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL || '/api'}/auth/resend-otp`, {
         email
       });
 
