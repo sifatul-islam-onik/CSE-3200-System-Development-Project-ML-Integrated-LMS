@@ -22,33 +22,73 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   const [isLoadingMarks, setIsLoadingMarks] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
   
+  // Processing queue and status
+  const [processingQueue, setProcessingQueue] = useState(new Map());
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [savedMarks, setSavedMarks] = useState(null); // Track marks from database
+  
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const processingAbortControllers = useRef(new Map());
+  const currentStudentIdRef = useRef(null);
 
   const currentStudent = students[currentStudentIndex];
+  
+  // Update ref whenever current student changes
+  useEffect(() => {
+    currentStudentIdRef.current = currentStudent._id;
+  }, [currentStudent._id]);
+  
+  // Generate session storage key
+  const getSessionKey = (studentId) => {
+    return `marks_${course._id}_${studentId}_${section || 'default'}`;
+  };
 
   // Load saved data when student changes
   useEffect(() => {
     const loadStudentMarks = async () => {
       const studentId = currentStudent._id;
+      const sessionKey = getSessionKey(studentId);
       
-      // Check in-memory cache first
+      // Check sessionStorage first for processed data
+      const sessionData = sessionStorage.getItem(sessionKey);
+      if (sessionData) {
+        try {
+          const parsed = JSON.parse(sessionData);
+          setMarks(parsed.marks);
+          setCapturedImage(parsed.image);
+          console.log('Loaded from session storage for', currentStudent.name);
+        } catch (e) {
+          console.error('Error parsing session data:', e);
+        }
+      }
+      
+      // Check in-memory cache
       if (studentData[studentId]) {
         setMarks(studentData[studentId].marks);
         setCapturedImage(studentData[studentId].image);
-        return;
       }
       
-      // Fetch from database
+      // Fetch from database to compare
       setIsLoadingMarks(true);
       try {
         const response = await getTermExamMarks(studentId, course._id, section);
         if (response.success && response.data) {
-          setMarks(response.data.marks);
-          // Only set image if it's a valid URL (not a blob URL from previous bad saves)
+          setSavedMarks(response.data.marks); // Track database version
+          
+          // If no session data, load from database
+          if (!sessionData && !studentData[studentId]) {
+            setMarks(response.data.marks);
+          }
+          
           const validImage = response.data.imageUrl && !response.data.imageUrl.startsWith('blob:') ? response.data.imageUrl : null;
-          setCapturedImage(validImage);
+          
+          // If no session data, load from database
+          if (!sessionData && !studentData[studentId]) {
+            setCapturedImage(validImage);
+          }
+          
           // Cache in memory
           setStudentData(prev => ({
             ...prev,
@@ -57,17 +97,23 @@ const MarkEntry = ({ course, students, section, onClose }) => {
               image: validImage
             }
           }));
+        } else {
+          // No marks found in database
+          setSavedMarks(null);
         }
       } catch (error) {
         // No marks found in database - reset to empty
         console.log('No existing marks found for student:', currentStudent.name);
-        setMarks({
-          question1: { a: '', b: '', c: '', d: '' },
-          question2: { a: '', b: '', c: '', d: '' },
-          question3: { a: '', b: '', c: '', d: '' },
-          question4: { a: '', b: '', c: '', d: '' }
-        });
-        setCapturedImage(null);
+        setSavedMarks(null);
+        if (!sessionData && !studentData[studentId]) {
+          setMarks({
+            question1: { a: '', b: '', c: '', d: '' },
+            question2: { a: '', b: '', c: '', d: '' },
+            question3: { a: '', b: '', c: '', d: '' },
+            question4: { a: '', b: '', c: '', d: '' }
+          });
+          setCapturedImage(null);
+        }
       } finally {
         setIsLoadingMarks(false);
       }
@@ -76,6 +122,22 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     loadStudentMarks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStudentIndex, currentStudent._id, course._id, section]);
+  
+  // Check for unsaved changes
+  useEffect(() => {
+    if (!savedMarks) {
+      // No saved marks in database, check if current marks are empty
+      const isEmpty = Object.values(marks).every(q => 
+        Object.values(q).every(v => !v || v === '')
+      );
+      setHasUnsavedChanges(!isEmpty);
+      return;
+    }
+    
+    // Compare current marks with saved marks
+    const hasChanges = JSON.stringify(marks) !== JSON.stringify(savedMarks);
+    setHasUnsavedChanges(hasChanges);
+  }, [marks, savedMarks]);
 
   // Cleanup camera stream on unmount or when camera closes
   useEffect(() => {
@@ -202,95 +264,144 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     });
   };
 
-  // Process image with FastAPI
+  // Process image with FastAPI (non-blocking, queue-based)
   const processImage = async () => {
     if (!capturedImage || capturedImage === 'skipped') return;
 
-    setIsProcessing(true);
-    setProcessingProgress(0);
+    const studentId = currentStudent._id;
+    const sessionKey = getSessionKey(studentId);
     
-    try {
-      // Convert image URL to blob
-      const blob = await fetch(capturedImage).then(r => r.blob());
-      
-      // Create FormData and append image
-      const formData = new FormData();
-      formData.append('image', blob, 'answer-sheet.jpg');
-      
-      // Use XMLHttpRequest to track real upload progress
-      const xhr = new XMLHttpRequest();
-      
-      // Track upload progress (actual progress)
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          const uploadProgress = (e.loaded / e.total) * 50; // Upload is 0-50%
-          setProcessingProgress(uploadProgress);
-        }
-      });
-      
-      // Handle response
-      const response = await new Promise((resolve, reject) => {
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              resolve(JSON.parse(xhr.responseText));
-            } catch (e) {
-              reject(new Error('Invalid JSON response'));
-            }
-          } else {
-            reject(new Error(`Server returned ${xhr.status}: ${xhr.statusText}`));
+    // Save image to session storage immediately
+    sessionStorage.setItem(sessionKey, JSON.stringify({
+      marks: marks,
+      image: capturedImage
+    }));
+    
+    // Update queue status
+    setProcessingQueue(prev => new Map(prev).set(studentId, {
+      status: 'processing',
+      studentRoll: currentStudent.roll,
+      progress: 0
+    }));
+    
+    // Start background processing
+    (async () => {
+      try {
+        // Convert image URL to blob
+        const blob = await fetch(capturedImage).then(r => r.blob());
+        
+        // Create FormData and append image
+        const formData = new FormData();
+        formData.append('image', blob, 'answer-sheet.jpg');
+        
+        // Use XMLHttpRequest to track real upload progress
+        const xhr = new XMLHttpRequest();
+        const abortController = new AbortController();
+        processingAbortControllers.current.set(studentId, xhr);
+        
+        // Track upload progress (actual progress)
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const uploadProgress = (e.loaded / e.total) * 50; // Upload is 0-50%
+            setProcessingQueue(prev => {
+              const updated = new Map(prev);
+              const item = updated.get(studentId);
+              if (item) {
+                item.progress = uploadProgress;
+                updated.set(studentId, item);
+              }
+              return updated;
+            });
           }
         });
         
-        xhr.addEventListener('error', () => {
-          reject(new Error('Network error occurred'));
+        // Handle response
+        const response = await new Promise((resolve, reject) => {
+          xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                resolve(JSON.parse(xhr.responseText));
+              } catch (e) {
+                reject(new Error('Invalid JSON response'));
+              }
+            } else {
+              reject(new Error(`Server returned ${xhr.status}: ${xhr.statusText}`));
+            }
+          });
+          
+          xhr.addEventListener('error', () => {
+            reject(new Error('Network error occurred'));
+          });
+          
+          xhr.addEventListener('abort', () => {
+            reject(new Error('Request was aborted'));
+          });
+          
+          // Start processing phase (50-100%)
+          xhr.addEventListener('loadstart', () => {
+            setProcessingQueue(prev => {
+              const updated = new Map(prev);
+              const item = updated.get(studentId);
+              if (item) {
+                item.progress = 50;
+                updated.set(studentId, item);
+              }
+              return updated;
+            });
+          });
+          
+          xhr.open('POST', '/ml-api/extract-marks');
+          xhr.send(formData);
         });
         
-        xhr.addEventListener('abort', () => {
-          reject(new Error('Request was aborted'));
-        });
-        
-        // Start processing phase (50-100%)
-        xhr.addEventListener('loadstart', () => {
-          setProcessingProgress(50);
-        });
-        
-        xhr.open('POST', '/ml-api/extract-marks');
-        xhr.send(formData);
-      });
-      
-      setProcessingProgress(90);
-      
-      if (response.success && response.marks) {
-        // Set extracted marks
-        setMarks(response.marks);
-        setProcessingProgress(100);
-        console.log('Marks extracted successfully:', response);
-        console.log('Confidence:', response.confidence);
-        if (response.raw_table) {
-          console.log('Raw table detected:', response.raw_table);
+        if (response.success && response.marks) {
+          // Save to session storage
+          sessionStorage.setItem(sessionKey, JSON.stringify({
+            marks: response.marks,
+            image: capturedImage,
+            processed: true
+          }));
+          
+          // Update marks ONLY if still on same student (using ref for current value)
+          if (currentStudentIdRef.current === studentId) {
+            setMarks(response.marks);
+          }
+          
+          // Update queue status to completed
+          setProcessingQueue(prev => {
+            const updated = new Map(prev);
+            updated.set(studentId, {
+              status: 'completed',
+              studentRoll: currentStudent.roll,
+              progress: 100,
+              marks: response.marks
+            });
+            return updated;
+          });
+          
+          console.log('✓ Marks extracted for roll:', currentStudent.roll);
+        } else {
+          throw new Error(response.message || 'Failed to extract marks from image');
         }
-      } else {
-        throw new Error(response.message || 'Failed to extract marks from image');
-      }
 
-    } catch (error) {
-      console.error('Error processing image:', error);
-      alert(`Failed to process image: ${error.message}. Please enter marks manually.`);
-      // Allow manual entry if OCR fails
-      setMarks({
-        question1: { a: '', b: '', c: '', d: '' },
-        question2: { a: '', b: '', c: '', d: '' },
-        question3: { a: '', b: '', c: '', d: '' },
-        question4: { a: '', b: '', c: '', d: '' }
-      });
-    } finally {
-      setProcessingProgress(100);
-      setTimeout(() => {
-        setIsProcessing(false);
-        setProcessingProgress(0);
-      }, 500);
-    }
+      } catch (error) {
+        console.error('Error processing image for', currentStudent.name, ':', error);
+        
+        // Update queue status to failed
+        setProcessingQueue(prev => {
+          const updated = new Map(prev);
+          updated.set(studentId, {
+            status: 'failed',
+            studentRoll: currentStudent.roll,
+            progress: 0,
+            error: error.message
+          });
+          return updated;
+        });
+      } finally {
+        processingAbortControllers.current.delete(studentId);
+      }
+    })();
   };
 
   // Handle mark change
@@ -298,12 +409,21 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     // Only allow numbers
     if (value && !/^\d*\.?\d*$/.test(value)) return;
     
-    setMarks(prev => ({
-      ...prev,
+    const updatedMarks = {
+      ...marks,
       [question]: {
-        ...prev[question],
+        ...marks[question],
         [part]: value
       }
+    };
+    
+    setMarks(updatedMarks);
+    
+    // Save to session storage
+    const sessionKey = getSessionKey(currentStudent._id);
+    sessionStorage.setItem(sessionKey, JSON.stringify({
+      marks: updatedMarks,
+      image: capturedImage
     }));
   };
 
@@ -317,10 +437,9 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     });
     return total.toFixed(2);
   };
-
-  // Save and go to next student
-  const handleNext = async () => {
-    // Save current student's data to database
+  
+  // Manual save to database
+  const handleSave = async () => {
     const studentId = currentStudent._id;
     const totalMarks = calculateTotal();
     
@@ -331,11 +450,13 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         section: section,
         marks: marks,
         totalMarks: parseFloat(totalMarks),
-        // Don't save blob URLs to database as they expire
         imageUrl: capturedImage && !capturedImage.startsWith('blob:') && capturedImage !== 'skipped' ? capturedImage : null
       });
       
       console.log('✓ Marks saved for', currentStudent.name, '- Total:', totalMarks);
+      
+      // Update saved marks to current marks
+      setSavedMarks(marks);
       
       // Update in-memory cache
       setStudentData(prev => ({
@@ -346,9 +467,46 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         }
       }));
       
+      alert('Marks saved successfully!');
     } catch (error) {
       console.error('Error saving marks:', error);
-      // Continue anyway - marks saved in memory
+      alert('Failed to save marks: ' + error.message);
+    }
+  };
+
+  // Save and go to next student
+  const handleNext = async () => {
+    if (hasUnsavedChanges) {
+      // Save current student's data to database
+      const studentId = currentStudent._id;
+      const totalMarks = calculateTotal();
+      
+      try {
+        await saveTermExamMarks({
+          studentId: studentId,
+          courseId: course._id,
+          section: section,
+          marks: marks,
+          totalMarks: parseFloat(totalMarks),
+          // Don't save blob URLs to database as they expire
+          imageUrl: capturedImage && !capturedImage.startsWith('blob:') && capturedImage !== 'skipped' ? capturedImage : null
+        });
+        
+        console.log('✓ Marks saved for', currentStudent.name, '- Total:', totalMarks);
+        
+        // Update in-memory cache
+        setStudentData(prev => ({
+          ...prev,
+          [studentId]: {
+            marks: marks,
+            image: capturedImage
+          }
+        }));
+        
+      } catch (error) {
+        console.error('Error saving marks:', error);
+        // Continue anyway - marks saved in memory
+      }
     }
     
     if (currentStudentIndex < students.length - 1) {
@@ -444,6 +602,74 @@ const MarkEntry = ({ course, students, section, onClose }) => {
               />
             </div>
           </div>
+          
+          {/* Processing Queue Status */}
+          {processingQueue.size > 0 && (
+            <div style={{
+              background: '#f3f4f6',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '12px',
+              marginBottom: '16px'
+            }}>
+              <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600' }}>
+                Background Processing ({processingQueue.size})
+              </h5>
+              {Array.from(processingQueue.entries()).reverse().slice(0, 3).map(([id, info]) => (
+                <div key={id} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '6px 0',
+                  borderBottom: '1px solid #e5e7eb'
+                }}>
+                  <span style={{ fontSize: '13px' }}>Roll: {info.studentRoll}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {info.status === 'processing' && (
+                      <>
+                        <div style={{ width: '80px', height: '4px', background: '#e5e7eb', borderRadius: '2px', overflow: 'hidden' }}>
+                          <div style={{ width: `${info.progress}%`, height: '100%', background: '#3b82f6', transition: 'width 0.3s' }} />
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#3b82f6' }}>⏳</span>
+                      </>
+                    )}
+                    {info.status === 'completed' && <span style={{ fontSize: '12px', color: '#10b981' }}>✓ Done</span>}
+                    {info.status === 'failed' && <span style={{ fontSize: '12px', color: '#ef4444' }}>✗ Failed</span>}
+                  </div>
+                </div>
+              ))}
+              {processingQueue.size > 3 && (
+                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                  +{processingQueue.size - 3} more processing...
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Current student processing status */}
+          {processingQueue.has(currentStudent._id) && (
+            <div style={{
+              background: processingQueue.get(currentStudent._id).status === 'completed' ? '#d1fae5' : 
+                         processingQueue.get(currentStudent._id).status === 'failed' ? '#fee2e2' : '#dbeafe',
+              border: '1px solid',
+              borderColor: processingQueue.get(currentStudent._id).status === 'completed' ? '#10b981' : 
+                           processingQueue.get(currentStudent._id).status === 'failed' ? '#ef4444' : '#3b82f6',
+              borderRadius: '8px',
+              padding: '12px',
+              marginBottom: '16px',
+              fontSize: '14px'
+            }}>
+              {processingQueue.get(currentStudent._id).status === 'processing' && (
+                <>⏳ Processing image for this student... ({Math.round(processingQueue.get(currentStudent._id).progress)}%)</>
+              )}
+              {processingQueue.get(currentStudent._id).status === 'completed' && (
+                <>✓ Processing completed! Marks have been extracted.</>
+              )}
+              {processingQueue.get(currentStudent._id).status === 'failed' && (
+                <>✗ Processing failed: {processingQueue.get(currentStudent._id).error}</>
+              )}
+            </div>
+          )}
 
           {/* Image Capture/Upload Section */}
           {!capturedImage && !showCamera && (
@@ -503,33 +729,14 @@ const MarkEntry = ({ course, students, section, onClose }) => {
               <h4>Answer Sheet</h4>
               <div className="image-container">
                 <img src={capturedImage} alt="Answer sheet" className="captured-image" />
-                {isProcessing && (
-                  <div className="processing-overlay">
-                    <div className="spinner-container">
-                      <svg className="progress-ring" width="60" height="60">
-                        <circle
-                          className="progress-ring-circle"
-                          stroke="#3b82f6"
-                          strokeWidth="4"
-                          fill="transparent"
-                          r="26"
-                          cx="30"
-                          cy="30"
-                        />
-                      </svg>
-                    </div>
-                  </div>
-                )}
               </div>
               <div className="image-actions">
                 <button className="btn btn-outline" onClick={handleRetake}>
                   <FontAwesomeIcon icon={faCamera} /> Retake
                 </button>
-                {!isProcessing && (
-                  <button className="btn btn-primary" onClick={processImage}>
-                    Process Image
-                  </button>
-                )}
+                <button className="btn btn-primary" onClick={processImage}>
+                  Process Image
+                </button>
               </div>
             </div>
           )}
@@ -580,9 +787,20 @@ const MarkEntry = ({ course, students, section, onClose }) => {
               <FontAwesomeIcon icon={faChevronLeft} /> Previous
             </button>
           </div>
-          <button className="btn btn-outline" onClick={onClose}>
-            Cancel
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {hasUnsavedChanges && (
+              <button 
+                className="btn btn-success" 
+                onClick={handleSave}
+                style={{ background: '#10b981', borderColor: '#10b981' }}
+              >
+                <FontAwesomeIcon icon={faCheck} /> Save
+              </button>
+            )}
+            <button className="btn btn-outline" onClick={onClose}>
+              Cancel
+            </button>
+          </div>
           <div>
             <button 
               className="btn btn-primary" 
