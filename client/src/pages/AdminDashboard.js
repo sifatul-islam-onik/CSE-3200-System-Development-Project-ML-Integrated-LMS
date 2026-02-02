@@ -906,7 +906,7 @@ const AdminDashboard = () => {
     
     try {
       // Call API to update user profile
-      const response = await fetch(`http://localhost:5000/api/admin/users/${selectedUserProfile._id}/profile`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/admin/users/${selectedUserProfile._id}/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2576,7 +2576,7 @@ const AdminDashboard = () => {
                             const reader = new FileReader();
                             reader.onloadend = async () => {
                               try {
-                                const response = await fetch('http://localhost:5000/api/auth/profile/update', {
+                                const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/auth/profile/update`, {
                                   method: 'PUT',
                                   headers: {
                                     'Content-Type': 'application/json',
@@ -2624,7 +2624,7 @@ const AdminDashboard = () => {
                             const reader = new FileReader();
                             reader.onloadend = async () => {
                               try {
-                                const response = await fetch('http://localhost:5000/api/auth/profile/update', {
+                                const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/auth/profile/update`, {
                                   method: 'PUT',
                                   headers: {
                                     'Content-Type': 'application/json',
@@ -2767,7 +2767,7 @@ const AdminDashboard = () => {
                             payload.newPassword = adminNewPassword;
                           }
 
-                          const response = await fetch('http://localhost:5000/api/auth/profile/update', {
+                          const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/auth/profile/update`, {
                             method: 'PUT',
                             headers: {
                               'Content-Type': 'application/json',
