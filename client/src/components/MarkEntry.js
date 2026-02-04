@@ -10,10 +10,13 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [marks, setMarks] = useState({
-    question1: { a: '', b: '', c: '', d: '' },
-    question2: { a: '', b: '', c: '', d: '' },
-    question3: { a: '', b: '', c: '', d: '' },
-    question4: { a: '', b: '', c: '', d: '' }
+    a: { '1': '', '2': '', '3': '', '4': '' },
+    b: { '1': '', '2': '', '3': '', '4': '' },
+    c: { '1': '', '2': '', '3': '', '4': '' },
+    d: { '1': '', '2': '', '3': '', '4': '' },
+    e: { '1': '', '2': '', '3': '', '4': '' },
+    f: { '1': '', '2': '', '3': '', '4': '' },
+    g: { '1': '', '2': '', '3': '', '4': '' }
   });
   // Store all students' marks and images
   const [studentData, setStudentData] = useState({});
@@ -51,66 +54,79 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       const studentId = currentStudent._id;
       const sessionKey = getSessionKey(studentId);
       
-      // Check sessionStorage first for processed data
+      let marksLoaded = false;
+      let imageLoaded = false;
+      
+      // Priority 1: Check sessionStorage first for processed data (highest priority)
       const sessionData = sessionStorage.getItem(sessionKey);
       if (sessionData) {
         try {
           const parsed = JSON.parse(sessionData);
           setMarks(parsed.marks);
           setCapturedImage(parsed.image);
+          marksLoaded = true;
+          imageLoaded = true;
           console.log('Loaded from session storage for', currentStudent.name);
         } catch (e) {
           console.error('Error parsing session data:', e);
         }
       }
       
-      // Check in-memory cache
-      if (studentData[studentId]) {
+      // Priority 2: Check in-memory cache (if not loaded from session)
+      if (!marksLoaded && studentData[studentId]) {
         setMarks(studentData[studentId].marks);
         setCapturedImage(studentData[studentId].image);
+        marksLoaded = true;
+        imageLoaded = true;
+        console.log('Loaded from in-memory cache for', currentStudent.name);
       }
       
-      // Fetch from database to compare
+      // Priority 3: Fetch from database (if not loaded from session or cache)
       setIsLoadingMarks(true);
       try {
         const response = await getTermExamMarks(studentId, course._id, section);
         if (response.success && response.data) {
           setSavedMarks(response.data.marks); // Track database version
           
-          // If no session data, load from database
-          if (!sessionData && !studentData[studentId]) {
+          // Only load from database if no session/cache data
+          if (!marksLoaded) {
             setMarks(response.data.marks);
           }
           
           const validImage = response.data.imageUrl && !response.data.imageUrl.startsWith('blob:') ? response.data.imageUrl : null;
           
-          // If no session data, load from database
-          if (!sessionData && !studentData[studentId]) {
+          // Only load image from database if no session/cache image
+          if (!imageLoaded) {
             setCapturedImage(validImage);
           }
           
-          // Cache in memory
-          setStudentData(prev => ({
-            ...prev,
-            [studentId]: {
-              marks: response.data.marks,
-              image: validImage
-            }
-          }));
+          // Update in-memory cache only if we don't have fresher session data
+          if (!sessionData) {
+            setStudentData(prev => ({
+              ...prev,
+              [studentId]: {
+                marks: response.data.marks,
+                image: validImage
+              }
+            }));
+          }
         } else {
           // No marks found in database
           setSavedMarks(null);
         }
       } catch (error) {
-        // No marks found in database - reset to empty
+        // No marks found in database - reset to empty only if no session/cache data
         console.log('No existing marks found for student:', currentStudent.name);
         setSavedMarks(null);
-        if (!sessionData && !studentData[studentId]) {
+        if (!marksLoaded) {
           setMarks({
-            question1: { a: '', b: '', c: '', d: '' },
-            question2: { a: '', b: '', c: '', d: '' },
-            question3: { a: '', b: '', c: '', d: '' },
-            question4: { a: '', b: '', c: '', d: '' }
+            a: { '1': '', '2': '', '3': '', '4': '' },
+            b: { '1': '', '2': '', '3': '', '4': '' },
+            c: { '1': '', '2': '', '3': '', '4': '' },
+            d: { '1': '', '2': '', '3': '', '4': '' },
+            e: { '1': '', '2': '', '3': '', '4': '' },
+            f: { '1': '', '2': '', '3': '', '4': '' },
+            g: { '1': '', '2': '', '3': '', '4': '' }
           });
           setCapturedImage(null);
         }
@@ -257,10 +273,13 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     }
     setCapturedImage(null);
     setMarks({
-      question1: { a: '', b: '', c: '', d: '' },
-      question2: { a: '', b: '', c: '', d: '' },
-      question3: { a: '', b: '', c: '', d: '' },
-      question4: { a: '', b: '', c: '', d: '' }
+      a: { '1': '', '2': '', '3': '', '4': '' },
+      b: { '1': '', '2': '', '3': '', '4': '' },
+      c: { '1': '', '2': '', '3': '', '4': '' },
+      d: { '1': '', '2': '', '3': '', '4': '' },
+      e: { '1': '', '2': '', '3': '', '4': '' },
+      f: { '1': '', '2': '', '3': '', '4': '' },
+      g: { '1': '', '2': '', '3': '', '4': '' }
     });
   };
 
@@ -362,6 +381,15 @@ const MarkEntry = ({ course, students, section, onClose }) => {
             processed: true
           }));
           
+          // Update in-memory cache
+          setStudentData(prev => ({
+            ...prev,
+            [studentId]: {
+              marks: response.marks,
+              image: capturedImage
+            }
+          }));
+          
           // Update marks ONLY if still on same student (using ref for current value)
           if (currentStudentIdRef.current === studentId) {
             setMarks(response.marks);
@@ -405,15 +433,15 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   };
 
   // Handle mark change
-  const handleMarkChange = (question, part, value) => {
+  const handleMarkChange = (row, question, value) => {
     // Only allow numbers
     if (value && !/^\d*\.?\d*$/.test(value)) return;
     
     const updatedMarks = {
       ...marks,
-      [question]: {
-        ...marks[question],
-        [part]: value
+      [row]: {
+        ...marks[row],
+        [question]: value
       }
     };
     
@@ -734,8 +762,16 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                 <button className="btn btn-outline" onClick={handleRetake}>
                   <FontAwesomeIcon icon={faCamera} /> Retake
                 </button>
-                <button className="btn btn-primary" onClick={processImage}>
-                  Process Image
+                <button 
+                  className="btn btn-primary" 
+                  onClick={processImage}
+                  disabled={processingQueue.has(currentStudent._id) && processingQueue.get(currentStudent._id).status === 'processing'}
+                >
+                  {processingQueue.has(currentStudent._id) && processingQueue.get(currentStudent._id).status === 'processing' ? (
+                    <>⏳ Processing...</>
+                  ) : (
+                    <>Process Image</>
+                  )}
                 </button>
               </div>
             </div>
@@ -745,26 +781,37 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           {(capturedImage || showCamera === false) && (
             <div className="marks-form-section">
               <h4>Enter Marks</h4>
-              <div className="marks-grid">
-                {[1, 2, 3, 4].map(qNum => (
-                  <div key={qNum} className="question-marks">
-                    <h5>Question {qNum}</h5>
-                    <div className="parts-grid">
-                      {['a', 'b', 'c', 'd'].map(part => (
-                        <div key={part} className="mark-input-group">
-                          <label>{part.toUpperCase()}</label>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={marks[`question${qNum}`][part]}
-                            onChange={(e) => handleMarkChange(`question${qNum}`, part, e.target.value)}
-                            placeholder="0"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+              <div className="marks-table-container">
+                <table className="marks-table">
+                  <thead>
+                    <tr>
+                      <th>Row</th>
+                      <th>Q1</th>
+                      <th>Q2</th>
+                      <th>Q3</th>
+                      <th>Q4</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(row => (
+                      <tr key={row}>
+                        <td className="row-label">{row}</td>
+                        {['1', '2', '3', '4'].map(question => (
+                          <td key={question}>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={marks[row][question]}
+                              onChange={(e) => handleMarkChange(row, question, e.target.value)}
+                              placeholder="0"
+                              className="mark-input"
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
               
               {/* Total Marks */}
