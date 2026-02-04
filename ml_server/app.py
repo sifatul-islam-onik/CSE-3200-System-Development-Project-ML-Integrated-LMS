@@ -225,32 +225,58 @@ def extract_table_from_image(image_path: str, confidence_threshold: float = 0.55
             shutil.rmtree(temp_dir)
 
 def parse_marks_from_table(table_data: List[List[str]]) -> Dict[str, Dict[str, str]]:
-    """Parse marks from table data into question/part structure"""
+    """Parse marks from table data into row/question structure"""
+    # New structure: rows a-g with questions 1-4
     marks = {
-        "question1": {"a": "", "b": "", "c": "", "d": ""},
-        "question2": {"a": "", "b": "", "c": "", "d": ""},
-        "question3": {"a": "", "b": "", "c": "", "d": ""},
-        "question4": {"a": "", "b": "", "c": "", "d": ""}
+        "a": {"1": "", "2": "", "3": "", "4": ""},
+        "b": {"1": "", "2": "", "3": "", "4": ""},
+        "c": {"1": "", "2": "", "3": "", "4": ""},
+        "d": {"1": "", "2": "", "3": "", "4": ""},
+        "e": {"1": "", "2": "", "3": "", "4": ""},
+        "f": {"1": "", "2": "", "3": "", "4": ""},
+        "g": {"1": "", "2": "", "3": "", "4": ""}
     }
     
-    # Expected: 5 rows (header + 4 questions), 5 columns (question + a,b,c,d)
+    # Expected: 8 rows (header + 7 data rows a-g), 5 columns (row label + questions 1-4)
     if len(table_data) < 2:
         return marks
     
-    # Skip header row, process data rows
-    for row_idx, row in enumerate(table_data[1:5], 1):  # Process up to 4 questions
-        if len(row) < 2:
+    # Row labels in order
+    row_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
+    
+    # Process rows using position-based indexing (more reliable than OCR labels)
+    data_row_idx = 0
+    for table_row_idx in range(1, len(table_data)):
+        row = table_data[table_row_idx]
+        
+        # Skip completely empty rows
+        if len(row) == 0 or all(cell.strip() == '' for cell in row):
             continue
         
-        question_key = f"question{row_idx}"
+        # Check if this row has at least one numeric value (indicates it's a data row)
+        has_data = False
+        for col_idx in range(1, min(5, len(row))):
+            if row[col_idx].strip() and re.search(r'\d', row[col_idx]):
+                has_data = True
+                break
         
-        # Extract marks for parts a, b, c, d
-        for col_idx, part in enumerate(['a', 'b', 'c', 'd']):
-            if col_idx + 1 < len(row):
-                value = row[col_idx + 1].strip()
-                # Clean value - keep only numbers and decimal point
-                cleaned_value = re.sub(r'[^0-9.]', '', value)
-                marks[question_key][part] = cleaned_value
+        # Skip rows without any numeric data
+        if not has_data and data_row_idx >= len(row_labels):
+            continue
+        
+        # Assign to the next available row label based on position
+        if data_row_idx < len(row_labels):
+            row_key = row_labels[data_row_idx]
+            
+            # Extract marks for questions 1, 2, 3, 4
+            for col_idx, question in enumerate(['1', '2', '3', '4']):
+                if col_idx + 1 < len(row):
+                    value = row[col_idx + 1].strip()
+                    # Clean value - keep only numbers and decimal point
+                    cleaned_value = re.sub(r'[^0-9.]', '', value)
+                    marks[row_key][question] = cleaned_value
+            
+            data_row_idx += 1
     
     return marks
 
@@ -290,8 +316,18 @@ async def extract_marks(image: UploadFile = File(...)):
         # Extract table from image
         result = extract_table_from_image(temp_file.name)
         
+        # Log raw table data for debugging
+        print("Raw table data extracted:")
+        for i, row in enumerate(result["table_data"]):
+            print(f"  Row {i}: {row}")
+        
         # Parse marks from table
         marks = parse_marks_from_table(result["table_data"])
+        
+        # Log parsed marks for debugging
+        print("Parsed marks:")
+        for row_label, questions in marks.items():
+            print(f"  {row_label}: {questions}")
         
         return MarksResponse(
             success=True,
@@ -303,6 +339,8 @@ async def extract_marks(image: UploadFile = File(...)):
         
     except Exception as e:
         print(f"Error processing image: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
     
     finally:

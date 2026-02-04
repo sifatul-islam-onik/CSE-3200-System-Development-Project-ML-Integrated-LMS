@@ -247,6 +247,96 @@
   width: 100%;
 }
 
+/* New table-based marks entry */
+.marks-table-container {
+  overflow-x: auto;
+  margin-bottom: 20px;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+.marks-table {
+  width: 100%;
+  min-width: 400px; /* Minimum width to prevent cramping */
+  border-collapse: collapse;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.marks-table thead {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.marks-table th {
+  padding: 12px 16px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  white-space: nowrap;
+}
+
+.marks-table tbody tr {
+  transition: background-color 0.2s;
+}
+
+.marks-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.marks-table tbody tr:nth-child(even) {
+  background-color: #f3f4f6;
+}
+
+.marks-table tbody tr:nth-child(even):hover {
+  background-color: #e5e7eb;
+}
+
+.marks-table td {
+  padding: 8px;
+  text-align: center;
+  border: 1px solid #e5e7eb;
+}
+
+.marks-table .row-label {
+  font-weight: 600;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 15px;
+  width: 60px;
+  min-width: 50px;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.marks-table .mark-input {
+  width: 100%;
+  max-width: 80px;
+  min-width: 60px;
+  padding: 8px 12px;
+  border: 2px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  text-align: center;
+  font-weight: 500;
+  transition: all 0.2s;
+  background: white;
+  -webkit-appearance: none; /* Remove default styling on iOS */
+}
+
+.marks-table .mark-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.marks-table .mark-input:hover {
+  border-color: #9ca3af;
+}
+
 .question-marks {
   background: #f9fafb;
   padding: 16px;
@@ -369,6 +459,28 @@
 
   .upload-options button {
     width: 100%;
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+
+  .image-actions {
+    flex-direction: column;
+  }
+
+  .image-actions button {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+
+  .camera-controls {
+    flex-direction: column;
+  }
+
+  .camera-controls button {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 15px;
   }
 
   .student-info-card {
@@ -401,6 +513,40 @@
     padding: 12px;
   }
 
+  .marks-form-section h4 {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+
+  /* Mobile responsive table */
+  .marks-table {
+    min-width: 350px;
+    font-size: 13px;
+  }
+
+  .marks-table th {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .marks-table td {
+    padding: 6px;
+  }
+
+  .marks-table .row-label {
+    font-size: 14px;
+    width: 45px;
+    min-width: 40px;
+    padding: 6px 8px;
+  }
+
+  .marks-table .mark-input {
+    padding: 6px 8px;
+    font-size: 13px;
+    max-width: 65px;
+    min-width: 55px;
+  }
+
   .question-marks {
     padding: 10px;
   }
@@ -412,5 +558,41 @@
   .mark-input-group input {
     padding: 6px;
     font-size: 13px;
+  }
+
+  /* Total marks section */
+  .total-marks {
+    font-size: 14px;
+  }
+
+  .total-value {
+    font-size: 18px;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 360px) {
+  .marks-table {
+    min-width: 320px;
+    font-size: 12px;
+  }
+
+  .marks-table th {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  .marks-table .row-label {
+    font-size: 13px;
+    width: 38px;
+    min-width: 35px;
+    padding: 5px 6px;
+  }
+
+  .marks-table .mark-input {
+    padding: 5px 6px;
+    font-size: 12px;
+    max-width: 55px;
+    min-width: 50px;
   }
 }

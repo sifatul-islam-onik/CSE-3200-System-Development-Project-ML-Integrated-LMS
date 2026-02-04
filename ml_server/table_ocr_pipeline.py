@@ -59,7 +59,8 @@ def preprocess_cell_for_ocr(cell_image):
 def filter_allowed_characters(text):
     if not text:
         return ""
-    allowed_pattern = re.compile(r'[^abcdABCD0-9]')
+    # Allow a-g (row labels), 0-9 (numbers), and decimal points
+    allowed_pattern = re.compile(r'[^abcdefgABCDEFG0-9.]')
     filtered_text = allowed_pattern.sub('', text)
     return filtered_text
 
