@@ -31,12 +31,18 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   const [savedMarks, setSavedMarks] = useState(null); // Track marks from database
   
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null); // Separate ref for mobile camera input
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const processingAbortControllers = useRef(new Map());
   const currentStudentIdRef = useRef(null);
 
   const currentStudent = students[currentStudentIndex];
+  
+  // Detect if device is mobile
+  const isMobileDevice = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  };
   
   // Update ref whenever current student changes
   useEffect(() => {
@@ -196,6 +202,13 @@ const MarkEntry = ({ course, students, section, onClose }) => {
 
   // Initialize camera
   const startCamera = async () => {
+    // On mobile, trigger the native camera input instead of embedded camera
+    if (isMobileDevice()) {
+      cameraInputRef.current?.click();
+      return;
+    }
+    
+    // Desktop: Use embedded camera
     try {
       setVideoReady(false);
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
@@ -302,6 +315,11 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       studentRoll: currentStudent.roll,
       progress: 0
     }));
+    
+    // Move to next student immediately after starting processing
+    if (currentStudentIndex < students.length - 1) {
+      setCurrentStudentIndex(prev => prev + 1);
+    }
     
     // Start background processing
     (async () => {
@@ -716,6 +734,14 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                 ref={fileInputRef}
                 style={{ display: 'none' }}
                 accept="image/*"
+                onChange={handleFileUpload}
+              />
+              <input
+                type="file"
+                ref={cameraInputRef}
+                style={{ display: 'none' }}
+                accept="image/*"
+                capture="environment"
                 onChange={handleFileUpload}
               />
             </div>

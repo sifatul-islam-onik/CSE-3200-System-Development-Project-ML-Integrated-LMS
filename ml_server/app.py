@@ -237,45 +237,83 @@ def parse_marks_from_table(table_data: List[List[str]]) -> Dict[str, Dict[str, s
         "g": {"1": "", "2": "", "3": "", "4": ""}
     }
     
-    # Expected: 8 rows (header + 7 data rows a-g), 5 columns (row label + questions 1-4)
     if len(table_data) < 2:
         return marks
     
-    # Row labels in order
-    row_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
+    # Step 1: Find the header row (contains '1', '2', '3', '4')
+    header_row_idx = -1
+    question_col_indices = {}  # Map question number to column index
     
-    # Process rows using position-based indexing (more reliable than OCR labels)
+    for idx, row in enumerate(table_data):
+        if len(row) < 4:
+            continue
+        
+        # Check if this row contains question numbers 1, 2, 3, 4
+        found_questions = {}
+        for col_idx, cell in enumerate(row):
+            cell_clean = cell.strip()
+            if cell_clean in ['1', '2', '3', '4']:
+                found_questions[cell_clean] = col_idx
+        
+        # If we found all 4 questions, this is the header row
+        if len(found_questions) >= 4:
+            header_row_idx = idx
+            question_col_indices = found_questions
+            print(f"  Found header at row {idx}: questions at columns {question_col_indices}")
+            break
+    
+    # If no header found, fall back to assuming first row is header
+    if header_row_idx == -1:
+        print("  Warning: Could not find header row with questions 1-4")
+        header_row_idx = 0
+        # Assume standard layout: column 1-4 are questions
+        question_col_indices = {'1': 1, '2': 2, '3': 3, '4': 4}
+    
+    # Step 2: Process data rows after header
+    row_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
     data_row_idx = 0
-    for table_row_idx in range(1, len(table_data)):
+    
+    for table_row_idx in range(header_row_idx + 1, len(table_data)):
         row = table_data[table_row_idx]
         
         # Skip completely empty rows
         if len(row) == 0 or all(cell.strip() == '' for cell in row):
             continue
         
-        # Check if this row has at least one numeric value (indicates it's a data row)
+        # Check if this is a "Total" row by examining first column
+        first_col = row[0].strip().lower() if len(row) > 0 else ''
+        if 'total' in first_col or 'sum' in first_col:
+            print(f"  Skipping Total row at index {table_row_idx}")
+            continue
+        
+        # Check if this row has at least one numeric value in question columns
         has_data = False
-        for col_idx in range(1, min(5, len(row))):
-            if row[col_idx].strip() and re.search(r'\d', row[col_idx]):
-                has_data = True
-                break
+        for question, col_idx in question_col_indices.items():
+            if col_idx < len(row):
+                cell_value = row[col_idx].strip()
+                if cell_value and re.search(r'\d', cell_value):
+                    has_data = True
+                    break
         
         # Skip rows without any numeric data
-        if not has_data and data_row_idx >= len(row_labels):
+        if not has_data:
             continue
         
         # Assign to the next available row label based on position
         if data_row_idx < len(row_labels):
             row_key = row_labels[data_row_idx]
             
-            # Extract marks for questions 1, 2, 3, 4
-            for col_idx, question in enumerate(['1', '2', '3', '4']):
-                if col_idx + 1 < len(row):
-                    value = row[col_idx + 1].strip()
-                    # Clean value - keep only numbers and decimal point
-                    cleaned_value = re.sub(r'[^0-9.]', '', value)
-                    marks[row_key][question] = cleaned_value
+            # Extract marks for questions 1, 2, 3, 4 using column indices from header
+            for question in ['1', '2', '3', '4']:
+                if question in question_col_indices:
+                    col_idx = question_col_indices[question]
+                    if col_idx < len(row):
+                        value = row[col_idx].strip()
+                        # Clean value - keep only numbers and decimal point
+                        cleaned_value = re.sub(r'[^0-9.]', '', value)
+                        marks[row_key][question] = cleaned_value
             
+            print(f"  Parsed row {row_key}: {marks[row_key]}")
             data_row_idx += 1
     
     return marks

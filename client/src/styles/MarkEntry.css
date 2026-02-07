@@ -37,6 +37,13 @@
   flex-shrink: 0;
 }
 
+.mark-entry-footer button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
 .student-info-card {
   display: flex;
   justify-content: space-between;
@@ -436,8 +443,21 @@
 
   .mark-entry-footer {
     padding: 12px 20px;
-    flex-direction: row;
-    gap: 8px;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .mark-entry-footer > div {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  .mark-entry-footer button {
+    flex: 1;
+    min-width: 100px;
+    padding: 10px 16px;
+    font-size: 14px;
   }
 
   .marks-grid {
@@ -507,6 +527,16 @@
 @media (max-width: 480px) {
   .mark-entry-body {
     padding: 16px;
+  }
+
+  .mark-entry-footer {
+    padding: 10px 16px;
+    gap: 10px;
+  }
+
+  .mark-entry-footer button {
+    padding: 10px 12px;
+    font-size: 13px;
   }
 
   .marks-form-section {
