@@ -51,3 +51,13 @@ export const deleteOCRJob = async (jobId) => {
   });
   return response.data;
 };
+
+// Get queue status
+export const getQueueStatus = async () => {
+  const response = await axios.get(`${API_URL}/queue-status`, {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    }
+  });
+  return response.data;
+};
