@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes, faCamera, faUpload, faChevronLeft, faChevronRight, faCheck, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faTimes, faCamera, faUpload, faChevronLeft, faChevronRight, faCheck, faSpinner, faClock, faHourglassHalf, faCircleXmark } from '@fortawesome/free-solid-svg-icons';
 import { getTermExamMarks, saveTermExamMarks } from '../services/termExamMarksService';
-import { submitOCRJob, getOCRJobStatus } from '../services/ocrJobService';
+import { submitOCRJob, getOCRJobStatus, getQueueStatus } from '../services/ocrJobService';
 import '../styles/MarkEntry.css';
 
 const MarkEntry = ({ course, students, section, onClose }) => {
@@ -30,6 +30,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   const [isProcessingImage, setIsProcessingImage] = useState(false); // Loading state for process button
   const [isLoadingData, setIsLoadingData] = useState(true); // Loading state for initial data
   const [activeJobCount, setActiveJobCount] = useState(0); // Track number of active jobs for efficient polling
+  const [queueStatus, setQueueStatus] = useState(null); // Queue status from Redis
   
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null); // Separate ref for mobile camera input
@@ -38,6 +39,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   const currentStudentIdRef = useRef(null);
   const pollIntervalRef = useRef(null);
   const ocrJobsRef = useRef(new Map()); // Ref for polling without causing re-renders
+  const queuePollIntervalRef = useRef(null); // Separate interval for queue status polling
 
   const currentStudent = students[currentStudentIndex];
   
@@ -195,6 +197,31 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       }
     };
   }, [activeJobCount]); // Re-run when activeJobCount changes
+
+  // Poll queue status
+  useEffect(() => {
+    const pollQueueStatus = async () => {
+      try {
+        const response = await getQueueStatus();
+        if (response.success) {
+          setQueueStatus(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching queue status:', error);
+      }
+    };
+
+    // Poll queue status every 5 seconds
+    pollQueueStatus(); // Initial poll
+    queuePollIntervalRef.current = setInterval(pollQueueStatus, 5000);
+
+    return () => {
+      if (queuePollIntervalRef.current) {
+        clearInterval(queuePollIntervalRef.current);
+        queuePollIntervalRef.current = null;
+      }
+    };
+  }, []); // Run once on mount
 
   // Load saved data when student changes
   useEffect(() => {
@@ -744,8 +771,11 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   // Handle Enter key press in roll input
   const handleRollInputKeyPress = (event) => {
     if (event.key === 'Enter') {
-      handleJumpToStudent(event.target.value);
+      event.preventDefault(); // Prevent default form submission behavior
+      const rollValue = event.target.value;
+      handleJumpToStudent(rollValue);
       event.target.value = ''; // Clear input after jumping
+      event.target.blur(); // Remove focus from input
     }
   };
 
@@ -829,17 +859,17 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                     Roll: {job.student?.roll || 'N/A'}
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {job.status === 'pending' && <span style={{ fontSize: '12px', color: '#f59e0b' }}>⏱ Queued</span>}
+                    {job.status === 'pending' && <span style={{ fontSize: '12px', color: '#f59e0b' }}><FontAwesomeIcon icon={faClock} /> Queued</span>}
                     {job.status === 'processing' && (
                       <>
                         <div style={{ width: '80px', height: '4px', background: '#e5e7eb', borderRadius: '2px', overflow: 'hidden' }}>
                           <div style={{ width: `${job.progress}%`, height: '100%', background: '#3b82f6', transition: 'width 0.3s' }} />
                         </div>
-                        <span style={{ fontSize: '12px', color: '#3b82f6' }}>⏳ {job.progress}%</span>
+                        <span style={{ fontSize: '12px', color: '#3b82f6' }}><FontAwesomeIcon icon={faHourglassHalf} /> {job.progress}%</span>
                       </>
                     )}
-                    {job.status === 'completed' && <span style={{ fontSize: '12px', color: '#10b981' }}>✓ Done</span>}
-                    {job.status === 'failed' && <span style={{ fontSize: '12px', color: '#ef4444' }}>✗ Failed</span>}
+                    {job.status === 'completed' && <span style={{ fontSize: '12px', color: '#10b981' }}><FontAwesomeIcon icon={faCheck} /> Done</span>}
+                    {job.status === 'failed' && <span style={{ fontSize: '12px', color: '#ef4444' }}><FontAwesomeIcon icon={faCircleXmark} /> Failed</span>}
                   </div>
                 </div>
               ))}
@@ -851,6 +881,31 @@ const MarkEntry = ({ course, students, section, onClose }) => {
             </div>
             );
           })()}
+          
+          {/* Queue Status */}
+          {queueStatus && queueStatus.counts.waiting > 0 && (
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+              border: '2px solid #f59e0b',
+              borderRadius: '12px',
+              padding: '8px 16px',
+              marginBottom: '16px',
+              boxShadow: '0 2px 4px rgba(245, 158, 11, 0.1)'
+            }}>
+              <span style={{ fontSize: '18px' }}><FontAwesomeIcon icon={faSpinner}/></span>
+              <div>
+                <span style={{ fontWeight: '700', fontSize: '20px', color: '#92400e' }}>
+                  {queueStatus.counts.waiting}
+                </span>
+                <span style={{ fontSize: '13px', color: '#78350f', marginLeft: '6px', fontWeight: '500' }}>
+                  in queue
+                </span>
+              </div>
+            </div>
+          )}
           
           {/* Current student OCR job status */}
           {ocrJobs.has(currentStudent._id) && ocrJobs.get(currentStudent._id).status !== 'completed' && (
@@ -864,13 +919,13 @@ const MarkEntry = ({ course, students, section, onClose }) => {
               fontSize: '14px'
             }}>
               {ocrJobs.get(currentStudent._id).status === 'pending' && (
-                <>⏱ OCR job queued for this student...</>
+                <><FontAwesomeIcon icon={faClock} /> OCR job queued for this student...</>
               )}
               {ocrJobs.get(currentStudent._id).status === 'processing' && (
-                <>⏳ Processing image for this student... ({ocrJobs.get(currentStudent._id).progress}%)</>
+                <><FontAwesomeIcon icon={faHourglassHalf} /> Processing image for this student... ({ocrJobs.get(currentStudent._id).progress}%)</>
               )}
               {ocrJobs.get(currentStudent._id).status === 'failed' && (
-                <>✗ OCR processing failed: {ocrJobs.get(currentStudent._id).error}</>
+                <><FontAwesomeIcon icon={faCircleXmark} /> OCR processing failed: {ocrJobs.get(currentStudent._id).error}</>
               )}
             </div>
           )}
@@ -885,7 +940,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
               marginBottom: '16px',
               fontSize: '14px'
             }}>
-              ✓ OCR processing completed! Marks have been auto-filled.
+               <FontAwesomeIcon icon={faCheck} /> OCR processing completed! Marks have been auto-filled.
             </div>
           )}
 
