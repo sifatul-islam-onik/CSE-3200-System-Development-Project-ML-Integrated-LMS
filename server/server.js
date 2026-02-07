@@ -10,8 +10,8 @@ const app = express();
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Database connection
 const connectDB = async () => {
@@ -61,6 +61,7 @@ const courseProposalRoutes = require('./routes/courseProposalRoutes');
 const termExamMarksRoutes = require('./routes/termExamMarksRoutes');
 const attainmentRoutes = require('./routes/attainmentRoutes');
 const courseProfileRoutes = require('./routes/courseProfileRoutes');
+const ocrRoutes = require('./routes/ocrRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
@@ -74,6 +75,7 @@ app.use('/api/course-proposals', courseProposalRoutes);
 app.use('/api/term-exam-marks', termExamMarksRoutes);
 app.use('/api/attainment', attainmentRoutes);
 app.use('/api/course-profile', courseProfileRoutes);
+app.use('/api/ocr', ocrRoutes);
 
 // Error handlers
 process.on('unhandledRejection', (err) => {

@@ -2,13 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faCamera, faUpload, faChevronLeft, faChevronRight, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { getTermExamMarks, saveTermExamMarks } from '../services/termExamMarksService';
+import { submitOCRJob, getUserOCRJobs, getOCRJobStatus } from '../services/ocrJobService';
 import '../styles/MarkEntry.css';
 
 const MarkEntry = ({ course, students, section, onClose }) => {
   const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
   const [capturedImage, setCapturedImage] = useState(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingProgress, setProcessingProgress] = useState(0);
   const [marks, setMarks] = useState({
     a: { '1': '', '2': '', '3': '', '4': '' },
     b: { '1': '', '2': '', '3': '', '4': '' },
@@ -22,11 +21,10 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   const [studentData, setStudentData] = useState({});
   const [showCamera, setShowCamera] = useState(false);
   const [stream, setStream] = useState(null);
-  const [isLoadingMarks, setIsLoadingMarks] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
   
-  // Processing queue and status
-  const [processingQueue, setProcessingQueue] = useState(new Map());
+  // OCR job tracking (replaces sessionStorage and processingQueue)
+  const [ocrJobs, setOcrJobs] = useState(new Map()); // studentId -> job object
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [savedMarks, setSavedMarks] = useState(null); // Track marks from database
   
@@ -34,8 +32,8 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   const cameraInputRef = useRef(null); // Separate ref for mobile camera input
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const processingAbortControllers = useRef(new Map());
   const currentStudentIdRef = useRef(null);
+  const pollIntervalRef = useRef(null);
 
   const currentStudent = students[currentStudentIndex];
   
@@ -49,36 +47,101 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     currentStudentIdRef.current = currentStudent._id;
   }, [currentStudent._id]);
   
-  // Generate session storage key
-  const getSessionKey = (studentId) => {
-    return `marks_${course._id}_${studentId}_${section || 'default'}`;
-  };
+  // Load OCR jobs for all students on mount
+  useEffect(() => {
+    const loadOCRJobs = async () => {
+      try {
+        const response = await getUserOCRJobs({ courseId: course._id });
+        if (response.success) {
+          const jobsMap = new Map();
+          response.data.forEach(job => {
+            if (job.student && job.student._id) {
+              jobsMap.set(job.student._id, job);
+            }
+          });
+          setOcrJobs(jobsMap);
+          console.log('Loaded OCR jobs:', jobsMap.size);
+        }
+      } catch (error) {
+        console.error('Error loading OCR jobs:', error);
+      }
+    };
+    
+    loadOCRJobs();
+  }, [course._id]);
+  
+  // Poll active OCR jobs
+  useEffect(() => {
+    const activeJobs = Array.from(ocrJobs.values()).filter(
+      job => job.status === 'pending' || job.status === 'processing'
+    );
+    
+    if (activeJobs.length === 0) {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      return;
+    }
+    
+    // Poll every 2 seconds
+    pollIntervalRef.current = setInterval(async () => {
+      for (const job of activeJobs) {
+        try {
+          const response = await getOCRJobStatus(job.jobId);
+          if (response.success) {
+            const updatedJob = response.data;
+            setOcrJobs(prev => {
+              const updated = new Map(prev);
+              if (updatedJob.student && updatedJob.student._id) {
+                updated.set(updatedJob.student._id, updatedJob);
+              }
+              return updated;
+            });
+            
+            // If job completed, auto-fill marks if viewing this student
+            if (updatedJob.status === 'completed' && updatedJob.student._id === currentStudent._id) {
+              if (updatedJob.marks) {
+                setMarks(updatedJob.marks);
+                console.log('Auto-filled marks from completed OCR job');
+              }
+              if (updatedJob.imageUrl) {
+                setCapturedImage(updatedJob.imageUrl);
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`Error polling job ${job.jobId}:`, error);
+        }
+      }
+    }, 2000);
+    
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, [ocrJobs, currentStudent._id]);
 
   // Load saved data when student changes
   useEffect(() => {
     const loadStudentMarks = async () => {
       const studentId = currentStudent._id;
-      const sessionKey = getSessionKey(studentId);
       
       let marksLoaded = false;
       let imageLoaded = false;
       
-      // Priority 1: Check sessionStorage first for processed data (highest priority)
-      const sessionData = sessionStorage.getItem(sessionKey);
-      if (sessionData) {
-        try {
-          const parsed = JSON.parse(sessionData);
-          setMarks(parsed.marks);
-          setCapturedImage(parsed.image);
-          marksLoaded = true;
-          imageLoaded = true;
-          console.log('Loaded from session storage for', currentStudent.name);
-        } catch (e) {
-          console.error('Error parsing session data:', e);
-        }
+      // Priority 1: Check if there's a completed OCR job
+      const ocrJob = ocrJobs.get(studentId);
+      if (ocrJob && ocrJob.status === 'completed' && ocrJob.marks) {
+        setMarks(ocrJob.marks);
+        setCapturedImage(ocrJob.imageUrl);
+        marksLoaded = true;
+        imageLoaded = true;
+        console.log('Loaded from OCR job for', currentStudent.name);
       }
       
-      // Priority 2: Check in-memory cache (if not loaded from session)
+      // Priority 2: Check in-memory cache (if not loaded from OCR job)
       if (!marksLoaded && studentData[studentId]) {
         setMarks(studentData[studentId].marks);
         setCapturedImage(studentData[studentId].image);
@@ -87,8 +150,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         console.log('Loaded from in-memory cache for', currentStudent.name);
       }
       
-      // Priority 3: Fetch from database (if not loaded from session or cache)
-      setIsLoadingMarks(true);
+      // Priority 3: Fetch from database (if not loaded from OCR job or cache)
       try {
         const response = await getTermExamMarks(studentId, course._id, section);
         if (response.success && response.data) {
@@ -101,13 +163,13 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           
           const validImage = response.data.imageUrl && !response.data.imageUrl.startsWith('blob:') ? response.data.imageUrl : null;
           
-          // Only load image from database if no session/cache image
+          // Only load image from database if no OCR job or cache image
           if (!imageLoaded) {
             setCapturedImage(validImage);
           }
           
-          // Update in-memory cache only if we don't have fresher session data
-          if (!sessionData) {
+          // Update in-memory cache only if we don't have fresher OCR job data
+          if (!ocrJob || ocrJob.status !== 'completed') {
             setStudentData(prev => ({
               ...prev,
               [studentId]: {
@@ -121,7 +183,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           setSavedMarks(null);
         }
       } catch (error) {
-        // No marks found in database - reset to empty only if no session/cache data
+        // No marks found in database - reset to empty only if no OCR job or cache data
         console.log('No existing marks found for student:', currentStudent.name);
         setSavedMarks(null);
         if (!marksLoaded) {
@@ -136,14 +198,12 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           });
           setCapturedImage(null);
         }
-      } finally {
-        setIsLoadingMarks(false);
       }
     };
     
     loadStudentMarks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStudentIndex, currentStudent._id, course._id, section]);
+  }, [currentStudentIndex, currentStudent._id, course._id, section, ocrJobs]);
   
   // Check for unsaved changes
   useEffect(() => {
@@ -173,7 +233,8 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   // Setup video stream when stream is available
   useEffect(() => {
     if (stream && videoRef.current) {
-      videoRef.current.srcObject = stream;
+      const video = videoRef.current; // Store ref value
+      video.srcObject = stream;
       
       const handleCanPlay = () => {
         console.log('Video can play');
@@ -188,14 +249,12 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         }, 500);
       };
 
-      videoRef.current.addEventListener('canplay', handleCanPlay);
-      videoRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
+      video.addEventListener('canplay', handleCanPlay);
+      video.addEventListener('loadedmetadata', handleLoadedMetadata);
 
       return () => {
-        if (videoRef.current) {
-          videoRef.current.removeEventListener('canplay', handleCanPlay);
-          videoRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
-        }
+        video.removeEventListener('canplay', handleCanPlay);
+        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       };
     }
   }, [stream, showCamera]);
@@ -301,153 +360,53 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     if (!capturedImage || capturedImage === 'skipped') return;
 
     const studentId = currentStudent._id;
-    const sessionKey = getSessionKey(studentId);
     
-    // Save image to session storage immediately
-    sessionStorage.setItem(sessionKey, JSON.stringify({
-      marks: marks,
-      image: capturedImage
-    }));
-    
-    // Update queue status
-    setProcessingQueue(prev => new Map(prev).set(studentId, {
-      status: 'processing',
-      studentRoll: currentStudent.roll,
-      progress: 0
-    }));
-    
-    // Move to next student immediately after starting processing
-    if (currentStudentIndex < students.length - 1) {
-      setCurrentStudentIndex(prev => prev + 1);
-    }
-    
-    // Start background processing
-    (async () => {
-      try {
-        // Convert image URL to blob
+    try {
+      // Convert blob URL to base64 if needed
+      let imageDataUrl = capturedImage;
+      if (capturedImage.startsWith('blob:')) {
+        console.log('Converting blob URL to base64...');
         const blob = await fetch(capturedImage).then(r => r.blob());
-        
-        // Create FormData and append image
-        const formData = new FormData();
-        formData.append('image', blob, 'answer-sheet.jpg');
-        
-        // Use XMLHttpRequest to track real upload progress
-        const xhr = new XMLHttpRequest();
-        const abortController = new AbortController();
-        processingAbortControllers.current.set(studentId, xhr);
-        
-        // Track upload progress (actual progress)
-        xhr.upload.addEventListener('progress', (e) => {
-          if (e.lengthComputable) {
-            const uploadProgress = (e.loaded / e.total) * 50; // Upload is 0-50%
-            setProcessingQueue(prev => {
-              const updated = new Map(prev);
-              const item = updated.get(studentId);
-              if (item) {
-                item.progress = uploadProgress;
-                updated.set(studentId, item);
-              }
-              return updated;
-            });
-          }
+        imageDataUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
         });
+        console.log('Converted to base64, length:', imageDataUrl.length);
+      }
+      
+      // Submit OCR job
+      const response = await submitOCRJob(studentId, course._id, section, imageDataUrl);
+      
+      if (response.success) {
+        // Update OCR jobs map with new job
+        const newJob = {
+          jobId: response.jobId,
+          student: { _id: studentId, name: currentStudent.name, roll: currentStudent.roll },
+          course: { _id: course._id },
+          imageUrl: imageDataUrl,
+          status: 'pending',
+          progress: 0,
+          createdAt: new Date()
+        };
         
-        // Handle response
-        const response = await new Promise((resolve, reject) => {
-          xhr.addEventListener('load', () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              try {
-                resolve(JSON.parse(xhr.responseText));
-              } catch (e) {
-                reject(new Error('Invalid JSON response'));
-              }
-            } else {
-              reject(new Error(`Server returned ${xhr.status}: ${xhr.statusText}`));
-            }
-          });
-          
-          xhr.addEventListener('error', () => {
-            reject(new Error('Network error occurred'));
-          });
-          
-          xhr.addEventListener('abort', () => {
-            reject(new Error('Request was aborted'));
-          });
-          
-          // Start processing phase (50-100%)
-          xhr.addEventListener('loadstart', () => {
-            setProcessingQueue(prev => {
-              const updated = new Map(prev);
-              const item = updated.get(studentId);
-              if (item) {
-                item.progress = 50;
-                updated.set(studentId, item);
-              }
-              return updated;
-            });
-          });
-          
-          xhr.open('POST', '/ml-api/extract-marks');
-          xhr.send(formData);
-        });
-        
-        if (response.success && response.marks) {
-          // Save to session storage
-          sessionStorage.setItem(sessionKey, JSON.stringify({
-            marks: response.marks,
-            image: capturedImage,
-            processed: true
-          }));
-          
-          // Update in-memory cache
-          setStudentData(prev => ({
-            ...prev,
-            [studentId]: {
-              marks: response.marks,
-              image: capturedImage
-            }
-          }));
-          
-          // Update marks ONLY if still on same student (using ref for current value)
-          if (currentStudentIdRef.current === studentId) {
-            setMarks(response.marks);
-          }
-          
-          // Update queue status to completed
-          setProcessingQueue(prev => {
-            const updated = new Map(prev);
-            updated.set(studentId, {
-              status: 'completed',
-              studentRoll: currentStudent.roll,
-              progress: 100,
-              marks: response.marks
-            });
-            return updated;
-          });
-          
-          console.log('✓ Marks extracted for roll:', currentStudent.roll);
-        } else {
-          throw new Error(response.message || 'Failed to extract marks from image');
-        }
-
-      } catch (error) {
-        console.error('Error processing image for', currentStudent.name, ':', error);
-        
-        // Update queue status to failed
-        setProcessingQueue(prev => {
+        setOcrJobs(prev => {
           const updated = new Map(prev);
-          updated.set(studentId, {
-            status: 'failed',
-            studentRoll: currentStudent.roll,
-            progress: 0,
-            error: error.message
-          });
+          updated.set(studentId, newJob);
           return updated;
         });
-      } finally {
-        processingAbortControllers.current.delete(studentId);
+        
+        console.log(`OCR job ${response.jobId} submitted for ${currentStudent.name}`);
+        
+        // Move to next student immediately
+        if (currentStudentIndex < students.length - 1) {
+          setCurrentStudentIndex(prev => prev + 1);
+        }
       }
-    })();
+    } catch (error) {
+      console.error('Error submitting OCR job:', error);
+      alert('Failed to submit OCR job. Please try again.');
+    }
   };
 
   // Handle mark change
@@ -465,11 +424,13 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     
     setMarks(updatedMarks);
     
-    // Save to session storage
-    const sessionKey = getSessionKey(currentStudent._id);
-    sessionStorage.setItem(sessionKey, JSON.stringify({
-      marks: updatedMarks,
-      image: capturedImage
+    // Update in-memory cache
+    setStudentData(prev => ({
+      ...prev,
+      [currentStudent._id]: {
+        marks: updatedMarks,
+        image: capturedImage
+      }
     }));
   };
 
@@ -649,8 +610,8 @@ const MarkEntry = ({ course, students, section, onClose }) => {
             </div>
           </div>
           
-          {/* Processing Queue Status */}
-          {processingQueue.size > 0 && (
+          {/* OCR Jobs Status */}
+          {ocrJobs.size > 0 && (
             <div style={{
               background: '#f3f4f6',
               border: '1px solid #e5e7eb',
@@ -659,9 +620,9 @@ const MarkEntry = ({ course, students, section, onClose }) => {
               marginBottom: '16px'
             }}>
               <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600' }}>
-                Background Processing ({processingQueue.size})
+                OCR Jobs ({Array.from(ocrJobs.values()).filter(j => j.status !== 'completed').length} active)
               </h5>
-              {Array.from(processingQueue.entries()).reverse().slice(0, 3).map(([id, info]) => (
+              {Array.from(ocrJobs.entries()).reverse().slice(0, 3).map(([id, job]) => (
                 <div key={id} style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -669,51 +630,66 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                   padding: '6px 0',
                   borderBottom: '1px solid #e5e7eb'
                 }}>
-                  <span style={{ fontSize: '13px' }}>Roll: {info.studentRoll}</span>
+                  <span style={{ fontSize: '13px' }}>
+                    Roll: {job.student?.roll || 'N/A'}
+                  </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {info.status === 'processing' && (
+                    {job.status === 'pending' && <span style={{ fontSize: '12px', color: '#f59e0b' }}>⏱ Queued</span>}
+                    {job.status === 'processing' && (
                       <>
                         <div style={{ width: '80px', height: '4px', background: '#e5e7eb', borderRadius: '2px', overflow: 'hidden' }}>
-                          <div style={{ width: `${info.progress}%`, height: '100%', background: '#3b82f6', transition: 'width 0.3s' }} />
+                          <div style={{ width: `${job.progress}%`, height: '100%', background: '#3b82f6', transition: 'width 0.3s' }} />
                         </div>
-                        <span style={{ fontSize: '12px', color: '#3b82f6' }}>⏳</span>
+                        <span style={{ fontSize: '12px', color: '#3b82f6' }}>⏳ {job.progress}%</span>
                       </>
                     )}
-                    {info.status === 'completed' && <span style={{ fontSize: '12px', color: '#10b981' }}>✓ Done</span>}
-                    {info.status === 'failed' && <span style={{ fontSize: '12px', color: '#ef4444' }}>✗ Failed</span>}
+                    {job.status === 'completed' && <span style={{ fontSize: '12px', color: '#10b981' }}>✓ Done</span>}
+                    {job.status === 'failed' && <span style={{ fontSize: '12px', color: '#ef4444' }}>✗ Failed</span>}
                   </div>
                 </div>
               ))}
-              {processingQueue.size > 3 && (
+              {ocrJobs.size > 3 && (
                 <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                  +{processingQueue.size - 3} more processing...
+                  +{ocrJobs.size - 3} more jobs...
                 </div>
               )}
             </div>
           )}
           
-          {/* Current student processing status */}
-          {processingQueue.has(currentStudent._id) && (
+          {/* Current student OCR job status */}
+          {ocrJobs.has(currentStudent._id) && ocrJobs.get(currentStudent._id).status !== 'completed' && (
             <div style={{
-              background: processingQueue.get(currentStudent._id).status === 'completed' ? '#d1fae5' : 
-                         processingQueue.get(currentStudent._id).status === 'failed' ? '#fee2e2' : '#dbeafe',
+              background: ocrJobs.get(currentStudent._id).status === 'failed' ? '#fee2e2' : '#dbeafe',
               border: '1px solid',
-              borderColor: processingQueue.get(currentStudent._id).status === 'completed' ? '#10b981' : 
-                           processingQueue.get(currentStudent._id).status === 'failed' ? '#ef4444' : '#3b82f6',
+              borderColor: ocrJobs.get(currentStudent._id).status === 'failed' ? '#ef4444' : '#3b82f6',
               borderRadius: '8px',
               padding: '12px',
               marginBottom: '16px',
               fontSize: '14px'
             }}>
-              {processingQueue.get(currentStudent._id).status === 'processing' && (
-                <>⏳ Processing image for this student... ({Math.round(processingQueue.get(currentStudent._id).progress)}%)</>
+              {ocrJobs.get(currentStudent._id).status === 'pending' && (
+                <>⏱ OCR job queued for this student...</>
               )}
-              {processingQueue.get(currentStudent._id).status === 'completed' && (
-                <>✓ Processing completed! Marks have been extracted.</>
+              {ocrJobs.get(currentStudent._id).status === 'processing' && (
+                <>⏳ Processing image for this student... ({ocrJobs.get(currentStudent._id).progress}%)</>
               )}
-              {processingQueue.get(currentStudent._id).status === 'failed' && (
-                <>✗ Processing failed: {processingQueue.get(currentStudent._id).error}</>
+              {ocrJobs.get(currentStudent._id).status === 'failed' && (
+                <>✗ OCR processing failed: {ocrJobs.get(currentStudent._id).error}</>
               )}
+            </div>
+          )}
+          
+          {/* Completed OCR job notification */}
+          {ocrJobs.has(currentStudent._id) && ocrJobs.get(currentStudent._id).status === 'completed' && (
+            <div style={{
+              background: '#d1fae5',
+              border: '1px solid #10b981',
+              borderRadius: '8px',
+              padding: '12px',
+              marginBottom: '16px',
+              fontSize: '14px'
+            }}>
+              ✓ OCR processing completed! Marks have been auto-filled.
             </div>
           )}
 
@@ -791,9 +767,11 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                 <button 
                   className="btn btn-primary" 
                   onClick={processImage}
-                  disabled={processingQueue.has(currentStudent._id) && processingQueue.get(currentStudent._id).status === 'processing'}
+                  disabled={ocrJobs.has(currentStudent._id) && ['pending', 'processing'].includes(ocrJobs.get(currentStudent._id).status)}
                 >
-                  {processingQueue.has(currentStudent._id) && processingQueue.get(currentStudent._id).status === 'processing' ? (
+                  {ocrJobs.has(currentStudent._id) && ocrJobs.get(currentStudent._id).status === 'pending' ? (
+                    <>⏱ Queued...</>
+                  ) : ocrJobs.has(currentStudent._id) && ocrJobs.get(currentStudent._id).status === 'processing' ? (
                     <>⏳ Processing...</>
                   ) : (
                     <>Process Image</>
