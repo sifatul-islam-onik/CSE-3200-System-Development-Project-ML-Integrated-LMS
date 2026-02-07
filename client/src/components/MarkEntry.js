@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes, faCamera, faUpload, faChevronLeft, faChevronRight, faCheck } from '@fortawesome/free-solid-svg-icons';
+import { faTimes, faCamera, faUpload, faChevronLeft, faChevronRight, faCheck, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { getTermExamMarks, saveTermExamMarks } from '../services/termExamMarksService';
-import { submitOCRJob, getUserOCRJobs, getOCRJobStatus } from '../services/ocrJobService';
+import { submitOCRJob, getOCRJobStatus } from '../services/ocrJobService';
 import '../styles/MarkEntry.css';
 
 const MarkEntry = ({ course, students, section, onClose }) => {
@@ -27,6 +27,9 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   const [ocrJobs, setOcrJobs] = useState(new Map()); // studentId -> job object
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [savedMarks, setSavedMarks] = useState(null); // Track marks from database
+  const [isProcessingImage, setIsProcessingImage] = useState(false); // Loading state for process button
+  const [isLoadingData, setIsLoadingData] = useState(true); // Loading state for initial data
+  const [activeJobCount, setActiveJobCount] = useState(0); // Track number of active jobs for efficient polling
   
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null); // Separate ref for mobile camera input
@@ -34,6 +37,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   const canvasRef = useRef(null);
   const currentStudentIdRef = useRef(null);
   const pollIntervalRef = useRef(null);
+  const ocrJobsRef = useRef(new Map()); // Ref for polling without causing re-renders
 
   const currentStudent = students[currentStudentIndex];
   
@@ -47,36 +51,15 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     currentStudentIdRef.current = currentStudent._id;
   }, [currentStudent._id]);
   
-  // Load OCR jobs for all students on mount
+  // Sync ocrJobsRef with ocrJobs state
   useEffect(() => {
-    const loadOCRJobs = async () => {
-      try {
-        const response = await getUserOCRJobs({ courseId: course._id });
-        if (response.success) {
-          const jobsMap = new Map();
-          response.data.forEach(job => {
-            if (job.student && job.student._id) {
-              jobsMap.set(job.student._id, job);
-            }
-          });
-          setOcrJobs(jobsMap);
-          console.log('Loaded OCR jobs:', jobsMap.size);
-        }
-      } catch (error) {
-        console.error('Error loading OCR jobs:', error);
-      }
-    };
-    
-    loadOCRJobs();
-  }, [course._id]);
+    ocrJobsRef.current = ocrJobs;
+  }, [ocrJobs]);
   
-  // Poll active OCR jobs
+  // Poll active OCR jobs with performance optimizations - only when there are active jobs
   useEffect(() => {
-    const activeJobs = Array.from(ocrJobs.values()).filter(
-      job => job.status === 'pending' || job.status === 'processing'
-    );
-    
-    if (activeJobs.length === 0) {
+    if (activeJobCount === 0) {
+      // No active jobs, clear any existing interval
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
@@ -84,61 +67,151 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       return;
     }
     
-    // Poll every 2 seconds
-    pollIntervalRef.current = setInterval(async () => {
+    const pollJobs = async () => {
+      const activeJobs = Array.from(ocrJobsRef.current.values()).filter(
+        job => job.status === 'pending' || job.status === 'processing'
+      );
+      
+      if (activeJobs.length === 0) {
+        setActiveJobCount(0); // This will stop polling via the effect
+        return;
+      }
+      
+      // Batch update all jobs
+      const updates = [];
       for (const job of activeJobs) {
         try {
           const response = await getOCRJobStatus(job.jobId);
-          if (response.success) {
-            const updatedJob = response.data;
-            setOcrJobs(prev => {
-              const updated = new Map(prev);
-              if (updatedJob.student && updatedJob.student._id) {
-                updated.set(updatedJob.student._id, updatedJob);
-              }
-              return updated;
-            });
-            
-            // If job completed, auto-fill marks if viewing this student
-            if (updatedJob.status === 'completed' && updatedJob.student._id === currentStudent._id) {
-              if (updatedJob.marks) {
-                setMarks(updatedJob.marks);
-                console.log('Auto-filled marks from completed OCR job');
-              }
-              if (updatedJob.imageUrl) {
-                setCapturedImage(updatedJob.imageUrl);
-              }
-            }
+          if (response.success && response.data) {
+            console.log('Job status response:', response.data);
+            updates.push(response.data);
           }
         } catch (error) {
           console.error(`Error polling job ${job.jobId}:`, error);
         }
       }
-    }, 2000);
+      
+      // Only update state if there are actual changes
+      if (updates.length > 0) {
+        console.log('Polling updates received:', updates.length, 'jobs');
+        
+        let hasChanges = false;
+        const currentStudentUpdate = updates.find(
+          job => {
+            const isCompleted = job.status === 'completed';
+            const isCurrentStudent = job.studentId === currentStudentIdRef.current || job.student?._id === currentStudentIdRef.current;
+            console.log('Checking job:', {
+              jobStudentId: job.studentId || job.student?._id,
+              currentStudentId: currentStudentIdRef.current,
+              status: job.status,
+              isCompleted,
+              isCurrentStudent,
+              hasMarks: !!job.marks
+            });
+            return isCompleted && isCurrentStudent;
+          }
+        );
+        
+        // Check if any job actually changed
+        for (const updatedJob of updates) {
+          const existingJob = ocrJobsRef.current.get(updatedJob.student?._id);
+          if (!existingJob || 
+              existingJob.status !== updatedJob.status || 
+              existingJob.progress !== updatedJob.progress) {
+            hasChanges = true;
+            break;
+          }
+        }
+        
+        if (hasChanges) {
+          setOcrJobs(prev => {
+            const updated = new Map(prev);
+            const now = Date.now();
+            let activeCount = 0;
+            
+            updates.forEach(updatedJob => {
+              if (updatedJob.studentId || updatedJob.student?._id) {
+                const studentId = updatedJob.studentId || updatedJob.student?._id;
+                const existingJob = updated.get(studentId);
+                
+                // Don't store large base64 imageUrl to save memory
+                // Preserve student info from existing job if available
+                const optimizedJob = {
+                  ...updatedJob,
+                  student: existingJob?.student || updatedJob.student || { _id: studentId },
+                  imageUrl: null // Clear image data after processing
+                };
+                updated.set(studentId, optimizedJob);
+              }
+            });
+            
+            // Auto-clean completed/failed jobs older than 30 seconds and count active jobs
+            for (const [studentId, job] of updated.entries()) {
+              if (job.status === 'pending' || job.status === 'processing') {
+                activeCount++;
+              } else if ((job.status === 'completed' || job.status === 'failed') && job.completedAt) {
+                const completedTime = new Date(job.completedAt).getTime();
+                if (now - completedTime > 30000) { // 30 seconds
+                  updated.delete(studentId);
+                }
+              }
+            }
+            
+            // Limit total jobs to 10 most recent to prevent memory bloat
+            if (updated.size > 10) {
+              const sortedJobs = Array.from(updated.entries())
+                .sort((a, b) => new Date(b[1].createdAt) - new Date(a[1].createdAt))
+                .slice(0, 10);
+              updated.clear();
+              sortedJobs.forEach(([id, job]) => updated.set(id, job));
+            }
+            
+            setActiveJobCount(activeCount);
+            return updated;
+          });
+          
+          // Auto-fill marks if current student's job completed
+          if (currentStudentUpdate) {
+            console.log('Current student job completed:', currentStudentUpdate);
+            if (currentStudentUpdate.marks) {
+              console.log('Auto-filling marks:', currentStudentUpdate.marks);
+              setMarks(currentStudentUpdate.marks);
+            } else {
+              console.warn('Job completed but no marks found in response');
+            }
+          }
+        }
+      }
+    };
+    
+    // Start polling
+    pollJobs(); // Initial poll
+    pollIntervalRef.current = setInterval(pollJobs, 4000); // Poll every 4 seconds
     
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
       }
     };
-  }, [ocrJobs, currentStudent._id]);
+  }, [activeJobCount]); // Re-run when activeJobCount changes
 
   // Load saved data when student changes
   useEffect(() => {
     const loadStudentMarks = async () => {
+      setIsLoadingData(true);
       const studentId = currentStudent._id;
       
       let marksLoaded = false;
       let imageLoaded = false;
       
-      // Priority 1: Check if there's a completed OCR job
-      const ocrJob = ocrJobs.get(studentId);
+      // Priority 1: Check if there's a completed OCR job (from memory only, no lazy loading)
+      const ocrJob = ocrJobsRef.current.get(studentId);
+      
       if (ocrJob && ocrJob.status === 'completed' && ocrJob.marks) {
         setMarks(ocrJob.marks);
-        setCapturedImage(ocrJob.imageUrl);
         marksLoaded = true;
-        imageLoaded = true;
-        console.log('Loaded from OCR job for', currentStudent.name);
+        imageLoaded = true; // Don't load image since we cleared it
       }
       
       // Priority 2: Check in-memory cache (if not loaded from OCR job)
@@ -147,7 +220,6 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         setCapturedImage(studentData[studentId].image);
         marksLoaded = true;
         imageLoaded = true;
-        console.log('Loaded from in-memory cache for', currentStudent.name);
       }
       
       // Priority 3: Fetch from database (if not loaded from OCR job or cache)
@@ -164,8 +236,9 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           const validImage = response.data.imageUrl && !response.data.imageUrl.startsWith('blob:') ? response.data.imageUrl : null;
           
           // Only load image from database if no OCR job or cache image
+          // Also don't overwrite a freshly captured image (blob URL)
           if (!imageLoaded) {
-            setCapturedImage(validImage);
+            setCapturedImage(prev => prev?.startsWith('blob:') ? prev : validImage);
           }
           
           // Update in-memory cache only if we don't have fresher OCR job data
@@ -184,7 +257,6 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         }
       } catch (error) {
         // No marks found in database - reset to empty only if no OCR job or cache data
-        console.log('No existing marks found for student:', currentStudent.name);
         setSavedMarks(null);
         if (!marksLoaded) {
           setMarks({
@@ -196,30 +268,37 @@ const MarkEntry = ({ course, students, section, onClose }) => {
             f: { '1': '', '2': '', '3': '', '4': '' },
             g: { '1': '', '2': '', '3': '', '4': '' }
           });
-          setCapturedImage(null);
+          // Don't clear image if it's a fresh capture (blob URL) - only clear if no image or non-blob
+          if (!imageLoaded) {
+            setCapturedImage(prev => prev?.startsWith('blob:') ? prev : null);
+          }
         }
       }
+      
+      setIsLoadingData(false);
     };
     
     loadStudentMarks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStudentIndex, currentStudent._id, course._id, section, ocrJobs]);
+  }, [currentStudentIndex, currentStudent._id, course._id, section]);
   
-  // Check for unsaved changes
-  useEffect(() => {
+  // Check for unsaved changes (memoized to reduce re-computations)
+  const hasChangesComputed = useMemo(() => {
     if (!savedMarks) {
       // No saved marks in database, check if current marks are empty
       const isEmpty = Object.values(marks).every(q => 
         Object.values(q).every(v => !v || v === '')
       );
-      setHasUnsavedChanges(!isEmpty);
-      return;
+      return !isEmpty;
     }
     
     // Compare current marks with saved marks
-    const hasChanges = JSON.stringify(marks) !== JSON.stringify(savedMarks);
-    setHasUnsavedChanges(hasChanges);
+    return JSON.stringify(marks) !== JSON.stringify(savedMarks);
   }, [marks, savedMarks]);
+  
+  useEffect(() => {
+    setHasUnsavedChanges(hasChangesComputed);
+  }, [hasChangesComputed]);
 
   // Cleanup camera stream on unmount or when camera closes
   useEffect(() => {
@@ -229,6 +308,16 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       }
     };
   }, [stream]);
+  
+  // Cleanup blob URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    const currentImage = capturedImage;
+    return () => {
+      if (currentImage && currentImage.startsWith('blob:')) {
+        URL.revokeObjectURL(currentImage);
+      }
+    };
+  }, [capturedImage]);
 
   // Setup video stream when stream is available
   useEffect(() => {
@@ -295,6 +384,49 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     setVideoReady(false);
   };
 
+  // Compress image while maintaining quality
+  const compressImage = async (imageUrl, maxWidth = 1920, maxHeight = 1920, quality = 0.9) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // Calculate new dimensions while maintaining aspect ratio
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.floor(width * ratio);
+          height = Math.floor(height * ratio);
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        // Use better image smoothing for quality
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Convert to JPEG with high quality
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(URL.createObjectURL(blob));
+            } else {
+              reject(new Error('Failed to compress image'));
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = imageUrl;
+    });
+  };
+
   // Capture photo from camera
   const capturePhoto = () => {
     if (videoRef.current && canvasRef.current) {
@@ -314,25 +446,44 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0);
       
-      canvas.toBlob((blob) => {
+      canvas.toBlob(async (blob) => {
         if (blob) {
           const imageUrl = URL.createObjectURL(blob);
-          setCapturedImage(imageUrl);
-          stopCamera();
+          // Compress the image before setting
+          try {
+            const compressedUrl = await compressImage(imageUrl, 1920, 1920, 0.92);
+            URL.revokeObjectURL(imageUrl); // Clean up original
+            setCapturedImage(compressedUrl);
+            stopCamera();
+          } catch (error) {
+            console.error('Compression error:', error);
+            // Fallback to original if compression fails
+            setCapturedImage(imageUrl);
+            stopCamera();
+          }
         } else {
           console.error('Failed to create blob from canvas');
           alert('Failed to capture image. Please try again.');
         }
-      }, 'image/jpeg', 0.95);
+      }, 'image/jpeg', 0.92);
     }
   };
 
   // Handle file upload
-  const handleFileUpload = (event) => {
+  const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (file && file.type.startsWith('image/')) {
       const imageUrl = URL.createObjectURL(file);
-      setCapturedImage(imageUrl);
+      // Compress the uploaded image
+      try {
+        const compressedUrl = await compressImage(imageUrl, 1920, 1920, 0.92);
+        URL.revokeObjectURL(imageUrl); // Clean up original
+        setCapturedImage(compressedUrl);
+      } catch (error) {
+        console.error('Compression error:', error);
+        // Fallback to original if compression fails
+        setCapturedImage(imageUrl);
+      }
     } else {
       alert('Please select a valid image file');
     }
@@ -353,6 +504,21 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       f: { '1': '', '2': '', '3': '', '4': '' },
       g: { '1': '', '2': '', '3': '', '4': '' }
     });
+    
+    // Clear the student's data from in-memory cache and OCR jobs
+    const studentId = currentStudent._id;
+    setStudentData(prev => {
+      const updated = { ...prev };
+      delete updated[studentId];
+      return updated;
+    });
+    
+    // Remove OCR job for this student to prevent auto-reload
+    setOcrJobs(prev => {
+      const updated = new Map(prev);
+      updated.delete(studentId);
+      return updated;
+    });
   };
 
   // Process image with FastAPI (non-blocking, queue-based)
@@ -360,35 +526,38 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     if (!capturedImage || capturedImage === 'skipped') return;
 
     const studentId = currentStudent._id;
+    setIsProcessingImage(true);
     
     try {
       // Convert blob URL to base64 if needed
       let imageDataUrl = capturedImage;
       if (capturedImage.startsWith('blob:')) {
-        console.log('Converting blob URL to base64...');
         const blob = await fetch(capturedImage).then(r => r.blob());
         imageDataUrl = await new Promise((resolve) => {
           const reader = new FileReader();
           reader.onloadend = () => resolve(reader.result);
           reader.readAsDataURL(blob);
         });
-        console.log('Converted to base64, length:', imageDataUrl.length);
       }
       
       // Submit OCR job
       const response = await submitOCRJob(studentId, course._id, section, imageDataUrl);
       
       if (response.success) {
-        // Update OCR jobs map with new job
+        // Update OCR jobs map with new job (don't store base64 image to save memory)
         const newJob = {
           jobId: response.jobId,
+          studentId: studentId, // Use studentId to match server response structure
           student: { _id: studentId, name: currentStudent.name, roll: currentStudent.roll },
+          courseId: course._id,
           course: { _id: course._id },
-          imageUrl: imageDataUrl,
+          imageUrl: null, // Don't store large base64 in state
           status: 'pending',
           progress: 0,
           createdAt: new Date()
         };
+        
+        console.log('Job created and stored with studentId:', studentId);
         
         setOcrJobs(prev => {
           const updated = new Map(prev);
@@ -396,9 +565,17 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           return updated;
         });
         
-        console.log(`OCR job ${response.jobId} submitted for ${currentStudent.name}`);
+        // Increment active job count to trigger polling
+        setActiveJobCount(prev => prev + 1);
         
-        // Move to next student immediately
+        // Clear captured image and move to next student immediately
+        setCapturedImage(null);
+        
+        // Revoke blob URL to free memory if it exists
+        if (capturedImage && capturedImage.startsWith('blob:')) {
+          URL.revokeObjectURL(capturedImage);
+        }
+        
         if (currentStudentIndex < students.length - 1) {
           setCurrentStudentIndex(prev => prev + 1);
         }
@@ -406,36 +583,28 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     } catch (error) {
       console.error('Error submitting OCR job:', error);
       alert('Failed to submit OCR job. Please try again.');
+    } finally {
+      setIsProcessingImage(false);
     }
   };
 
   // Handle mark change
-  const handleMarkChange = (row, question, value) => {
+  const handleMarkChange = useCallback((row, question, value) => {
     // Only allow numbers
     if (value && !/^\d*\.?\d*$/.test(value)) return;
     
-    const updatedMarks = {
-      ...marks,
+    setMarks(prev => ({
+      ...prev,
       [row]: {
-        ...marks[row],
+        ...prev[row],
         [question]: value
       }
-    };
-    
-    setMarks(updatedMarks);
-    
-    // Update in-memory cache
-    setStudentData(prev => ({
-      ...prev,
-      [currentStudent._id]: {
-        marks: updatedMarks,
-        image: capturedImage
-      }
     }));
-  };
+    // Note: studentData cache update moved to handleNext/handleSave to reduce re-renders
+  }, []);
 
-  // Calculate total marks
-  const calculateTotal = () => {
+  // Calculate total marks (memoized to prevent recalculation on every render)
+  const totalMarks = useMemo(() => {
     let total = 0;
     Object.values(marks).forEach(question => {
       Object.values(question).forEach(mark => {
@@ -443,12 +612,11 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       });
     });
     return total.toFixed(2);
-  };
+  }, [marks]);
   
   // Manual save to database
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     const studentId = currentStudent._id;
-    const totalMarks = calculateTotal();
     
     try {
       await saveTermExamMarks({
@@ -460,17 +628,15 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         imageUrl: capturedImage && !capturedImage.startsWith('blob:') && capturedImage !== 'skipped' ? capturedImage : null
       });
       
-      console.log('✓ Marks saved for', currentStudent.name, '- Total:', totalMarks);
-      
       // Update saved marks to current marks
       setSavedMarks(marks);
       
-      // Update in-memory cache
+      // Update in-memory cache (without blob URLs)
       setStudentData(prev => ({
         ...prev,
         [studentId]: {
           marks: marks,
-          image: capturedImage
+          image: capturedImage && !capturedImage.startsWith('blob:') ? capturedImage : null
         }
       }));
       
@@ -479,15 +645,14 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       console.error('Error saving marks:', error);
       alert('Failed to save marks: ' + error.message);
     }
-  };
+  }, [currentStudent._id, course._id, section, marks, totalMarks, capturedImage]);
 
   // Save and go to next student
-  const handleNext = async () => {
+  const handleNext = useCallback(async () => {
+    const studentId = currentStudent._id;
+    
     if (hasUnsavedChanges) {
       // Save current student's data to database
-      const studentId = currentStudent._id;
-      const totalMarks = calculateTotal();
-      
       try {
         await saveTermExamMarks({
           studentId: studentId,
@@ -499,14 +664,13 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           imageUrl: capturedImage && !capturedImage.startsWith('blob:') && capturedImage !== 'skipped' ? capturedImage : null
         });
         
-        console.log('✓ Marks saved for', currentStudent.name, '- Total:', totalMarks);
         
-        // Update in-memory cache
+        // Update in-memory cache (without blob URLs)
         setStudentData(prev => ({
           ...prev,
           [studentId]: {
             marks: marks,
-            image: capturedImage
+            image: capturedImage && !capturedImage.startsWith('blob:') ? capturedImage : null
           }
         }));
         
@@ -516,6 +680,11 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       }
     }
     
+    // Clean up blob URL before moving to next student
+    if (capturedImage && capturedImage.startsWith('blob:')) {
+      URL.revokeObjectURL(capturedImage);
+    }
+    
     if (currentStudentIndex < students.length - 1) {
       // Move to next student - data will be loaded by useEffect
       setCurrentStudentIndex(prev => prev + 1);
@@ -523,18 +692,23 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       // All students completed
       onClose();
     }
-  };
+  }, [hasUnsavedChanges, currentStudent._id, course._id, section, marks, totalMarks, capturedImage, currentStudentIndex, students.length, onClose]);
 
   // Go to previous student
   const handlePrevious = () => {
     if (currentStudentIndex > 0) {
+      // Clean up blob URL before moving to prevent memory leak
+      if (capturedImage && capturedImage.startsWith('blob:')) {
+        URL.revokeObjectURL(capturedImage);
+      }
+      
       // Save current student's data before moving
       const studentId = currentStudent._id;
       setStudentData(prev => ({
         ...prev,
         [studentId]: {
           marks: marks,
-          image: capturedImage
+          image: capturedImage && !capturedImage.startsWith('blob:') ? capturedImage : null
         }
       }));
       
@@ -591,6 +765,23 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         </div>
 
         <div className="modal-body mark-entry-body">
+          {/* Loading State */}
+          {isLoadingData && (
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              textAlign: 'center',
+              zIndex: 10
+            }}>
+              <FontAwesomeIcon icon={faSpinner} spin size="2x" style={{ color: '#2563eb', marginBottom: '8px' }} />
+              <p style={{ color: '#6b7280', fontSize: '14px' }}>Loading student data...</p>
+            </div>
+          )}
+          
+          {/* Main Content */}
+          <div style={{ opacity: isLoadingData ? 0.3 : 1, pointerEvents: isLoadingData ? 'none' : 'auto' }}>
           {/* Student Info */}
           <div className="student-info-card">
             <div>
@@ -610,19 +801,23 @@ const MarkEntry = ({ course, students, section, onClose }) => {
             </div>
           </div>
           
-          {/* OCR Jobs Status */}
-          {ocrJobs.size > 0 && (
-            <div style={{
-              background: '#f3f4f6',
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              padding: '12px',
-              marginBottom: '16px'
-            }}>
-              <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600' }}>
-                OCR Jobs ({Array.from(ocrJobs.values()).filter(j => j.status !== 'completed').length} active)
-              </h5>
-              {Array.from(ocrJobs.entries()).reverse().slice(0, 3).map(([id, job]) => (
+          {/* OCR Jobs Status - Memoized to prevent re-renders */}
+          {ocrJobs.size > 0 && (() => {
+            const activeJobsCount = Array.from(ocrJobs.values()).filter(j => j.status === 'pending' || j.status === 'processing').length;
+            const jobsToDisplay = Array.from(ocrJobs.entries()).slice(-3).reverse(); // Get last 3 jobs
+            
+            return (
+              <div style={{
+                background: '#f3f4f6',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                padding: '12px',
+                marginBottom: '16px'
+              }}>
+                <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600' }}>
+                  OCR Jobs ({activeJobsCount} active)
+                </h5>
+                {jobsToDisplay.map(([id, job]) => (
                 <div key={id} style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -654,7 +849,8 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
           
           {/* Current student OCR job status */}
           {ocrJobs.has(currentStudent._id) && ocrJobs.get(currentStudent._id).status !== 'completed' && (
@@ -694,7 +890,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           )}
 
           {/* Image Capture/Upload Section */}
-          {!capturedImage && !showCamera && (
+          {!capturedImage && !showCamera && !ocrJobs.has(currentStudent._id) && (
             <div className="image-upload-section">
               <h4>Upload Answer Sheet</h4>
               <div className="upload-options">
@@ -720,6 +916,23 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                 capture="environment"
                 onChange={handleFileUpload}
               />
+            </div>
+          )}
+          
+          {/* Show message when OCR is active but no image to display */}
+          {!capturedImage && !showCamera && ocrJobs.has(currentStudent._id) && ['pending', 'processing'].includes(ocrJobs.get(currentStudent._id).status) && (
+            <div className="image-upload-section">
+              <div style={{
+                background: '#f3f4f6',
+                border: '2px dashed #9ca3af',
+                borderRadius: '8px',
+                padding: '32px',
+                textAlign: 'center',
+                color: '#6b7280'
+              }}>
+                <FontAwesomeIcon icon={faSpinner} spin style={{ fontSize: '32px', marginBottom: '12px' }} />
+                <p style={{ margin: 0, fontSize: '14px' }}>Image submitted for processing...</p>
+              </div>
             </div>
           )}
 
@@ -753,8 +966,8 @@ const MarkEntry = ({ course, students, section, onClose }) => {
             </div>
           )}
 
-          {/* Captured Image Preview */}
-          {capturedImage && capturedImage !== 'skipped' && (
+          {/* Captured Image Preview - Only show if NOT yet submitted for processing */}
+          {capturedImage && capturedImage !== 'skipped' && !ocrJobs.has(currentStudent._id) && (
             <div className="image-preview-section">
               <h4>Answer Sheet</h4>
               <div className="image-container">
@@ -767,12 +980,10 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                 <button 
                   className="btn btn-primary" 
                   onClick={processImage}
-                  disabled={ocrJobs.has(currentStudent._id) && ['pending', 'processing'].includes(ocrJobs.get(currentStudent._id).status)}
+                  disabled={isProcessingImage}
                 >
-                  {ocrJobs.has(currentStudent._id) && ocrJobs.get(currentStudent._id).status === 'pending' ? (
-                    <>⏱ Queued...</>
-                  ) : ocrJobs.has(currentStudent._id) && ocrJobs.get(currentStudent._id).status === 'processing' ? (
-                    <>⏳ Processing...</>
+                  {isProcessingImage ? (
+                    <><FontAwesomeIcon icon={faSpinner} spin /> Submitting...</>
                   ) : (
                     <>Process Image</>
                   )}
@@ -821,10 +1032,11 @@ const MarkEntry = ({ course, students, section, onClose }) => {
               {/* Total Marks */}
               <div className="total-marks">
                 <strong>Total Marks:</strong>
-                <span className="total-value">{calculateTotal()}</span>
+                <span className="total-value">{totalMarks}</span>
               </div>
             </div>
           )}
+          </div> {/* End of main content wrapper */}
         </div>
 
         {/* Footer with Navigation */}

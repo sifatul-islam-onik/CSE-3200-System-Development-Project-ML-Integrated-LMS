@@ -5,7 +5,8 @@ import shutil
 import glob
 import re
 import numpy as np
-from paddleocr import TableCellsDetection, TextRecognition
+from paddleocr import TableCellsDetection, TextRecognition, LayoutDetection
+from PIL import Image
 
 def preprocess_cell_for_ocr(cell_image):
     if cell_image.shape[0] < 10 or cell_image.shape[1] < 10:
@@ -63,6 +64,64 @@ def filter_allowed_characters(text):
     allowed_pattern = re.compile(r'[^abcdefgABCDEFG0-9.]')
     filtered_text = allowed_pattern.sub('', text)
     return filtered_text
+
+def unwarp_and_detect_tables(image_path, output_dir, layout_model=None):
+    """
+    Detect and crop tables from the input image.
+    Returns a list of paths to cropped table images.
+    
+    Args:
+        image_path: Path to input image
+        output_dir: Directory to save outputs
+        layout_model: Pre-loaded LayoutDetection model (loads new one if None)
+    """
+    print(f"  → Detecting tables...")
+    
+    # Detect tables in the input image directly (no unwarping)
+    # Only load model if not provided
+    if layout_model is None:
+        layout_model = LayoutDetection(model_name="PP-DocLayout_plus-L")
+    
+    layout_output = layout_model.predict(image_path, batch_size=1, layout_nms=True)
+    
+    # Save detection results
+    detection_json_path = os.path.join(output_dir, "table_detection.json")
+    for res in layout_output:
+        res.save_to_json(save_path=detection_json_path)
+    
+    # Load the input image for cropping
+    original_image = Image.open(image_path)
+    
+    # Read the detection JSON
+    with open(detection_json_path, "r") as f:
+        res_dict = json.load(f)
+    
+    # Crop and save detected tables
+    cropped_table_paths = []
+    tables_dir = os.path.join(output_dir, "cropped_tables")
+    os.makedirs(tables_dir, exist_ok=True)
+    
+    if 'boxes' in res_dict:
+        table_count = 0
+        for idx, box in enumerate(res_dict['boxes']):
+            if box['label'] == "table":
+                # Extract coordinates [x1, y1, x2, y2]
+                x1, y1, x2, y2 = box['coordinate']
+                
+                # Crop the table region
+                cropped_table = original_image.crop((x1, y1, x2, y2))
+                
+                # Save the cropped table
+                output_filename = os.path.join(tables_dir, f"table_{table_count}.jpg")
+                cropped_table.save(output_filename)
+                cropped_table_paths.append(output_filename)
+                table_count += 1
+        
+        print(f"  ✓ Detected and cropped {table_count} table(s)")
+    else:
+        print(f"  ✗ No tables detected in the image")
+    
+    return cropped_table_paths
 
 def process_single_image(image_path, output_dir, temp_dir, cell_detection_model, text_rec_model, confidence_threshold=0.60):
     
@@ -242,12 +301,27 @@ def main():
     print(f"Found {total_images} image(s) to process")
     print("="*60)
     
+    # Load models once for all processing
+    print("Loading models...")
+    
+    print("  → Loading layout detection model...")
+    layout_model = LayoutDetection(model_name="PP-DocLayout_plus-L")
+    print("  ✓ Layout detection model loaded")
+    
+    print("  → Loading cell detection model...")
     cell_detection_model = TableCellsDetection(model_name="RT-DETR-L_wired_table_cell_det",
                                                model_dir="E:\\CSE\\CODES\\fdskj\\models\\RT-DETR-L_wired_table_cell_det")
+    print("  ✓ Cell detection model loaded")
+    
+    print("  → Loading text recognition model...")
     text_rec_model = TextRecognition(model_name="en_PP-OCRv5_mobile_rec")
+    print("  ✓ Text recognition model loaded")
+    
+    print("✓ All models loaded\n")
     
     successful = 0
     failed = 0
+    total_tables_processed = 0
     total_cells_all = 0
     confident_cells_all = 0
     total_confidence_score = 0.0
@@ -259,41 +333,67 @@ def main():
         print(f"[{idx}/{total_images}] Processing: {image_name}")
         
         output_dir = os.path.join(OUTPUT_BASE_DIR, image_name_no_ext)
-        temp_dir = os.path.join(output_dir, "temp")
         os.makedirs(output_dir, exist_ok=True)
-        os.makedirs(temp_dir, exist_ok=True)
         
         try:
-            result = process_single_image(
-                image_path, 
-                output_dir, 
-                temp_dir, 
-                cell_detection_model, 
-                text_rec_model, 
-                CONFIDENCE_THRESHOLD
-            )
+            # Step 1: Detect tables
+            cropped_table_paths = unwarp_and_detect_tables(image_path, output_dir, layout_model)
             
-            if result is not None:
-                successful += 1
-                total_cells_all += result['total_cells']
-                confident_cells_all += result['confident_cells']
-                total_confidence_score += result['avg_confidence_score'] * result['total_cells']
-                
-                print(f"  ✓ Detected {result['num_rows']}x{result['num_cols']} table")
-                print(f"  ✓ Recognition: {result['confidence_percentage']:.1f}% ({result['confident_cells']}/{result['total_cells']} cells)")
-                print(f"  ✓ Avg confidence: {result['avg_confidence_score']:.3f}")
-            else:
+            if not cropped_table_paths:
                 failed += 1
-                print(f"  ✗ Failed to load image")
+                print(f"  ✗ No tables found to process\n")
+                continue
+            
+            # Step 2: Process each detected table with OCR
+            print(f"  → Processing {len(cropped_table_paths)} table(s) with OCR...")
+            
+            for table_idx, table_path in enumerate(cropped_table_paths):
+                table_name = os.path.basename(table_path)
+                print(f"    Table {table_idx + 1}/{len(cropped_table_paths)}: {table_name}")
+                
+                # Create output directory for this specific table
+                table_output_dir = os.path.join(output_dir, f"table_{table_idx}")
+                temp_dir = os.path.join(table_output_dir, "temp")
+                os.makedirs(table_output_dir, exist_ok=True)
+                os.makedirs(temp_dir, exist_ok=True)
+                
+                try:
+                    result = process_single_image(
+                        table_path, 
+                        table_output_dir, 
+                        temp_dir, 
+                        cell_detection_model, 
+                        text_rec_model, 
+                        CONFIDENCE_THRESHOLD
+                    )
+                    
+                    if result is not None:
+                        total_tables_processed += 1
+                        total_cells_all += result['total_cells']
+                        confident_cells_all += result['confident_cells']
+                        total_confidence_score += result['avg_confidence_score'] * result['total_cells']
+                        
+                        print(f"    ✓ Detected {result['num_rows']}x{result['num_cols']} table")
+                        print(f"    ✓ Recognition: {result['confidence_percentage']:.1f}% ({result['confident_cells']}/{result['total_cells']} cells)")
+                        print(f"    ✓ Avg confidence: {result['avg_confidence_score']:.3f}")
+                    else:
+                        print(f"    ✗ Failed to process table")
+                except Exception as e:
+                    print(f"    ✗ Error processing table: {str(e)}")
+                finally:
+                    if os.path.exists(temp_dir):
+                        shutil.rmtree(temp_dir)
+            
+            successful += 1
+            print(f"  ✓ Completed processing {image_name}\n")
+            
         except Exception as e:
             failed += 1
-            print(f"  ✗ Error: {str(e)}")
-        finally:
-            if os.path.exists(temp_dir):
-                shutil.rmtree(temp_dir)
+            print(f"  ✗ Error: {str(e)}\n")
     
     print("="*60)
-    print(f"Processing complete: {successful} successful, {failed} failed")
+    print(f"Processing complete: {successful} images successful, {failed} failed")
+    print(f"Total tables processed: {total_tables_processed}")
     
     if total_cells_all > 0:
         overall_recognition = (confident_cells_all / total_cells_all) * 100
