@@ -4,7 +4,8 @@ const {
   submitOCRJob,
   getUserOCRJobs,
   getOCRJobStatus,
-  deleteOCRJob
+  deleteOCRJob,
+  getQueueStatus
 } = require('../controllers/ocrController');
 const { authenticateUser } = require('../middlewares/authMiddleware');
 const { authorizeRoles } = require('../middlewares/roleMiddleware');
@@ -20,6 +21,9 @@ router.get('/jobs', getUserOCRJobs);
 
 // Get specific job status
 router.get('/status/:jobId', getOCRJobStatus);
+
+// Get queue status
+router.get('/queue-status', getQueueStatus);
 
 // Delete job
 router.delete('/jobs/:jobId', deleteOCRJob);

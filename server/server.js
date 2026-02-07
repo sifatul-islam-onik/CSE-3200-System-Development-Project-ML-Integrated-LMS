@@ -26,6 +26,10 @@ const connectDB = async () => {
 
 connectDB();
 
+// Initialize OCR Worker
+const ocrWorker = require('./workers/ocrWorker');
+console.log('OCR Worker initialized');
+
 // Startup normalization: collapse multiple batch assignments to a single latest entry
 (async () => {
   try {
