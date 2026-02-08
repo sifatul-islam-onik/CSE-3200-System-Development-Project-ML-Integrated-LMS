@@ -51,7 +51,10 @@ ocrQueue.process(1, async (job, done) => {
     job.progress(50);
 
     const mlResponse = await axios.post(`${ML_SERVER_URL}/api/extract-marks`, formData, {
-      headers: formData.getHeaders(),
+      headers: {
+        ...formData.getHeaders(),
+        'ngrok-skip-browser-warning': 'true'  // Skip ngrok warning page
+      },
       timeout: 120000 // 2 minutes timeout
     });
 

@@ -172,6 +172,23 @@ const MarkEntry = ({ course, students, section, onClose }) => {
             return updated;
           });
           
+          // Update studentData cache for all completed jobs (not just current student)
+          updates.forEach(updatedJob => {
+            if (updatedJob.status === 'completed' && updatedJob.marks) {
+              const studentId = updatedJob.studentId || updatedJob.student?._id;
+              if (studentId) {
+                console.log('Caching marks for student:', studentId);
+                setStudentData(prev => ({
+                  ...prev,
+                  [studentId]: {
+                    marks: updatedJob.marks,
+                    image: prev[studentId]?.image || null
+                  }
+                }));
+              }
+            }
+          });
+          
           // Auto-fill marks if current student's job completed
           if (currentStudentUpdate) {
             console.log('Current student job completed:', currentStudentUpdate);
@@ -883,29 +900,46 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           })()}
           
           {/* Queue Status */}
-          {queueStatus && queueStatus.counts.waiting > 0 && (
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-              border: '2px solid #f59e0b',
-              borderRadius: '12px',
-              padding: '8px 16px',
-              marginBottom: '16px',
-              boxShadow: '0 2px 4px rgba(245, 158, 11, 0.1)'
-            }}>
-              <span style={{ fontSize: '18px' }}><FontAwesomeIcon icon={faSpinner}/></span>
-              <div>
-                <span style={{ fontWeight: '700', fontSize: '20px', color: '#92400e' }}>
-                  {queueStatus.counts.waiting}
+          {queueStatus && (() => {
+            const totalJobs = (queueStatus.counts.waiting || 0) + (queueStatus.counts.active || 0);
+            const isBusy = totalJobs > 0;
+            
+            return (
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: isBusy 
+                  ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' 
+                  : 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+                border: isBusy ? '2px solid #f59e0b' : '2px solid #10b981',
+                borderRadius: '12px',
+                padding: '8px 16px',
+                marginBottom: '16px',
+                boxShadow: isBusy 
+                  ? '0 2px 4px rgba(245, 158, 11, 0.1)' 
+                  : '0 2px 4px rgba(16, 185, 129, 0.1)'
+              }}>
+                <span style={{ fontSize: '18px' }}>
+                  <FontAwesomeIcon icon={isBusy ? faSpinner : faCheck} spin={isBusy} />
                 </span>
-                <span style={{ fontSize: '13px', color: '#78350f', marginLeft: '6px', fontWeight: '500' }}>
-                  in queue
-                </span>
+                <div>
+                  <span style={{ 
+                    fontWeight: '600', 
+                    fontSize: '15px', 
+                    color: isBusy ? '#92400e' : '#065f46' 
+                  }}>
+                    OCR server {isBusy ? 'busy' : 'free'}
+                    {isBusy && totalJobs > 0 && (
+                      <span style={{ fontSize: '13px', marginLeft: '4px', fontWeight: '500' }}>
+                        ({totalJobs} waiting)
+                      </span>
+                    )}
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
           
           {/* Current student OCR job status */}
           {ocrJobs.has(currentStudent._id) && ocrJobs.get(currentStudent._id).status !== 'completed' && (
