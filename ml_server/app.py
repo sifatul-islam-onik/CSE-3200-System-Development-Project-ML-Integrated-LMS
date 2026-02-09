@@ -465,10 +465,11 @@ async def extract_marks(image: UploadFile = File(...)):
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
+    models_loaded = (layout_model is not None and
+                    cell_detection_model is not None and text_rec_model is not None)
     return {
-        "status": "healthy",
-        "models_loaded": (layout_model is not None and
-                         cell_detection_model is not None and text_rec_model is not None)
+        "status": "ok" if models_loaded else "error",
+        "models_loaded": models_loaded
     }
 
 if __name__ == "__main__":

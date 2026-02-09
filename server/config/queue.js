@@ -6,10 +6,10 @@ const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 // Create OCR processing queue
 const ocrQueue = new Bull('ocr-processing', REDIS_URL, {
   defaultJobOptions: {
-    attempts: 3,
+    attempts: 3, // 3 attempts - health check conflicts resolved
     backoff: {
       type: 'exponential',
-      delay: 5000
+      delay: 3000 // 3 second delay between retries
     },
     removeOnComplete: {
       count: 100, // Keep last 100 completed jobs

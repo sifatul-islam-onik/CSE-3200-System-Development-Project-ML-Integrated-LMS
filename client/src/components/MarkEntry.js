@@ -71,7 +71,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     
     const pollJobs = async () => {
       const activeJobs = Array.from(ocrJobsRef.current.values()).filter(
-        job => job.status === 'pending' || job.status === 'processing'
+        job => job.status === 'pending' || job.status === 'processing' || job.status === 'retrying'
       );
       
       if (activeJobs.length === 0) {
@@ -98,25 +98,10 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         console.log('Polling updates received:', updates.length, 'jobs');
         
         let hasChanges = false;
-        const currentStudentUpdate = updates.find(
-          job => {
-            const isCompleted = job.status === 'completed';
-            const isCurrentStudent = job.studentId === currentStudentIdRef.current || job.student?._id === currentStudentIdRef.current;
-            console.log('Checking job:', {
-              jobStudentId: job.studentId || job.student?._id,
-              currentStudentId: currentStudentIdRef.current,
-              status: job.status,
-              isCompleted,
-              isCurrentStudent,
-              hasMarks: !!job.marks
-            });
-            return isCompleted && isCurrentStudent;
-          }
-        );
         
         // Check if any job actually changed
         for (const updatedJob of updates) {
-          const existingJob = ocrJobsRef.current.get(updatedJob.student?._id);
+          const existingJob = ocrJobsRef.current.get(updatedJob.studentId);
           if (!existingJob || 
               existingJob.status !== updatedJob.status || 
               existingJob.progress !== updatedJob.progress) {
@@ -132,24 +117,39 @@ const MarkEntry = ({ course, students, section, onClose }) => {
             let activeCount = 0;
             
             updates.forEach(updatedJob => {
-              if (updatedJob.studentId || updatedJob.student?._id) {
-                const studentId = updatedJob.studentId || updatedJob.student?._id;
-                const existingJob = updated.get(studentId);
+              if (updatedJob.studentId) {
+                const studentId = updatedJob.studentId;
                 
                 // Don't store large base64 imageUrl to save memory
-                // Preserve student info from existing job if available
                 const optimizedJob = {
                   ...updatedJob,
-                  student: existingJob?.student || updatedJob.student || { _id: studentId },
                   imageUrl: null // Clear image data after processing
                 };
                 updated.set(studentId, optimizedJob);
+                
+                // Immediately cache completed jobs to studentData
+                if (updatedJob.status === 'completed' && updatedJob.marks) {
+                  console.log('Immediately caching marks for student:', studentId);
+                  setStudentData(prevData => ({
+                    ...prevData,
+                    [studentId]: {
+                      marks: updatedJob.marks,
+                      image: prevData[studentId]?.image || null
+                    }
+                  }));
+                  
+                  // Update marks if this is the current student
+                  if (studentId === currentStudentIdRef.current) {
+                    console.log('Auto-filling marks for current student:', studentId);
+                    setMarks(updatedJob.marks);
+                  }
+                }
               }
             });
             
             // Auto-clean completed/failed jobs older than 30 seconds and count active jobs
             for (const [studentId, job] of updated.entries()) {
-              if (job.status === 'pending' || job.status === 'processing') {
+              if (job.status === 'pending' || job.status === 'processing' || job.status === 'retrying') {
                 activeCount++;
               } else if ((job.status === 'completed' || job.status === 'failed') && job.completedAt) {
                 const completedTime = new Date(job.completedAt).getTime();
@@ -171,41 +171,13 @@ const MarkEntry = ({ course, students, section, onClose }) => {
             setActiveJobCount(activeCount);
             return updated;
           });
-          
-          // Update studentData cache for all completed jobs (not just current student)
-          updates.forEach(updatedJob => {
-            if (updatedJob.status === 'completed' && updatedJob.marks) {
-              const studentId = updatedJob.studentId || updatedJob.student?._id;
-              if (studentId) {
-                console.log('Caching marks for student:', studentId);
-                setStudentData(prev => ({
-                  ...prev,
-                  [studentId]: {
-                    marks: updatedJob.marks,
-                    image: prev[studentId]?.image || null
-                  }
-                }));
-              }
-            }
-          });
-          
-          // Auto-fill marks if current student's job completed
-          if (currentStudentUpdate) {
-            console.log('Current student job completed:', currentStudentUpdate);
-            if (currentStudentUpdate.marks) {
-              console.log('Auto-filling marks:', currentStudentUpdate.marks);
-              setMarks(currentStudentUpdate.marks);
-            } else {
-              console.warn('Job completed but no marks found in response');
-            }
-          }
         }
       }
     };
     
     // Start polling
     pollJobs(); // Initial poll
-    pollIntervalRef.current = setInterval(pollJobs, 4000); // Poll every 4 seconds
+    pollIntervalRef.current = setInterval(pollJobs, 2000); // Poll every 2 seconds for faster updates
     
     return () => {
       if (pollIntervalRef.current) {
@@ -585,7 +557,13 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       }
       
       // Submit OCR job
-      const response = await submitOCRJob(studentId, course._id, section, imageDataUrl);
+      const response = await submitOCRJob(
+        studentId, 
+        course._id, 
+        section, 
+        imageDataUrl,
+        { _id: studentId, name: currentStudent.name, roll: currentStudent.roll } // Send student info
+      );
       
       if (response.success) {
         // Update OCR jobs map with new job (don't store base64 image to save memory)
@@ -850,7 +828,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           
           {/* OCR Jobs Status - Memoized to prevent re-renders */}
           {ocrJobs.size > 0 && (() => {
-            const activeJobsCount = Array.from(ocrJobs.values()).filter(j => j.status === 'pending' || j.status === 'processing').length;
+            const activeJobsCount = Array.from(ocrJobs.values()).filter(j => j.status === 'pending' || j.status === 'processing' || j.status === 'retrying').length;
             const jobsToDisplay = Array.from(ocrJobs.entries()).slice(-3).reverse(); // Get last 3 jobs
             
             return (
@@ -882,10 +860,22 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                         <div style={{ width: '80px', height: '4px', background: '#e5e7eb', borderRadius: '2px', overflow: 'hidden' }}>
                           <div style={{ width: `${job.progress}%`, height: '100%', background: '#3b82f6', transition: 'width 0.3s' }} />
                         </div>
-                        <span style={{ fontSize: '12px', color: '#3b82f6' }}><FontAwesomeIcon icon={faHourglassHalf} /> {job.progress}%</span>
+                        <span style={{ fontSize: '12px', color: '#3b82f6' }}>
+                          <FontAwesomeIcon icon={faHourglassHalf} /> {job.progress}%
+                          {job.isRetry && ` (Retry ${job.attemptNumber}/${job.maxAttempts})`}
+                        </span>
                       </>
                     )}
-                    {job.status === 'completed' && <span style={{ fontSize: '12px', color: '#10b981' }}><FontAwesomeIcon icon={faCheck} /> Done</span>}
+                    {job.status === 'retrying' && (
+                      <span style={{ fontSize: '12px', color: '#f59e0b' }}>
+                        <FontAwesomeIcon icon={faHourglassHalf} /> Retrying ({job.attemptNumber}/{job.maxAttempts})...
+                      </span>
+                    )}
+                    {job.status === 'completed' && (
+                      <span style={{ fontSize: '12px', color: '#10b981' }}>
+                        <FontAwesomeIcon icon={faCheck} /> Done{job.succeededAfterRetry ? ' (after retry)' : ''}
+                      </span>
+                    )}
                     {job.status === 'failed' && <span style={{ fontSize: '12px', color: '#ef4444' }}><FontAwesomeIcon icon={faCircleXmark} /> Failed</span>}
                   </div>
                 </div>
@@ -901,8 +891,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           
           {/* Queue Status */}
           {queueStatus && (() => {
-            const totalJobs = (queueStatus.counts.waiting || 0) + (queueStatus.counts.active || 0);
-            const isBusy = totalJobs > 0;
+            const isBusy = queueStatus.status === 'busy';
             
             return (
               <div style={{
@@ -930,11 +919,6 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                     color: isBusy ? '#92400e' : '#065f46' 
                   }}>
                     OCR server {isBusy ? 'busy' : 'free'}
-                    {isBusy && totalJobs > 0 && (
-                      <span style={{ fontSize: '13px', marginLeft: '4px', fontWeight: '500' }}>
-                        ({totalJobs} waiting)
-                      </span>
-                    )}
                   </span>
                 </div>
               </div>
@@ -944,9 +928,11 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           {/* Current student OCR job status */}
           {ocrJobs.has(currentStudent._id) && ocrJobs.get(currentStudent._id).status !== 'completed' && (
             <div style={{
-              background: ocrJobs.get(currentStudent._id).status === 'failed' ? '#fee2e2' : '#dbeafe',
+              background: ocrJobs.get(currentStudent._id).status === 'failed' ? '#fee2e2' : 
+                         ocrJobs.get(currentStudent._id).status === 'retrying' ? '#fef3c7' : '#dbeafe',
               border: '1px solid',
-              borderColor: ocrJobs.get(currentStudent._id).status === 'failed' ? '#ef4444' : '#3b82f6',
+              borderColor: ocrJobs.get(currentStudent._id).status === 'failed' ? '#ef4444' : 
+                          ocrJobs.get(currentStudent._id).status === 'retrying' ? '#f59e0b' : '#3b82f6',
               borderRadius: '8px',
               padding: '12px',
               marginBottom: '16px',
@@ -956,10 +942,17 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                 <><FontAwesomeIcon icon={faClock} /> OCR job queued for this student...</>
               )}
               {ocrJobs.get(currentStudent._id).status === 'processing' && (
-                <><FontAwesomeIcon icon={faHourglassHalf} /> Processing image for this student... ({ocrJobs.get(currentStudent._id).progress}%)</>
+                <><FontAwesomeIcon icon={faHourglassHalf} /> Processing image for this student... ({ocrJobs.get(currentStudent._id).progress}%)
+                {ocrJobs.get(currentStudent._id).isRetry && ` - Retry ${ocrJobs.get(currentStudent._id).attemptNumber}/${ocrJobs.get(currentStudent._id).maxAttempts}`}
+                </>
+              )}
+              {ocrJobs.get(currentStudent._id).status === 'retrying' && (
+                <><FontAwesomeIcon icon={faHourglassHalf} /> Processing failed, retrying... (Attempt {ocrJobs.get(currentStudent._id).attemptNumber}/{ocrJobs.get(currentStudent._id).maxAttempts})
+                {ocrJobs.get(currentStudent._id).error && <><br/><small style={{color: '#92400e'}}>Error: {ocrJobs.get(currentStudent._id).error}</small></>}
+                </>
               )}
               {ocrJobs.get(currentStudent._id).status === 'failed' && (
-                <><FontAwesomeIcon icon={faCircleXmark} /> OCR processing failed: {ocrJobs.get(currentStudent._id).error}</>
+                <><FontAwesomeIcon icon={faCircleXmark} /> OCR processing failed after {ocrJobs.get(currentStudent._id).attemptNumber || 3} attempts: {ocrJobs.get(currentStudent._id).error}</>
               )}
             </div>
           )}

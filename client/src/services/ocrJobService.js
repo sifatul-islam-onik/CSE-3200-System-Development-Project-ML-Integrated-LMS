@@ -3,12 +3,13 @@ import axios from 'axios';
 const API_URL = '/api/ocr';
 
 // Submit OCR job
-export const submitOCRJob = async (studentId, courseId, section, imageUrl) => {
+export const submitOCRJob = async (studentId, courseId, section, imageUrl, student = null) => {
   const response = await axios.post(`${API_URL}/submit`, {
     studentId,
     courseId,
     section,
-    imageUrl
+    imageUrl,
+    student // Include student info (name, roll) for UI display
   }, {
     headers: {
       'Authorization': `Bearer ${localStorage.getItem('token')}`
