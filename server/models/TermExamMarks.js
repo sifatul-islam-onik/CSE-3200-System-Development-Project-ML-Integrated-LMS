@@ -1,67 +1,55 @@
 const mongoose = require('mongoose');
 
 const termExamMarksSchema = new mongoose.Schema({
-  courseId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Course',
-    required: true
-  },
-  studentId: {
+  student: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  rollNumber: {
-    type: String,
+  course: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Course',
     required: true
-  },
-  year: {
-    type: Number,
-    required: true
-  },
-  semester: {
-    type: String,
-    required: true,
-    enum: ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th']
   },
   section: {
     type: String,
-    required: true
+    default: null
   },
-  examType: {
-    type: String,
-    required: true,
-    enum: ['midterm', 'final']
-  },
-  // CO-wise marks
-  coMarks: [{
-    co: {
-      type: String,
-      required: true
+  // New marks structure: rows a-g with questions 1-4
+  marks: {
+    type: Map,
+    of: {
+      type: Map,
+      of: String
     },
-    obtainedMarks: {
-      type: Number,
-      required: true
-    },
-    totalMarks: {
-      type: Number,
-      required: true
+    default: {
+      a: { '1': '', '2': '', '3': '', '4': '' },
+      b: { '1': '', '2': '', '3': '', '4': '' },
+      c: { '1': '', '2': '', '3': '', '4': '' },
+      d: { '1': '', '2': '', '3': '', '4': '' },
+      e: { '1': '', '2': '', '3': '', '4': '' },
+      f: { '1': '', '2': '', '3': '', '4': '' },
+      g: { '1': '', '2': '', '3': '', '4': '' }
     }
-  }],
-  // Total marks
-  totalObtained: {
-    type: Number,
-    required: true
   },
+  // Total marks
   totalMarks: {
     type: Number,
-    required: true
+    default: 0
   },
-  percentage: {
-    type: Number
+  // Image URL of the answer sheet
+  imageUrl: {
+    type: String,
+    default: null
   },
-  remarks: {
-    type: String
+  // Entry metadata
+  enteredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  lastModified: {
+    type: Date,
+    default: Date.now
   }
 }, {
   timestamps: true

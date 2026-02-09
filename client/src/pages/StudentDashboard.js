@@ -380,7 +380,7 @@ const StudentDashboard = () => {
                 payload.currentPassword = currentPassword;
                 payload.newPassword = newPassword;
               }
-              const response = await fetch('http://localhost:5000/api/auth/profile/update', {
+              const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/auth/profile/update`, {
                 method: 'PUT',
                 headers: {
                   'Content-Type': 'application/json',
@@ -431,7 +431,7 @@ const StudentDashboard = () => {
                             const reader = new FileReader();
                             reader.onloadend = async () => {
                               try {
-                                const response = await fetch('http://localhost:5000/api/auth/profile/update', {
+                                const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/auth/profile/update`, {
                                   method: 'PUT',
                                   headers: {
                                     'Content-Type': 'application/json',
@@ -471,7 +471,7 @@ const StudentDashboard = () => {
                             const reader = new FileReader();
                             reader.onloadend = async () => {
                               try {
-                                const response = await fetch('http://localhost:5000/api/auth/profile/update', {
+                                const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/auth/profile/update`, {
                                   method: 'PUT',
                                   headers: {
                                     'Content-Type': 'application/json',
