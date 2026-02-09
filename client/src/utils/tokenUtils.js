@@ -22,7 +22,7 @@ export const setupTokenInterceptor = () => {
         if (error.message === 'Network Error' || error.message.includes('fetch')) {
           // Network/CORS issue
           const enhancedError = new Error(
-            'Network error: Unable to reach server. Make sure the backend is running on http://localhost:5000'
+            `Network error: Unable to reach server. Make sure the backend is running on ${process.env.REACT_APP_API_URL || 'http://localhost:5000'}`
           );
           enhancedError.originalError = error;
           return Promise.reject(enhancedError);
