@@ -35,6 +35,24 @@ console.log('Worker Registry initialized');
 const ocrWorker = require('./workers/ocrWorker');
 console.log('OCR Worker initialized');
 
+// Initialize OCR Job Store cleanup and monitoring
+const ocrJobStore = require('./utils/ocrJobStore');
+ocrJobStore.startPeriodicCleanup(); // Clean up old jobs every hour
+console.log('OCR Job Store cleanup initialized');
+
+// Periodic check for stuck jobs (every 2 minutes)
+setInterval(() => {
+  const pendingCount = ocrJobStore.getPendingCount();
+  const processingCount = ocrJobStore.getProcessingCount();
+  
+  if (pendingCount > 0 || processingCount > 0) {
+    console.log(`📊 Job Status: ${pendingCount} pending, ${processingCount} processing`);
+  }
+  
+  // Check for jobs that have been pending too long
+  ocrJobStore.checkStuckJobs();
+}, 2 * 60 * 1000); // Every 2 minutes
+
 // Startup normalization: collapse multiple batch assignments to a single latest entry
 (async () => {
   try {

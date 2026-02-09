@@ -147,23 +147,20 @@ const MarkEntry = ({ course, students, section, onClose }) => {
               }
             });
             
-            // Auto-clean completed/failed jobs older than 30 seconds and count active jobs
+            // Count active jobs only (don't auto-clean completed jobs)
+            // Completed jobs stay in memory until page refresh
             for (const [studentId, job] of updated.entries()) {
               if (job.status === 'pending' || job.status === 'processing' || job.status === 'retrying') {
                 activeCount++;
-              } else if ((job.status === 'completed' || job.status === 'failed') && job.completedAt) {
-                const completedTime = new Date(job.completedAt).getTime();
-                if (now - completedTime > 30000) { // 30 seconds
-                  updated.delete(studentId);
-                }
               }
             }
             
-            // Limit total jobs to 10 most recent to prevent memory bloat
-            if (updated.size > 10) {
+            // Limit total jobs to 130 most recent to prevent memory bloat
+            // This allows for larger classes without losing data
+            if (updated.size > 130) {
               const sortedJobs = Array.from(updated.entries())
                 .sort((a, b) => new Date(b[1].createdAt) - new Date(a[1].createdAt))
-                .slice(0, 10);
+                .slice(0, 130);
               updated.clear();
               sortedJobs.forEach(([id, job]) => updated.set(id, job));
             }

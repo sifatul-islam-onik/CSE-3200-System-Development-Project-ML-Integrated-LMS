@@ -31,26 +31,59 @@ exports.submitOCRJob = async (req, res) => {
       imageUrl
     });
 
-    // Immediately return job ID to client
+    // Add job to Bull queue FIRST with strict FIFO ordering
+    // CRITICAL: Let Bull auto-generate job IDs to prevent conflicts/replacements
+    // Use sequence number for tracking only
+    const sequence = ocrQueue.getNextSequence();
+    let bullJob; // Declare outside try-catch for access in response
+    
+    try {
+      bullJob = await ocrQueue.add(
+        {
+          jobId: ocrJob.jobId, // Our internal job ID (in data payload)
+          imageUrl,
+          submittedAt: Date.now(),
+          sequence: sequence // For tracking and verification
+        }
+        // DO NOT specify jobId in options - let Bull auto-generate
+        // DO NOT use named jobs - use default unnamed queue
+        // This ensures true FIFO behavior
+      );
+      
+      // IMMEDIATELY update job store BEFORE job can be picked up by worker
+      // This prevents race condition where worker tries to access incomplete job data
+      ocrJobStore.updateJob(ocrJob.jobId, {
+        queuedAt: new Date(),
+        sequence: sequence,
+        bullJobId: bullJob.id // Store Bull's auto-generated ID for later reference
+      });
+      
+      // Log after store update to ensure consistency
+      console.log(`📥 Job ${ocrJob.jobId} queued (seq: ${sequence}, bullId: ${bullJob.id})`);
+      
+    } catch (queueError) {
+      // If queue add fails, mark job as failed and throw error
+      console.error(`❌ Failed to add job ${ocrJob.jobId} to queue:`, queueError);
+      ocrJobStore.updateJob(ocrJob.jobId, {
+        status: 'failed',
+        error: `Failed to add to queue: ${queueError.message}`
+      });
+      throw new Error(`Failed to add job to queue: ${queueError.message}`);
+    }
+
+    // Return job ID to client after successful queue addition
     res.status(202).json({
       success: true,
-      message: 'OCR job submitted successfully',
+      message: 'OCR job submitted successfully and queued',
       jobId: ocrJob.jobId,
       data: {
         jobId: ocrJob.jobId,
         status: ocrJob.status,
         progress: ocrJob.progress,
-        createdAt: ocrJob.createdAt
+        createdAt: ocrJob.createdAt,
+        sequence: sequence, // Include sequence for client-side tracking
+        bullJobId: bullJob.id // Include Bull ID for debugging
       }
-    });
-
-    // Add job to Bull queue
-    await ocrQueue.add({
-      jobId: ocrJob.jobId,
-      imageUrl
-    }, {
-      jobId: ocrJob.jobId, // Use our jobId as Bull's job ID for easy tracking
-      priority: 1
     });
 
   } catch (error) {
@@ -137,17 +170,21 @@ exports.deleteOCRJob = async (req, res) => {
       });
     }
 
-    // Remove from memory store
+    // Remove from memory store first
+    const bullJobId = job.bullJobId; // Get Bull's auto-generated ID
     ocrJobStore.deleteJob(jobId);
 
-    // Remove from Bull queue if it's there
-    try {
-      const bullJob = await ocrQueue.getJob(jobId);
-      if (bullJob) {
-        await bullJob.remove();
+    // Remove from Bull queue if it's there (using Bull's ID)
+    if (bullJobId) {
+      try {
+        const bullJob = await ocrQueue.getJob(bullJobId);
+        if (bullJob) {
+          await bullJob.remove();
+          console.log(`🗑️  Removed job ${jobId} (Bull ID: ${bullJobId}) from queue`);
+        }
+      } catch (error) {
+        console.warn(`Could not remove job ${jobId} from queue:`, error.message);
       }
-    } catch (error) {
-      console.warn(`Could not remove job ${jobId} from queue:`, error.message);
     }
 
     res.status(200).json({
@@ -171,8 +208,12 @@ exports.getQueueStatus = async (req, res) => {
   try {
     const healthyWorkers = workerRegistry.getHealthyWorkers();
     
-    // Get queue counts
+    // Get queue counts for detailed status
     const waitingCount = await ocrQueue.getWaitingCount();
+    const activeCount = await ocrQueue.getActiveCount();
+    const completedCount = await ocrQueue.getCompletedCount();
+    const failedCount = await ocrQueue.getFailedCount();
+    const delayedCount = await ocrQueue.getDelayedCount();
     
     // Status logic: 
     // - busy: if there are waiting jobs (workers are at capacity)
@@ -184,7 +225,15 @@ exports.getQueueStatus = async (req, res) => {
       data: {
         status,
         healthyWorkers: healthyWorkers.length,
-        totalWorkers: workerRegistry.getWorkers(true).length
+        totalWorkers: workerRegistry.getWorkers(true).length,
+        queue: {
+          waiting: waitingCount,
+          active: activeCount,
+          completed: completedCount,
+          failed: failedCount,
+          delayed: delayedCount,
+          orderingType: 'FIFO' // First In First Out
+        }
       }
     });
   } catch (error) {
