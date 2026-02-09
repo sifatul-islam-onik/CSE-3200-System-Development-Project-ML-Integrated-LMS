@@ -16,9 +16,10 @@ const CONCURRENCY = parseInt(process.env.OCR_CONCURRENCY || '4', 10);
 
 console.log(`OCR Worker configured with concurrency: ${CONCURRENCY}`);
 
-// Single processor that routes jobs to available workers
+// Single processor that routes jobs to available workers (STRICT FIFO order)
+// Process unnamed jobs in natural FIFO order from Bull queue
 ocrQueue.process(CONCURRENCY, async (job, done) => {
-  const { jobId, imageUrl } = job.data;
+  const { jobId, imageUrl, submittedAt, sequence } = job.data;
   
   const attemptNumber = job.attemptsMade + 1;
   const maxAttempts = job.opts.attempts || 3;
@@ -28,14 +29,23 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
   let workerUrl = null;
 
   try {
+    // Verify job exists in store (prevent processing lost jobs)
+    const jobInStore = ocrJobStore.getJob(jobId);
+    if (!jobInStore) {
+      console.error(`❌ Job ${jobId} not found in store - creating entry`);
+      // Recreate job entry if somehow lost
+      throw new Error('Job not found in store - may have been deleted');
+    }
+
     // Get an available healthy worker (one with lowest activeRequests)
     const healthyWorkers = workerRegistry.getHealthyWorkers();
     
     if (healthyWorkers.length === 0) {
+      // No workers available - this will trigger a retry
       throw new Error('No healthy OCR workers available. Please check worker status.');
     }
 
-    // Select worker with least active requests
+    // Select worker with least active requests for better load distribution
     const selectedWorker = healthyWorkers.reduce((prev, current) => 
       (prev.activeRequests < current.activeRequests) ? prev : current
     );
@@ -43,11 +53,16 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
     workerId = selectedWorker.id;
     workerUrl = selectedWorker.url;
 
-    if (selectedWorker.activeRequests > 0) {
-      console.log(`  ⚠ Worker ${workerId} already has ${selectedWorker.activeRequests} active request(s)`);
+    const waitTime = Date.now() - (submittedAt || Date.now());
+    if (waitTime > 5000) {
+      console.log(`  ⏱️  Job ${jobId} waited ${(waitTime/1000).toFixed(1)}s in queue`);
     }
 
-    console.log(`Worker ${workerId}: Processing OCR job ${jobId}${isRetry ? ` (Retry ${attemptNumber}/${maxAttempts})` : ''}`);
+    if (selectedWorker.activeRequests > 0) {
+      console.log(`  ⚠️  Worker ${workerId} has ${selectedWorker.activeRequests} active request(s)`);
+    }
+
+    console.log(`🔄 Worker ${workerId}: Processing job ${jobId} [SEQ:${sequence}]${isRetry ? ` (Retry ${attemptNumber}/${maxAttempts})` : ''} [FIFO]`);
 
     // Mark request start for metrics
     workerRegistry.requestStart(workerId);
@@ -123,16 +138,24 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
         error: null
       });
       job.progress(100);
-      console.log(`✓ Worker ${workerId}: Job ${jobId} completed${isRetry ? ' (after retry)' : ''}`);
+      console.log(`✅ Worker ${workerId}: Job ${jobId} completed${isRetry ? ' (after retry)' : ''}`);
       
+      // Mark worker request as complete BEFORE calling done()
       workerRegistry.requestComplete(workerId, true);
-      done(null, { success: true, jobId, workerId });
+      
+      // Signal successful completion to Bull queue
+      done(null, { 
+        success: true, 
+        jobId, 
+        workerId,
+        completedAt: new Date().toISOString()
+      });
     } else {
       throw new Error(mlResponse.data.message || 'OCR extraction failed - no marks in response');
     }
 
   } catch (error) {
-    console.error(`✗ Worker ${workerId || 'unknown'}: Job ${jobId} failed: ${error.message}`);
+    console.error(`❌ Worker ${workerId || 'unknown'}: Job ${jobId} failed: ${error.message}`);
     
     if (error.response) {
       console.error(`  ML Server response status: ${error.response.status}`);
@@ -142,7 +165,7 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
     const willRetry = attemptNumber < maxAttempts;
     
     if (willRetry) {
-      console.log(`  ⟳ Will retry (attempt ${attemptNumber}/${maxAttempts})`);
+      console.log(`  🔄 Will retry (attempt ${attemptNumber}/${maxAttempts})`);
       ocrJobStore.updateJob(jobId, {
         status: 'retrying',
         error: error.message,
@@ -153,7 +176,7 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
         lastFailedAt: new Date()
       });
     } else {
-      console.log(`  ✗ Final failure (all ${maxAttempts} attempts exhausted)`);
+      console.log(`  ❌ Final failure (all ${maxAttempts} attempts exhausted)`);
       ocrJobStore.updateJob(jobId, {
         status: 'failed',
         error: error.message,
@@ -165,10 +188,12 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
       });
     }
 
+    // Always release worker from active request tracking
     if (workerId) {
       workerRegistry.requestComplete(workerId, false);
     }
     
+    // Signal failure to Bull queue (will trigger retry if attempts remain)
     done(new Error(error.message));
   }
 });
