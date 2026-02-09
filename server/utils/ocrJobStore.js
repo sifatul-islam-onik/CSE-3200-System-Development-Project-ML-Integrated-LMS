@@ -13,6 +13,7 @@ class OCRJobStore {
       jobId: jobData.jobId,
       userId: jobData.userId,
       studentId: jobData.studentId,
+      student: jobData.student || null, // Store student info (name, roll) for UI display
       courseId: jobData.courseId,
       section: jobData.section || null,
       imageUrl: jobData.imageUrl,

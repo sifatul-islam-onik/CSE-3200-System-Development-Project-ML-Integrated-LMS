@@ -1,5 +1,6 @@
 const ocrJobStore = require('../utils/ocrJobStore');
 const ocrQueue = require('../config/queue');
+const workerRegistry = require('../utils/workerRegistry');
 const { v4: uuidv4 } = require('uuid');
 
 // @desc    Submit OCR job
@@ -7,7 +8,7 @@ const { v4: uuidv4 } = require('uuid');
 // @access  Private (Teacher)
 exports.submitOCRJob = async (req, res) => {
   try {
-    const { studentId, courseId, section, imageUrl } = req.body;
+    const { studentId, courseId, section, imageUrl, student } = req.body;
 
     if (!studentId || !courseId || !imageUrl) {
       return res.status(400).json({
@@ -24,6 +25,7 @@ exports.submitOCRJob = async (req, res) => {
       jobId,
       userId: req.user._id.toString(),
       studentId,
+      student: student || null, // Store student info for UI display
       courseId,
       section: section || null,
       imageUrl
@@ -162,40 +164,27 @@ exports.deleteOCRJob = async (req, res) => {
   }
 };
 
-// @desc    Get queue status
+// @desc    Get OCR server status (free/busy based on worker availability and queue)
 // @route   GET /api/ocr/queue-status
 // @access  Private
 exports.getQueueStatus = async (req, res) => {
   try {
-    const [waiting, active, completed, failed, delayed] = await Promise.all([
-      ocrQueue.getWaitingCount(),
-      ocrQueue.getActiveCount(),
-      ocrQueue.getCompletedCount(),
-      ocrQueue.getFailedCount(),
-      ocrQueue.getDelayedCount()
-    ]);
-
-    const waitingJobs = await ocrQueue.getWaiting();
-    const activeJobs = await ocrQueue.getActive();
-
+    const healthyWorkers = workerRegistry.getHealthyWorkers();
+    
+    // Get queue counts
+    const waitingCount = await ocrQueue.getWaitingCount();
+    
+    // Status logic: 
+    // - busy: if there are waiting jobs (workers are at capacity)
+    // - free: if no waiting jobs (workers are ready)
+    const status = waitingCount > 0 ? 'busy' : 'free';
+    
     res.status(200).json({
       success: true,
       data: {
-        counts: {
-          waiting,
-          active,
-          completed,
-          failed,
-          delayed
-        },
-        waitingJobs: waitingJobs.map(j => ({
-          jobId: j.data.jobId,
-          timestamp: j.timestamp
-        })),
-        activeJobs: activeJobs.map(j => ({
-          jobId: j.data.jobId,
-          progress: j.progress()
-        }))
+        status,
+        healthyWorkers: healthyWorkers.length,
+        totalWorkers: workerRegistry.getWorkers(true).length
       }
     });
   } catch (error) {
