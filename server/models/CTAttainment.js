@@ -5,7 +5,8 @@ const ctAttainmentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Course',
     required: true,
-    unique: true
+    unique: true,
+    index: true
   },
   ctRows: [{
     coNumber: String,
@@ -59,5 +60,8 @@ const ctAttainmentSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// Add compound index for common query patterns
+ctAttainmentSchema.index({ course: 1, updatedAt: -1 });
 
 module.exports = mongoose.model('CTAttainment', ctAttainmentSchema);

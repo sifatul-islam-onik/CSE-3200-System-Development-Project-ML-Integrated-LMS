@@ -6,16 +6,28 @@ import { submitOCRJob, getOCRJobStatus, getQueueStatus } from '../services/ocrJo
 import '../styles/MarkEntry.css';
 
 const MarkEntry = ({ course, students, section, onClose }) => {
+  // Debug: Log the section value to console
+  console.log('MarkEntry - Section prop received:', section, 'Type:', typeof section);
+  
+  // Normalize section to uppercase and trim whitespace, default to 'A' if null/undefined
+  const normalizedSection = section ? section.toString().trim().toUpperCase() : 'A';
+  console.log('MarkEntry - Normalized section:', normalizedSection);
+  
+  // Warn if section is null - this means teacher assignment may not have section set
+  if (!section) {
+    console.warn(`⚠️ Section is null for course ${course?.courseCode}. Defaulting to Section A. Please ensure teachers are assigned to specific sections in the course settings.`);
+  }
+  
   const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
   const [capturedImage, setCapturedImage] = useState(null);
   const [marks, setMarks] = useState({
-    a: { '1': '', '2': '', '3': '', '4': '' },
-    b: { '1': '', '2': '', '3': '', '4': '' },
-    c: { '1': '', '2': '', '3': '', '4': '' },
-    d: { '1': '', '2': '', '3': '', '4': '' },
-    e: { '1': '', '2': '', '3': '', '4': '' },
-    f: { '1': '', '2': '', '3': '', '4': '' },
-    g: { '1': '', '2': '', '3': '', '4': '' }
+    a: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+    b: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+    c: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+    d: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+    e: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+    f: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+    g: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' }
   });
   // Store all students' marks and images
   const [studentData, setStudentData] = useState({});
@@ -237,7 +249,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       
       // Priority 3: Fetch from database (if not loaded from OCR job or cache)
       try {
-        const response = await getTermExamMarks(studentId, course._id, section);
+        const response = await getTermExamMarks(studentId, course._id, normalizedSection);
         if (response.success && response.data) {
           setSavedMarks(response.data.marks); // Track database version
           
@@ -273,13 +285,13 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         setSavedMarks(null);
         if (!marksLoaded) {
           setMarks({
-            a: { '1': '', '2': '', '3': '', '4': '' },
-            b: { '1': '', '2': '', '3': '', '4': '' },
-            c: { '1': '', '2': '', '3': '', '4': '' },
-            d: { '1': '', '2': '', '3': '', '4': '' },
-            e: { '1': '', '2': '', '3': '', '4': '' },
-            f: { '1': '', '2': '', '3': '', '4': '' },
-            g: { '1': '', '2': '', '3': '', '4': '' }
+            a: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+            b: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+            c: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+            d: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+            e: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+            f: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+            g: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' }
           });
           // Don't clear image if it's a fresh capture (blob URL) - only clear if no image or non-blob
           if (!imageLoaded) {
@@ -293,7 +305,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     
     loadStudentMarks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStudentIndex, currentStudent._id, course._id, section]);
+  }, [currentStudentIndex, currentStudent._id, course._id, normalizedSection]);
   
   // Check for unsaved changes (memoized to reduce re-computations)
   const hasChangesComputed = useMemo(() => {
@@ -509,13 +521,13 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     }
     setCapturedImage(null);
     setMarks({
-      a: { '1': '', '2': '', '3': '', '4': '' },
-      b: { '1': '', '2': '', '3': '', '4': '' },
-      c: { '1': '', '2': '', '3': '', '4': '' },
-      d: { '1': '', '2': '', '3': '', '4': '' },
-      e: { '1': '', '2': '', '3': '', '4': '' },
-      f: { '1': '', '2': '', '3': '', '4': '' },
-      g: { '1': '', '2': '', '3': '', '4': '' }
+      a: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+      b: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+      c: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+      d: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+      e: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+      f: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' },
+      g: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' }
     });
     
     // Clear the student's data from in-memory cache and OCR jobs
@@ -557,7 +569,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       const response = await submitOCRJob(
         studentId, 
         course._id, 
-        section, 
+        normalizedSection, 
         imageDataUrl,
         { _id: studentId, name: currentStudent.name, roll: currentStudent.roll } // Send student info
       );
@@ -641,7 +653,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       await saveTermExamMarks({
         studentId: studentId,
         courseId: course._id,
-        section: section,
+        section: normalizedSection,
         marks: marks,
         totalMarks: parseFloat(totalMarks),
         imageUrl: capturedImage && !capturedImage.startsWith('blob:') && capturedImage !== 'skipped' ? capturedImage : null
@@ -664,7 +676,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       console.error('Error saving marks:', error);
       alert('Failed to save marks: ' + error.message);
     }
-  }, [currentStudent._id, course._id, section, marks, totalMarks, capturedImage]);
+  }, [currentStudent._id, course._id, normalizedSection, marks, totalMarks, capturedImage]);
 
   // Save and go to next student
   const handleNext = useCallback(async () => {
@@ -676,7 +688,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         await saveTermExamMarks({
           studentId: studentId,
           courseId: course._id,
-          section: section,
+          section: normalizedSection,
           marks: marks,
           totalMarks: parseFloat(totalMarks),
           // Don't save blob URLs to database as they expire
@@ -711,7 +723,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       // All students completed
       onClose();
     }
-  }, [hasUnsavedChanges, currentStudent._id, course._id, section, marks, totalMarks, capturedImage, currentStudentIndex, students.length, onClose]);
+  }, [hasUnsavedChanges, currentStudent._id, course._id, normalizedSection, marks, totalMarks, capturedImage, currentStudentIndex, students.length, onClose]);
 
   // Go to previous student
   const handlePrevious = () => {
@@ -778,7 +790,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           <div>
             <h3>{course.courseCode} - Term Exam Marks Entry</h3>
             <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#6b7280' }}>
-              {section ? `Section ${section}` : ''} • Student {currentStudentIndex + 1} of {students.length}
+              {normalizedSection ? `Section ${normalizedSection}` : ''} • Student {currentStudentIndex + 1} of {students.length}
             </p>
           </div>
           <button className="close-btn" onClick={onClose}>
@@ -804,6 +816,22 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           
           {/* Main Content */}
           <div style={{ opacity: isLoadingData ? 0.3 : 1, pointerEvents: isLoadingData ? 'none' : 'auto' }}>
+          
+          {/* Warning if section is null */}
+          {!section && (
+            <div style={{
+              background: '#fef3c7',
+              border: '1px solid #f59e0b',
+              borderRadius: '8px',
+              padding: '12px',
+              marginBottom: '16px',
+              fontSize: '14px',
+              color: '#92400e'
+            }}>
+              ℹ️ <strong>Note:</strong> No section assigned for this course. Defaulting to Section A (Questions 1-4). Please contact admin to assign sections properly.
+            </div>
+          )}
+          
           {/* Student Info */}
           <div className="student-info-card">
             <div>
@@ -1074,23 +1102,23 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           {/* Marks Entry Form */}
           {(capturedImage || showCamera === false) && (
             <div className="marks-form-section">
-              <h4>Enter Marks</h4>
+              <h4>Enter Marks - Section {normalizedSection} (Q{normalizedSection === 'A' ? '1-4' : '5-8'})</h4>
               <div className="marks-table-container">
                 <table className="marks-table">
                   <thead>
                     <tr>
                       <th>Row</th>
-                      <th>Q1</th>
-                      <th>Q2</th>
-                      <th>Q3</th>
-                      <th>Q4</th>
+                      <th>Q{normalizedSection === 'A' ? '1' : '5'}</th>
+                      <th>Q{normalizedSection === 'A' ? '2' : '6'}</th>
+                      <th>Q{normalizedSection === 'A' ? '3' : '7'}</th>
+                      <th>Q{normalizedSection === 'A' ? '4' : '8'}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(row => (
                       <tr key={row}>
                         <td className="row-label">{row}</td>
-                        {['1', '2', '3', '4'].map(question => (
+                        {(normalizedSection === 'A' ? ['1', '2', '3', '4'] : ['5', '6', '7', '8']).map(question => (
                           <td key={question}>
                             <input
                               type="text"

@@ -977,23 +977,7 @@ exports.assignTeacherToCourse = async (req, res) => {
       });
     }
 
-    // Validate section is required
-    if (!section) {
-      return res.status(400).json({
-        success: false,
-        message: 'Section is required'
-      });
-    }
-
-    // Validate section value
-    if (!['A', 'B'].includes(section)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Section must be either A or B'
-      });
-    }
-
-    // Validate course exists
+    // Validate course exists first (need to check course type)
     const Course = require('../models/Course');
     const course = await Course.findById(courseId);
     if (!course) {
@@ -1001,6 +985,32 @@ exports.assignTeacherToCourse = async (req, res) => {
         success: false,
         message: 'Course not found'
       });
+    }
+
+    // Validate section based on course type
+    // For THEORY courses, section is required and must be A or B
+    // For other course types (SESSIONAL, PROJECT/THESIS), section can be null
+    if (course.course_type === 'THEORY') {
+      if (!section) {
+        return res.status(400).json({
+          success: false,
+          message: 'Section (A or B) is required for THEORY courses'
+        });
+      }
+      if (!['A', 'B'].includes(section)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Section must be either A or B for THEORY courses'
+        });
+      }
+    } else {
+      // For non-THEORY courses, section should be null
+      if (section && section !== null) {
+        return res.status(400).json({
+          success: false,
+          message: `Section assignment is not applicable for ${course.course_type} courses`
+        });
+      }
     }
 
     // Validate teacher exists and is a teacher
@@ -1057,22 +1067,24 @@ exports.assignTeacherToCourse = async (req, res) => {
       });
     }
 
-    // Check if section is already assigned to another teacher
-    const sectionAlreadyAssigned = course.assignedTeachers.find(
-      a => a.section === section
-    );
+    // Check if section is already assigned to another teacher (only for THEORY courses)
+    if (course.course_type === 'THEORY' && section) {
+      const sectionAlreadyAssigned = course.assignedTeachers.find(
+        a => a.section === section
+      );
 
-    if (sectionAlreadyAssigned) {
-      return res.status(400).json({
-        success: false,
-        message: `Section ${section} is already assigned to another teacher`
-      });
+      if (sectionAlreadyAssigned) {
+        return res.status(400).json({
+          success: false,
+          message: `Section ${section} is already assigned to another teacher`
+        });
+      }
     }
 
     // Add teacher to assignedTeachers array
     course.assignedTeachers.push({
       teacher: teacherId,
-      section: section
+      section: course.course_type === 'THEORY' ? section : null
     });
     await course.save();
 

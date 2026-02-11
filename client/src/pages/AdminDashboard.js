@@ -3072,7 +3072,7 @@ const AdminDashboard = () => {
                 </h4>
                 {selectedCourseForAssignment.assignedTeachers && selectedCourseForAssignment.assignedTeachers.length > 0 ? (
                   <>
-                    {selectedCourseForAssignment.assignedTeachers.some(a => !a.section) && (
+                    {selectedCourseForAssignment.course_type === 'THEORY' && selectedCourseForAssignment.assignedTeachers.some(a => !a.section) && (
                       <div style={{
                         padding: '10px 12px',
                         backgroundColor: '#fef3c7',
@@ -3082,7 +3082,7 @@ const AdminDashboard = () => {
                         fontSize: '13px',
                         color: '#92400e'
                       }}>
-                        <strong>⚠️ Warning:</strong> Some teachers don't have a section assigned. Please remove and reassign them with a section.
+                        <strong>⚠️ Warning:</strong> Some teachers don't have a section assigned. For THEORY courses, sections (A or B) are required. Please remove and reassign them with a section.
                       </div>
                     )}
                     <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
@@ -3123,7 +3123,7 @@ const AdminDashboard = () => {
                                 }}>
                                   Section {section}
                                 </span>
-                              ) : (
+                              ) : selectedCourseForAssignment.course_type === 'THEORY' ? (
                                 <span style={{
                                   marginLeft: '8px',
                                   padding: '2px 8px',
@@ -3133,9 +3133,9 @@ const AdminDashboard = () => {
                                   fontSize: '12px',
                                   fontWeight: 600
                                 }}>
-                                  No Section
+                                  No Section ⚠️
                                 </span>
-                              )}
+                              ) : null}
                             </div>
                             <div style={{fontSize: '12px', color: '#6b7280', marginTop: '2px'}}>
                               {teacher.email}
@@ -3301,45 +3301,64 @@ const AdminDashboard = () => {
                               {teacher.designation && ` • ${teacher.designation}`}
                             </div>
                           </div>
-                          <select
-                            value={teacherSectionSelections[teacher._id] || ''}
-                            onChange={(e) => {
-                              const newSection = e.target.value;
-                              // Check if section is already taken by another teacher
-                              const isTaken = sectionsSelectedByOthers.includes(newSection) || assignedSections.includes(newSection);
-                              if (!isTaken || !newSection) {
-                                setTeacherSectionSelections(prev => ({
-                                  ...prev,
-                                  [teacher._id]: newSection
-                                }));
-                              }
-                            }}
-                            style={{
-                              padding: '6px 10px',
-                              fontSize: '12px',
-                              borderRadius: '4px',
-                              border: '1px solid #d1d5db',
-                              backgroundColor: 'white',
-                              cursor: 'pointer',
-                              minWidth: '120px'
-                            }}
-                            disabled={assignmentLoading || hasReachedMaxTeachers}
-                          >
-                            <option value="" disabled>Select Section</option>
-                            <option value="A" disabled={isSectionAUnavailable}>Section A {isSectionAUnavailable ? '(Taken)' : ''}</option>
-                            <option value="B" disabled={isSectionBUnavailable}>Section B {isSectionBUnavailable ? '(Taken)' : ''}</option>
-                          </select>
+                          
+                          {/* Only show section dropdown for THEORY courses */}
+                          {selectedCourseForAssignment.course_type === 'THEORY' && (
+                            <select
+                              value={teacherSectionSelections[teacher._id] || ''}
+                              onChange={(e) => {
+                                const newSection = e.target.value;
+                                // Check if section is already taken by another teacher
+                                const isTaken = sectionsSelectedByOthers.includes(newSection) || assignedSections.includes(newSection);
+                                if (!isTaken || !newSection) {
+                                  setTeacherSectionSelections(prev => ({
+                                    ...prev,
+                                    [teacher._id]: newSection
+                                  }));
+                                }
+                              }}
+                              style={{
+                                padding: '6px 10px',
+                                fontSize: '12px',
+                                borderRadius: '4px',
+                                border: '1px solid #d1d5db',
+                                backgroundColor: 'white',
+                                cursor: 'pointer',
+                                minWidth: '120px'
+                              }}
+                              disabled={assignmentLoading || hasReachedMaxTeachers}
+                            >
+                              <option value="" disabled>Select Section</option>
+                              <option value="A" disabled={isSectionAUnavailable}>Section A {isSectionAUnavailable ? '(Taken)' : ''}</option>
+                              <option value="B" disabled={isSectionBUnavailable}>Section B {isSectionBUnavailable ? '(Taken)' : ''}</option>
+                            </select>
+                          )}
+                          
                           <button
                             type="button"
                             className="btn btn-sm btn-primary"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              handleAssignTeacher(teacher._id, teacherSectionSelections[teacher._id]);
+                              // For THEORY courses, use selected section; for others, use null
+                              const sectionToAssign = selectedCourseForAssignment.course_type === 'THEORY' 
+                                ? teacherSectionSelections[teacher._id] 
+                                : null;
+                              handleAssignTeacher(teacher._id, sectionToAssign);
                             }}
-                            disabled={assignmentLoading || hasReachedMaxTeachers || !teacherSectionSelections[teacher._id]}
+                            disabled={
+                              assignmentLoading || 
+                              hasReachedMaxTeachers || 
+                              (selectedCourseForAssignment.course_type === 'THEORY' && !teacherSectionSelections[teacher._id])
+                            }
                             style={{fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}
-                            title={hasReachedMaxTeachers ? 'Maximum 2 teachers reached' : !teacherSectionSelections[teacher._id] ? 'Please select a section first' : 'Assign teacher'}
+                            title={
+                              hasReachedMaxTeachers 
+                                ? 'Maximum 2 teachers reached' 
+                                : (selectedCourseForAssignment.course_type === 'THEORY' && !teacherSectionSelections[teacher._id])
+                                  ? 'Please select a section first' 
+                                  : 'Assign teacher'
+                            }
                           >
                             Assign
                           </button>

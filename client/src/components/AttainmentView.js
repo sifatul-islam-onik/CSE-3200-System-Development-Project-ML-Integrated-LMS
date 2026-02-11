@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   getAttainmentData,
   getSheetNames,
@@ -6,11 +6,14 @@ import {
   getCTData,
   saveAssignmentData,
   getAssignmentData,
+  getTermExamMarks,
 } from '../services/attainmentService';
 import { getCourseProfile } from '../services/courseProfileService';
 import { getCourseStudents } from '../services/courseService';
 import { getAllCourses } from '../services/courseService';
 import { getAllProgramOutcomes } from '../services/programOutcomeService';
+import { loadStudentsOptimized, loadAttainmentDatasets } from '../services/dataLoader';
+import logger from '../utils/logger';
 import '../styles/AttainmentView.css';
 
 // Helper function to format numbers - show as integer if no decimal part, otherwise remove trailing zeros
@@ -107,6 +110,10 @@ const AttainmentView = () => {
   // Modal state for LabActivity obtained table
   const [showLabActivityObtainedModal, setShowLabActivityObtainedModal] = useState(false);
   
+  // Term exam marks state
+  const [termExamMarks, setTermExamMarks] = useState([]);
+  const [termExamLoading, setTermExamLoading] = useState(false);
+  
   // Navigation state for LabActivity generated modal (0 = factored values, 1 = multiplication factor)
   const [labActivityGeneratedView, setLabActivityGeneratedView] = useState(0);
   
@@ -133,37 +140,36 @@ const AttainmentView = () => {
     loadSheetNames();
   }, []);
 
-  // Load course profile function
+  // Load course profile function - memoized for better performance
   const loadCourseProfile = useCallback(async () => {
     if (!selectedCourse) return;
     try {
-      console.log('Loading course profile for:', selectedCourse.courseCode);
       const response = await getCourseProfile(selectedCourse.courseCode);
-      console.log('Course profile response:', response);
       if (response.success && response.data) {
-        console.log('Setting CLOs:', response.data);
         setClos(response.data);
       } else {
-        console.log('No data in response');
         setClos([]);
       }
     } catch (err) {
-      console.error('Failed to load course profile:', err);
+      logger.error('Failed to load course profile:', err);
       setClos([]);
     }
   }, [selectedCourse]);
 
-  // Load/clear course outcomes for CourseProfile, CT, Attn_Assign, SectionA, SectionB, LabActivity, COAttainment, COCalc, COCalc_LabUnnorm, COPOMap, and Charts views
+  // Memoize sheets that require CLOs to avoid repeated string checks
+  const cloDependentSheets = useMemo(() => 
+    ['CourseProfile', 'CT', 'Attn_Assign', 'SectionA', 'SectionB', 'LabActivity', 'COAttainment', 'COCalc', 'COCalc_LabUnnorm', 'COPOMap', 'Charts'],
+    []
+  );
+
+  // Load/clear course outcomes - optimized with memoization
   useEffect(() => {
-    console.log('CLO loading effect triggered:', { selectedCourse, selectedSheet, hasSelectedCourse: !!selectedCourse });
-    if (selectedCourse && (selectedSheet === 'CourseProfile' || selectedSheet === 'CT' || selectedSheet === 'Attn_Assign' || selectedSheet === 'SectionA' || selectedSheet === 'SectionB' || selectedSheet === 'LabActivity' || selectedSheet === 'COAttainment' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COPOMap' || selectedSheet === 'Charts')) {
-      console.log('Loading course profile for sheet:', selectedSheet);
+    if (selectedCourse && cloDependentSheets.includes(selectedSheet)) {
       loadCourseProfile();
     } else {
-      console.log('Clearing CLOs');
       setClos([]);
     }
-  }, [selectedCourse, selectedSheet, loadCourseProfile]);
+  }, [selectedCourse, selectedSheet, loadCourseProfile, cloDependentSheets]);
 
   // Initialize CT matrix rows when clos is available and CT is selected
   useEffect(() => {
@@ -195,7 +201,6 @@ const AttainmentView = () => {
 
   // Initialize Assignment matrix rows when clos is available and Attn_Assign is selected
   useEffect(() => {
-    console.log('Assignment initialization effect:', { selectedSheet, closLength: clos.length, clos });
     if (selectedSheet === 'Attn_Assign' && clos.length > 0) {
       const initial = clos.map(clo => ({
         coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
@@ -298,104 +303,25 @@ const AttainmentView = () => {
     }
   }, [selectedSheet, clos]);
 
-  // Initialize CO Attainment data when COAttainment sheet is selected
+  // Initialize CO Attainment data when COAttainment sheet is selected - OPTIMIZED
   useEffect(() => {
     const calculateCOAttainment = async () => {
       if (selectedSheet === 'COAttainment' && selectedCourse && clos.length > 0) {
-        console.log('🎯 Calculating CO Attainment data');
         
-        // Get students list using the same pattern as other sheets
-        let allStudents = [];
+        // Use optimized parallel loader
+        const uniqueStudents = await loadStudentsOptimized(selectedCourse, sheetNames);
         
-        // Try to get students from course API first
-        if (selectedCourse._id) {
-          try {
-            const resp = await getCourseStudents(selectedCourse._id);
-            console.log('📡 getCourseStudents response:', resp);
-            if (resp.success && Array.isArray(resp.data) && resp.data.length > 0) {
-              allStudents = resp.data.map(s => ({ 
-                rollNumber: s.roll || s.rollNumber, 
-                name: s.name 
-              }));
-              console.log('✅ Found students from course API:', allStudents.length);
-            }
-          } catch (err) {
-            console.error('Error getting students:', err);
-          }
-        }
-        
-        // Try fallback: Section sheets
-        if (allStudents.length === 0) {
-          const sectionSheets = (sheetNames || []).filter(name => /^Section/i.test(name));
-          for (const sName of sectionSheets) {
-            try {
-              const resp = await getAttainmentData(sName);
-              const list = Array.isArray(resp?.data?.students) ? resp.data.students : [];
-              if (list.length) allStudents = allStudents.concat(list.map(s => ({
-                rollNumber: s.rollNumber || s.roll || s,
-                name: s.name
-              })));
-            } catch (error) {
-              console.log('Error checking sheet', sName, ':', error);
-            }
-          }
-        }
-        
-        // Try fallback: Attn_Assign sheet
-        if (allStudents.length === 0 && (sheetNames || []).includes('Attn_Assign')) {
-          try {
-            const resp = await getAttainmentData('Attn_Assign');
-            const list = Array.isArray(resp?.data?.students) ? resp.data.students : [];
-            if (list.length) allStudents = allStudents.concat(list.map(s => ({
-              rollNumber: s.rollNumber || s.roll || s,
-              name: s.name
-            })));
-          } catch (error) {
-            console.log('Error checking Attn_Assign:', error);
-          }
-        }
-        
-        // Deduplicate students
-        let uniqueStudents = [];
-        const seen = new Set();
-        for (const stu of allStudents) {
-          let rn = stu.rollNumber || stu.roll || stu;
-          if (!rn) continue;
-          rn = String(rn).trim();
-          const lower = rn.toLowerCase();
-          if (!seen.has(lower)) {
-            seen.add(lower);
-            uniqueStudents.push({ rollNumber: rn, name: stu.name });
-          }
-        }
-        
-        console.log('📊 Total unique students:', uniqueStudents.length);
         
         if (uniqueStudents.length === 0) {
           setCoAttainmentData([]);
           return;
         }
         
-        // Load obtained marks data from all sheets to calculate CO attainment
-        let ctData = [];
-        let attnAssignData = [];
-        let sectionAData = [];
-        let sectionBData = [];
-        let labActivityData = [];
+        // Load all required datasets in parallel
+        const datasets = await loadAttainmentDatasets(selectedCourse, ['ct', 'assignment', 'termExam']);
         
-        // Try to load CT obtained marks
-        try {
-          const ctResp = await getCTData(selectedCourse.courseCode);
-          if (ctResp.success && ctResp.data && ctResp.data.obtainedMarks) {
-            ctData = ctResp.data.obtainedMarks;
-            console.log('📊 CT Data loaded:', ctData.length, 'students');
-          }
-        } catch (err) {
-          console.log('No CT data available');
-        }
-        
-        // Try to load other sheet data if needed
-        // For now, we'll calculate based on CT data primarily
+        // Extract CT obtained marks
+        const ctData = datasets.ct?.ctObtainedRows || [];
         
         // Calculate CO attainment for each student
         const attainmentRows = uniqueStudents.map(student => {
@@ -430,7 +356,7 @@ const AttainmentView = () => {
               ? (totalObtained / totalAllocated) * 100 
               : 0;
             
-            row.coValues[coNumber] = Math.round(percentage * 100) / 100; // Round to 2 decimals
+            row.coValues[coNumber] = Math.round(percentage * 100) / 100;
           });
           
           return row;
@@ -443,13 +369,12 @@ const AttainmentView = () => {
     };
     
     calculateCOAttainment();
-  }, [selectedSheet, selectedCourse, clos, sheetNames, attainmentData]);
+  }, [selectedSheet, selectedCourse, clos, sheetNames]);
 
   // Initialize COCalc data when COCalc or COCalc_LabUnnorm sheet is selected
   useEffect(() => {
     const loadCOCalcData = async () => {
       if ((selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm') && selectedCourse && clos.length > 0) {
-        console.log('📊 Loading COCalc data');
         
         // Get students list
         let allStudents = [];
@@ -463,7 +388,6 @@ const AttainmentView = () => {
               }));
             }
           } catch (err) {
-            console.warn('Could not fetch students from course API:', err);
           }
         }
         
@@ -475,7 +399,6 @@ const AttainmentView = () => {
               allStudents = sectAData.data.map(s => ({ rollNumber: s.rollNumber }));
             }
           } catch (err) {
-            console.warn('Could not fetch Section A data:', err);
           }
         }
         
@@ -503,7 +426,6 @@ const AttainmentView = () => {
               sectionAData = sectAResp.data;
             }
           } catch (err) {
-            console.warn('Could not fetch Section A marks:', err);
           }
         }
         
@@ -514,7 +436,6 @@ const AttainmentView = () => {
               sectionBData = sectBResp.data;
             }
           } catch (err) {
-            console.warn('Could not fetch Section B marks:', err);
           }
         }
         
@@ -525,8 +446,38 @@ const AttainmentView = () => {
               ctData = ctResp.data;
             }
           } catch (err) {
-            console.warn('Could not fetch CT marks:', err);
           }
+        }
+        
+        // Fetch term exam marks for this course
+        let termMarksData = [];
+        try {
+          setTermExamLoading(true);
+          const termResp = await getTermExamMarks(selectedCourse._id, selectedCourse.section);
+          if (termResp.success && Array.isArray(termResp.data)) {
+            setTermExamMarks(termResp.data);
+            termMarksData = termResp.data;
+          } else {
+            setTermExamMarks([]);
+          }
+        } catch (err) {
+          setTermExamMarks([]);
+        } finally {
+          setTermExamLoading(false);
+        }
+        
+        // Transform term exam marks into sectionA and sectionB format
+        // Term marks structure: { marks: { a: {1,2,3,4,5,6,7,8}, b: {...}, ... } }
+        // Questions 1-4 are Section A, Questions 5-8 are Section B
+        // But we need format: { rollNumber, obtained_CO1, allocated_CO1, obtained_CO2, allocated_CO2, ... }
+        
+        // For now, use the existing sectionA/B data fetch
+        // TODO: Calculate CO-wise marks from term exam marks based on question-CO mapping
+        if (termMarksData.length > 0 && !sheetNames.includes('Section A') && !sheetNames.includes('Section B')) {
+          // If we have term marks but no Section A/B sheets, we need to process term marks
+          // This requires knowing which questions map to which COs
+          // For now, just note that term marks are available
+          // The actual CO mapping would need to come from course profile or CO definitions
         }
         
         if (sheetNames.includes('Attn_Assign')) {
@@ -536,7 +487,6 @@ const AttainmentView = () => {
               assignData = assignResp.data;
             }
           } catch (err) {
-            console.warn('Could not fetch Assignment marks:', err);
           }
         }
         
@@ -692,61 +642,41 @@ const AttainmentView = () => {
   // Initialize Obtained Marks table rows from student list when CT, Attn_Assign, SectionA or SectionB selected
   useEffect(() => {
     const initObtainedRows = async (forSheet) => {
-      console.log('🔍 initObtainedRows called for sheet:', forSheet);
-      console.log('📚 selectedCourse:', selectedCourse);
-      console.log('📋 sheetNames:', sheetNames);
       
       let allStudents = [];
       if (selectedCourse && selectedCourse._id) {
-        console.log('🎓 Trying to get students from course API:', selectedCourse._id);
         try {
           const resp = await getCourseStudents(selectedCourse._id);
-          console.log('📡 getCourseStudents response:', resp);
           if (resp.success && Array.isArray(resp.data) && resp.data.length > 0) {
             allStudents = resp.data.map(s => ({ rollNumber: s.roll || s.rollNumber, name: s.name }));
-            console.log('✅ Found students from course API:', allStudents.length);
           } else {
-            console.log('❌ No students from course API');
           }
         } catch (error) {
-          console.log('🚨 Error getting students from course API:', error);
         }
       } else {
-        console.log('⚠️ No selectedCourse._id available');
       }
       if (allStudents.length === 0) {
-        console.log('🔄 Trying fallback: Section sheets');
         const sectionSheets = (sheetNames || []).filter(name => /^Section/i.test(name));
-        console.log('📄 Section sheets found:', sectionSheets);
         for (const sName of sectionSheets) {
           try {
-            console.log('📊 Checking sheet:', sName);
             const resp = await getAttainmentData(sName);
             const list = Array.isArray(resp?.data?.students) ? resp.data.students : [];
-            console.log('👥 Students in', sName, ':', list.length);
             if (list.length) allStudents = allStudents.concat(list);
           } catch (error) {
-            console.log('🚨 Error checking sheet', sName, ':', error);
           }
         }
       }
       if (allStudents.length === 0 && (sheetNames || []).includes('Attn_Assign')) {
-        console.log('🔄 Trying fallback: Attn_Assign sheet');
         try {
           const resp = await getAttainmentData('Attn_Assign');
           const list = Array.isArray(resp?.data?.students) ? resp.data.students : [];
-          console.log('👥 Students in Attn_Assign:', list.length);
           if (list.length) allStudents = allStudents.concat(list);
         } catch (error) {
-          console.log('🚨 Error checking Attn_Assign:', error);
         }
       }
       if (allStudents.length === 0 && Array.isArray(attainmentData?.students)) {
-        console.log('🔄 Trying fallback: attainmentData.students');
         allStudents = attainmentData.students;
-        console.log('👥 Students from attainmentData:', allStudents.length);
       }
-      console.log('📊 Total students collected before processing:', allStudents.length);
       
       let uniqueByRoll = [];
       const seen = new Set();
@@ -765,8 +695,6 @@ const AttainmentView = () => {
         }
       }
       
-      console.log('✅ Final processed students:', uniqueByRoll.length);
-      console.log('👨‍🎓 Student sample:', uniqueByRoll.slice(0, 3));
       uniqueByRoll.sort((a, b) => {
         const aNum = String(a.rollNumber).replace(/\D/g, '');
         const bNum = String(b.rollNumber).replace(/\D/g, '');
@@ -775,7 +703,6 @@ const AttainmentView = () => {
       
       // If no valid students found after processing, don't add sample students
       if (uniqueByRoll.length === 0) {
-        console.log('⚠️ No valid students found');
       }
       if (uniqueByRoll.length > 0) {
         if (forSheet === 'CT') {
@@ -786,7 +713,6 @@ const AttainmentView = () => {
             CT2_Q1: 0, CT2_Q2: 0, CT2_Q3: 0,
             CT3_Q1: 0, CT3_Q2: 0, CT3_Q3: 0,
           }));
-          console.log('📝 Setting ctObtainedRows with', initial.length, 'students');
           setCtObtainedRows(initial);
         } else if (forSheet === 'Attn_Assign') {
           const initial = uniqueByRoll.map(stu => ({
@@ -797,7 +723,6 @@ const AttainmentView = () => {
             Assgn2_Q1: 0, Assgn2_Q2: 0, Assgn2_Q3: 0,
             Assgn3_Q1: 0, Assgn3_Q2: 0, Assgn3_Q3: 0,
           }));
-          console.log('📝 Setting attnAssignObtainedRows with', initial.length, 'students');
           setAttnAssignObtainedRows(initial);
         } else if (forSheet === 'SectionA') {
           const initial = uniqueByRoll.map(stu => ({
@@ -808,7 +733,6 @@ const AttainmentView = () => {
             Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
             Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
           }));
-          console.log('📝 Setting sectionAObtainedRows with', initial.length, 'students');
           setSectionAObtainedRows(initial);
         } else if (forSheet === 'SectionB') {
           const initial = uniqueByRoll.map(stu => ({
@@ -819,7 +743,6 @@ const AttainmentView = () => {
             Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
             Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
           }));
-          console.log('📝 Setting sectionBObtainedRows with', initial.length, 'students');
           setSectionBObtainedRows(initial);
         } else if (forSheet === 'LabActivity') {
           const initial = uniqueByRoll.map(stu => ({
@@ -836,28 +759,22 @@ const AttainmentView = () => {
             otherMeasured: 0,
             other: 0,
           }));
-          console.log('📝 Setting labActivityObtainedRows with', initial.length, 'students');
           setLabActivityObtainedRows(initial);
         }
       } else {
         if (forSheet === 'CT') {
-          console.log('📝 Setting ctObtainedRows to empty array');
           setCtObtainedRows([]);
         }
         else if (forSheet === 'Attn_Assign') {
-          console.log('📝 Setting attnAssignObtainedRows to empty array');
           setAttnAssignObtainedRows([]);
         }
         else if (forSheet === 'SectionA') {
-          console.log('📝 Setting sectionAObtainedRows to empty array');
           setSectionAObtainedRows([]);
         }
         else if (forSheet === 'SectionB') {
-          console.log('📝 Setting sectionBObtainedRows to empty array');
           setSectionBObtainedRows([]);
         }
         else if (forSheet === 'LabActivity') {
-          console.log('📝 Setting labActivityObtainedRows to empty array');
           setLabActivityObtainedRows([]);
         }
       }
@@ -879,7 +796,7 @@ const AttainmentView = () => {
             setProgramOutcomes(poResponse.data);
           }
         } catch (err) {
-          console.error('Failed to load program outcomes:', err);
+          logger.error('Failed to load program outcomes:', err);
         }
       }
     };
@@ -900,7 +817,7 @@ const AttainmentView = () => {
             setPoCalcStudents(students);
           }
         } catch (err) {
-          console.error('Failed to load students:', err);
+          logger.error('Failed to load students:', err);
           setPoCalcStudents([]);
         }
       }
@@ -993,7 +910,7 @@ const AttainmentView = () => {
           setCombinedCOPOMatrix(combined);
           
         } catch (err) {
-          console.error('Failed to load combined CO-PO matrix:', err);
+          logger.error('Failed to load combined CO-PO matrix:', err);
           setCombinedCOPOMatrix(null);
         }
       }
@@ -1090,7 +1007,6 @@ const AttainmentView = () => {
   // Manual save function (saves immediately without debounce)
   const handleManualSave = async () => {
     if (!selectedCourse || !selectedCourse._id || selectedSheet !== 'CT') {
-      console.log('[Manual Save] Skipping - no course or not CT sheet');
       return;
     }
 
@@ -1111,16 +1027,14 @@ const AttainmentView = () => {
         ctObtainedRows
       };
 
-      console.log('[Manual Save] Saving data for course:', selectedCourse._id);
       const response = await saveCTData(selectedCourse._id, dataToSave);
-      console.log('[Manual Save] Save response:', response);
       
       setSaveStatus('saved');
       
       // Clear saved status after 2 seconds
       setTimeout(() => setSaveStatus(''), 2000);
     } catch (error) {
-      console.error('[Manual Save] Error:', error);
+      logger.error('[Manual Save] Error:', error);
       setSaveStatus('error');
       setTimeout(() => setSaveStatus(''), 3000);
     }
@@ -1129,7 +1043,6 @@ const AttainmentView = () => {
   // Manual save function for Assignment/Attendance (saves immediately without debounce)
   const handleManualSaveAssignment = async () => {
     if (!selectedCourse || !selectedCourse._id || selectedSheet !== 'Attn_Assign') {
-      console.log('[Manual Save Assignment] Skipping - no course or not Attn_Assign sheet');
       return;
     }
 
@@ -1149,16 +1062,14 @@ const AttainmentView = () => {
         attnAssignObtainedRows
       };
 
-      console.log('[Manual Save Assignment] Saving data for course:', selectedCourse._id);
       const response = await saveAssignmentData(selectedCourse._id, dataToSave);
-      console.log('[Manual Save Assignment] Save response:', response);
       
       setSaveStatus('saved');
       
       // Clear saved status after 2 seconds
       setTimeout(() => setSaveStatus(''), 2000);
     } catch (error) {
-      console.error('[Manual Save Assignment] Error:', error);
+      logger.error('[Manual Save Assignment] Error:', error);
       setSaveStatus('error');
       setTimeout(() => setSaveStatus(''), 3000);
     }
@@ -1182,7 +1093,6 @@ const AttainmentView = () => {
             if (savedObtained) setCtObtainedRows(savedObtained);
           }
         } catch (error) {
-          console.log('No saved CT data found or error loading:', error);
         }
       }
     };
@@ -1207,7 +1117,6 @@ const AttainmentView = () => {
             if (savedObtained) setAttnAssignObtainedRows(savedObtained);
           }
         } catch (error) {
-          console.log('No saved Assignment data found or error loading:', error);
         }
       }
     };
@@ -2399,13 +2308,9 @@ const AttainmentView = () => {
 
   // Refresh teacher courses (force reload from backend)
   const refreshTeacherCourses = useCallback(async () => {
-    console.log('🔄 refreshTeacherCourses called');
     try {
       const data = await getAllCourses();
-      console.log('📦 getAllCourses response:', data);
       const courseList = Array.isArray(data) ? data : (data.courses || []);
-      console.log('📚 Course list extracted:', courseList.length, 'courses');
-      console.log('📋 First course sample:', courseList[0]);
       
       // Get current user's ID to find their section assignment
       const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -2428,22 +2333,18 @@ const AttainmentView = () => {
       // Only update if we get a valid course list
       if (coursesWithSection && coursesWithSection.length > 0) {
         setTeacherCourses(coursesWithSection);
-        console.log('✅ Teacher courses set:', coursesWithSection.length);
         // If a course is already selected, update it with the latest info
         if (selectedCourse) {
           const updated = coursesWithSection.find(c => c._id === selectedCourse._id);
           if (updated) {
-            console.log('🔄 Updated selected course:', updated);
             setSelectedCourse(updated);
           }
         }
       } else {
-        console.log('❌ No courses found in response');
       }
     } catch (err) {
-      console.error('🚨 refreshTeacherCourses error:', err);
+      logger.error('🚨 refreshTeacherCourses error:', err);
       // Don't clear existing courses on error, just log it
-      console.warn('⚠️ Keeping existing course list due to refresh error');
     }
   }, [selectedCourse]);
 
@@ -2490,9 +2391,6 @@ const AttainmentView = () => {
               const course = teacherCourses.find(c => 
                 c.courseCode === code && (c.section || 'null') === section
               );
-              console.log('🎯 Course selected:', course);
-              console.log('🆔 Course _id:', course?._id);
-              console.log('📚 Course full object:', course);
               setSelectedCourse(course);
             }}
             style={{width: '100%', padding: '10px', fontSize: '14px', borderRadius: '4px', border: '1px solid #ddd'}}
@@ -2891,6 +2789,7 @@ const AttainmentView = () => {
                   View Generated Table
                 </button>
               </div>
+              
               {clos.length === 0 && (
                 <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
               )}
@@ -3314,6 +3213,7 @@ const AttainmentView = () => {
                   View Generated Table
                 </button>
               </div>
+              
               {clos.length === 0 && (
                 <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
               )}
@@ -4232,7 +4132,6 @@ const AttainmentView = () => {
                   </button>
                 </div>
               </div>
-              {console.log('selectedCourse', selectedCourse, 'attendanceMarks', selectedCourse?.attendanceMarks)}
               {clos.length === 0 && (
                 <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
               )}
@@ -7989,7 +7888,6 @@ const AttainmentView = () => {
                     const ploAssessed = clo.ploAssessed || '';
                     const mappedPOs = new Set();
                     
-                    console.log(`${coNumber} ploAssessed:`, ploAssessed);
                     
                     if (ploAssessed && ploAssessed.trim()) {
                       // Split by comma and parse numbers
@@ -8002,7 +7900,6 @@ const AttainmentView = () => {
                       });
                     }
                     
-                    console.log(`${coNumber} mapped PO numbers:`, Array.from(mappedPOs));
                     
                     // Calculate row total
                     const rowTotal = mappedPOs.size;
