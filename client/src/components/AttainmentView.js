@@ -2,23 +2,25 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   getAttainmentData,
   getSheetNames,
-  updateStudentPoValue,
   saveCTData,
   getCTData,
+  saveAssignmentData,
+  getAssignmentData,
 } from '../services/attainmentService';
 import { getCourseProfile } from '../services/courseProfileService';
 import { getCourseStudents } from '../services/courseService';
 import { getAllCourses } from '../services/courseService';
+import { getAllProgramOutcomes } from '../services/programOutcomeService';
 import '../styles/AttainmentView.css';
 
-// Helper function to safely render cell values
-const renderCellValue = (value) => {
-  if (value === null || value === undefined) return '-';
-  if (typeof value === 'object') {
-    // Handle formula objects or other objects
-    return value.result !== undefined ? value.result : '-';
+// Helper function to format numbers - show as integer if no decimal part, otherwise remove trailing zeros
+const formatNumber = (num) => {
+  if (num === 0) return '0';
+  const str = num.toString();
+  if (str.includes('.')) {
+    return parseFloat(str).toString();
   }
-  return value.toString();
+  return str;
 };
 
 const AttainmentView = () => {
@@ -28,12 +30,14 @@ const AttainmentView = () => {
   const [attainmentData, setAttainmentData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [editingCell, setEditingCell] = useState(null);
   const [saving, setSaving] = useState(false);
   const [userRole, setUserRole] = useState('');
   const [clos, setClos] = useState([]);
+  const [programOutcomes, setProgramOutcomes] = useState([]);
+  const [combinedCOPOMatrix, setCombinedCOPOMatrix] = useState(null);
+  const [matchingCourseCode, setMatchingCourseCode] = useState(null);
+  const [poCalcStudents, setPoCalcStudents] = useState([]);
   const [editingCLOCell, setEditingCLOCell] = useState(null);
-  const [showCourseProfile, setShowCourseProfile] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [filteredSheets, setFilteredSheets] = useState([]);
   const [ctRows, setCtRows] = useState([]);
@@ -50,8 +54,6 @@ const AttainmentView = () => {
   
   // Assignment & Attendance states
   const [assignmentRows, setAssignmentRows] = useState([]);
-  const [assignmentFactors, setAssignmentFactors] = useState({});
-  const [assignmentEqWts, setAssignmentEqWts] = useState({});
   const [assignmentManualWts, setAssignmentManualWts] = useState({});
   const [attendanceMarks, setAttendanceMarks] = useState(0);
   const [assignmentSummary, setAssignmentSummary] = useState({ assignTaken: 0, assignmentMarks30: 0, useEqWt: 0 });
@@ -80,6 +82,45 @@ const AttainmentView = () => {
   
   // LabActivity obtained marks table state
   const [labActivityObtainedRows, setLabActivityObtainedRows] = useState([]);
+  
+  // Modal state for generated table
+  const [showGeneratedTableModal, setShowGeneratedTableModal] = useState(false);
+  
+  // Modal state for obtained generated table
+  const [showObtainedGeneratedModal, setShowObtainedGeneratedModal] = useState(false);
+  
+  // Modal state for Section A generated table
+  const [showSectionAGeneratedModal, setShowSectionAGeneratedModal] = useState(false);
+  
+  // Modal state for Section A Obtained generated table
+  const [showSectionAObtainedModal, setShowSectionAObtainedModal] = useState(false);
+  
+  // Modal state for Section B generated table
+  const [showSectionBGeneratedModal, setShowSectionBGeneratedModal] = useState(false);
+  
+  // Modal state for Section B Obtained generated table
+  const [showSectionBObtainedModal, setShowSectionBObtainedModal] = useState(false);
+  
+  // Modal state for LabActivity generated table
+  const [showLabActivityGeneratedModal, setShowLabActivityGeneratedModal] = useState(false);
+  
+  // Modal state for LabActivity obtained table
+  const [showLabActivityObtainedModal, setShowLabActivityObtainedModal] = useState(false);
+  
+  // Navigation state for LabActivity generated modal (0 = factored values, 1 = multiplication factor)
+  const [labActivityGeneratedView, setLabActivityGeneratedView] = useState(0);
+  
+  // Navigation state for LabActivity obtained modal (0 = CO wise marks, 1 = CO attainment)
+  const [labActivityObtainedView, setLabActivityObtainedView] = useState(0);
+  
+  // Navigation state for obtained generated modal (0 = original view, 1 = factored view)
+  const [obtainedModalView, setObtainedModalView] = useState(0);
+  
+  // CO Attainment state
+  const [coAttainmentData, setCoAttainmentData] = useState([]);
+  
+  // COCalc state
+  const [coCalcData, setCoCalcData] = useState([]);
   
   // Load user role
   useEffect(() => {
@@ -112,10 +153,10 @@ const AttainmentView = () => {
     }
   }, [selectedCourse]);
 
-  // Load/clear course outcomes for CourseProfile, CT, Attn_Assign, SectionA and SectionB views
+  // Load/clear course outcomes for CourseProfile, CT, Attn_Assign, SectionA, SectionB, LabActivity, COAttainment, COCalc, COCalc_LabUnnorm, COPOMap, and Charts views
   useEffect(() => {
     console.log('CLO loading effect triggered:', { selectedCourse, selectedSheet, hasSelectedCourse: !!selectedCourse });
-    if (selectedCourse && (selectedSheet === 'CourseProfile' || selectedSheet === 'CT' || selectedSheet === 'Attn_Assign' || selectedSheet === 'SectionA' || selectedSheet === 'SectionB' || selectedSheet === 'LabActivity')) {
+    if (selectedCourse && (selectedSheet === 'CourseProfile' || selectedSheet === 'CT' || selectedSheet === 'Attn_Assign' || selectedSheet === 'SectionA' || selectedSheet === 'SectionB' || selectedSheet === 'LabActivity' || selectedSheet === 'COAttainment' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COPOMap' || selectedSheet === 'Charts')) {
       console.log('Loading course profile for sheet:', selectedSheet);
       loadCourseProfile();
     } else {
@@ -165,13 +206,11 @@ const AttainmentView = () => {
       }));
       setAssignmentRows(initial);
       
-      // Initialize factors, eq wt, and manual wt
+      // Initialize manual wt
       const manualInit = {};
       ['Assgn1_Q1','Assgn1_Q2','Assgn1_Q3','Assgn2_Q1','Assgn2_Q2','Assgn2_Q3','Assgn3_Q1','Assgn3_Q2','Assgn3_Q3'].forEach(f => {
         manualInit[f] = 0;
       });
-      setAssignmentFactors({ Assgn1: 1, Assgn2: 1, Assgn3: 1 });
-      setAssignmentEqWts({ Assgn1: 0, Assgn2: 0, Assgn3: 0 });
       setAssignmentManualWts(manualInit);
       
       // Get attendance marks from course
@@ -183,8 +222,6 @@ const AttainmentView = () => {
     }
     if (selectedSheet !== 'Attn_Assign') {
       setAssignmentRows([]);
-      setAssignmentFactors({});
-      setAssignmentEqWts({});
       setAssignmentManualWts({});
       setAttendanceMarks(0);
     }
@@ -199,6 +236,10 @@ const AttainmentView = () => {
         Q2a: 0, Q2b: 0, Q2c: 0, Q2d: 0,
         Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
         Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
+        // Generated table combinations
+        q123: 0, q124: 0, q134: 0, q234: 0,
+        q12: 0, q13: 0, q14: 0, q23: 0, q24: 0, q34: 0,
+        q1: 0, q2: 0, q3: 0, q4: 0, none: 0
       }));
       setSectionARows(initial);
     }
@@ -216,6 +257,10 @@ const AttainmentView = () => {
         Q2a: 0, Q2b: 0, Q2c: 0, Q2d: 0,
         Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
         Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
+        // Add combination fields
+        q123: 0, q124: 0, q134: 0, q234: 0,
+        q12: 0, q13: 0, q14: 0, q23: 0, q24: 0, q34: 0,
+        q1: 0, q2: 0, q3: 0, q4: 0, none: 0
       }));
       setSectionBRows(initial);
     }
@@ -253,38 +298,456 @@ const AttainmentView = () => {
     }
   }, [selectedSheet, clos]);
 
+  // Initialize CO Attainment data when COAttainment sheet is selected
+  useEffect(() => {
+    const calculateCOAttainment = async () => {
+      if (selectedSheet === 'COAttainment' && selectedCourse && clos.length > 0) {
+        console.log('🎯 Calculating CO Attainment data');
+        
+        // Get students list using the same pattern as other sheets
+        let allStudents = [];
+        
+        // Try to get students from course API first
+        if (selectedCourse._id) {
+          try {
+            const resp = await getCourseStudents(selectedCourse._id);
+            console.log('📡 getCourseStudents response:', resp);
+            if (resp.success && Array.isArray(resp.data) && resp.data.length > 0) {
+              allStudents = resp.data.map(s => ({ 
+                rollNumber: s.roll || s.rollNumber, 
+                name: s.name 
+              }));
+              console.log('✅ Found students from course API:', allStudents.length);
+            }
+          } catch (err) {
+            console.error('Error getting students:', err);
+          }
+        }
+        
+        // Try fallback: Section sheets
+        if (allStudents.length === 0) {
+          const sectionSheets = (sheetNames || []).filter(name => /^Section/i.test(name));
+          for (const sName of sectionSheets) {
+            try {
+              const resp = await getAttainmentData(sName);
+              const list = Array.isArray(resp?.data?.students) ? resp.data.students : [];
+              if (list.length) allStudents = allStudents.concat(list.map(s => ({
+                rollNumber: s.rollNumber || s.roll || s,
+                name: s.name
+              })));
+            } catch (error) {
+              console.log('Error checking sheet', sName, ':', error);
+            }
+          }
+        }
+        
+        // Try fallback: Attn_Assign sheet
+        if (allStudents.length === 0 && (sheetNames || []).includes('Attn_Assign')) {
+          try {
+            const resp = await getAttainmentData('Attn_Assign');
+            const list = Array.isArray(resp?.data?.students) ? resp.data.students : [];
+            if (list.length) allStudents = allStudents.concat(list.map(s => ({
+              rollNumber: s.rollNumber || s.roll || s,
+              name: s.name
+            })));
+          } catch (error) {
+            console.log('Error checking Attn_Assign:', error);
+          }
+        }
+        
+        // Deduplicate students
+        let uniqueStudents = [];
+        const seen = new Set();
+        for (const stu of allStudents) {
+          let rn = stu.rollNumber || stu.roll || stu;
+          if (!rn) continue;
+          rn = String(rn).trim();
+          const lower = rn.toLowerCase();
+          if (!seen.has(lower)) {
+            seen.add(lower);
+            uniqueStudents.push({ rollNumber: rn, name: stu.name });
+          }
+        }
+        
+        console.log('📊 Total unique students:', uniqueStudents.length);
+        
+        if (uniqueStudents.length === 0) {
+          setCoAttainmentData([]);
+          return;
+        }
+        
+        // Load obtained marks data from all sheets to calculate CO attainment
+        let ctData = [];
+        let attnAssignData = [];
+        let sectionAData = [];
+        let sectionBData = [];
+        let labActivityData = [];
+        
+        // Try to load CT obtained marks
+        try {
+          const ctResp = await getCTData(selectedCourse.courseCode);
+          if (ctResp.success && ctResp.data && ctResp.data.obtainedMarks) {
+            ctData = ctResp.data.obtainedMarks;
+            console.log('📊 CT Data loaded:', ctData.length, 'students');
+          }
+        } catch (err) {
+          console.log('No CT data available');
+        }
+        
+        // Try to load other sheet data if needed
+        // For now, we'll calculate based on CT data primarily
+        
+        // Calculate CO attainment for each student
+        const attainmentRows = uniqueStudents.map(student => {
+          const row = {
+            rollNumber: student.rollNumber,
+            coValues: {}
+          };
+          
+          // Find student's obtained marks from CT data
+          const studentCTData = ctData.find(s => 
+            String(s.rollNumber || '').trim().toLowerCase() === 
+            String(student.rollNumber || '').trim().toLowerCase()
+          );
+          
+          // For each CO, calculate attainment percentage
+          clos.forEach(clo => {
+            const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+            let totalObtained = 0;
+            let totalAllocated = 0;
+            
+            // Calculate from CT data if available
+            if (studentCTData && studentCTData.coMarks) {
+              const coMarks = studentCTData.coMarks[coNumber];
+              if (coMarks) {
+                totalObtained += coMarks.obtained || 0;
+                totalAllocated += coMarks.allocated || 0;
+              }
+            }
+            
+            // Calculate percentage
+            const percentage = totalAllocated > 0 
+              ? (totalObtained / totalAllocated) * 100 
+              : 0;
+            
+            row.coValues[coNumber] = Math.round(percentage * 100) / 100; // Round to 2 decimals
+          });
+          
+          return row;
+        });
+        
+        setCoAttainmentData(attainmentRows);
+      } else {
+        setCoAttainmentData([]);
+      }
+    };
+    
+    calculateCOAttainment();
+  }, [selectedSheet, selectedCourse, clos, sheetNames, attainmentData]);
+
+  // Initialize COCalc data when COCalc or COCalc_LabUnnorm sheet is selected
+  useEffect(() => {
+    const loadCOCalcData = async () => {
+      if ((selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm') && selectedCourse && clos.length > 0) {
+        console.log('📊 Loading COCalc data');
+        
+        // Get students list
+        let allStudents = [];
+        
+        if (selectedCourse._id) {
+          try {
+            const resp = await getCourseStudents(selectedCourse._id);
+            if (resp.success && Array.isArray(resp.data) && resp.data.length > 0) {
+              allStudents = resp.data.map(s => ({ 
+                rollNumber: s.roll || s.rollNumber
+              }));
+            }
+          } catch (err) {
+            console.warn('Could not fetch students from course API:', err);
+          }
+        }
+        
+        // Fallback: try Section sheets
+        if (allStudents.length === 0 && sheetNames.includes('Section A')) {
+          try {
+            const sectAData = await getAttainmentData(selectedCourse._id, 'Section A');
+            if (sectAData.success && Array.isArray(sectAData.data)) {
+              allStudents = sectAData.data.map(s => ({ rollNumber: s.rollNumber }));
+            }
+          } catch (err) {
+            console.warn('Could not fetch Section A data:', err);
+          }
+        }
+        
+        // Deduplicate students
+        const uniqueStudents = [];
+        const seenRolls = new Set();
+        allStudents.forEach(student => {
+          const rollLower = String(student.rollNumber || '').trim().toLowerCase();
+          if (rollLower && !seenRolls.has(rollLower)) {
+            seenRolls.add(rollLower);
+            uniqueStudents.push(student);
+          }
+        });
+        
+        // Get Section A and Section B data
+        let sectionAData = [];
+        let sectionBData = [];
+        let ctData = [];
+        let assignData = [];
+        
+        if (sheetNames.includes('Section A')) {
+          try {
+            const sectAResp = await getAttainmentData(selectedCourse._id, 'Section A');
+            if (sectAResp.success && Array.isArray(sectAResp.data)) {
+              sectionAData = sectAResp.data;
+            }
+          } catch (err) {
+            console.warn('Could not fetch Section A marks:', err);
+          }
+        }
+        
+        if (sheetNames.includes('Section B')) {
+          try {
+            const sectBResp = await getAttainmentData(selectedCourse._id, 'Section B');
+            if (sectBResp.success && Array.isArray(sectBResp.data)) {
+              sectionBData = sectBResp.data;
+            }
+          } catch (err) {
+            console.warn('Could not fetch Section B marks:', err);
+          }
+        }
+        
+        if (sheetNames.includes('CT')) {
+          try {
+            const ctResp = await getCTData(selectedCourse._id);
+            if (ctResp.success && Array.isArray(ctResp.data)) {
+              ctData = ctResp.data;
+            }
+          } catch (err) {
+            console.warn('Could not fetch CT marks:', err);
+          }
+        }
+        
+        if (sheetNames.includes('Attn_Assign')) {
+          try {
+            const assignResp = await getAttainmentData(selectedCourse._id, 'Attn_Assign');
+            if (assignResp.success && Array.isArray(assignResp.data)) {
+              assignData = assignResp.data;
+            }
+          } catch (err) {
+            console.warn('Could not fetch Assignment marks:', err);
+          }
+        }
+        
+        // Build COCalc rows
+        const calcRows = uniqueStudents.map(student => {
+          const row = {
+            rollNumber: student.rollNumber,
+            sectionA: {
+              marksObtained: {},
+              marksDistribution: {}
+            },
+            sectionB: {
+              marksObtained: {},
+              marksDistribution: {}
+            },
+            ct: {
+              marksObtained: {},
+              marksDistribution: {}
+            },
+            assignment: {
+              marksObtained: {},
+              marksDistribution: {}
+            },
+            attendance: 0,
+            total: {
+              marksObtained: {},
+              marksDistribution: {}
+            }
+          };
+          
+          // Find student data in Section A
+          const studentSectA = sectionAData.find(s => 
+            String(s.rollNumber || '').trim().toLowerCase() === 
+            String(student.rollNumber || '').trim().toLowerCase()
+          );
+          
+          // Find student data in Section B
+          const studentSectB = sectionBData.find(s => 
+            String(s.rollNumber || '').trim().toLowerCase() === 
+            String(student.rollNumber || '').trim().toLowerCase()
+          );
+          
+          // Find student data in CT
+          const studentCT = ctData.find(s => 
+            String(s.rollNumber || '').trim().toLowerCase() === 
+            String(student.rollNumber || '').trim().toLowerCase()
+          );
+          
+          // Find student data in Assignment
+          const studentAssign = assignData.find(s => 
+            String(s.rollNumber || '').trim().toLowerCase() === 
+            String(student.rollNumber || '').trim().toLowerCase()
+          );
+          
+          // Populate CO marks for Section A
+          clos.forEach(clo => {
+            const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+            if (studentSectA) {
+              row.sectionA.marksObtained[coNumber] = studentSectA[`obtained_${coNumber}`] || 0;
+              row.sectionA.marksDistribution[coNumber] = studentSectA[`allocated_${coNumber}`] || 0;
+            } else {
+              row.sectionA.marksObtained[coNumber] = 0;
+              row.sectionA.marksDistribution[coNumber] = 0;
+            }
+          });
+          
+          // Populate CO marks for Section B
+          clos.forEach(clo => {
+            const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+            if (studentSectB) {
+              row.sectionB.marksObtained[coNumber] = studentSectB[`obtained_${coNumber}`] || 0;
+              row.sectionB.marksDistribution[coNumber] = studentSectB[`allocated_${coNumber}`] || 0;
+            } else {
+              row.sectionB.marksObtained[coNumber] = 0;
+              row.sectionB.marksDistribution[coNumber] = 0;
+            }
+          });
+          
+          // Populate CO marks for CT
+          clos.forEach(clo => {
+            const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+            if (studentCT) {
+              row.ct.marksObtained[coNumber] = studentCT[`obtained_${coNumber}`] || 0;
+              row.ct.marksDistribution[coNumber] = studentCT[`allocated_${coNumber}`] || 0;
+            } else {
+              row.ct.marksObtained[coNumber] = 0;
+              row.ct.marksDistribution[coNumber] = 0;
+            }
+          });
+          
+          // Populate CO marks for Assignment
+          clos.forEach(clo => {
+            const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+            if (studentAssign) {
+              row.assignment.marksObtained[coNumber] = studentAssign[`obtained_${coNumber}`] || 0;
+              row.assignment.marksDistribution[coNumber] = studentAssign[`allocated_${coNumber}`] || 0;
+            } else {
+              row.assignment.marksObtained[coNumber] = 0;
+              row.assignment.marksDistribution[coNumber] = 0;
+            }
+          });
+          
+          // Populate attendance marks
+          if (studentAssign) {
+            row.attendance = studentAssign.attendanceMark || studentAssign.attendance || 0;
+          } else {
+            row.attendance = 0;
+          }
+          
+          // Calculate total marks (CT + Assign + Section A + Section B)
+          clos.forEach(clo => {
+            const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+            
+            let totalObtained = 0;
+            let totalAllocated = 0;
+            
+            // Add CT marks
+            if (studentCT) {
+              totalObtained += studentCT[`obtained_${coNumber}`] || 0;
+              totalAllocated += studentCT[`allocated_${coNumber}`] || 0;
+            }
+            
+            // Add Assignment marks
+            if (studentAssign) {
+              totalObtained += studentAssign[`obtained_${coNumber}`] || 0;
+              totalAllocated += studentAssign[`allocated_${coNumber}`] || 0;
+            }
+            
+            // Add Section A marks
+            totalObtained += row.sectionA.marksObtained[coNumber];
+            totalAllocated += row.sectionA.marksDistribution[coNumber];
+            
+            // Add Section B marks
+            totalObtained += row.sectionB.marksObtained[coNumber];
+            totalAllocated += row.sectionB.marksDistribution[coNumber];
+            
+            row.total.marksObtained[coNumber] = totalObtained;
+            row.total.marksDistribution[coNumber] = totalAllocated;
+          });
+          
+          return row;
+        });
+        
+        setCoCalcData(calcRows);
+      } else {
+        setCoCalcData([]);
+      }
+    };
+    
+    loadCOCalcData();
+  }, [selectedSheet, selectedCourse, clos, sheetNames, attainmentData]);
+
   // Initialize Obtained Marks table rows from student list when CT, Attn_Assign, SectionA or SectionB selected
   useEffect(() => {
     const initObtainedRows = async (forSheet) => {
+      console.log('🔍 initObtainedRows called for sheet:', forSheet);
+      console.log('📚 selectedCourse:', selectedCourse);
+      console.log('📋 sheetNames:', sheetNames);
+      
       let allStudents = [];
       if (selectedCourse && selectedCourse._id) {
+        console.log('🎓 Trying to get students from course API:', selectedCourse._id);
         try {
           const resp = await getCourseStudents(selectedCourse._id);
+          console.log('📡 getCourseStudents response:', resp);
           if (resp.success && Array.isArray(resp.data) && resp.data.length > 0) {
             allStudents = resp.data.map(s => ({ rollNumber: s.roll || s.rollNumber, name: s.name }));
+            console.log('✅ Found students from course API:', allStudents.length);
+          } else {
+            console.log('❌ No students from course API');
           }
-        } catch {}
+        } catch (error) {
+          console.log('🚨 Error getting students from course API:', error);
+        }
+      } else {
+        console.log('⚠️ No selectedCourse._id available');
       }
       if (allStudents.length === 0) {
+        console.log('🔄 Trying fallback: Section sheets');
         const sectionSheets = (sheetNames || []).filter(name => /^Section/i.test(name));
+        console.log('📄 Section sheets found:', sectionSheets);
         for (const sName of sectionSheets) {
           try {
+            console.log('📊 Checking sheet:', sName);
             const resp = await getAttainmentData(sName);
             const list = Array.isArray(resp?.data?.students) ? resp.data.students : [];
+            console.log('👥 Students in', sName, ':', list.length);
             if (list.length) allStudents = allStudents.concat(list);
-          } catch {}
+          } catch (error) {
+            console.log('🚨 Error checking sheet', sName, ':', error);
+          }
         }
       }
       if (allStudents.length === 0 && (sheetNames || []).includes('Attn_Assign')) {
+        console.log('🔄 Trying fallback: Attn_Assign sheet');
         try {
           const resp = await getAttainmentData('Attn_Assign');
           const list = Array.isArray(resp?.data?.students) ? resp.data.students : [];
+          console.log('👥 Students in Attn_Assign:', list.length);
           if (list.length) allStudents = allStudents.concat(list);
-        } catch {}
+        } catch (error) {
+          console.log('🚨 Error checking Attn_Assign:', error);
+        }
       }
       if (allStudents.length === 0 && Array.isArray(attainmentData?.students)) {
+        console.log('🔄 Trying fallback: attainmentData.students');
         allStudents = attainmentData.students;
+        console.log('👥 Students from attainmentData:', allStudents.length);
       }
+      console.log('📊 Total students collected before processing:', allStudents.length);
+      
       let uniqueByRoll = [];
       const seen = new Set();
       for (const stu of allStudents) {
@@ -301,11 +764,19 @@ const AttainmentView = () => {
           uniqueByRoll.push({ rollNumber: rn, name: stu.name || '' });
         }
       }
+      
+      console.log('✅ Final processed students:', uniqueByRoll.length);
+      console.log('👨‍🎓 Student sample:', uniqueByRoll.slice(0, 3));
       uniqueByRoll.sort((a, b) => {
         const aNum = String(a.rollNumber).replace(/\D/g, '');
         const bNum = String(b.rollNumber).replace(/\D/g, '');
         return aNum.localeCompare(bNum, undefined, { numeric: true });
       });
+      
+      // If no valid students found after processing, don't add sample students
+      if (uniqueByRoll.length === 0) {
+        console.log('⚠️ No valid students found');
+      }
       if (uniqueByRoll.length > 0) {
         if (forSheet === 'CT') {
           const initial = uniqueByRoll.map(stu => ({
@@ -315,6 +786,7 @@ const AttainmentView = () => {
             CT2_Q1: 0, CT2_Q2: 0, CT2_Q3: 0,
             CT3_Q1: 0, CT3_Q2: 0, CT3_Q3: 0,
           }));
+          console.log('📝 Setting ctObtainedRows with', initial.length, 'students');
           setCtObtainedRows(initial);
         } else if (forSheet === 'Attn_Assign') {
           const initial = uniqueByRoll.map(stu => ({
@@ -325,6 +797,7 @@ const AttainmentView = () => {
             Assgn2_Q1: 0, Assgn2_Q2: 0, Assgn2_Q3: 0,
             Assgn3_Q1: 0, Assgn3_Q2: 0, Assgn3_Q3: 0,
           }));
+          console.log('📝 Setting attnAssignObtainedRows with', initial.length, 'students');
           setAttnAssignObtainedRows(initial);
         } else if (forSheet === 'SectionA') {
           const initial = uniqueByRoll.map(stu => ({
@@ -335,6 +808,7 @@ const AttainmentView = () => {
             Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
             Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
           }));
+          console.log('📝 Setting sectionAObtainedRows with', initial.length, 'students');
           setSectionAObtainedRows(initial);
         } else if (forSheet === 'SectionB') {
           const initial = uniqueByRoll.map(stu => ({
@@ -345,6 +819,7 @@ const AttainmentView = () => {
             Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
             Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
           }));
+          console.log('📝 Setting sectionBObtainedRows with', initial.length, 'students');
           setSectionBObtainedRows(initial);
         } else if (forSheet === 'LabActivity') {
           const initial = uniqueByRoll.map(stu => ({
@@ -361,14 +836,30 @@ const AttainmentView = () => {
             otherMeasured: 0,
             other: 0,
           }));
+          console.log('📝 Setting labActivityObtainedRows with', initial.length, 'students');
           setLabActivityObtainedRows(initial);
         }
       } else {
-        if (forSheet === 'CT') setCtObtainedRows([]);
-        else if (forSheet === 'Attn_Assign') setAttnAssignObtainedRows([]);
-        else if (forSheet === 'SectionA') setSectionAObtainedRows([]);
-        else if (forSheet === 'SectionB') setSectionBObtainedRows([]);
-        else if (forSheet === 'LabActivity') setLabActivityObtainedRows([]);
+        if (forSheet === 'CT') {
+          console.log('📝 Setting ctObtainedRows to empty array');
+          setCtObtainedRows([]);
+        }
+        else if (forSheet === 'Attn_Assign') {
+          console.log('📝 Setting attnAssignObtainedRows to empty array');
+          setAttnAssignObtainedRows([]);
+        }
+        else if (forSheet === 'SectionA') {
+          console.log('📝 Setting sectionAObtainedRows to empty array');
+          setSectionAObtainedRows([]);
+        }
+        else if (forSheet === 'SectionB') {
+          console.log('📝 Setting sectionBObtainedRows to empty array');
+          setSectionBObtainedRows([]);
+        }
+        else if (forSheet === 'LabActivity') {
+          console.log('📝 Setting labActivityObtainedRows to empty array');
+          setLabActivityObtainedRows([]);
+        }
       }
     };
     if (selectedSheet === 'CT') initObtainedRows('CT');
@@ -376,7 +867,193 @@ const AttainmentView = () => {
     else if (selectedSheet === 'SectionA') initObtainedRows('SectionA');
     else if (selectedSheet === 'SectionB') initObtainedRows('SectionB');
     else if (selectedSheet === 'LabActivity') initObtainedRows('LabActivity');
-  }, [selectedSheet, attainmentData, selectedCourse, sheetNames]);
+  }, [selectedSheet, selectedCourse, sheetNames]);
+
+  // Load Program Outcomes when COPOMap, POCalcMax, Charts, CheckPO, or POCalc is selected
+  useEffect(() => {
+    const loadProgramOutcomes = async () => {
+      if (selectedSheet === 'COPOMap' || selectedSheet === 'POCalcMax' || selectedSheet === 'Charts' || selectedSheet === 'CheckPO' || selectedSheet === 'POCalc') {
+        try {
+          const poResponse = await getAllProgramOutcomes();
+          if (poResponse.success && poResponse.data) {
+            setProgramOutcomes(poResponse.data);
+          }
+        } catch (err) {
+          console.error('Failed to load program outcomes:', err);
+        }
+      }
+    };
+    loadProgramOutcomes();
+  }, [selectedSheet]);
+
+  // Load students when POCalcMax, CheckPO, or POCalc is selected
+  useEffect(() => {
+    const loadStudents = async () => {
+      if ((selectedSheet === 'POCalcMax' || selectedSheet === 'CheckPO' || selectedSheet === 'POCalc') && selectedCourse && selectedCourse._id) {
+        try {
+          const resp = await getCourseStudents(selectedCourse._id);
+          if (resp.success && Array.isArray(resp.data)) {
+            const students = resp.data.map(s => ({
+              rollNumber: s.roll || s.rollNumber,
+              name: s.name
+            }));
+            setPoCalcStudents(students);
+          }
+        } catch (err) {
+          console.error('Failed to load students:', err);
+          setPoCalcStudents([]);
+        }
+      }
+    };
+    loadStudents();
+  }, [selectedSheet, selectedCourse]);
+
+  // Load combined CO-PO matrix for theory and lab courses
+  useEffect(() => {
+    const loadCombinedCOPOMatrix = async () => {
+      if (selectedSheet === 'COPOMap' && selectedCourse && selectedCourse.courseCode) {
+        try {
+          const courseCode = selectedCourse.courseCode;
+          const lastDigit = parseInt(courseCode.slice(-1));
+          
+          if (isNaN(lastDigit)) return;
+          
+          // Determine if current course is theory (odd) or lab (even)
+          const isTheory = lastDigit % 2 === 1;
+          
+          // Generate matching course code
+          const baseCode = courseCode.slice(0, -1);
+          const matchingLastDigit = isTheory ? lastDigit + 1 : lastDigit - 1;
+          const matchingCode = baseCode + matchingLastDigit;
+          
+          setMatchingCourseCode(matchingCode);
+          
+          // Load both course profiles
+          const [currentProfile, matchingProfile] = await Promise.all([
+            getCourseProfile(courseCode),
+            getCourseProfile(matchingCode).catch(() => ({ success: false, data: [] }))
+          ]);
+          
+          if (!currentProfile.success || !currentProfile.data) {
+            setCombinedCOPOMatrix(null);
+            return;
+          }
+          
+          const currentCLOs = currentProfile.data;
+          const matchingCLOs = matchingProfile.success ? matchingProfile.data : [];
+          
+          // Create combined matrix
+          const combined = {};
+          
+          // Process current course CLOs
+          currentCLOs.forEach(clo => {
+            const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+            const ploAssessed = clo.ploAssessed || '';
+            const mappedPOs = new Set();
+            
+            if (ploAssessed && ploAssessed.trim()) {
+              const parts = ploAssessed.split(',').map(p => p.trim());
+              parts.forEach(part => {
+                const poNum = parseInt(part);
+                if (!isNaN(poNum) && poNum > 0) {
+                  mappedPOs.add(poNum);
+                }
+              });
+            }
+            
+            combined[coNumber] = Array.from(mappedPOs);
+          });
+          
+          // Merge matching course CLOs (OR logic)
+          matchingCLOs.forEach(clo => {
+            const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+            const ploAssessed = clo.ploAssessed || '';
+            
+            if (ploAssessed && ploAssessed.trim()) {
+              const parts = ploAssessed.split(',').map(p => p.trim());
+              parts.forEach(part => {
+                const poNum = parseInt(part);
+                if (!isNaN(poNum) && poNum > 0) {
+                  if (!combined[coNumber]) {
+                    combined[coNumber] = [];
+                  }
+                  if (!combined[coNumber].includes(poNum)) {
+                    combined[coNumber].push(poNum);
+                  }
+                }
+              });
+            }
+          });
+          
+          // Sort PO numbers for each CO
+          Object.keys(combined).forEach(co => {
+            combined[co].sort((a, b) => a - b);
+          });
+          
+          setCombinedCOPOMatrix(combined);
+          
+        } catch (err) {
+          console.error('Failed to load combined CO-PO matrix:', err);
+          setCombinedCOPOMatrix(null);
+        }
+      }
+    };
+    loadCombinedCOPOMatrix();
+  }, [selectedSheet, selectedCourse]);
+
+  // Calculate CO totals from CT table (sum of all CO Total values)
+  const calculateCOTotals = () => {
+    const coTotals = {};
+    ctRows.forEach((row, idx) => {
+      const coKey = row.coNumber || `CO${idx + 1}`;
+      const coTotal = computeCOTotal(row);
+      coTotals[coKey] = (coTotals[coKey] || 0) + coTotal;
+    });
+    return coTotals;
+  };
+
+  // Calculate factored CO totals from generated table (View Generated Table)
+  const calculateFactoredCOTotals = () => {
+    const coTotals = {};
+    ctRows.forEach((row, idx) => {
+      const coKey = row.coNumber || `CO${idx + 1}`;
+      const factoredTotal = getActiveCTFields().reduce((sum, field) => {
+        const ctKey = field.replace(/(_Q[123])$/, '');
+        const factor = calculateAutoFactor()[ctKey] || 0;
+        const originalValue = row[field] || 0;
+        return sum + (factor * originalValue);
+      }, 0);
+      coTotals[coKey] = factoredTotal;
+    });
+    return coTotals;
+  };
+
+  // Calculate assignment CO totals (original)
+  const calculateAssignmentCOTotals = () => {
+    const coTotals = {};
+    assignmentRows.forEach((row, idx) => {
+      const coKey = row.coNumber || `CO${idx + 1}`;
+      const coTotal = computeAssignmentCOTotal(row);
+      coTotals[coKey] = (coTotals[coKey] || 0) + coTotal;
+    });
+    return coTotals;
+  };
+
+  // Calculate factored assignment CO totals
+  const calculateFactoredAssignmentCOTotals = () => {
+    const coTotals = {};
+    assignmentRows.forEach((row, idx) => {
+      const coKey = row.coNumber || `CO${idx + 1}`;
+      const factoredTotal = attendanceMarks + getActiveAssignmentFields().reduce((sum, field) => {
+        const assignmentKey = field.replace(/(_Q[123])$/, '');
+        const factor = calculateAutoAssignmentFactor()[assignmentKey] || 0;
+        const originalValue = row[field] || 0;
+        return sum + (factor * originalValue);
+      }, 0);
+      coTotals[coKey] = factoredTotal;
+    });
+    return coTotals;
+  };
 
   // Helper to get dynamic CT field names based on ctTaken
   const getActiveCTFields = () => {
@@ -391,48 +1068,101 @@ const AttainmentView = () => {
     return ['CT1', 'CT2', 'CT3'].slice(0, ctTaken);
   };
 
-  // Autosave function with debounce
+  // Helper to get Assignment keys based on assignTaken
+  const getActiveAssignments = () => {
+    const assignTaken = assignmentSummary.assignTaken || 3;
+    return ['Assgn1', 'Assgn2', 'Assgn3'].slice(0, assignTaken);
+  };
+
+  // Helper to get dynamic Assignment field names based on assignTaken
+  const getActiveAssignmentFields = () => {
+    const assignTaken = assignmentSummary.assignTaken || 3;
+    const allFields = ['Assgn1_Q1','Assgn1_Q2','Assgn1_Q3','Assgn2_Q1','Assgn2_Q2','Assgn2_Q3','Assgn3_Q1','Assgn3_Q2','Assgn3_Q3'];
+    return allFields.slice(0, assignTaken * 3);
+  };
+
+  // Autosave function disabled - using manual save only
   const triggerAutosave = useCallback(() => {
+    // Autosave disabled for CT - users must click Save buttons
+    return;
+  }, []);
+
+  // Manual save function (saves immediately without debounce)
+  const handleManualSave = async () => {
     if (!selectedCourse || !selectedCourse._id || selectedSheet !== 'CT') {
-      console.log('[Autosave] Skipping - no course or not CT sheet');
+      console.log('[Manual Save] Skipping - no course or not CT sheet');
       return;
     }
 
-    // Clear existing timeout
+    // Clear any pending autosave
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
-    // Set saving status
     setSaveStatus('saving');
 
-    // Debounce save by 1.5 seconds
-    saveTimeoutRef.current = setTimeout(async () => {
-      try {
-        const dataToSave = {
-          ctRows,
-          ctFactors,
-          ctManualWts,
-          ctEqWts,
-          ctSummary,
-          ctObtainedRows
-        };
+    try {
+      const dataToSave = {
+        ctRows,
+        ctFactors,
+        ctManualWts,
+        ctEqWts,
+        ctSummary,
+        ctObtainedRows
+      };
 
-        console.log('[Autosave] Saving data for course:', selectedCourse._id);
-        const response = await saveCTData(selectedCourse._id, dataToSave);
-        console.log('[Autosave] Save response:', response);
-        
-        setSaveStatus('saved');
-        
-        // Clear saved status after 2 seconds
-        setTimeout(() => setSaveStatus(''), 2000);
-      } catch (error) {
-        console.error('[Autosave] Error:', error);
-        setSaveStatus('error');
-        setTimeout(() => setSaveStatus(''), 3000);
-      }
-    }, 1500);
-  }, [selectedCourse, selectedSheet, ctRows, ctFactors, ctManualWts, ctEqWts, ctSummary, ctObtainedRows]);
+      console.log('[Manual Save] Saving data for course:', selectedCourse._id);
+      const response = await saveCTData(selectedCourse._id, dataToSave);
+      console.log('[Manual Save] Save response:', response);
+      
+      setSaveStatus('saved');
+      
+      // Clear saved status after 2 seconds
+      setTimeout(() => setSaveStatus(''), 2000);
+    } catch (error) {
+      console.error('[Manual Save] Error:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus(''), 3000);
+    }
+  };
+
+  // Manual save function for Assignment/Attendance (saves immediately without debounce)
+  const handleManualSaveAssignment = async () => {
+    if (!selectedCourse || !selectedCourse._id || selectedSheet !== 'Attn_Assign') {
+      console.log('[Manual Save Assignment] Skipping - no course or not Attn_Assign sheet');
+      return;
+    }
+
+    // Clear any pending autosave
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    setSaveStatus('saving');
+
+    try {
+      const dataToSave = {
+        assignmentRows,
+        assignmentManualWts,
+        assignmentSummary,
+        attendanceMarks,
+        attnAssignObtainedRows
+      };
+
+      console.log('[Manual Save Assignment] Saving data for course:', selectedCourse._id);
+      const response = await saveAssignmentData(selectedCourse._id, dataToSave);
+      console.log('[Manual Save Assignment] Save response:', response);
+      
+      setSaveStatus('saved');
+      
+      // Clear saved status after 2 seconds
+      setTimeout(() => setSaveStatus(''), 2000);
+    } catch (error) {
+      console.error('[Manual Save Assignment] Error:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus(''), 3000);
+    }
+  };
 
   // Load saved CT data when course and CT sheet selected
   useEffect(() => {
@@ -459,12 +1189,36 @@ const AttainmentView = () => {
     loadCTData();
   }, [selectedCourse, selectedSheet]);
 
+  // Load saved Assignment/Attendance data when course and Attn_Assign sheet selected
+  useEffect(() => {
+    const loadAssignmentData = async () => {
+      if (selectedCourse && selectedCourse._id && selectedSheet === 'Attn_Assign') {
+        try {
+          const response = await getAssignmentData(selectedCourse._id);
+          if (response.success && response.data) {
+            const { assignmentRows: savedRows, assignmentManualWts: savedManual, 
+                    assignmentSummary: savedSummary, attendanceMarks: savedAttendance,
+                    attnAssignObtainedRows: savedObtained } = response.data;
+            
+            if (savedRows) setAssignmentRows(savedRows);
+            if (savedManual) setAssignmentManualWts(savedManual);
+            if (savedSummary) setAssignmentSummary(savedSummary);
+            if (savedAttendance !== undefined) setAttendanceMarks(savedAttendance);
+            if (savedObtained) setAttnAssignObtainedRows(savedObtained);
+          }
+        } catch (error) {
+          console.log('No saved Assignment data found or error loading:', error);
+        }
+      }
+    };
+    loadAssignmentData();
+  }, [selectedCourse, selectedSheet]);
+
   const handleCTCellChange = (index, field, value) => {
     const num = Number(value);
     const updated = [...ctRows];
     updated[index] = { ...updated[index], [field]: isNaN(num) ? 0 : num };
     setCtRows(updated);
-    triggerAutosave();
   };
 
   const computeCOTotal = (row) => {
@@ -481,7 +1235,6 @@ const AttainmentView = () => {
     const updated = [...assignmentRows];
     updated[index] = { ...updated[index], [field]: isNaN(num) ? 0 : num };
     setAssignmentRows(updated);
-    triggerAutosave();
   };
 
   const computeAssignmentCOTotal = (row) => {
@@ -491,14 +1244,6 @@ const AttainmentView = () => {
       (row.Assgn2_Q1 || 0) + (row.Assgn2_Q2 || 0) + (row.Assgn2_Q3 || 0) +
       (row.Assgn3_Q1 || 0) + (row.Assgn3_Q2 || 0) + (row.Assgn3_Q3 || 0)
     );
-  };
-
-  const assignmentColumnTotals = () => {
-    const fields = ['attendance','Assgn1_Q1','Assgn1_Q2','Assgn1_Q3','Assgn2_Q1','Assgn2_Q2','Assgn2_Q3','Assgn3_Q1','Assgn3_Q2','Assgn3_Q3'];
-    const totals = {};
-    fields.forEach(f => totals[f] = 0);
-    assignmentRows.forEach(r => fields.forEach(f => totals[f] += (r[f] || 0)));
-    return totals;
   };
 
   const assignmentSums = () => {
@@ -519,18 +1264,6 @@ const AttainmentView = () => {
       Assgn2: sums.assgn2,
       Assgn3: sums.assgn3
     };
-  };
-
-  const handleAssignmentFactorChange = (key, value) => {
-    const num = Number(value);
-    setAssignmentFactors(prev => ({ ...prev, [key]: isNaN(num) ? 0 : num }));
-    triggerAutosave();
-  };
-
-  const handleAssignmentEqWtChange = (key, value) => {
-    const num = Number(value);
-    setAssignmentEqWts(prev => ({ ...prev, [key]: isNaN(num) ? 0 : num }));
-    triggerAutosave();
   };
 
   // Calculate automatic Eq. Wt for each Assignment
@@ -656,6 +1389,295 @@ const AttainmentView = () => {
     );
   };
 
+  // SectionA Generated Table handler
+  const handleSectionAGeneratedCellChange = (index, field, value) => {
+    const num = Number(value);
+    const updated = [...sectionARows];
+    updated[index] = { ...updated[index], [field]: isNaN(num) ? 0 : num };
+    setSectionARows(updated);
+  };
+
+  // Auto-calculate combination values from allocated marks
+  const calculateQ1Total = (row) => (row.Q1a || 0) + (row.Q1b || 0) + (row.Q1c || 0) + (row.Q1d || 0);
+  const calculateQ2Total = (row) => (row.Q2a || 0) + (row.Q2b || 0) + (row.Q2c || 0) + (row.Q2d || 0);
+  const calculateQ3Total = (row) => (row.Q3a || 0) + (row.Q3b || 0) + (row.Q3c || 0) + (row.Q3d || 0);
+  const calculateQ4Total = (row) => (row.Q4a || 0) + (row.Q4b || 0) + (row.Q4c || 0) + (row.Q4d || 0);
+
+  const getAutoGeneratedCombination = (row, combination) => {
+    switch(combination) {
+      case 'q123': return calculateQ1Total(row) + calculateQ2Total(row) + calculateQ3Total(row);
+      case 'q124': return calculateQ1Total(row) + calculateQ2Total(row) + calculateQ4Total(row);
+      case 'q134': return calculateQ1Total(row) + calculateQ3Total(row) + calculateQ4Total(row);
+      case 'q234': return calculateQ2Total(row) + calculateQ3Total(row) + calculateQ4Total(row);
+      case 'q12': return calculateQ1Total(row) + calculateQ2Total(row);
+      case 'q13': return calculateQ1Total(row) + calculateQ3Total(row);
+      case 'q14': return calculateQ1Total(row) + calculateQ4Total(row);
+      case 'q23': return calculateQ2Total(row) + calculateQ3Total(row);
+      case 'q24': return calculateQ2Total(row) + calculateQ4Total(row);
+      case 'q34': return calculateQ3Total(row) + calculateQ4Total(row);
+      case 'q1': return calculateQ1Total(row);
+      case 'q2': return calculateQ2Total(row);
+      case 'q3': return calculateQ3Total(row);
+      case 'q4': return calculateQ4Total(row);
+      case 'none': return 0;
+      default: return 0;
+    }
+  };
+
+  // Section A Generated Table calculations
+  const calculateSectionACOMsrd = (row) => {
+    const sum3Combo = getAutoGeneratedCombination(row, 'q123') + 
+                      getAutoGeneratedCombination(row, 'q124') + 
+                      getAutoGeneratedCombination(row, 'q134') + 
+                      getAutoGeneratedCombination(row, 'q234');
+    return sum3Combo > 0 ? 1 : 0;
+  };
+
+  const calculateTotalCOMsrd = () => {
+    return sectionARows.reduce((sum, row) => sum + calculateSectionACOMsrd(row), 0);
+  };
+
+  const calculateUnitV = (row) => {
+    const totalMsrd = calculateTotalCOMsrd();
+    if (totalMsrd === 0) return 0;
+    return calculateSectionACOMsrd(row) / totalMsrd;
+  };
+
+  const calculateCombinationRatio = (row, combination) => {
+    const rowValue = getAutoGeneratedCombination(row, combination);
+    const totalForAllCOs = sectionARows.reduce((sum, r) => sum + getAutoGeneratedCombination(r, combination), 0);
+    if (totalForAllCOs === 0) return 0;
+    return rowValue / totalForAllCOs;
+  };
+
+  // Calculate population standard deviation for a 3-combination column
+  const calculateStDevP = (combination) => {
+    const values = sectionARows.map(row => calculateCombinationRatio(row, combination));
+    const n = values.length;
+    if (n === 0) return 0;
+    const mean = values.reduce((sum, val) => sum + val, 0) / n;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / n;
+    return Math.sqrt(variance);
+  };
+
+  // Calculate Dist: SUM of (Unit V - combination ratio)² for each 3-combination
+  const calculateDist = (combination) => {
+    return sectionARows.reduce((sum, row) => {
+      const unitV = calculateUnitV(row);
+      const combinationValue = calculateCombinationRatio(row, combination);
+      return sum + Math.pow(unitV - combinationValue, 2);
+    }, 0);
+  };
+
+  // Helper: Get marks obtained for a specific question (Q1, Q2, Q3, Q4) for a student
+  const getStudentQuestionTotal = (studentRow, questionNum) => {
+    const parts = ['a', 'b', 'c', 'd'];
+    return parts.reduce((sum, part) => {
+      const field = `Q${questionNum}${part}`;
+      return sum + (parseFloat(studentRow[field]) || 0);
+    }, 0);
+  };
+
+  // Helper: Get total marks obtained per CO for a student
+  const getStudentCOTotal = (studentRow, coNumber) => {
+    const coRow = sectionARows.find(r => r.coNumber === coNumber);
+    if (!coRow) return 0;
+    
+    // Sum across all questions for this CO
+    const parts = ['a', 'b', 'c', 'd'];
+    return [1, 2, 3, 4].reduce((total, qNum) => {
+      return total + parts.reduce((qSum, part) => {
+        const field = `Q${qNum}${part}`;
+        const allocated = parseFloat(coRow[field]) || 0;
+        const obtained = parseFloat(studentRow[field]) || 0;
+        // Only count if this question part is allocated to this CO
+        return qSum + (allocated > 0 ? obtained : 0);
+      }, 0);
+    }, 0);
+  };
+
+  // Helper: Count how many questions have zero marks for a student
+  const getStudentZeroCount = (studentRow) => {
+    let zeroCount = 0;
+    for (let qNum = 1; qNum <= 4; qNum++) {
+      if (getStudentQuestionTotal(studentRow, qNum) === 0) {
+        zeroCount++;
+      }
+    }
+    return zeroCount;
+  };
+
+  // Helper: Determine which combination the student answered
+  const getStudentAnswerCombination = (studentRow) => {
+    const answeredQuestions = [];
+    for (let qNum = 1; qNum <= 4; qNum++) {
+      if (getStudentQuestionTotal(studentRow, qNum) > 0) {
+        answeredQuestions.push(qNum);
+      }
+    }
+    return answeredQuestions.length > 0 ? answeredQuestions.join(',') : 'None';
+  };
+
+  // Helper: Get CO marks distribution - returns the total allocated marks for that CO from the allocation table
+  const getStudentCODistribution = (studentRow, coNumber) => {
+    const coRow = sectionARows.find(r => r.coNumber === coNumber);
+    if (!coRow) return 0;
+    
+    // Sum all allocated marks for this CO across all question parts
+    const parts = ['a', 'b', 'c', 'd'];
+    return [1, 2, 3, 4].reduce((total, qNum) => {
+      return total + parts.reduce((qSum, part) => {
+        const field = `Q${qNum}${part}`;
+        const allocated = parseFloat(coRow[field]) || 0;
+        return qSum + allocated;
+      }, 0);
+    }, 0);
+  };
+
+  // ========== Section B Calculation Functions ==========
+  
+  // Calculate totals for each question in Section B
+  const calculateQ1TotalB = (row) => (row.Q1a||0) + (row.Q1b||0) + (row.Q1c||0) + (row.Q1d||0);
+  const calculateQ2TotalB = (row) => (row.Q2a||0) + (row.Q2b||0) + (row.Q2c||0) + (row.Q2d||0);
+  const calculateQ3TotalB = (row) => (row.Q3a||0) + (row.Q3b||0) + (row.Q3c||0) + (row.Q3d||0);
+  const calculateQ4TotalB = (row) => (row.Q4a||0) + (row.Q4b||0) + (row.Q4c||0) + (row.Q4d||0);
+
+  // Auto-generate combination values for Section B
+  const getAutoGeneratedCombinationB = (row, combination) => {
+    const q1 = calculateQ1TotalB(row);
+    const q2 = calculateQ2TotalB(row);
+    const q3 = calculateQ3TotalB(row);
+    const q4 = calculateQ4TotalB(row);
+
+    switch(combination) {
+      case 'q123': return q1 + q2 + q3;
+      case 'q124': return q1 + q2 + q4;
+      case 'q134': return q1 + q3 + q4;
+      case 'q234': return q2 + q3 + q4;
+      case 'q12': return q1 + q2;
+      case 'q13': return q1 + q3;
+      case 'q14': return q1 + q4;
+      case 'q23': return q2 + q3;
+      case 'q24': return q2 + q4;
+      case 'q34': return q3 + q4;
+      case 'q1': return q1;
+      case 'q2': return q2;
+      case 'q3': return q3;
+      case 'q4': return q4;
+      case 'none': return 0;
+      default: return 0;
+    }
+  };
+
+  // Calculate CO measured for Section B (1 if any 3-combo > 0, else 0)
+  const calculateSectionBCOMsrd = (row) => {
+    const sum3combos = getAutoGeneratedCombinationB(row, 'q123') +
+                      getAutoGeneratedCombinationB(row, 'q124') +
+                      getAutoGeneratedCombinationB(row, 'q134') +
+                      getAutoGeneratedCombinationB(row, 'q234');
+    return sum3combos > 0 ? 1 : 0;
+  };
+
+  // Calculate total CO measured across all COs for Section B
+  const calculateTotalCOMsrdB = () => {
+    return sectionBRows.reduce((sum, row) => sum + calculateSectionBCOMsrd(row), 0);
+  };
+
+  // Calculate Unit V for Section B
+  const calculateUnitVB = (row) => {
+    const totalCOMsrd = calculateTotalCOMsrdB();
+    if (totalCOMsrd === 0) return 0;
+    return calculateSectionBCOMsrd(row) / totalCOMsrd;
+  };
+
+  // Calculate combination ratio for Section B
+  const calculateCombinationRatioB = (row, combination) => {
+    const totalForAllCOs = sectionBRows.reduce((sum, r) => sum + getAutoGeneratedCombinationB(r, combination), 0);
+    if (totalForAllCOs === 0) return 0;
+    return getAutoGeneratedCombinationB(row, combination) / totalForAllCOs;
+  };
+
+  // Calculate standard deviation (population) for Section B
+  const calculateStDevPB = (combination) => {
+    const values = sectionBRows.map(row => calculateCombinationRatioB(row, combination));
+    const n = values.length;
+    if (n === 0) return 0;
+    const mean = values.reduce((sum, val) => sum + val, 0) / n;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / n;
+    return Math.sqrt(variance);
+  };
+
+  // Calculate distance for Section B
+  const calculateDistB = (combination) => {
+    return sectionBRows.reduce((sum, row) => {
+      const unitV = calculateUnitVB(row);
+      const combinationValue = calculateCombinationRatioB(row, combination);
+      return sum + Math.pow(unitV - combinationValue, 2);
+    }, 0);
+  };
+
+  // Helper: Get marks obtained for a specific question (Q1, Q2, Q3, Q4) for a student in Section B
+  const getStudentQuestionTotalB = (studentRow, questionNum) => {
+    const parts = ['a', 'b', 'c', 'd'];
+    return parts.reduce((sum, part) => {
+      const field = `Q${questionNum}${part}`;
+      return sum + (parseFloat(studentRow[field]) || 0);
+    }, 0);
+  };
+
+  // Helper: Get total marks obtained per CO for a student in Section B
+  const getStudentCOTotalB = (studentRow, coNumber) => {
+    const coRow = sectionBRows.find(r => r.coNumber === coNumber);
+    if (!coRow) return 0;
+    
+    const parts = ['a', 'b', 'c', 'd'];
+    return [1, 2, 3, 4].reduce((total, qNum) => {
+      return total + parts.reduce((qSum, part) => {
+        const field = `Q${qNum}${part}`;
+        const allocated = parseFloat(coRow[field]) || 0;
+        const obtained = parseFloat(studentRow[field]) || 0;
+        return qSum + (allocated > 0 ? obtained : 0);
+      }, 0);
+    }, 0);
+  };
+
+  // Helper: Count how many questions have zero marks for a student in Section B
+  const getStudentZeroCountB = (studentRow) => {
+    let zeroCount = 0;
+    for (let qNum = 1; qNum <= 4; qNum++) {
+      if (getStudentQuestionTotalB(studentRow, qNum) === 0) {
+        zeroCount++;
+      }
+    }
+    return zeroCount;
+  };
+
+  // Helper: Determine which combination the student answered in Section B
+  const getStudentAnswerCombinationB = (studentRow) => {
+    const answeredQuestions = [];
+    for (let qNum = 1; qNum <= 4; qNum++) {
+      if (getStudentQuestionTotalB(studentRow, qNum) > 0) {
+        answeredQuestions.push(qNum);
+      }
+    }
+    return answeredQuestions.length > 0 ? answeredQuestions.join(',') : 'None';
+  };
+
+  // Helper: Get CO marks distribution for Section B
+  const getStudentCODistributionB = (studentRow, coNumber) => {
+    const coRow = sectionBRows.find(r => r.coNumber === coNumber);
+    if (!coRow) return 0;
+    
+    const parts = ['a', 'b', 'c', 'd'];
+    return [1, 2, 3, 4].reduce((total, qNum) => {
+      return total + parts.reduce((qSum, part) => {
+        const field = `Q${qNum}${part}`;
+        const allocated = parseFloat(coRow[field]) || 0;
+        return qSum + allocated;
+      }, 0);
+    }, 0);
+  };
+
   const sectionAColumnTotals = () => {
     const fields = ['Q1a','Q1b','Q1c','Q1d','Q2a','Q2b','Q2c','Q2d','Q3a','Q3b','Q3c','Q3d','Q4a','Q4b','Q4c','Q4d'];
     const totals = {};
@@ -756,24 +1778,221 @@ const AttainmentView = () => {
   };
 
   const computeLabActivityCOTotal = (row) => {
-    return (
-      (row.attn || 0) + (row.quiz || 0) + (row.viva || 0) +
-      (row.Activity1_Q1 || 0) + (row.Activity1_Q2 || 0) + (row.Activity1_Q3 || 0) +
-      (row.Activity2_Q1 || 0) + (row.Activity2_Q2 || 0) + (row.Activity2_Q3 || 0) +
-      (row.Activity3_Q1 || 0) + (row.Activity3_Q2 || 0) + (row.Activity3_Q3 || 0) +
-      (row.Activity4_Q1 || 0) + (row.Activity4_Q2 || 0) + (row.Activity4_Q3 || 0) +
-      (row.Activity5_Q1 || 0) + (row.Activity5_Q2 || 0) + (row.Activity5_Q3 || 0)
-    );
+    let sum = (row.attn || 0) + (row.quiz || 0) + (row.viva || 0);
+    for (let i = 1; i <= (activityTaken || 5); i++) {
+      sum += (row[`Activity${i}_Q1`] || 0) + (row[`Activity${i}_Q2`] || 0) + (row[`Activity${i}_Q3`] || 0);
+    }
+    return sum;
+  };
+
+  // Helper function to calculate factored value for LabActivity generated table
+  const getLabActivityFactoredValue = (row, field, activityKey) => {
+    try {
+      const cellValue = parseFloat(row[field]) || 0;
+      const factor = parseFloat(labActivityFactors[activityKey]) || 0;
+      return cellValue * factor;
+    } catch (error) {
+      return 0;
+    }
+  };
+
+  // Helper function to calculate multiplication factor (generated/allocated) for LabActivity
+  const getLabActivityMultiplicationFactor = (row, field, activityKey) => {
+    try {
+      const generatedValue = getLabActivityFactoredValue(row, field, activityKey);
+      const allocatedValue = parseFloat(row[field]) || 0;
+      if (allocatedValue === 0) return 0;
+      return generatedValue / allocatedValue;
+    } catch (error) {
+      return 0;
+    }
+  };
+
+  // Helper function to calculate CO total for generated table (multiplication factor view)
+  const getLabActivityMultiplicationCOTotal = (row) => {
+    try {
+      let sum = 0;
+      for (let i = 1; i <= (activityTaken || 5); i++) {
+        const activityKey = `activity${i}`;
+        sum += getLabActivityMultiplicationFactor(row, `Activity${i}_Q1`, activityKey);
+        sum += getLabActivityMultiplicationFactor(row, `Activity${i}_Q2`, activityKey);
+        sum += getLabActivityMultiplicationFactor(row, `Activity${i}_Q3`, activityKey);
+      }
+      return sum;
+    } catch (error) {
+      return 0;
+    }
+  };
+
+  // Helper function to get CO-wise obtained marks for a student (out of CO Total from allocated table)
+  const getLabActivityStudentCOMarks = (studentRow, coNumber) => {
+    try {
+      // Find the CO row in labActivityRows
+      const coRow = labActivityRows.find(r => r.coNumber === coNumber);
+      if (!coRow) return 0;
+
+      let studentTotal = 0;
+      let coTotal = 0;
+
+      // Calculate for each activity
+      for (let i = 1; i <= (activityTaken || 5); i++) {
+        const q1Field = `Activity${i}_Q1`;
+        const q2Field = `Activity${i}_Q2`;
+        const q3Field = `Activity${i}_Q3`;
+
+        // Add student marks
+        studentTotal += (parseFloat(studentRow[q1Field]) || 0) + 
+                       (parseFloat(studentRow[q2Field]) || 0) + 
+                       (parseFloat(studentRow[q3Field]) || 0);
+
+        // Add CO allocated marks
+        coTotal += (parseFloat(coRow[q1Field]) || 0) + 
+                   (parseFloat(coRow[q2Field]) || 0) + 
+                   (parseFloat(coRow[q3Field]) || 0);
+      }
+
+      // Return marks proportional to CO's share
+      if (coTotal === 0) return 0;
+      const coShare = computeLabActivityCOTotal(coRow);
+      if (coShare === 0) return 0;
+      
+      return studentTotal;
+    } catch (error) {
+      return 0;
+    }
+  };
+
+  // Helper function to get CO-wise obtained marks (out of CO Mapped Activity Marks)
+  const getLabActivityStudentCOMappedMarks = (studentRow, coNumber) => {
+    try {
+      const coRow = labActivityRows.find(r => r.coNumber === coNumber);
+      if (!coRow) return 0;
+
+      let total = 0;
+
+      for (let i = 1; i <= (activityTaken || 5); i++) {
+        const activityKey = `activity${i}`;
+        const q1Field = `Activity${i}_Q1`;
+        const q2Field = `Activity${i}_Q2`;
+        const q3Field = `Activity${i}_Q3`;
+
+        // Get student marks and apply factor
+        const studentQ1 = parseFloat(studentRow[q1Field]) || 0;
+        const studentQ2 = parseFloat(studentRow[q2Field]) || 0;
+        const studentQ3 = parseFloat(studentRow[q3Field]) || 0;
+
+        const factor = parseFloat(labActivityFactors[activityKey]) || 0;
+
+        total += (studentQ1 * factor) + (studentQ2 * factor) + (studentQ3 * factor);
+      }
+
+      return total;
+    } catch (error) {
+      return 0;
+    }
+  };
+
+  // Helper function to calculate CO attainment (obtained/allocated)
+  const getLabActivityCOAttainment = (studentRow, coNumber) => {
+    try {
+      const obtainedMarks = getLabActivityStudentCOMappedMarks(studentRow, coNumber);
+      const coRow = labActivityRows.find(r => r.coNumber === coNumber);
+      if (!coRow) return 0;
+      
+      const allocatedMarks = getLabActivityGeneratedCOTotal(coRow);
+      if (allocatedMarks === 0) return 0;
+      
+      return obtainedMarks / allocatedMarks;
+    } catch (error) {
+      return 0;
+    }
+  };
+
+  // Helper function to calculate total marks for a student (sum of all CO attainments)
+  const getLabActivityStudentTotalMarks = (studentRow) => {
+    try {
+      let total = 0;
+      labActivityRows.forEach(coRow => {
+        total += getLabActivityStudentCOMappedMarks(studentRow, coRow.coNumber);
+      });
+      return total;
+    } catch (error) {
+      return 0;
+    }
+  };
+
+  // Helper function to get letter grade based on marks
+  const getLetterGrade = (marks) => {
+    if (marks >= 80) return 'A+';
+    if (marks >= 75) return 'A';
+    if (marks >= 70) return 'A-';
+    if (marks >= 65) return 'B+';
+    if (marks >= 60) return 'B';
+    if (marks >= 55) return 'B-';
+    if (marks >= 50) return 'C+';
+    if (marks >= 45) return 'C';
+    if (marks >= 40) return 'D';
+    return 'F';
+  };
+
+  // Helper function to get grade color
+  const getGradeColor = (grade) => {
+    switch(grade) {
+      case 'A+':
+      case 'A':
+      case 'A-':
+        return '#27ae60'; // Green
+      case 'B+':
+      case 'B':
+      case 'B-':
+        return '#3498db'; // Blue
+      case 'C+':
+      case 'C':
+        return '#f39c12'; // Orange
+      case 'D':
+        return '#e67e22'; // Dark Orange
+      case 'F':
+        return '#e74c3c'; // Red
+      default:
+        return '#2c3e50'; // Default dark
+    }
+  };
+
+  // Helper function to calculate CO total for generated table
+  const getLabActivityGeneratedCOTotal = (row) => {
+    try {
+      let total = 0;
+      // Activity1
+      total += getLabActivityFactoredValue(row, 'Activity1_Q1', 'activity1');
+      total += getLabActivityFactoredValue(row, 'Activity1_Q2', 'activity1');
+      total += getLabActivityFactoredValue(row, 'Activity1_Q3', 'activity1');
+      // Activity2
+      total += getLabActivityFactoredValue(row, 'Activity2_Q1', 'activity2');
+      total += getLabActivityFactoredValue(row, 'Activity2_Q2', 'activity2');
+      total += getLabActivityFactoredValue(row, 'Activity2_Q3', 'activity2');
+      // Activity3
+      total += getLabActivityFactoredValue(row, 'Activity3_Q1', 'activity3');
+      total += getLabActivityFactoredValue(row, 'Activity3_Q2', 'activity3');
+      total += getLabActivityFactoredValue(row, 'Activity3_Q3', 'activity3');
+      // Activity4
+      total += getLabActivityFactoredValue(row, 'Activity4_Q1', 'activity4');
+      total += getLabActivityFactoredValue(row, 'Activity4_Q2', 'activity4');
+      total += getLabActivityFactoredValue(row, 'Activity4_Q3', 'activity4');
+      // Activity5
+      total += getLabActivityFactoredValue(row, 'Activity5_Q1', 'activity5');
+      total += getLabActivityFactoredValue(row, 'Activity5_Q2', 'activity5');
+      total += getLabActivityFactoredValue(row, 'Activity5_Q3', 'activity5');
+      return total;
+    } catch (error) {
+      return 0;
+    }
   };
 
   const labActivityColumnTotals = () => {
-    const fields = [
-      'Activity1_Q1','Activity1_Q2','Activity1_Q3',
-      'Activity2_Q1','Activity2_Q2','Activity2_Q3',
-      'Activity3_Q1','Activity3_Q2','Activity3_Q3',
-      'Activity4_Q1','Activity4_Q2','Activity4_Q3',
-      'Activity5_Q1','Activity5_Q2','Activity5_Q3'
-    ];
+    const fields = [];
+    for (let i = 1; i <= (activityTaken || 5); i++) {
+      fields.push(`Activity${i}_Q1`, `Activity${i}_Q2`, `Activity${i}_Q3`);
+    }
     const totals = {};
     fields.forEach(f => totals[f] = 0);
     labActivityRows.forEach(r => fields.forEach(f => totals[f] += (r[f] || 0)));
@@ -782,12 +2001,15 @@ const AttainmentView = () => {
 
   const labActivityActivityTotals = () => {
     const totals = labActivityColumnTotals();
-    const activity1 = (totals.Activity1_Q1 || 0) + (totals.Activity1_Q2 || 0) + (totals.Activity1_Q3 || 0);
-    const activity2 = (totals.Activity2_Q1 || 0) + (totals.Activity2_Q2 || 0) + (totals.Activity2_Q3 || 0);
-    const activity3 = (totals.Activity3_Q1 || 0) + (totals.Activity3_Q2 || 0) + (totals.Activity3_Q3 || 0);
-    const activity4 = (totals.Activity4_Q1 || 0) + (totals.Activity4_Q2 || 0) + (totals.Activity4_Q3 || 0);
-    const activity5 = (totals.Activity5_Q1 || 0) + (totals.Activity5_Q2 || 0) + (totals.Activity5_Q3 || 0);
-    return { activity1, activity2, activity3, activity4, activity5 };
+    const result = {};
+    for (let i = 1; i <= (activityTaken || 5); i++) {
+      const activityKey = `activity${i}`;
+      const q1 = totals[`Activity${i}_Q1`] || 0;
+      const q2 = totals[`Activity${i}_Q2`] || 0;
+      const q3 = totals[`Activity${i}_Q3`] || 0;
+      result[activityKey] = q1 + q2 + q3;
+    }
+    return result;
   };
 
   const computeSectionBObtainedTotal = (row) => {
@@ -827,21 +2049,9 @@ const AttainmentView = () => {
     return { ct1, ct2, ct3 };
   };
 
-  const handleFactorChange = (ctKey, value) => {
-    const num = Number(value);
-    setCtFactors(prev => ({ ...prev, [ctKey]: isNaN(num) ? 0 : num }));
-    triggerAutosave();
-  };
-
   const handleManualWtChange = (ctKey, value) => {
     const num = Number(value);
     setCtManualWts(prev => ({ ...prev, [ctKey]: isNaN(num) ? 0 : num }));
-    triggerAutosave();
-  };
-
-  const handleEqWtChange = (ctKey, value) => {
-    const num = Number(value);
-    setCtEqWts(prev => ({ ...prev, [ctKey]: isNaN(num) ? 0 : num }));
     triggerAutosave();
   };
 
@@ -960,7 +2170,6 @@ const AttainmentView = () => {
     const updated = [...ctObtainedRows];
     updated[index] = { ...updated[index], [field]: isNaN(num) ? 0 : num };
     setCtObtainedRows(updated);
-    triggerAutosave();
   };
 
   const computeObtainedTotal = (row) => {
@@ -994,7 +2203,7 @@ const AttainmentView = () => {
       
       // Define sheets for each course type
       const theorySheets = [
-        'CourseProfile', 'CT', 'Attn_Assign', 'SectionA', 'SectionB', 'COAttainment', 'COCalc', 'COPOMap', 'POCalcMax', 'Charts', 'POCalc', 'CheckPO'
+        'CourseProfile', 'CT', 'Attn_Assign', 'SectionA', 'SectionB', 'COAttainment', 'COCalc', 'COCalc_LabUnnorm', 'COPOMap', 'POCalcMax', 'Charts', 'POCalc', 'CheckPO'
       ];
       
       const labSheets = [
@@ -1074,12 +2283,32 @@ const AttainmentView = () => {
       setLoading(true);
       const response = await getSheetNames();
       setSheetNames(response.sheets || []);
-      setTeacherCourses(response.courses || []);
+      
+      // Get current user's ID to find their section assignment
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const userId = user._id || user.id;
+      
+      // Extract the section for the logged-in teacher from assignedTeachers array
+      const courseList = response.courses || [];
+      const coursesWithSection = courseList.map(course => {
+        if (course.assignedTeachers && Array.isArray(course.assignedTeachers)) {
+          const teacherAssignment = course.assignedTeachers.find(
+            assignedTeacher => assignedTeacher.teacher && 
+            (assignedTeacher.teacher._id === userId || assignedTeacher.teacher === userId)
+          );
+          if (teacherAssignment && teacherAssignment.section) {
+            return { ...course, section: teacherAssignment.section };
+          }
+        }
+        return course;
+      });
+      
+      setTeacherCourses(coursesWithSection);
       
       // Auto-select first sheet
       if (response.sheets && response.sheets.length > 0) {
         setSelectedSheet(response.sheets[0]);
-      } else if (response.courses && response.courses.length > 0) {
+      } else if (coursesWithSection && coursesWithSection.length > 0) {
         setError('No attainment sheets found for your assigned courses');
       }
     } catch (err) {
@@ -1100,41 +2329,6 @@ const AttainmentView = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleCellEdit = (rollNumber, poNumber, currentValue) => {
-    // Only allow editing for teachers and admins
-    if (userRole !== 'teacher' && userRole !== 'admin') {
-      return;
-    }
-
-    setEditingCell({ rollNumber, poNumber, value: currentValue });
-  };
-
-  const handleCellSave = async () => {
-    if (!editingCell) return;
-
-    try {
-      setSaving(true);
-      await updateStudentPoValue(
-        selectedSheet,
-        editingCell.rollNumber,
-        editingCell.poNumber,
-        editingCell.value
-      );
-
-      // Reload data to get updated summary
-      await loadAttainmentData(selectedSheet);
-      setEditingCell(null);
-    } catch (err) {
-      alert(err.error || 'Failed to save value');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleCellCancel = () => {
-    setEditingCell(null);
   };
 
   const handleCLOCellEdit = (cloNumber, field, currentValue) => {
@@ -1201,39 +2395,72 @@ const AttainmentView = () => {
     );
   };
 
-  const handleCellChange = (e) => {
-    setEditingCell({ ...editingCell, value: e.target.value });
-  };
-
   const canEdit = userRole === 'teacher' || userRole === 'admin';
 
   // Refresh teacher courses (force reload from backend)
-  const refreshTeacherCourses = async () => {
+  const refreshTeacherCourses = useCallback(async () => {
+    console.log('🔄 refreshTeacherCourses called');
     try {
       const data = await getAllCourses();
+      console.log('📦 getAllCourses response:', data);
       const courseList = Array.isArray(data) ? data : (data.courses || []);
+      console.log('📚 Course list extracted:', courseList.length, 'courses');
+      console.log('📋 First course sample:', courseList[0]);
+      
+      // Get current user's ID to find their section assignment
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const userId = user._id || user.id;
+      
+      // Extract the section for the logged-in teacher from assignedTeachers array
+      const coursesWithSection = courseList.map(course => {
+        if (course.assignedTeachers && Array.isArray(course.assignedTeachers)) {
+          const teacherAssignment = course.assignedTeachers.find(
+            assignedTeacher => assignedTeacher.teacher && 
+            (assignedTeacher.teacher._id === userId || assignedTeacher.teacher === userId)
+          );
+          if (teacherAssignment && teacherAssignment.section) {
+            return { ...course, section: teacherAssignment.section };
+          }
+        }
+        return course;
+      });
+      
       // Only update if we get a valid course list
-      if (courseList && courseList.length > 0) {
-        setTeacherCourses(courseList);
+      if (coursesWithSection && coursesWithSection.length > 0) {
+        setTeacherCourses(coursesWithSection);
+        console.log('✅ Teacher courses set:', coursesWithSection.length);
         // If a course is already selected, update it with the latest info
         if (selectedCourse) {
-          const updated = courseList.find(c => c._id === selectedCourse._id);
-          if (updated) setSelectedCourse(updated);
+          const updated = coursesWithSection.find(c => c._id === selectedCourse._id);
+          if (updated) {
+            console.log('🔄 Updated selected course:', updated);
+            setSelectedCourse(updated);
+          }
         }
+      } else {
+        console.log('❌ No courses found in response');
       }
     } catch (err) {
-      console.error('refreshTeacherCourses error:', err);
+      console.error('🚨 refreshTeacherCourses error:', err);
       // Don't clear existing courses on error, just log it
-      console.warn('Keeping existing course list due to refresh error');
+      console.warn('⚠️ Keeping existing course list due to refresh error');
     }
-  };
+  }, [selectedCourse]);
+
+  // Load courses for teachers on mount
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (user.role === 'teacher') {
+      refreshTeacherCourses();
+    }
+  }, [refreshTeacherCourses]);
 
   // Auto-refresh courses when AttainmentView mounts and when sheet changes to Attn_Assign
   useEffect(() => {
     if (selectedSheet === 'Attn_Assign') {
       refreshTeacherCourses();
     }
-  }, [selectedSheet]);
+  }, [selectedSheet, refreshTeacherCourses]);
 
   if (loading && !attainmentData) {
     return <div className="attainment-loading">Loading...</div>;
@@ -1263,6 +2490,9 @@ const AttainmentView = () => {
               const course = teacherCourses.find(c => 
                 c.courseCode === code && (c.section || 'null') === section
               );
+              console.log('🎯 Course selected:', course);
+              console.log('🆔 Course _id:', course?._id);
+              console.log('📚 Course full object:', course);
               setSelectedCourse(course);
             }}
             style={{width: '100%', padding: '10px', fontSize: '14px', borderRadius: '4px', border: '1px solid #ddd'}}
@@ -1281,25 +2511,6 @@ const AttainmentView = () => {
         </div>
       )}
 
-      {/* Save Status Indicator */}
-      {selectedSheet === 'CT' && saveStatus && (
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          padding: '10px 20px',
-          borderRadius: '4px',
-          backgroundColor: saveStatus === 'saved' ? '#d4edda' : saveStatus === 'saving' ? '#fff3cd' : '#f8d7da',
-          color: saveStatus === 'saved' ? '#155724' : saveStatus === 'saving' ? '#856404' : '#721c24',
-          border: `1px solid ${saveStatus === 'saved' ? '#c3e6cb' : saveStatus === 'saving' ? '#ffeeba' : '#f5c6cb'}`,
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          zIndex: 1000
-        }}>
-          {saveStatus === 'saving' && '💾 Saving...'}
-          {saveStatus === 'saved' && '✓ Saved'}
-          {saveStatus === 'error' && '✗ Error saving'}
-        </div>
-      )}
 
       {/* Evaluation Selector - Second Step (shown only after course selection) */}
       {selectedCourse && (
@@ -1389,7 +2600,31 @@ const AttainmentView = () => {
           {/* CT Matrix - shown when CT is selected */}
           {selectedSheet === 'CT' && (
             <section className="ct-section" style={{marginTop: '30px'}}>
-              <h2>CO mapping of Class Test Marks</h2>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px'}}>
+                <h2 style={{margin: 0}}>CO mapping of Class Test Marks</h2>
+                <div className="action-buttons-container">
+                  {saveStatus && (
+                    <div className={`save-status-badge ${saveStatus}`}>
+                      {saveStatus === 'saving' && '💾 Saving...'}
+                      {saveStatus === 'saved' && '✓ Saved'}
+                      {saveStatus === 'error' && '✗ Error saving'}
+                    </div>
+                  )}
+                  <button 
+                    onClick={handleManualSave}
+                    disabled={saveStatus === 'saving'}
+                    className="btn-professional btn-save"
+                  >
+                    {saveStatus === 'saving' ? 'Saving...' : 'Save Table'}
+                  </button>
+                  <button 
+                    onClick={() => setShowGeneratedTableModal(true)}
+                    className="btn-professional btn-primary"
+                  >
+                    View Generated Table
+                  </button>
+                </div>
+              </div>
               {/* CO mapping table */}
               <div className="table-wrapper">
                 <table className="ct-table">
@@ -1448,7 +2683,7 @@ const AttainmentView = () => {
                         const autoFactor = calculateAutoFactor();
                         return (
                           <td key={ct} colSpan={3} style={{textAlign: 'center'}}>
-                            {(autoFactor[ct] || 0).toFixed(4)}
+                            {formatNumber(autoFactor[ct] || 0)}
                           </td>
                         );
                       })}
@@ -1460,11 +2695,11 @@ const AttainmentView = () => {
                         const autoEqWt = calculateAutoEqWt();
                         return (
                           <td key={ct} colSpan={3} style={{textAlign: 'center'}}>
-                            {(autoEqWt[ct] || 0).toFixed(2)}
+                            {formatNumber(autoEqWt[ct] || 0)}
                           </td>
                         );
                       })}
-                      <td><strong>{sumEqWtTotal().toFixed(2)}</strong></td>
+                      <td><strong>{formatNumber(sumEqWtTotal())}</strong></td>
                     </tr>
                     <tr>
                       <td className="footer-label">Manual Wt</td>
@@ -1479,7 +2714,39 @@ const AttainmentView = () => {
                           />
                         </td>
                       ))}
-                      <td><strong>{sumManualWtTotal().toFixed(2)}</strong></td>
+                      <td><strong>{formatNumber(sumManualWtTotal())}</strong></td>
+                    </tr>
+                    <tr>
+                      <td className="footer-label" style={{fontWeight: 'bold', color: '#2c3e50'}}>Status</td>
+                      {(() => {
+                        const manualTotal = sumManualWtTotal();
+                        const coMappedMarks = ctSummary.coMappedMarks60 || 0;
+                        const useEqWt = ctSummary.useEqWt || 0;
+                        
+                        let message = '';
+                        let messageColor = '#27ae60'; // green for OK
+                        
+                        if (manualTotal === coMappedMarks) {
+                          message = 'OK';
+                        } else {
+                          if (useEqWt === 0) {
+                            message = `Sum should be ${coMappedMarks}`;
+                            messageColor = '#e74c3c'; // red for error
+                          } else {
+                            message = `Sum should be ${coMappedMarks}, you can ignore as Eq. wt=1`;
+                            messageColor = '#f39c12'; // orange for warning
+                          }
+                        }
+                        
+                        return (
+                          <>
+                            <td colSpan={getActiveCTs().length * 3} style={{textAlign: 'center', fontWeight: 'bold', color: messageColor}}>
+                              {message}
+                            </td>
+                            <td></td>
+                          </>
+                        );
+                      })()}
                     </tr>
                   </tfoot>
                 </table>
@@ -1489,26 +2756,68 @@ const AttainmentView = () => {
                 <table className="ct-table">
                   <tbody>
                     <tr>
-                      <td>CTs Taken</td>
+                      <td style={{backgroundColor: '#f8f9fa', fontWeight: 600}}>CTs Taken</td>
                       <td><input type="number" min={0} max={3} style={{width:'80px'}} value={ctSummary.ctTaken} onChange={e=>setCtSummary(prev=>({...prev, ctTaken: Math.max(0, Math.min(3, Number(e.target.value)||0))}))} /></td>
                     </tr>
                     <tr>
-                      <td>CT Marks out of 60</td>
+                      <td style={{backgroundColor: '#f8f9fa', fontWeight: 600}}>CT Marks out of 60</td>
                       <td><input type="number" min={0} max={60} style={{width:'80px'}} value={ctSummary.coMappedMarks60} onChange={e=>setCtSummary(prev=>({...prev, coMappedMarks60: Math.max(0, Math.min(60, Number(e.target.value)||0))}))} /></td>
                     </tr>
                     <tr>
-                      <td>Use Eq. Wt</td>
+                      <td style={{backgroundColor: '#f8f9fa', fontWeight: 600}}>Use Eq. Wt</td>
                       <td><input type="number" step="0.01" style={{width:'80px'}} value={ctSummary.useEqWt} onChange={e=>setCtSummary(prev=>({...prev, useEqWt: Number(e.target.value)||0}))} /></td>
                     </tr>
                   </tbody>
                 </table>
+              </div>
+              
+              {/* Save Summary Button */}
+              <div className="action-buttons-container" style={{marginTop: '10px', justifyContent: 'flex-end'}}>
+                {saveStatus && (
+                  <div className={`save-status-badge ${saveStatus}`}>
+                    {saveStatus === 'saving' && '💾 Saving...'}
+                    {saveStatus === 'saved' && '✓ Saved'}
+                    {saveStatus === 'error' && '✗ Error saving'}
+                  </div>
+                )}
+                <button 
+                  onClick={handleManualSave}
+                  disabled={saveStatus === 'saving'}
+                  className="btn-professional btn-save"
+                >
+                  {saveStatus === 'saving' ? 'Saving...' : 'Save Summary'}
+                </button>
               </div>
 
 
               {/* Obtained Marks for Class Tests */}
               {(() => { const g = ctGroupTotals(); const ctTaken = ctSummary.ctTaken || 3; return (
               <section style={{marginTop:'20px'}}>
-                <h3>Obtained Marks for Class Tests</h3>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px'}}>
+                  <h3 style={{margin: 0}}>Obtained Marks for Class Tests</h3>
+                  <div className="action-buttons-container">
+                    {saveStatus && (
+                      <div className={`save-status-badge ${saveStatus}`}>
+                        {saveStatus === 'saving' && '💾 Saving...'}
+                        {saveStatus === 'saved' && '✓ Saved'}
+                        {saveStatus === 'error' && '✗ Error saving'}
+                      </div>
+                    )}
+                    <button 
+                      onClick={handleManualSave}
+                      disabled={saveStatus === 'saving'}
+                      className="btn-professional btn-save"
+                    >
+                      {saveStatus === 'saving' ? 'Saving...' : 'Save Table'}
+                    </button>
+                    <button 
+                      onClick={() => setShowObtainedGeneratedModal(true)}
+                      className="btn-professional btn-primary"
+                    >
+                      View Generated Obtained Table
+                    </button>
+                  </div>
+                </div>
                 <div className="table-wrapper">
                   <table className="ct-obtained-table">
                     <thead>
@@ -1549,7 +2858,9 @@ const AttainmentView = () => {
                         </tr>
                       ))}
                       {ctObtainedRows.length === 0 && (
-                        <tr><td colSpan={ctTaken * 3 + 2} style={{textAlign:'center', color:'#7f8c8d'}}>No students found for this sheet.</td></tr>
+                        <tr><td colSpan={ctTaken * 3 + 2} style={{textAlign:'center', color:'#7f8c8d', padding: '20px'}}>
+                          <div>Sample students should be loaded. If not, check browser console for errors.</div>
+                        </td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1563,7 +2874,23 @@ const AttainmentView = () => {
           {/* Section A Section */}
           {selectedSheet === 'SectionA' && (
             <section className="section-a-section" style={{marginTop: '30px'}}>
-              <h2>Allocated marks for Section-A in final question</h2>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+                <h2 style={{borderBottom: 'none', marginBottom: 0, paddingBottom: 0}}>Allocated marks for Section-A in final question</h2>
+                <button 
+                  onClick={() => setShowSectionAGeneratedModal(true)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#3498db',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  View Generated Table
+                </button>
+              </div>
               {clos.length === 0 && (
                 <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
               )}
@@ -1578,7 +2905,6 @@ const AttainmentView = () => {
                       <th style={{borderLeft: '2px solid #d5d5d5'}} colSpan="4">2</th>
                       <th style={{borderLeft: '2px solid #d5d5d5'}} colSpan="4">3</th>
                       <th style={{borderLeft: '2px solid #d5d5d5'}} colSpan="4">4</th>
-                      <th rowSpan="2">CO Total</th>
                     </tr>
                     <tr>
                       <th>1(a)</th><th>1(b)</th><th>1(c)</th><th>1(d)</th>
@@ -1735,7 +3061,6 @@ const AttainmentView = () => {
                             style={{width:'80px'}}
                           />
                         </td>
-                        <td className="co-total">{computeSectionACOTotal(row)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1753,7 +3078,6 @@ const AttainmentView = () => {
                           </>
                         );
                       })()}
-                      <td>{sectionARows.reduce((sum, r) => sum + computeSectionACOTotal(r), 0)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1761,7 +3085,23 @@ const AttainmentView = () => {
               
               {/* Obtained Marks for Section-A */}
               <section style={{marginTop:'30px'}}>
-                <h3>Obtained marks for Section-A</h3>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+                  <h3 style={{margin: 0}}>Obtained marks for Section-A</h3>
+                  <button 
+                    onClick={() => setShowSectionAObtainedModal(true)}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#3498db',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    View Generated Table
+                  </button>
+                </div>
                 <div className="table-wrapper">
                   <table className="section-a-table">
                     <thead>
@@ -1931,7 +3271,18 @@ const AttainmentView = () => {
                           <td className="co-total">{computeSectionAObtainedTotal(row)}</td>
                         </tr>
                       )) : (
-                        <tr><td colSpan={18} style={{textAlign:'center', color:'#7f8c8d'}}>No students found for this course.</td></tr>
+                        <tr>
+                          <td colSpan={18} style={{textAlign:'center', color:'#7f8c8d', padding: '20px'}}>
+                            <div style={{marginBottom: '10px'}}>
+                              <strong>No students found for this course.</strong>
+                            </div>
+                            <div style={{fontSize: '14px', lineHeight: '1.4'}}>
+                              To enter student marks, you need to:
+                              <br />• Ensure students are enrolled in this course, or
+                              <br />• Import student data from existing evaluation sheets
+                            </div>
+                          </td>
+                        </tr>
                       )}
                     </tbody>
                   </table>
@@ -1946,7 +3297,23 @@ const AttainmentView = () => {
           {/* Section B Section */}
           {selectedSheet === 'SectionB' && (
             <section className="section-b-section" style={{marginTop: '30px'}}>
-              <h2>Allocated marks for Section-B in final question</h2>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+                <h2 style={{borderBottom: 'none', marginBottom: 0, paddingBottom: 0}}>Allocated marks for Section-B in final question</h2>
+                <button 
+                  onClick={() => setShowSectionBGeneratedModal(true)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#3498db',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  View Generated Table
+                </button>
+              </div>
               {clos.length === 0 && (
                 <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
               )}
@@ -1961,7 +3328,6 @@ const AttainmentView = () => {
                       <th style={{borderLeft: '2px solid #d5d5d5'}} colSpan="4">2</th>
                       <th style={{borderLeft: '2px solid #d5d5d5'}} colSpan="4">3</th>
                       <th style={{borderLeft: '2px solid #d5d5d5'}} colSpan="4">4</th>
-                      <th rowSpan="2">CO Total</th>
                     </tr>
                     <tr>
                       <th>1(a)</th><th>1(b)</th><th>1(c)</th><th>1(d)</th>
@@ -2144,7 +3510,23 @@ const AttainmentView = () => {
               
               {/* Obtained Marks for Section-B */}
               <section style={{marginTop:'30px'}}>
-                <h3>Obtained marks for Section-B</h3>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+                  <h3 style={{margin: 0}}>Obtained marks for Section-B</h3>
+                  <button 
+                    onClick={() => setShowSectionBObtainedModal(true)}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#3498db',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    View Generated Table
+                  </button>
+                </div>
                 <div className="table-wrapper">
                   <table className="section-a-table">
                     <thead>
@@ -2329,7 +3711,23 @@ const AttainmentView = () => {
           {/* LabActivity Section */}
           {selectedSheet === 'LabActivity' && (
             <section className="ct-section" style={{marginTop: '30px'}}>
-              <h2>Allocated Marks for Lab activity</h2>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+                <h2 style={{margin: 0}}>Allocated Marks for Lab activity</h2>
+                <button 
+                  onClick={() => setShowLabActivityGeneratedModal(true)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#3498db',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  View Generated Table
+                </button>
+              </div>
               {clos.length === 0 && (
                 <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
               )}
@@ -2343,16 +3741,14 @@ const AttainmentView = () => {
                       <th rowSpan="2">Attn.</th>
                       <th rowSpan="2">Quiz</th>
                       <th rowSpan="2">C. Viva</th>
-                      <th colSpan="15">CO Mapping of Lab Activity Marks</th>
+                      <th colSpan={(activityTaken || 5) * 3}>CO Mapping of Lab Activity Marks</th>
                       <th colSpan="1">Other</th>
                       <th rowSpan="3">CO Total</th>
                     </tr>
                     <tr>
-                      <th colSpan="3">Activity1</th>
-                      <th colSpan="3">Activity2</th>
-                      <th colSpan="3">Activity3</th>
-                      <th colSpan="3">Activity4</th>
-                      <th colSpan="3">Activity5</th>
+                      {Array.from({length: activityTaken || 5}, (_, i) => (
+                        <th key={`activity-header-${i+1}`} colSpan="3">Activity{i+1}</th>
+                      ))}
                       <th rowSpan="2">Measured Total</th>
                     </tr>
                     <tr>
@@ -2383,11 +3779,13 @@ const AttainmentView = () => {
                           style={{width:'50px'}}
                         />
                       </th>
-                      <th>Q1</th><th>Q2</th><th>Q3</th>
-                      <th>Q1</th><th>Q2</th><th>Q3</th>
-                      <th>Q1</th><th>Q2</th><th>Q3</th>
-                      <th>Q1</th><th>Q2</th><th>Q3</th>
-                      <th>Q1</th><th>Q2</th><th>Q3</th>
+                      {Array.from({length: activityTaken || 5}, (_, i) => (
+                        <React.Fragment key={`q-headers-${i+1}`}>
+                          <th>Q1</th>
+                          <th>Q2</th>
+                          <th>Q3</th>
+                        </React.Fragment>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -2421,141 +3819,40 @@ const AttainmentView = () => {
                             style={{width:'60px'}}
                           />
                         </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.Activity1_Q1}
-                            onChange={(e) => handleLabActivityCellChange(idx, 'Activity1_Q1', e.target.value)}
-                            style={{width:'60px'}}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.Activity1_Q2}
-                            onChange={(e) => handleLabActivityCellChange(idx, 'Activity1_Q2', e.target.value)}
-                            style={{width:'60px'}}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.Activity1_Q3}
-                            onChange={(e) => handleLabActivityCellChange(idx, 'Activity1_Q3', e.target.value)}
-                            style={{width:'60px'}}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.Activity2_Q1}
-                            onChange={(e) => handleLabActivityCellChange(idx, 'Activity2_Q1', e.target.value)}
-                            style={{width:'60px'}}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.Activity2_Q2}
-                            onChange={(e) => handleLabActivityCellChange(idx, 'Activity2_Q2', e.target.value)}
-                            style={{width:'60px'}}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.Activity2_Q3}
-                            onChange={(e) => handleLabActivityCellChange(idx, 'Activity2_Q3', e.target.value)}
-                            style={{width:'60px'}}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.Activity3_Q1}
-                            onChange={(e) => handleLabActivityCellChange(idx, 'Activity3_Q1', e.target.value)}
-                            style={{width:'60px'}}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.Activity3_Q2}
-                            onChange={(e) => handleLabActivityCellChange(idx, 'Activity3_Q2', e.target.value)}
-                            style={{width:'60px'}}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.Activity3_Q3}
-                            onChange={(e) => handleLabActivityCellChange(idx, 'Activity3_Q3', e.target.value)}
-                            style={{width:'60px'}}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.Activity4_Q1}
-                            onChange={(e) => handleLabActivityCellChange(idx, 'Activity4_Q1', e.target.value)}
-                            style={{width:'60px'}}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.Activity4_Q2}
-                            onChange={(e) => handleLabActivityCellChange(idx, 'Activity4_Q2', e.target.value)}
-                            style={{width:'60px'}}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.Activity4_Q3}
-                            onChange={(e) => handleLabActivityCellChange(idx, 'Activity4_Q3', e.target.value)}
-                            style={{width:'60px'}}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.Activity5_Q1}
-                            onChange={(e) => handleLabActivityCellChange(idx, 'Activity5_Q1', e.target.value)}
-                            style={{width:'60px'}}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.Activity5_Q2}
-                            onChange={(e) => handleLabActivityCellChange(idx, 'Activity5_Q2', e.target.value)}
-                            style={{width:'60px'}}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.Activity5_Q3}
-                            onChange={(e) => handleLabActivityCellChange(idx, 'Activity5_Q3', e.target.value)}
-                            style={{width:'60px'}}
-                          />
-                        </td>
+                        {Array.from({length: activityTaken || 5}, (_, activityIndex) => {
+                          const activityNum = activityIndex + 1;
+                          return (
+                            <React.Fragment key={`activity-inputs-${activityNum}`}>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={row[`Activity${activityNum}_Q1`]}
+                                  onChange={(e) => handleLabActivityCellChange(idx, `Activity${activityNum}_Q1`, e.target.value)}
+                                  style={{width:'60px'}}
+                                />
+                              </td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={row[`Activity${activityNum}_Q2`]}
+                                  onChange={(e) => handleLabActivityCellChange(idx, `Activity${activityNum}_Q2`, e.target.value)}
+                                  style={{width:'60px'}}
+                                />
+                              </td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={row[`Activity${activityNum}_Q3`]}
+                                  onChange={(e) => handleLabActivityCellChange(idx, `Activity${activityNum}_Q3`, e.target.value)}
+                                  style={{width:'60px'}}
+                                />
+                              </td>
+                            </React.Fragment>
+                          );
+                        })}
                         <td>{computeLabActivityCOTotal(row)}</td>
                         <td className="co-total">{computeLabActivityCOTotal(row)}</td>
                       </tr>
@@ -2564,61 +3861,39 @@ const AttainmentView = () => {
                     {/* Total Factor Row */}
                     <tr className="factor-row">
                       <td colSpan="4"><strong>Total</strong></td>
-                      <td colSpan="3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={labActivityFactors.activity1 || 0}
-                          onChange={(e) => handleLabActivityFactorChange('activity1', e.target.value)}
-                          style={{width:'80px'}}
-                        />
-                      </td>
-                      <td colSpan="3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={labActivityFactors.activity2 || 0}
-                          onChange={(e) => handleLabActivityFactorChange('activity2', e.target.value)}
-                          style={{width:'80px'}}
-                        />
-                      </td>
-                      <td colSpan="3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={labActivityFactors.activity3 || 0}
-                          onChange={(e) => handleLabActivityFactorChange('activity3', e.target.value)}
-                          style={{width:'80px'}}
-                        />
-                      </td>
-                      <td colSpan="3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={labActivityFactors.activity4 || 0}
-                          onChange={(e) => handleLabActivityFactorChange('activity4', e.target.value)}
-                          style={{width:'80px'}}
-                        />
-                      </td>
-                      <td colSpan="3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={labActivityFactors.activity5 || 0}
-                          onChange={(e) => handleLabActivityFactorChange('activity5', e.target.value)}
-                          style={{width:'80px'}}
-                        />
-                      </td>
+                      {Array.from({length: activityTaken || 5}, (_, activityIndex) => {
+                        const activityNum = activityIndex + 1;
+                        const activityKey = `activity${activityNum}`;
+                        return (
+                          <td key={`factor-${activityKey}`} colSpan="3">
+                            <input
+                              type="number"
+                              min="0"
+                              value={labActivityFactors[activityKey] || 0}
+                              onChange={(e) => handleLabActivityFactorChange(activityKey, e.target.value)}
+                              style={{width:'80px'}}
+                            />
+                          </td>
+                        );
+                      })}
                       <td>
                         {(() => {
                           const totals = labActivityActivityTotals();
-                          return (totals.activity1 + totals.activity2 + totals.activity3 + totals.activity4 + totals.activity5);
+                          let sum = 0;
+                          for (let i = 1; i <= (activityTaken || 5); i++) {
+                            sum += totals[`activity${i}`] || 0;
+                          }
+                          return sum;
                         })()}
                       </td>
                       <td className="co-total">
                         {(() => {
                           const totals = labActivityActivityTotals();
-                          return (totals.activity1 + totals.activity2 + totals.activity3 + totals.activity4 + totals.activity5);
+                          let sum = 0;
+                          for (let i = 1; i <= (activityTaken || 5); i++) {
+                            sum += totals[`activity${i}`] || 0;
+                          }
+                          return sum;
                         })()}
                       </td>
                     </tr>
@@ -2626,73 +3901,43 @@ const AttainmentView = () => {
                     {/* Eq. Wt Row */}
                     <tr className="eq-wt-row">
                       <td colSpan="4"><strong>Eq. Wt</strong></td>
-                      <td colSpan="3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={labActivityEqWts.activity1 || 0}
-                          onChange={(e) => handleLabActivityEqWtChange('activity1', e.target.value)}
-                          style={{width:'80px'}}
-                        />
-                      </td>
-                      <td colSpan="3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={labActivityEqWts.activity2 || 0}
-                          onChange={(e) => handleLabActivityEqWtChange('activity2', e.target.value)}
-                          style={{width:'80px'}}
-                        />
-                      </td>
-                      <td colSpan="3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={labActivityEqWts.activity3 || 0}
-                          onChange={(e) => handleLabActivityEqWtChange('activity3', e.target.value)}
-                          style={{width:'80px'}}
-                        />
-                      </td>
-                      <td colSpan="3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={labActivityEqWts.activity4 || 0}
-                          onChange={(e) => handleLabActivityEqWtChange('activity4', e.target.value)}
-                          style={{width:'80px'}}
-                        />
-                      </td>
-                      <td colSpan="3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={labActivityEqWts.activity5 || 0}
-                          onChange={(e) => handleLabActivityEqWtChange('activity5', e.target.value)}
-                          style={{width:'80px'}}
-                        />
-                      </td>
+                      {Array.from({length: activityTaken || 5}, (_, activityIndex) => {
+                        const activityNum = activityIndex + 1;
+                        const activityKey = `activity${activityNum}`;
+                        return (
+                          <td key={`eqwt-${activityKey}`} colSpan="3">
+                            <input
+                              type="number"
+                              min="0"
+                              value={labActivityEqWts[activityKey] || 0}
+                              onChange={(e) => handleLabActivityEqWtChange(activityKey, e.target.value)}
+                              style={{width:'80px'}}
+                            />
+                          </td>
+                        );
+                      })}
                       <td>
                         {(() => {
                           const totals = labActivityActivityTotals();
                           const eqWts = labActivityEqWts;
-                          const activity1Total = totals.activity1 * (eqWts.activity1 || 0);
-                          const activity2Total = totals.activity2 * (eqWts.activity2 || 0);
-                          const activity3Total = totals.activity3 * (eqWts.activity3 || 0);
-                          const activity4Total = totals.activity4 * (eqWts.activity4 || 0);
-                          const activity5Total = totals.activity5 * (eqWts.activity5 || 0);
-                          return (activity1Total + activity2Total + activity3Total + activity4Total + activity5Total);
+                          let sum = 0;
+                          for (let i = 1; i <= (activityTaken || 5); i++) {
+                            const activityKey = `activity${i}`;
+                            sum += (totals[activityKey] || 0) * (eqWts[activityKey] || 0);
+                          }
+                          return sum;
                         })()}
                       </td>
                       <td className="co-total">
                         {(() => {
                           const totals = labActivityActivityTotals();
                           const eqWts = labActivityEqWts;
-                          const activity1Total = totals.activity1 * (eqWts.activity1 || 0);
-                          const activity2Total = totals.activity2 * (eqWts.activity2 || 0);
-                          const activity3Total = totals.activity3 * (eqWts.activity3 || 0);
-                          const activity4Total = totals.activity4 * (eqWts.activity4 || 0);
-                          const activity5Total = totals.activity5 * (eqWts.activity5 || 0);
-                          return (activity1Total + activity2Total + activity3Total + activity4Total + activity5Total);
+                          let sum = 0;
+                          for (let i = 1; i <= (activityTaken || 5); i++) {
+                            const activityKey = `activity${i}`;
+                            sum += (totals[activityKey] || 0) * (eqWts[activityKey] || 0);
+                          }
+                          return sum;
                         })()}
                       </td>
                     </tr>
@@ -2700,73 +3945,43 @@ const AttainmentView = () => {
                     {/* Manual Wt Row */}
                     <tr className="manual-wt-row">
                       <td colSpan="4"><strong>Manual Wt</strong></td>
-                      <td colSpan="3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={labActivityManualWts.activity1 || 0}
-                          onChange={(e) => handleLabActivityManualWtChange('activity1', e.target.value)}
-                          style={{width:'80px'}}
-                        />
-                      </td>
-                      <td colSpan="3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={labActivityManualWts.activity2 || 0}
-                          onChange={(e) => handleLabActivityManualWtChange('activity2', e.target.value)}
-                          style={{width:'80px'}}
-                        />
-                      </td>
-                      <td colSpan="3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={labActivityManualWts.activity3 || 0}
-                          onChange={(e) => handleLabActivityManualWtChange('activity3', e.target.value)}
-                          style={{width:'80px'}}
-                        />
-                      </td>
-                      <td colSpan="3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={labActivityManualWts.activity4 || 0}
-                          onChange={(e) => handleLabActivityManualWtChange('activity4', e.target.value)}
-                          style={{width:'80px'}}
-                        />
-                      </td>
-                      <td colSpan="3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={labActivityManualWts.activity5 || 0}
-                          onChange={(e) => handleLabActivityManualWtChange('activity5', e.target.value)}
-                          style={{width:'80px'}}
-                        />
-                      </td>
+                      {Array.from({length: activityTaken || 5}, (_, activityIndex) => {
+                        const activityNum = activityIndex + 1;
+                        const activityKey = `activity${activityNum}`;
+                        return (
+                          <td key={`manualwt-${activityKey}`} colSpan="3">
+                            <input
+                              type="number"
+                              min="0"
+                              value={labActivityManualWts[activityKey] || 0}
+                              onChange={(e) => handleLabActivityManualWtChange(activityKey, e.target.value)}
+                              style={{width:'80px'}}
+                            />
+                          </td>
+                        );
+                      })}
                       <td>
                         {(() => {
                           const totals = labActivityActivityTotals();
                           const manualWts = labActivityManualWts;
-                          const activity1Total = totals.activity1 * (manualWts.activity1 || 0);
-                          const activity2Total = totals.activity2 * (manualWts.activity2 || 0);
-                          const activity3Total = totals.activity3 * (manualWts.activity3 || 0);
-                          const activity4Total = totals.activity4 * (manualWts.activity4 || 0);
-                          const activity5Total = totals.activity5 * (manualWts.activity5 || 0);
-                          return (activity1Total + activity2Total + activity3Total + activity4Total + activity5Total);
+                          let sum = 0;
+                          for (let i = 1; i <= (activityTaken || 5); i++) {
+                            const activityKey = `activity${i}`;
+                            sum += (totals[activityKey] || 0) * (manualWts[activityKey] || 0);
+                          }
+                          return sum;
                         })()}
                       </td>
                       <td className="co-total">
                         {(() => {
                           const totals = labActivityActivityTotals();
                           const manualWts = labActivityManualWts;
-                          const activity1Total = totals.activity1 * (manualWts.activity1 || 0);
-                          const activity2Total = totals.activity2 * (manualWts.activity2 || 0);
-                          const activity3Total = totals.activity3 * (manualWts.activity3 || 0);
-                          const activity4Total = totals.activity4 * (manualWts.activity4 || 0);
-                          const activity5Total = totals.activity5 * (manualWts.activity5 || 0);
-                          return (activity1Total + activity2Total + activity3Total + activity4Total + activity5Total);
+                          let sum = 0;
+                          for (let i = 1; i <= (activityTaken || 5); i++) {
+                            const activityKey = `activity${i}`;
+                            sum += (totals[activityKey] || 0) * (manualWts[activityKey] || 0);
+                          }
+                          return sum;
                         })()}
                       </td>
                     </tr>
@@ -2844,7 +4059,23 @@ const AttainmentView = () => {
               
               {/* LabActivity Obtained Marks Table */}
               <section style={{marginTop:'30px'}}>
-                <h3>Obtained Marks</h3>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
+                  <h3>Obtained Marks</h3>
+                  <button 
+                    onClick={() => setShowLabActivityObtainedModal(true)}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#3498db',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Generated Tables
+                  </button>
+                </div>
                 <div className="table-wrapper">
                   <table className="ct-obtained-table">
                     <thead>
@@ -2976,7 +4207,31 @@ const AttainmentView = () => {
           {/* Assignment & Attendance Section */}
           {selectedSheet === 'Attn_Assign' && (
             <section className="ct-section" style={{marginTop: '30px'}}>
-              <h2>Allocated Marks for Attendance and Assignment (if taken)</h2>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px'}}>
+                <h2 style={{margin: 0}}>Allocated Marks for Attendance and Assignment (if taken)</h2>
+                <div className="action-buttons-container">
+                  {saveStatus && (
+                    <div className={`save-status-badge ${saveStatus}`}>
+                      {saveStatus === 'saving' && '💾 Saving...'}
+                      {saveStatus === 'saved' && '✓ Saved'}
+                      {saveStatus === 'error' && '✗ Error saving'}
+                    </div>
+                  )}
+                  <button 
+                    onClick={handleManualSaveAssignment}
+                    disabled={saveStatus === 'saving'}
+                    className="btn-professional btn-save"
+                  >
+                    {saveStatus === 'saving' ? 'Saving...' : 'Save Table'}
+                  </button>
+                  <button 
+                    onClick={() => setShowGeneratedTableModal(true)}
+                    className="btn-professional btn-primary"
+                  >
+                    View Generated Table
+                  </button>
+                </div>
+              </div>
               {console.log('selectedCourse', selectedCourse, 'attendanceMarks', selectedCourse?.attendanceMarks)}
               {clos.length === 0 && (
                 <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
@@ -2989,13 +4244,13 @@ const AttainmentView = () => {
                     <tr>
                       <th rowSpan="3">CO No.</th>
                       <th rowSpan="2">Attendance Performance</th>
-                      <th colSpan="9">CO mapping of Assignment Marks</th>
+                      <th colSpan={getActiveAssignments().length * 3}>CO mapping of Assignment Marks</th>
                       <th rowSpan="3">CO Total</th>
                     </tr>
                     <tr>
-                      <th colSpan="3">Assignment 1</th>
-                      <th colSpan="3">Assignment 2</th>
-                      <th colSpan="3">Assignment 3</th>
+                      {getActiveAssignments().map(assignment => (
+                        <th key={assignment} colSpan="3">{assignment.replace('Assgn', 'Assignment ')}</th>
+                      ))}
                     </tr>
                     <tr>
                       <th>
@@ -3007,9 +4262,13 @@ const AttainmentView = () => {
                           style={{width:'80px'}}
                         />
                       </th>
-                      <th>Q1</th><th>Q2</th><th>Q3</th>
-                      <th>Q1</th><th>Q2</th><th>Q3</th>
-                      <th>Q1</th><th>Q2</th><th>Q3</th>
+                      {getActiveAssignments().map((assignment) => (
+                        <React.Fragment key={assignment}>
+                          <th>Q1</th>
+                          <th>Q2</th>
+                          <th>Q3</th>
+                        </React.Fragment>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -3017,7 +4276,7 @@ const AttainmentView = () => {
                       <tr key={row.coNumber || idx}>
                         <td className="co-label">{row.coNumber || '-'}</td>
                         <td>-</td>
-                        {['Assgn1_Q1','Assgn1_Q2','Assgn1_Q3','Assgn2_Q1','Assgn2_Q2','Assgn2_Q3','Assgn3_Q1','Assgn3_Q2','Assgn3_Q3'].map(field => (
+                        {getActiveAssignmentFields().map(field => (
                           <td key={field}>
                             <input
                               type="number"
@@ -3037,7 +4296,7 @@ const AttainmentView = () => {
                       <td className="footer-label" colSpan={2}>Assignment Total</td>
                       {(() => { const assignmentTotals = assignmentColumnGroupTotals(); return (
                         <>
-                          {['Assgn1', 'Assgn2', 'Assgn3'].map(assignment => (
+                          {getActiveAssignments().map(assignment => (
                             <td key={assignment} colSpan={3} style={{textAlign: 'center', fontWeight: 'bold'}}>
                               {assignmentTotals[assignment] || 0}
                             </td>
@@ -3048,11 +4307,11 @@ const AttainmentView = () => {
                     </tr>
                     <tr>
                       <td className="footer-label" colSpan={2}>Factor</td>
-                      {['Assgn1', 'Assgn2', 'Assgn3'].map(assignment => {
+                      {getActiveAssignments().map(assignment => {
                         const autoFactor = calculateAutoAssignmentFactor();
                         return (
                           <td key={assignment} colSpan={3} style={{textAlign: 'center'}}>
-                            {(autoFactor[assignment] || 0).toFixed(4)}
+                            {formatNumber(autoFactor[assignment] || 0)}
                           </td>
                         );
                       })}
@@ -3060,19 +4319,19 @@ const AttainmentView = () => {
                     </tr>
                     <tr>
                       <td className="footer-label" colSpan={2}>Eq. Wt</td>
-                      {['Assgn1', 'Assgn2', 'Assgn3'].map(assignment => {
+                      {getActiveAssignments().map(assignment => {
                         const autoEqWt = calculateAssignmentAutoEqWt();
                         return (
                           <td key={assignment} colSpan={3} style={{textAlign: 'center'}}>
-                            {(autoEqWt[assignment] || 0).toFixed(2)}
+                            {formatNumber(autoEqWt[assignment] || 0)}
                           </td>
                         );
                       })}
-                      <td><strong>{sumAssignmentEqWtTotal().toFixed(2)}</strong></td>
+                      <td><strong>{formatNumber(sumAssignmentEqWtTotal())}</strong></td>
                     </tr>
                     <tr>
                       <td className="footer-label" colSpan={2}>Manual Wt</td>
-                      {['Assgn1', 'Assgn2', 'Assgn3'].map(assignment => (
+                      {getActiveAssignments().map(assignment => (
                         <td key={assignment} colSpan={3}>
                           <input
                             type="number"
@@ -3083,7 +4342,36 @@ const AttainmentView = () => {
                           />
                         </td>
                       ))}
-                      <td><strong>{sumAssignmentManualWtTotal().toFixed(2)}</strong></td>
+                      <td><strong>{formatNumber(sumAssignmentManualWtTotal())}</strong></td>
+                    </tr>
+                    <tr>
+                      <td className="footer-label" style={{fontWeight: 'bold', color: '#2c3e50'}}>Status</td>
+                      {(() => {
+                        const manualTotal = sumAssignmentManualWtTotal();
+                        const assignmentMarks = assignmentSummary.assignmentMarks30 || 0;
+                        const useEqWt = assignmentSummary.useEqWt || 0;
+                        
+                        let message = '';
+                        let messageColor = '#27ae60'; // green for OK
+                        
+                        if (manualTotal === assignmentMarks) {
+                          message = 'OK';
+                        } else {
+                          if (useEqWt === 0) {
+                            message = `Sum should be ${assignmentMarks}`;
+                            messageColor = '#e74c3c'; // red for error
+                          } else {
+                            message = `Sum should be ${assignmentMarks}, you can ignore as Eq. wt=1`;
+                            messageColor = '#f39c12'; // orange for warning
+                          }
+                        }
+                        
+                        return (
+                          <td colSpan={1 + getActiveAssignments().length * 3 + 1} style={{textAlign: 'center', fontWeight: 'bold', color: messageColor}}>
+                            {message}
+                          </td>
+                        );
+                      })()}
                     </tr>
                   </tfoot>
                 </table>
@@ -3093,42 +4381,98 @@ const AttainmentView = () => {
                 <table className="ct-table">
                   <tbody>
                     <tr>
-                      <td>Assign. Taken</td>
+                      <td style={{backgroundColor: '#f8f9fa', fontWeight: 600}}>Assign. Taken</td>
                       <td><input type="number" min={0} max={3} style={{width:'80px'}} value={assignmentSummary.assignTaken} onChange={e=>setAssignmentSummary(prev=>({...prev, assignTaken: Math.max(0, Math.min(3, Number(e.target.value)||0))}))} /></td>
                     </tr>
                     <tr>
-                      <td>Assignment Marks out of 30</td>
+                      <td style={{backgroundColor: '#f8f9fa', fontWeight: 600}}>Assignment Marks out of 30</td>
                       <td><input type="number" min={0} max={30} style={{width:'80px'}} value={assignmentSummary.assignmentMarks30} onChange={e=>setAssignmentSummary(prev=>({...prev, assignmentMarks30: Math.max(0, Math.min(30, Number(e.target.value)||0))}))} /></td>
                     </tr>
                     <tr>
-                      <td>Use Eq. Wt</td>
+                      <td style={{backgroundColor: '#f8f9fa', fontWeight: 600}}>Use Eq. Wt</td>
                       <td><input type="number" step="0.01" style={{width:'80px'}} value={assignmentSummary.useEqWt} onChange={e=>setAssignmentSummary(prev=>({...prev, useEqWt: Number(e.target.value)||0}))} /></td>
                     </tr>
                   </tbody>
                 </table>
               </div>
+              
+              <div className="action-buttons-container" style={{marginTop: '10px', justifyContent: 'flex-end'}}>
+                {saveStatus && (
+                  <div className={`save-status-badge ${saveStatus}`}>
+                    {saveStatus === 'saving' && '💾 Saving...'}
+                    {saveStatus === 'saved' && '✓ Saved'}
+                    {saveStatus === 'error' && '✗ Error saving'}
+                  </div>
+                )}
+                <button 
+                  onClick={handleManualSaveAssignment}
+                  disabled={saveStatus === 'saving'}
+                  className="btn-professional btn-save"
+                >
+                  {saveStatus === 'saving' ? 'Saving...' : 'Save Summary'}
+                </button>
+              </div>
 
               {/* 2nd new table: Obtained Marks for Attendance, Performance and Assignment */}
               <section style={{marginTop:'30px'}}>
-                <h3>Obtained Marks for Attendance, Performance and Assignment</h3>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px'}}>
+                  <h3 style={{margin: 0}}>Obtained Marks for Attendance, Performance and Assignment</h3>
+                  <div className="action-buttons-container">
+                    {saveStatus && (
+                      <div className={`save-status-badge ${saveStatus}`}>
+                        {saveStatus === 'saving' && '💾 Saving...'}
+                        {saveStatus === 'saved' && '✓ Saved'}
+                        {saveStatus === 'error' && '✗ Error saving'}
+                      </div>
+                    )}
+                    <button 
+                      onClick={handleManualSaveAssignment}
+                      disabled={saveStatus === 'saving'}
+                      className="btn-professional btn-save"
+                    >
+                      {saveStatus === 'saving' ? 'Saving...' : 'Save Table'}
+                    </button>
+                    <button 
+                      onClick={() => setShowObtainedGeneratedModal(true)}
+                      className="btn-professional btn-primary"
+                    >
+                      View Generated Obtained Table
+                    </button>
+                  </div>
+                </div>
                 <div className="table-wrapper">
                   <table className="ct-obtained-table">
                     <thead>
                       <tr>
                         <th rowSpan={3}>Roll</th>
                         <th rowSpan={3}>Attendance Performance ({selectedCourse?.attendanceMarks ?? 0})</th>
-                        <th colSpan={9}>Assignment marks obtained out of {/* TODO: replace with total assignment marks variable */}30</th>
+                        <th colSpan={getActiveAssignments().length * 3}>Assignment marks obtained out of {/* TODO: replace with total assignment marks variable */}30</th>
                         <th rowSpan={3}>Total (30)</th>
                       </tr>
                       <tr>
-                        <th colSpan={3}>Assignment 1 ({attnAssignObtainedRows.reduce((sum, row) => sum + (row.Assgn1_Q1 || 0) + (row.Assgn1_Q2 || 0) + (row.Assgn1_Q3 || 0), 0)})</th>
-                        <th colSpan={3}>Assignment 2 ({attnAssignObtainedRows.reduce((sum, row) => sum + (row.Assgn2_Q1 || 0) + (row.Assgn2_Q2 || 0) + (row.Assgn2_Q3 || 0), 0)})</th>
-                        <th colSpan={3}>Assignment 3 ({attnAssignObtainedRows.reduce((sum, row) => sum + (row.Assgn3_Q1 || 0) + (row.Assgn3_Q2 || 0) + (row.Assgn3_Q3 || 0), 0)})</th>
+                        {getActiveAssignments().map((assignment, index) => {
+                          const assignmentNumber = index + 1;
+                          const totalMarks = attnAssignObtainedRows.reduce((sum, row) => {
+                            const q1 = row[`${assignment}_Q1`] || 0;
+                            const q2 = row[`${assignment}_Q2`] || 0;
+                            const q3 = row[`${assignment}_Q3`] || 0;
+                            return sum + q1 + q2 + q3;
+                          }, 0);
+                          return (
+                            <th key={assignment} colSpan={3}>
+                              Assignment {assignmentNumber} ({totalMarks})
+                            </th>
+                          );
+                        })}
                       </tr>
                       <tr>
-                        <th>Q1</th><th>Q2</th><th>Q3</th>
-                        <th>Q1</th><th>Q2</th><th>Q3</th>
-                        <th>Q1</th><th>Q2</th><th>Q3</th>
+                        {getActiveAssignments().map((assignment) => (
+                          <React.Fragment key={assignment}>
+                            <th>Q1</th>
+                            <th>Q2</th>
+                            <th>Q3</th>
+                          </React.Fragment>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
@@ -3148,18 +4492,39 @@ const AttainmentView = () => {
                               style={{width:'80px'}}
                             />
                           </td>
-                          {['Assgn1_Q1','Assgn1_Q2','Assgn1_Q3','Assgn2_Q1','Assgn2_Q2','Assgn2_Q3','Assgn3_Q1','Assgn3_Q2','Assgn3_Q3'].map(field => (
-                            <td key={field}><input type="number" min={0} style={{width:'80px'}} /></td>
+                          {getActiveAssignmentFields().map(field => (
+                            <td key={field}>
+                              <input
+                                type="number"
+                                min={0}
+                                value={row[field] || 0}
+                                onChange={e => {
+                                  const updatedRows = [...attnAssignObtainedRows];
+                                  updatedRows[idx] = { ...row, [field]: Number(e.target.value) };
+                                  setAttnAssignObtainedRows(updatedRows);
+                                }}
+                                style={{width:'80px'}}
+                              />
+                            </td>
                           ))}
                           <td>{
                             (row.attendance || 0) +
-                            (row.Assgn1_Q1 || 0) + (row.Assgn1_Q2 || 0) + (row.Assgn1_Q3 || 0) +
-                            (row.Assgn2_Q1 || 0) + (row.Assgn2_Q2 || 0) + (row.Assgn2_Q3 || 0) +
-                            (row.Assgn3_Q1 || 0) + (row.Assgn3_Q2 || 0) + (row.Assgn3_Q3 || 0)
+                            getActiveAssignmentFields().reduce((sum, field) => sum + (row[field] || 0), 0)
                           }</td>
                         </tr>
                       )) : (
-                        <tr><td colSpan={12} style={{textAlign:'center', color:'#7f8c8d'}}>No students found for this sheet.</td></tr>
+                        <tr>
+                          <td colSpan={2 + getActiveAssignments().length * 3 + 1} style={{textAlign:'center', color:'#7f8c8d', padding: '20px'}}>
+                            <div style={{marginBottom: '10px'}}>
+                              <strong>No students found for this course.</strong>
+                            </div>
+                            <div style={{fontSize: '14px', lineHeight: '1.4'}}>
+                              To enter student marks, you need to:
+                              <br />• Ensure students are enrolled in this course, or
+                              <br />• Import student data from existing evaluation sheets
+                            </div>
+                          </td>
+                        </tr>
                       )}
                     </tbody>
                   </table>
@@ -3178,6 +4543,4330 @@ const AttainmentView = () => {
           Loading data for {selectedSheet}...
         </div>
       )}
+
+      {/* Generated Table Modal */}
+      {showGeneratedTableModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '16px',
+            maxWidth: '90%',
+            maxHeight: '90%',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+              <h3>
+                {selectedSheet === 'CT' 
+                  ? 'Generated Table - CO mapping of Class Test Marks'
+                  : selectedSheet === 'Attn_Assign'
+                  ? 'Generated Table - CO mapping of Attendance and Assignment Marks'
+                  : 'Generated Table'
+                }
+              </h3>
+              <button 
+                onClick={() => setShowGeneratedTableModal(false)}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: '#e74c3c',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="table-wrapper">
+              <table className="ct-table">
+                {selectedSheet === 'CT' ? (
+                  <>
+                    <thead>
+                      <tr>
+                        <th rowSpan="2">CO No.</th>
+                        {getActiveCTs().map(ct => (
+                          <th key={ct} colSpan="3">{ct}</th>
+                        ))}
+                        <th rowSpan="2">CO Total</th>
+                      </tr>
+                      <tr>
+                        {getActiveCTs().map(ct => (
+                          <React.Fragment key={`${ct}-questions`}>
+                            <th>Q1</th><th>Q2</th><th>Q3</th>
+                          </React.Fragment>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ctRows.map((row, idx) => (
+                        <tr key={row.coNumber || idx}>
+                          <td className="co-label">{row.coNumber || '-'}</td>
+                          {getActiveCTFields().map(field => {
+                            // Calculate factor * original value
+                            const ctKey = field.replace(/(_Q[123])$/, ''); // Extract CT key (CT1, CT2, CT3)
+                            const factor = calculateAutoFactor()[ctKey] || 0;
+                            const originalValue = row[field] || 0;
+                            const calculatedValue = factor * originalValue;
+                            
+                            return (
+                              <td key={field} style={{textAlign: 'center'}}>
+                                {formatNumber(calculatedValue)}
+                              </td>
+                            );
+                          })}
+                          <td className="co-total">
+                            {formatNumber(getActiveCTFields().reduce((sum, field) => {
+                              const ctKey = field.replace(/(_Q[123])$/, '');
+                              const factor = calculateAutoFactor()[ctKey] || 0;
+                              const originalValue = row[field] || 0;
+                              return sum + (factor * originalValue);
+                            }, 0))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td className="footer-label" style={{fontWeight: 'bold'}}>Total</td>
+                        <td colSpan={getActiveCTs().length * 3} style={{textAlign: 'center'}}></td>
+                        <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                          {formatNumber(ctRows.reduce((totalSum, row) => {
+                            return totalSum + getActiveCTFields().reduce((sum, field) => {
+                              const ctKey = field.replace(/(_Q[123])$/, '');
+                              const factor = calculateAutoFactor()[ctKey] || 0;
+                              const originalValue = row[field] || 0;
+                              return sum + (factor * originalValue);
+                            }, 0);
+                          }, 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </>
+                ) : selectedSheet === 'Attn_Assign' ? (
+                  <>
+                    <thead>
+                      <tr>
+                        <th rowSpan="2">CO No.</th>
+                        <th rowSpan="2">Attendance</th>
+                        {getActiveAssignments().map(assignment => (
+                          <th key={assignment} colSpan="3">{assignment.replace('Assgn', 'Assignment ')}</th>
+                        ))}
+                        <th rowSpan="2">CO Total</th>
+                      </tr>
+                      <tr>
+                        {getActiveAssignments().map(assignment => (
+                          <React.Fragment key={`${assignment}-questions`}>
+                            <th>Q1</th><th>Q2</th><th>Q3</th>
+                          </React.Fragment>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assignmentRows.map((row, idx) => (
+                        <tr key={row.coNumber || idx}>
+                          <td className="co-label">{row.coNumber || '-'}</td>
+                          <td style={{textAlign: 'center'}}>{formatNumber(attendanceMarks)}</td>
+                          {getActiveAssignmentFields().map(field => {
+                            // Calculate factor * original value
+                            const assignmentKey = field.replace(/(_Q[123])$/, ''); // Extract assignment key (Assgn1, Assgn2, etc.)
+                            const factor = calculateAutoAssignmentFactor()[assignmentKey] || 0;
+                            const originalValue = row[field] || 0;
+                            const calculatedValue = factor * originalValue;
+                            
+                            return (
+                              <td key={field} style={{textAlign: 'center'}}>
+                                {formatNumber(calculatedValue)}
+                              </td>
+                            );
+                          })}
+                          <td className="co-total">
+                            {formatNumber(attendanceMarks + getActiveAssignmentFields().reduce((sum, field) => {
+                              const assignmentKey = field.replace(/(_Q[123])$/, '');
+                              const factor = calculateAutoAssignmentFactor()[assignmentKey] || 0;
+                              const originalValue = row[field] || 0;
+                              return sum + (factor * originalValue);
+                            }, 0))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td className="footer-label" style={{fontWeight: 'bold'}}>Total</td>
+                        <td style={{textAlign: 'center'}}></td>
+                        <td colSpan={getActiveAssignments().length * 3} style={{textAlign: 'center'}}></td>
+                        <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                          {formatNumber(assignmentRows.reduce((totalSum, row) => {
+                            return totalSum + (attendanceMarks + getActiveAssignmentFields().reduce((sum, field) => {
+                              const assignmentKey = field.replace(/(_Q[123])$/, '');
+                              const factor = calculateAutoAssignmentFactor()[assignmentKey] || 0;
+                              const originalValue = row[field] || 0;
+                              return sum + (factor * originalValue);
+                            }, 0));
+                          }, 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </>
+                ) : null}
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Obtained Generated Table Modal */}
+      {showObtainedGeneratedModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '16px',
+            maxWidth: '90%',
+            maxHeight: '90%',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+              <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                <button 
+                  onClick={() => setObtainedModalView(prev => Math.max(0, prev - 1))}
+                  disabled={obtainedModalView === 0}
+                  style={{
+                    padding: '6px 12px',
+                    backgroundColor: obtainedModalView === 0 ? '#ccc' : '#3498db',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: obtainedModalView === 0 ? 'not-allowed' : 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  ← Previous
+                </button>
+                <h3>
+                  Generated Obtained Table - CO-wise Marks 
+                  {obtainedModalView === 0 ? '(Original)' : '(Factored)'}
+                </h3>
+                <button 
+                  onClick={() => setObtainedModalView(prev => Math.min(1, prev + 1))}
+                  disabled={obtainedModalView === 1}
+                  style={{
+                    padding: '6px 12px',
+                    backgroundColor: obtainedModalView === 1 ? '#ccc' : '#3498db',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: obtainedModalView === 1 ? 'not-allowed' : 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Next →
+                </button>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowObtainedGeneratedModal(false);
+                  setObtainedModalView(0);
+                }}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: '#e74c3c',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="table-wrapper">
+              <table className="ct-obtained-table">
+                {selectedSheet === 'CT' ? (
+                  <>
+                    <thead>
+                      <tr>
+                        <th>Roll</th>
+                        {ctRows.map((row, idx) => {
+                          const coKey = row.coNumber || `CO${idx + 1}`;
+                          const coTotals = obtainedModalView === 0 ? calculateCOTotals() : calculateFactoredCOTotals();
+                          const totalMarks = coTotals[coKey] || 0;
+                          return (
+                            <th key={`co-${idx}`}>
+                              {row.coNumber}<br />
+                              <small style={{fontWeight: 'normal', color: '#666'}}>({formatNumber(totalMarks)})</small>
+                            </th>
+                          );
+                        })}
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ctObtainedRows.map((studentRow, studentIdx) => (
+                        <tr key={studentRow.rollNumber || studentIdx}>
+                          <td className="roll-cell" title={studentRow.name || studentRow.rollNumber}>
+                            {studentRow.rollNumber || '-'}
+                          </td>
+                          {ctRows.map((coRow, coIdx) => {
+                            // Calculate total marks for this CO across all CTs for this student
+                            const coTotal = getActiveCTFields().reduce((sum, field) => {
+                              const ctKey = field.replace(/(_Q[123])$/, '');
+                              const factor = obtainedModalView === 0 ? 1 : (calculateAutoFactor()[ctKey] || 0);
+                              const studentMark = studentRow[field] || 0;
+                              return sum + (factor * studentMark);
+                            }, 0);
+                            
+                            return (
+                              <td key={`co-${coIdx}-student-${studentIdx}`} style={{textAlign: 'center'}}>
+                                {formatNumber(coTotal)}
+                              </td>
+                            );
+                          })}
+                          <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                            {formatNumber(ctRows.reduce((total, coRow, coIdx) => {
+                              const coTotal = getActiveCTFields().reduce((sum, field) => {
+                                const ctKey = field.replace(/(_Q[123])$/, '');
+                                const factor = obtainedModalView === 0 ? 1 : (calculateAutoFactor()[ctKey] || 0);
+                                const studentMark = studentRow[field] || 0;
+                                return sum + (factor * studentMark);
+                              }, 0);
+                              return total + coTotal;
+                            }, 0))}
+                          </td>
+                        </tr>
+                      ))}
+                      {ctObtainedRows.length === 0 && (
+                        <tr>
+                          <td colSpan={ctRows.length + 2} style={{textAlign:'center', color:'#7f8c8d', padding: '20px'}}>
+                            <div style={{marginBottom: '10px'}}>
+                              <strong>No students found for this course.</strong>
+                            </div>
+                            <div style={{fontSize: '14px', lineHeight: '1.4'}}>
+                              Sample students have been loaded for demonstration. In a real scenario:
+                              <br />• Ensure students are enrolled in this course
+                              <br />• Check that evaluation sheets contain student data
+                              <br />• Verify course and sheet selection
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td style={{fontWeight: 'bold'}}>Total</td>
+                        {ctRows.map((coRow, coIdx) => {
+                          const coGrandTotal = ctObtainedRows.reduce((sum, studentRow) => {
+                            const coTotal = getActiveCTFields().reduce((coSum, field) => {
+                              const ctKey = field.replace(/(_Q[123])$/, '');
+                              const factor = obtainedModalView === 0 ? 1 : (calculateAutoFactor()[ctKey] || 0);
+                              const studentMark = studentRow[field] || 0;
+                              return coSum + (factor * studentMark);
+                            }, 0);
+                            return sum + coTotal;
+                          }, 0);
+                          
+                          return (
+                            <td key={`total-co-${coIdx}`} style={{textAlign: 'center', fontWeight: 'bold'}}>
+                              {formatNumber(coGrandTotal)}
+                            </td>
+                          );
+                        })}
+                        <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                          {formatNumber(ctRows.reduce((grandTotal, coRow, coIdx) => {
+                            const coGrandTotal = ctObtainedRows.reduce((sum, studentRow) => {
+                              const coTotal = getActiveCTFields().reduce((coSum, field) => {
+                                const ctKey = field.replace(/(_Q[123])$/, '');
+                                const factor = obtainedModalView === 0 ? 1 : (calculateAutoFactor()[ctKey] || 0);
+                                const studentMark = studentRow[field] || 0;
+                                return coSum + (factor * studentMark);
+                              }, 0);
+                              return sum + coTotal;
+                            }, 0);
+                            return grandTotal + coGrandTotal;
+                          }, 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </>
+                ) : selectedSheet === 'Attn_Assign' ? (
+                  <>
+                    <thead>
+                      <tr>
+                        <th>Roll</th>
+                        {assignmentRows.map((row, idx) => {
+                          const coKey = row.coNumber || `CO${idx + 1}`;
+                          const coTotals = obtainedModalView === 0 ? calculateAssignmentCOTotals() : calculateFactoredAssignmentCOTotals();
+                          const totalMarks = coTotals[coKey] || 0;
+                          return (
+                            <th key={`co-${idx}`}>
+                              {row.coNumber}<br />
+                              <small style={{fontWeight: 'normal', color: '#666'}}>({formatNumber(totalMarks)})</small>
+                            </th>
+                          );
+                        })}
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {attnAssignObtainedRows.map((studentRow, studentIdx) => (
+                        <tr key={studentRow.rollNumber || studentIdx}>
+                          <td className="roll-cell" title={studentRow.name || studentRow.rollNumber}>
+                            {studentRow.rollNumber || '-'}
+                          </td>
+                          {assignmentRows.map((coRow, coIdx) => {
+                            // Calculate total marks for this CO across attendance and all assignments for this student
+                            const attendanceMark = studentRow.attendance || 0;
+                            const assignmentTotal = getActiveAssignmentFields().reduce((sum, field) => {
+                              const assignmentKey = field.replace(/(_Q[123])$/, '');
+                              const factor = obtainedModalView === 0 ? 1 : (calculateAutoAssignmentFactor()[assignmentKey] || 0);
+                              const studentMark = studentRow[field] || 0;
+                              return sum + (factor * studentMark);
+                            }, 0);
+                            const coTotal = attendanceMark + assignmentTotal;
+                            
+                            return (
+                              <td key={`co-${coIdx}-student-${studentIdx}`} style={{textAlign: 'center'}}>
+                                {formatNumber(coTotal)}
+                              </td>
+                            );
+                          })}
+                          <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                            {formatNumber(assignmentRows.reduce((total, coRow, coIdx) => {
+                              const attendanceMark = studentRow.attendance || 0;
+                              const assignmentTotal = getActiveAssignmentFields().reduce((sum, field) => {
+                                const assignmentKey = field.replace(/(_Q[123])$/, '');
+                                const factor = obtainedModalView === 0 ? 1 : (calculateAutoAssignmentFactor()[assignmentKey] || 0);
+                                const studentMark = studentRow[field] || 0;
+                                return sum + (factor * studentMark);
+                              }, 0);
+                              const coTotal = attendanceMark + assignmentTotal;
+                              return total + coTotal;
+                            }, 0))}
+                          </td>
+                        </tr>
+                      ))}
+                      {attnAssignObtainedRows.length === 0 && (
+                        <tr>
+                          <td colSpan={assignmentRows.length + 2} style={{textAlign:'center', color:'#7f8c8d', padding: '20px'}}>
+                            <div style={{marginBottom: '10px'}}>
+                              <strong>No students found for this course.</strong>
+                            </div>
+                            <div style={{fontSize: '14px', lineHeight: '1.4'}}>
+                              Sample students have been loaded for demonstration. In a real scenario:
+                              <br />• Ensure students are enrolled in this course
+                              <br />• Check that evaluation sheets contain student data
+                              <br />• Verify course and sheet selection
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td style={{fontWeight: 'bold'}}>Total</td>
+                        {assignmentRows.map((coRow, coIdx) => {
+                          const coGrandTotal = attnAssignObtainedRows.reduce((sum, studentRow) => {
+                            const attendanceMark = studentRow.attendance || 0;
+                            const assignmentTotal = getActiveAssignmentFields().reduce((coSum, field) => {
+                              const assignmentKey = field.replace(/(_Q[123])$/, '');
+                              const factor = obtainedModalView === 0 ? 1 : (calculateAutoAssignmentFactor()[assignmentKey] || 0);
+                              const studentMark = studentRow[field] || 0;
+                              return coSum + (factor * studentMark);
+                            }, 0);
+                            const coTotal = attendanceMark + assignmentTotal;
+                            return sum + coTotal;
+                          }, 0);
+                          
+                          return (
+                            <td key={`total-co-${coIdx}`} style={{textAlign: 'center', fontWeight: 'bold'}}>
+                              {formatNumber(coGrandTotal)}
+                            </td>
+                          );
+                        })}
+                        <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                          {formatNumber(assignmentRows.reduce((grandTotal, coRow, coIdx) => {
+                            const coGrandTotal = attnAssignObtainedRows.reduce((sum, studentRow) => {
+                              const attendanceMark = studentRow.attendance || 0;
+                              const assignmentTotal = getActiveAssignmentFields().reduce((coSum, field) => {
+                                const assignmentKey = field.replace(/(_Q[123])$/, '');
+                                const factor = obtainedModalView === 0 ? 1 : (calculateAutoAssignmentFactor()[assignmentKey] || 0);
+                                const studentMark = studentRow[field] || 0;
+                                return coSum + (factor * studentMark);
+                              }, 0);
+                              const coTotal = attendanceMark + assignmentTotal;
+                              return sum + coTotal;
+                            }, 0);
+                            return grandTotal + coGrandTotal;
+                          }, 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </>
+                ) : null}
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Section A Generated Table Modal */}
+      {showSectionAGeneratedModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '16px',
+            maxWidth: '90%',
+            maxHeight: '90%',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+              <h3>Generated Table - Section A Possible Answer Combinations</h3>
+              <button 
+                onClick={() => setShowSectionAGeneratedModal(false)}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: '#e74c3c',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="table-wrapper">
+              <table className="section-a-table">
+                <thead>
+                  <tr>
+                    <th rowSpan="2">CO No.</th>
+                    <th colSpan="15">Possible ans comb.</th>
+                    <th rowSpan="2">CO msrd</th>
+                    <th rowSpan="2">Unit V</th>
+                    <th rowSpan="2">(1,2,3)</th>
+                    <th rowSpan="2">(1,2,4)</th>
+                    <th rowSpan="2">(1,3,4)</th>
+                    <th rowSpan="2">(2,3,4)</th>
+                  </tr>
+                  <tr>
+                    <th>1,2,3</th>
+                    <th>1,2,4</th>
+                    <th>1,3,4</th>
+                    <th>2,3,4</th>
+                    <th>1,2</th>
+                    <th>1,3</th>
+                    <th>1,4</th>
+                    <th>2,3</th>
+                    <th>2,4</th>
+                    <th>3,4</th>
+                    <th>1</th>
+                    <th>2</th>
+                    <th>3</th>
+                    <th>4</th>
+                    <th>None</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sectionARows.map((row, idx) => (
+                    <tr key={row.coNumber || idx}>
+                      <td className="co-label">{row.coNumber || '-'}</td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombination(row, 'q123')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombination(row, 'q124')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombination(row, 'q134')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombination(row, 'q234')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombination(row, 'q12')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombination(row, 'q13')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombination(row, 'q14')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombination(row, 'q23')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombination(row, 'q24')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombination(row, 'q34')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombination(row, 'q1')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombination(row, 'q2')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombination(row, 'q3')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombination(row, 'q4')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombination(row, 'none')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa', fontWeight: 'bold'}}>
+                        {calculateSectionACOMsrd(row)}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {formatNumber(calculateUnitV(row))}
+                      </td>
+                      <td style={{backgroundColor: '#fff3cd'}}>
+                        {formatNumber(calculateCombinationRatio(row, 'q123'))}
+                      </td>
+                      <td style={{backgroundColor: '#fff3cd'}}>
+                        {formatNumber(calculateCombinationRatio(row, 'q124'))}
+                      </td>
+                      <td style={{backgroundColor: '#fff3cd'}}>
+                        {formatNumber(calculateCombinationRatio(row, 'q134'))}
+                      </td>
+                      <td style={{backgroundColor: '#fff3cd'}}>
+                        {formatNumber(calculateCombinationRatio(row, 'q234'))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td className="footer-label">Total</td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionARows.reduce((sum, row) => sum + getAutoGeneratedCombination(row, 'q123'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionARows.reduce((sum, row) => sum + getAutoGeneratedCombination(row, 'q124'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionARows.reduce((sum, row) => sum + getAutoGeneratedCombination(row, 'q134'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionARows.reduce((sum, row) => sum + getAutoGeneratedCombination(row, 'q234'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionARows.reduce((sum, row) => sum + getAutoGeneratedCombination(row, 'q12'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionARows.reduce((sum, row) => sum + getAutoGeneratedCombination(row, 'q13'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionARows.reduce((sum, row) => sum + getAutoGeneratedCombination(row, 'q14'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionARows.reduce((sum, row) => sum + getAutoGeneratedCombination(row, 'q23'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionARows.reduce((sum, row) => sum + getAutoGeneratedCombination(row, 'q24'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionARows.reduce((sum, row) => sum + getAutoGeneratedCombination(row, 'q34'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionARows.reduce((sum, row) => sum + getAutoGeneratedCombination(row, 'q1'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionARows.reduce((sum, row) => sum + getAutoGeneratedCombination(row, 'q2'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionARows.reduce((sum, row) => sum + getAutoGeneratedCombination(row, 'q3'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionARows.reduce((sum, row) => sum + getAutoGeneratedCombination(row, 'q4'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionARows.reduce((sum, row) => sum + getAutoGeneratedCombination(row, 'none'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#f8f9fa'}}>
+                      {calculateTotalCOMsrd()}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#f8f9fa'}}>
+                      {formatNumber(sectionARows.reduce((sum, row) => sum + calculateUnitV(row), 0))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd'}}>
+                      {formatNumber(sectionARows.reduce((sum, row) => sum + calculateCombinationRatio(row, 'q123'), 0))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd'}}>
+                      {formatNumber(sectionARows.reduce((sum, row) => sum + calculateCombinationRatio(row, 'q124'), 0))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd'}}>
+                      {formatNumber(sectionARows.reduce((sum, row) => sum + calculateCombinationRatio(row, 'q134'), 0))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd'}}>
+                      {formatNumber(sectionARows.reduce((sum, row) => sum + calculateCombinationRatio(row, 'q234'), 0))}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colSpan="16" style={{textAlign: 'center', border: 'none'}}></td>
+                    <td className="footer-label" colSpan="2" style={{textAlign: 'center'}}>StDev</td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd'}}>
+                      {formatNumber(calculateStDevP('q123'))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd'}}>
+                      {formatNumber(calculateStDevP('q124'))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd'}}>
+                      {formatNumber(calculateStDevP('q134'))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd'}}>
+                      {formatNumber(calculateStDevP('q234'))}
+                    </td>
+                  </tr>
+                  <tr style={{borderTop: 'none'}}>
+                    <td colSpan="16" style={{textAlign: 'center', border: 'none'}}></td>
+                    <td className="footer-label" colSpan="2" style={{textAlign: 'center', borderTop: 'none'}}>Dist</td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd', borderTop: 'none'}}>
+                      {formatNumber(Math.sqrt(calculateDist('q123')))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd', borderTop: 'none'}}>
+                      {formatNumber(Math.sqrt(calculateDist('q124')))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd', borderTop: 'none'}}>
+                      {formatNumber(Math.sqrt(calculateDist('q134')))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd', borderTop: 'none'}}>
+                      {formatNumber(Math.sqrt(calculateDist('q234')))}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Section A Obtained Generated Table Modal */}
+      {showSectionAObtainedModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '16px',
+            maxWidth: '90%',
+            maxHeight: '90%',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+              <h3>Generated Table - Student Analysis</h3>
+              <button 
+                onClick={() => setShowSectionAObtainedModal(false)}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: '#e74c3c',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="table-wrapper">
+              <table className="section-a-table">
+                <thead>
+                  <tr>
+                    <th rowSpan="2">Roll</th>
+                    <th colSpan={sectionARows.length}>Total Marks Obtained Per CO</th>
+                    <th colSpan="4">Q No.</th>
+                    <th rowSpan="2">Zero Count</th>
+                    <th rowSpan="2">Ans Combination</th>
+                    <th colSpan={sectionARows.length}>CO Marks Distribution Per Student</th>
+                    <th rowSpan="2">Total</th>
+                  </tr>
+                  <tr>
+                    {sectionARows.map((row, idx) => (
+                      <th key={`co-header-${idx}`}>{row.coNumber}</th>
+                    ))}
+                    <th>1</th>
+                    <th>2</th>
+                    <th>3</th>
+                    <th>4</th>
+                    {sectionARows.map((row, idx) => (
+                      <th key={`co-dist-header-${idx}`}>{row.coNumber}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sectionAObtainedRows.length > 0 ? sectionAObtainedRows.map((studentRow, idx) => (
+                    <tr key={studentRow.rollNumber || idx}>
+                      <td className="roll-cell" title={studentRow.name || studentRow.rollNumber}>
+                        {studentRow.rollNumber || '-'}
+                      </td>
+                      {/* Total Marks Obtained Per CO */}
+                      {sectionARows.map((coRow, coIdx) => (
+                        <td key={`co-total-${coIdx}`} style={{textAlign: 'center', backgroundColor: '#f8f9fa'}}>
+                          {formatNumber(getStudentCOTotal(studentRow, coRow.coNumber))}
+                        </td>
+                      ))}
+                      {/* Q No. (marks for each question) */}
+                      <td style={{textAlign: 'center', backgroundColor: '#e3f2fd'}}>
+                        {formatNumber(getStudentQuestionTotal(studentRow, 1))}
+                      </td>
+                      <td style={{textAlign: 'center', backgroundColor: '#e3f2fd'}}>
+                        {formatNumber(getStudentQuestionTotal(studentRow, 2))}
+                      </td>
+                      <td style={{textAlign: 'center', backgroundColor: '#e3f2fd'}}>
+                        {formatNumber(getStudentQuestionTotal(studentRow, 3))}
+                      </td>
+                      <td style={{textAlign: 'center', backgroundColor: '#e3f2fd'}}>
+                        {formatNumber(getStudentQuestionTotal(studentRow, 4))}
+                      </td>
+                      {/* Zero Count */}
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd'}}>
+                        {getStudentZeroCount(studentRow)}
+                      </td>
+                      {/* Ans Combination */}
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#d4edda'}}>
+                        {getStudentAnswerCombination(studentRow)}
+                      </td>
+                      {/* CO Marks Distribution Per Student */}
+                      {sectionARows.map((coRow, coIdx) => (
+                        <td key={`co-dist-${coIdx}`} style={{textAlign: 'center', backgroundColor: '#f8f9fa'}}>
+                          {formatNumber(getStudentCODistribution(studentRow, coRow.coNumber))}
+                        </td>
+                      ))}
+                      {/* Total */}
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff'}}>
+                        {formatNumber(sectionARows.reduce((sum, coRow) => sum + getStudentCODistribution(studentRow, coRow.coNumber), 0))}
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={3 + sectionARows.length * 2 + 6} style={{textAlign: 'center', padding: '20px', color: '#7f8c8d'}}>
+                        No student data available. Please ensure obtained marks are entered.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Section B Generated Table Modal */}
+      {showSectionBGeneratedModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '16px',
+            maxWidth: '90%',
+            maxHeight: '90%',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+              <h3>Generated Table - Section B Possible Answer Combinations</h3>
+              <button 
+                onClick={() => setShowSectionBGeneratedModal(false)}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: '#e74c3c',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="table-wrapper">
+              <table className="section-a-table">
+                <thead>
+                  <tr>
+                    <th rowSpan="2">CO No.</th>
+                    <th colSpan="15">Possible ans comb.</th>
+                    <th rowSpan="2">CO msrd</th>
+                    <th rowSpan="2">Unit V</th>
+                    <th rowSpan="2">(1,2,3)</th>
+                    <th rowSpan="2">(1,2,4)</th>
+                    <th rowSpan="2">(1,3,4)</th>
+                    <th rowSpan="2">(2,3,4)</th>
+                  </tr>
+                  <tr>
+                    <th>1,2,3</th>
+                    <th>1,2,4</th>
+                    <th>1,3,4</th>
+                    <th>2,3,4</th>
+                    <th>1,2</th>
+                    <th>1,3</th>
+                    <th>1,4</th>
+                    <th>2,3</th>
+                    <th>2,4</th>
+                    <th>3,4</th>
+                    <th>1</th>
+                    <th>2</th>
+                    <th>3</th>
+                    <th>4</th>
+                    <th>None</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sectionBRows.map((row, idx) => (
+                    <tr key={row.coNumber || idx}>
+                      <td className="co-label">{row.coNumber || '-'}</td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombinationB(row, 'q123')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombinationB(row, 'q124')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombinationB(row, 'q134')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombinationB(row, 'q234')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombinationB(row, 'q12')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombinationB(row, 'q13')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombinationB(row, 'q14')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombinationB(row, 'q23')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombinationB(row, 'q24')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombinationB(row, 'q34')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombinationB(row, 'q1')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombinationB(row, 'q2')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombinationB(row, 'q3')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombinationB(row, 'q4')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {getAutoGeneratedCombinationB(row, 'none')}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa', fontWeight: 'bold'}}>
+                        {calculateSectionBCOMsrd(row)}
+                      </td>
+                      <td style={{backgroundColor: '#f8f9fa'}}>
+                        {formatNumber(calculateUnitVB(row))}
+                      </td>
+                      <td style={{backgroundColor: '#fff3cd'}}>
+                        {formatNumber(calculateCombinationRatioB(row, 'q123'))}
+                      </td>
+                      <td style={{backgroundColor: '#fff3cd'}}>
+                        {formatNumber(calculateCombinationRatioB(row, 'q124'))}
+                      </td>
+                      <td style={{backgroundColor: '#fff3cd'}}>
+                        {formatNumber(calculateCombinationRatioB(row, 'q134'))}
+                      </td>
+                      <td style={{backgroundColor: '#fff3cd'}}>
+                        {formatNumber(calculateCombinationRatioB(row, 'q234'))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td className="footer-label">Total</td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionBRows.reduce((sum, row) => sum + getAutoGeneratedCombinationB(row, 'q123'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionBRows.reduce((sum, row) => sum + getAutoGeneratedCombinationB(row, 'q124'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionBRows.reduce((sum, row) => sum + getAutoGeneratedCombinationB(row, 'q134'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionBRows.reduce((sum, row) => sum + getAutoGeneratedCombinationB(row, 'q234'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionBRows.reduce((sum, row) => sum + getAutoGeneratedCombinationB(row, 'q12'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionBRows.reduce((sum, row) => sum + getAutoGeneratedCombinationB(row, 'q13'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionBRows.reduce((sum, row) => sum + getAutoGeneratedCombinationB(row, 'q14'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionBRows.reduce((sum, row) => sum + getAutoGeneratedCombinationB(row, 'q23'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionBRows.reduce((sum, row) => sum + getAutoGeneratedCombinationB(row, 'q24'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionBRows.reduce((sum, row) => sum + getAutoGeneratedCombinationB(row, 'q34'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionBRows.reduce((sum, row) => sum + getAutoGeneratedCombinationB(row, 'q1'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionBRows.reduce((sum, row) => sum + getAutoGeneratedCombinationB(row, 'q2'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionBRows.reduce((sum, row) => sum + getAutoGeneratedCombinationB(row, 'q3'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionBRows.reduce((sum, row) => sum + getAutoGeneratedCombinationB(row, 'q4'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                      {sectionBRows.reduce((sum, row) => sum + getAutoGeneratedCombinationB(row, 'none'), 0)}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#f8f9fa'}}>
+                      {calculateTotalCOMsrdB()}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#f8f9fa'}}>
+                      {formatNumber(sectionBRows.reduce((sum, row) => sum + calculateUnitVB(row), 0))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd'}}>
+                      {formatNumber(sectionBRows.reduce((sum, row) => sum + calculateCombinationRatioB(row, 'q123'), 0))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd'}}>
+                      {formatNumber(sectionBRows.reduce((sum, row) => sum + calculateCombinationRatioB(row, 'q124'), 0))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd'}}>
+                      {formatNumber(sectionBRows.reduce((sum, row) => sum + calculateCombinationRatioB(row, 'q134'), 0))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd'}}>
+                      {formatNumber(sectionBRows.reduce((sum, row) => sum + calculateCombinationRatioB(row, 'q234'), 0))}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colSpan="16" style={{textAlign: 'center', border: 'none'}}></td>
+                    <td className="footer-label" colSpan="2" style={{textAlign: 'center'}}>StDev</td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd'}}>
+                      {formatNumber(calculateStDevPB('q123'))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd'}}>
+                      {formatNumber(calculateStDevPB('q124'))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd'}}>
+                      {formatNumber(calculateStDevPB('q134'))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd'}}>
+                      {formatNumber(calculateStDevPB('q234'))}
+                    </td>
+                  </tr>
+                  <tr style={{borderTop: 'none'}}>
+                    <td colSpan="16" style={{textAlign: 'center', border: 'none'}}></td>
+                    <td className="footer-label" colSpan="2" style={{textAlign: 'center', borderTop: 'none'}}>Dist</td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd', borderTop: 'none'}}>
+                      {formatNumber(Math.sqrt(calculateDistB('q123')))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd', borderTop: 'none'}}>
+                      {formatNumber(Math.sqrt(calculateDistB('q124')))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd', borderTop: 'none'}}>
+                      {formatNumber(Math.sqrt(calculateDistB('q134')))}
+                    </td>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd', borderTop: 'none'}}>
+                      {formatNumber(Math.sqrt(calculateDistB('q234')))}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Section B Obtained Generated Table Modal */}
+      {showSectionBObtainedModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '16px',
+            maxWidth: '90%',
+            maxHeight: '90%',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+              <h3>Generated Table - Student Analysis (Section B)</h3>
+              <button 
+                onClick={() => setShowSectionBObtainedModal(false)}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: '#e74c3c',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="table-wrapper">
+              <table className="section-a-table">
+                <thead>
+                  <tr>
+                    <th rowSpan="2">Roll</th>
+                    <th colSpan={sectionBRows.length}>Total Marks Obtained Per CO</th>
+                    <th colSpan="4">Q No.</th>
+                    <th rowSpan="2">Zero Count</th>
+                    <th rowSpan="2">Ans Combination</th>
+                    <th colSpan={sectionBRows.length}>CO Marks Distribution Per Student</th>
+                    <th rowSpan="2">Total</th>
+                  </tr>
+                  <tr>
+                    {sectionBRows.map((row, idx) => (
+                      <th key={`co-header-${idx}`}>{row.coNumber}</th>
+                    ))}
+                    <th>1</th>
+                    <th>2</th>
+                    <th>3</th>
+                    <th>4</th>
+                    {sectionBRows.map((row, idx) => (
+                      <th key={`co-dist-header-${idx}`}>{row.coNumber}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sectionBObtainedRows.length > 0 ? sectionBObtainedRows.map((studentRow, idx) => (
+                    <tr key={studentRow.rollNumber || idx}>
+                      <td className="roll-cell" title={studentRow.name || studentRow.rollNumber}>
+                        {studentRow.rollNumber || '-'}
+                      </td>
+                      {/* Total Marks Obtained Per CO */}
+                      {sectionBRows.map((coRow, coIdx) => (
+                        <td key={`co-total-${coIdx}`} style={{textAlign: 'center', backgroundColor: '#f8f9fa'}}>
+                          {formatNumber(getStudentCOTotalB(studentRow, coRow.coNumber))}
+                        </td>
+                      ))}
+                      {/* Q No. (marks for each question) */}
+                      <td style={{textAlign: 'center', backgroundColor: '#e3f2fd'}}>
+                        {formatNumber(getStudentQuestionTotalB(studentRow, 1))}
+                      </td>
+                      <td style={{textAlign: 'center', backgroundColor: '#e3f2fd'}}>
+                        {formatNumber(getStudentQuestionTotalB(studentRow, 2))}
+                      </td>
+                      <td style={{textAlign: 'center', backgroundColor: '#e3f2fd'}}>
+                        {formatNumber(getStudentQuestionTotalB(studentRow, 3))}
+                      </td>
+                      <td style={{textAlign: 'center', backgroundColor: '#e3f2fd'}}>
+                        {formatNumber(getStudentQuestionTotalB(studentRow, 4))}
+                      </td>
+                      {/* Zero Count */}
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd'}}>
+                        {getStudentZeroCountB(studentRow)}
+                      </td>
+                      {/* Ans Combination */}
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#d4edda'}}>
+                        {getStudentAnswerCombinationB(studentRow)}
+                      </td>
+                      {/* CO Marks Distribution Per Student */}
+                      {sectionBRows.map((coRow, coIdx) => (
+                        <td key={`co-dist-${coIdx}`} style={{textAlign: 'center', backgroundColor: '#f8f9fa'}}>
+                          {formatNumber(getStudentCODistributionB(studentRow, coRow.coNumber))}
+                        </td>
+                      ))}
+                      {/* Total */}
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff'}}>
+                        {formatNumber(sectionBRows.reduce((sum, coRow) => sum + getStudentCODistributionB(studentRow, coRow.coNumber), 0))}
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={3 + sectionBRows.length * 2 + 6} style={{textAlign: 'center', padding: '20px', color: '#7f8c8d'}}>
+                        No student data available. Please ensure obtained marks are entered.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LabActivity Generated Table Modal */}
+      {showLabActivityGeneratedModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '16px',
+            maxWidth: '90%',
+            maxHeight: '90%',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+              <h3>Generated Table - Lab Activity</h3>
+              <button 
+                onClick={() => setShowLabActivityGeneratedModal(false)}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: '#e74c3c',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* Tab Navigation */}
+            <div style={{display: 'flex', marginBottom: '20px', borderBottom: '2px solid #e0e0e0'}}>
+              <button
+                onClick={() => setLabActivityGeneratedView(0)}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: 'transparent',
+                  color: labActivityGeneratedView === 0 ? '#2c3e50' : '#7f8c8d',
+                  border: 'none',
+                  borderBottom: labActivityGeneratedView === 0 ? '3px solid #3498db' : '3px solid transparent',
+                  cursor: 'pointer',
+                  fontWeight: labActivityGeneratedView === 0 ? '600' : 'normal',
+                  fontSize: '14px',
+                  transition: 'all 0.2s ease',
+                  marginBottom: '-2px'
+                }}
+                onMouseEnter={(e) => {
+                  if (labActivityGeneratedView !== 0) {
+                    e.target.style.color = '#2c3e50';
+                    e.target.style.borderBottom = '3px solid #bdc3c7';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (labActivityGeneratedView !== 0) {
+                    e.target.style.color = '#7f8c8d';
+                    e.target.style.borderBottom = '3px solid transparent';
+                  }
+                }}
+              >
+                CO Mapping of Lab Activity Marks
+              </button>
+              <button
+                onClick={() => setLabActivityGeneratedView(1)}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: 'transparent',
+                  color: labActivityGeneratedView === 1 ? '#2c3e50' : '#7f8c8d',
+                  border: 'none',
+                  borderBottom: labActivityGeneratedView === 1 ? '3px solid #3498db' : '3px solid transparent',
+                  cursor: 'pointer',
+                  fontWeight: labActivityGeneratedView === 1 ? '600' : 'normal',
+                  fontSize: '14px',
+                  transition: 'all 0.2s ease',
+                  marginBottom: '-2px'
+                }}
+                onMouseEnter={(e) => {
+                  if (labActivityGeneratedView !== 1) {
+                    e.target.style.color = '#2c3e50';
+                    e.target.style.borderBottom = '3px solid #bdc3c7';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (labActivityGeneratedView !== 1) {
+                    e.target.style.color = '#7f8c8d';
+                    e.target.style.borderBottom = '3px solid transparent';
+                  }
+                }}
+              >
+                CO wise multiplication factor
+              </button>
+            </div>
+            
+            {/* Table 1: CO Mapping of Lab Activity Marks */}
+            {labActivityGeneratedView === 0 && (
+              <div className="table-wrapper">
+                <h4 style={{marginBottom: '15px'}}>CO Mapping of Lab Activity Marks out of {coMappedActivityMarks}</h4>
+                <table className="section-a-table">
+                  <thead>
+                    <tr>
+                      <th rowSpan="3">CO No.</th>
+                      <th colSpan={(activityTaken || 5) * 3}>CO Mapping of Lab Activity Marks out of {coMappedActivityMarks}</th>
+                      <th rowSpan="3">CO Total</th>
+                    </tr>
+                    <tr>
+                      {Array.from({length: activityTaken || 5}, (_, i) => (
+                        <th key={`activity-${i+1}`} colSpan="3">Activity{i+1}</th>
+                      ))}
+                    </tr>
+                    <tr>
+                      {Array.from({length: activityTaken || 5}, (_, i) => (
+                        <React.Fragment key={`qs-${i+1}`}>
+                          <th>Q1</th>
+                          <th>Q2</th>
+                          <th>Q3</th>
+                        </React.Fragment>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {labActivityRows.map((row, idx) => (
+                      <tr key={idx}>
+                        <td className="co-label">{row.coNumber}</td>
+                        {Array.from({length: activityTaken || 5}, (_, activityIndex) => {
+                          const activityNum = activityIndex + 1;
+                          const activityKey = `activity${activityNum}`;
+                          const bgColors = ['#f8f9fa', '#e3f2fd', '#fff3cd', '#d4edda', '#f8d7da'];
+                          const bgColor = bgColors[activityIndex % bgColors.length];
+                          
+                          return (
+                            <React.Fragment key={`activity-${activityNum}`}>
+                              <td style={{textAlign: 'center', backgroundColor: bgColor}}>
+                                {formatNumber(getLabActivityFactoredValue(row, `Activity${activityNum}_Q1`, activityKey))}
+                              </td>
+                              <td style={{textAlign: 'center', backgroundColor: bgColor}}>
+                                {formatNumber(getLabActivityFactoredValue(row, `Activity${activityNum}_Q2`, activityKey))}
+                              </td>
+                              <td style={{textAlign: 'center', backgroundColor: bgColor}}>
+                                {formatNumber(getLabActivityFactoredValue(row, `Activity${activityNum}_Q3`, activityKey))}
+                              </td>
+                            </React.Fragment>
+                          );
+                        })}
+                        {/* CO Total */}
+                        <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                          {formatNumber(getLabActivityGeneratedCOTotal(row))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td className="footer-label">Total</td>
+                      {Array.from({length: activityTaken || 5}, (_, activityIndex) => {
+                        const activityNum = activityIndex + 1;
+                        const activityKey = `activity${activityNum}`;
+                        const bgColors = ['#f8f9fa', '#e3f2fd', '#fff3cd', '#d4edda', '#f8d7da'];
+                        const bgColor = bgColors[activityIndex % bgColors.length];
+                        
+                        return (
+                          <React.Fragment key={`total-activity-${activityNum}`}>
+                            <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: bgColor}}>
+                              {formatNumber(labActivityRows.reduce((sum, row) => sum + getLabActivityFactoredValue(row, `Activity${activityNum}_Q1`, activityKey), 0))}
+                            </td>
+                            <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: bgColor}}>
+                              {formatNumber(labActivityRows.reduce((sum, row) => sum + getLabActivityFactoredValue(row, `Activity${activityNum}_Q2`, activityKey), 0))}
+                            </td>
+                            <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: bgColor}}>
+                              {formatNumber(labActivityRows.reduce((sum, row) => sum + getLabActivityFactoredValue(row, `Activity${activityNum}_Q3`, activityKey), 0))}
+                            </td>
+                          </React.Fragment>
+                        );
+                      })}
+                      {/* Grand Total */}
+                      <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                        {formatNumber(labActivityRows.reduce((sum, row) => sum + getLabActivityGeneratedCOTotal(row), 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+            
+            {/* Table 2: CO wise multiplication factor */}
+            {labActivityGeneratedView === 1 && (
+              <div className="table-wrapper">
+                <h4 style={{marginBottom: '15px'}}>CO wise multiplication factor out of {coMappedActivityMarks}</h4>
+                <table className="section-a-table">
+                  <thead>
+                    <tr>
+                      <th rowSpan="3">CO No.</th>
+                      <th colSpan={(activityTaken || 5) * 3}>CO wise multiplication factor out of {coMappedActivityMarks}</th>
+                      <th rowSpan="3">CO Total</th>
+                    </tr>
+                    <tr>
+                      {Array.from({length: activityTaken || 5}, (_, i) => (
+                        <th key={`activity-${i+1}`} colSpan="3">Activity{i+1}</th>
+                      ))}
+                    </tr>
+                    <tr>
+                      {Array.from({length: activityTaken || 5}, (_, i) => (
+                        <React.Fragment key={`qs-${i+1}`}>
+                          <th>Q1</th>
+                          <th>Q2</th>
+                          <th>Q3</th>
+                        </React.Fragment>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {labActivityRows.map((row, idx) => (
+                      <tr key={idx}>
+                        <td className="co-label">{row.coNumber}</td>
+                        {Array.from({length: activityTaken || 5}, (_, activityIndex) => {
+                          const activityNum = activityIndex + 1;
+                          const activityKey = `activity${activityNum}`;
+                          const bgColors = ['#f8f9fa', '#e3f2fd', '#fff3cd', '#d4edda', '#f8d7da'];
+                          const bgColor = bgColors[activityIndex % bgColors.length];
+                          
+                          return (
+                            <React.Fragment key={`activity-${activityNum}`}>
+                              <td style={{textAlign: 'center', backgroundColor: bgColor}}>
+                                {formatNumber(getLabActivityMultiplicationFactor(row, `Activity${activityNum}_Q1`, activityKey))}
+                              </td>
+                              <td style={{textAlign: 'center', backgroundColor: bgColor}}>
+                                {formatNumber(getLabActivityMultiplicationFactor(row, `Activity${activityNum}_Q2`, activityKey))}
+                              </td>
+                              <td style={{textAlign: 'center', backgroundColor: bgColor}}>
+                                {formatNumber(getLabActivityMultiplicationFactor(row, `Activity${activityNum}_Q3`, activityKey))}
+                              </td>
+                            </React.Fragment>
+                          );
+                        })}
+                        {/* CO Total */}
+                        <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                          {formatNumber(getLabActivityMultiplicationCOTotal(row))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td className="footer-label">Total</td>
+                      {Array.from({length: activityTaken || 5}, (_, activityIndex) => {
+                        const activityNum = activityIndex + 1;
+                        const activityKey = `activity${activityNum}`;
+                        const bgColors = ['#f8f9fa', '#e3f2fd', '#fff3cd', '#d4edda', '#f8d7da'];
+                        const bgColor = bgColors[activityIndex % bgColors.length];
+                        
+                        return (
+                          <React.Fragment key={`total-activity-${activityNum}`}>
+                            <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: bgColor}}>
+                              {formatNumber(labActivityRows.reduce((sum, row) => sum + getLabActivityMultiplicationFactor(row, `Activity${activityNum}_Q1`, activityKey), 0))}
+                            </td>
+                            <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: bgColor}}>
+                              {formatNumber(labActivityRows.reduce((sum, row) => sum + getLabActivityMultiplicationFactor(row, `Activity${activityNum}_Q2`, activityKey), 0))}
+                            </td>
+                            <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: bgColor}}>
+                              {formatNumber(labActivityRows.reduce((sum, row) => sum + getLabActivityMultiplicationFactor(row, `Activity${activityNum}_Q3`, activityKey), 0))}
+                            </td>
+                          </React.Fragment>
+                        );
+                      })}
+                      {/* Grand Total */}
+                      <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                        {formatNumber(labActivityRows.reduce((sum, row) => sum + getLabActivityMultiplicationCOTotal(row), 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* LabActivity Obtained Marks Generated Modal */}
+      {showLabActivityObtainedModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '16px',
+            maxWidth: '95%',
+            maxHeight: '90%',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+              <h3>Generated Table - Lab Activity Obtained Marks</h3>
+              <button 
+                onClick={() => setShowLabActivityObtainedModal(false)}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: '#e74c3c',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Tab Navigation */}
+            <div style={{display: 'flex', marginBottom: '20px', borderBottom: '2px solid #e0e0e0'}}>
+              <button
+                onClick={() => setLabActivityObtainedView(0)}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: 'transparent',
+                  color: labActivityObtainedView === 0 ? '#2c3e50' : '#7f8c8d',
+                  border: 'none',
+                  borderBottom: labActivityObtainedView === 0 ? '3px solid #3498db' : '3px solid transparent',
+                  cursor: 'pointer',
+                  fontWeight: labActivityObtainedView === 0 ? '600' : 'normal',
+                  fontSize: '14px',
+                  transition: 'all 0.2s ease',
+                  marginBottom: '-2px'
+                }}
+                onMouseEnter={(e) => {
+                  if (labActivityObtainedView !== 0) {
+                    e.target.style.color = '#2c3e50';
+                    e.target.style.borderBottom = '3px solid #bdc3c7';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (labActivityObtainedView !== 0) {
+                    e.target.style.color = '#7f8c8d';
+                    e.target.style.borderBottom = '3px solid transparent';
+                  }
+                }}
+              >
+                CO wise obtained marks
+              </button>
+              <button
+                onClick={() => setLabActivityObtainedView(1)}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: 'transparent',
+                  color: labActivityObtainedView === 1 ? '#2c3e50' : '#7f8c8d',
+                  border: 'none',
+                  borderBottom: labActivityObtainedView === 1 ? '3px solid #3498db' : '3px solid transparent',
+                  cursor: 'pointer',
+                  fontWeight: labActivityObtainedView === 1 ? '600' : 'normal',
+                  fontSize: '14px',
+                  transition: 'all 0.2s ease',
+                  marginBottom: '-2px'
+                }}
+                onMouseEnter={(e) => {
+                  if (labActivityObtainedView !== 1) {
+                    e.target.style.color = '#2c3e50';
+                    e.target.style.borderBottom = '3px solid #bdc3c7';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (labActivityObtainedView !== 1) {
+                    e.target.style.color = '#7f8c8d';
+                    e.target.style.borderBottom = '3px solid transparent';
+                  }
+                }}
+              >
+                CO attainment
+              </button>
+            </div>
+
+            {/* Table 1: CO wise obtained marks */}
+            {labActivityObtainedView === 0 && (
+              <div className="table-wrapper">
+              <table className="section-a-table">
+                <thead>
+                  <tr>
+                    <th rowSpan="3">Roll</th>
+                    <th colSpan={labActivityRows.length}>CO wise obtained marks out of {(() => {
+                      // Calculate total CO marks from allocated table
+                      let total = 0;
+                      labActivityRows.forEach(row => {
+                        total += computeLabActivityCOTotal(row);
+                      });
+                      return formatNumber(total);
+                    })()}</th>
+                    <th colSpan={labActivityRows.length}>CO wise obtained marks out of {coMappedActivityMarks}</th>
+                  </tr>
+                  <tr>
+                    {/* First set of CO columns */}
+                    {labActivityRows.map((row, idx) => (
+                      <th key={`co1-${idx}`}>{row.coNumber}</th>
+                    ))}
+                    {/* Second set of CO columns */}
+                    {labActivityRows.map((row, idx) => (
+                      <th key={`co2-${idx}`}>{row.coNumber}</th>
+                    ))}
+                  </tr>
+                  <tr>
+                    {/* Total allocated marks for each CO - first set */}
+                    {labActivityRows.map((row, idx) => (
+                      <th key={`co1-total-${idx}`} style={{fontSize: '13px', fontWeight: '600', backgroundColor: '#e8f4f8', color: '#2c3e50', padding: '8px'}}>
+                        out of {formatNumber(computeLabActivityCOTotal(row))}
+                      </th>
+                    ))}
+                    {/* Total allocated marks for each CO - second set */}
+                    {labActivityRows.map((row, idx) => (
+                      <th key={`co2-total-${idx}`} style={{fontSize: '13px', fontWeight: '600', backgroundColor: '#e8f4f8', color: '#2c3e50', padding: '8px'}}>
+                        out of {formatNumber(getLabActivityGeneratedCOTotal(row))}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {labActivityObtainedRows.map((studentRow, idx) => (
+                    <tr key={studentRow.rollNumber || idx}>
+                      <td>{studentRow.rollNumber || '-'}</td>
+                      {/* CO wise marks out of CO Total */}
+                      {labActivityRows.map((coRow, coIdx) => (
+                        <td key={`co-total-${coIdx}`} style={{textAlign: 'center'}}>
+                          {formatNumber(getLabActivityStudentCOMarks(studentRow, coRow.coNumber))}
+                        </td>
+                      ))}
+                      {/* CO wise marks out of CO Mapped Activity Marks */}
+                      {labActivityRows.map((coRow, coIdx) => (
+                        <td key={`co-mapped-${coIdx}`} style={{textAlign: 'center'}}>
+                          {formatNumber(getLabActivityStudentCOMappedMarks(studentRow, coRow.coNumber))}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td className="footer-label">Total</td>
+                    {/* Totals for CO wise marks out of CO Total */}
+                    {labActivityRows.map((coRow, coIdx) => (
+                      <td key={`total-co-${coIdx}`} style={{textAlign: 'center', fontWeight: 'bold'}}>
+                        {formatNumber(labActivityObtainedRows.reduce((sum, studentRow) => 
+                          sum + getLabActivityStudentCOMarks(studentRow, coRow.coNumber), 0))}
+                      </td>
+                    ))}
+                    {/* Totals for CO wise marks out of CO Mapped Activity Marks */}
+                    {labActivityRows.map((coRow, coIdx) => (
+                      <td key={`total-mapped-${coIdx}`} style={{textAlign: 'center', fontWeight: 'bold'}}>
+                        {formatNumber(labActivityObtainedRows.reduce((sum, studentRow) => 
+                          sum + getLabActivityStudentCOMappedMarks(studentRow, coRow.coNumber), 0))}
+                      </td>
+                    ))}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            )}
+
+            {/* Table 2: CO attainment */}
+            {labActivityObtainedView === 1 && (
+              <div className="table-wrapper">
+                <table className="section-a-table">
+                  <thead>
+                    <tr>
+                      <th>Roll</th>
+                      {labActivityRows.map((coRow, idx) => (
+                        <th key={`co-${idx}`}>{coRow.coNumber}</th>
+                      ))}
+                      <th>Total Marks</th>
+                      <th>Ltr. Grade</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {labActivityObtainedRows.map((studentRow, idx) => {
+                      const totalMarks = getLabActivityStudentTotalMarks(studentRow);
+                      const grade = getLetterGrade(totalMarks);
+                      return (
+                        <tr key={studentRow.rollNumber || idx}>
+                          <td>{studentRow.rollNumber || '-'}</td>
+                          {/* CO attainment values */}
+                          {labActivityRows.map((coRow, coIdx) => (
+                            <td key={`co-att-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(getLabActivityCOAttainment(studentRow, coRow.coNumber))}
+                            </td>
+                          ))}
+                          {/* Total Marks */}
+                          <td style={{textAlign: 'center', fontWeight: '500'}}>
+                            {formatNumber(totalMarks)}
+                          </td>
+                          {/* Letter Grade */}
+                          <td style={{textAlign: 'center', fontWeight: '600', color: getGradeColor(grade)}}>
+                            {grade}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td className="footer-label">Average</td>
+                      {labActivityRows.map((coRow, coIdx) => (
+                        <td key={`avg-co-${coIdx}`} style={{textAlign: 'center', fontWeight: 'bold'}}>
+                          {formatNumber(labActivityObtainedRows.reduce((sum, studentRow) => 
+                            sum + getLabActivityCOAttainment(studentRow, coRow.coNumber), 0) / (labActivityObtainedRows.length || 1))}
+                        </td>
+                      ))}
+                      <td style={{textAlign: 'center', fontWeight: 'bold'}}>
+                        {formatNumber(labActivityObtainedRows.reduce((sum, studentRow) => 
+                          sum + getLabActivityStudentTotalMarks(studentRow), 0) / (labActivityObtainedRows.length || 1))}
+                      </td>
+                      <td style={{textAlign: 'center', fontWeight: 'bold', color: getGradeColor(getLetterGrade(labActivityObtainedRows.reduce((sum, studentRow) => 
+                          sum + getLabActivityStudentTotalMarks(studentRow), 0) / (labActivityObtainedRows.length || 1)))}}>
+                        {getLetterGrade(labActivityObtainedRows.reduce((sum, studentRow) => 
+                          sum + getLabActivityStudentTotalMarks(studentRow), 0) / (labActivityObtainedRows.length || 1))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* CO Attainment Section - Shows appropriate table based on course type */}
+      {selectedCourse && selectedSheet === 'COAttainment' && (() => {
+        const courseCode = selectedCourse.courseCode || '';
+        const lastDigit = parseInt(courseCode.slice(-1));
+        const isTheoryCourse = !isNaN(lastDigit) && lastDigit % 2 === 1;
+        
+        const courseInfo = (selectedCourse.courseTitle || '').toLowerCase();
+        const isProjectCourse = courseInfo.includes('project') || 
+                                courseInfo.includes('thesis') ||
+                                courseInfo.includes('research') ||
+                                courseInfo.includes('dissertation');
+        
+        const isLabCourse = (!isNaN(lastDigit) && lastDigit % 2 === 0) || isProjectCourse;
+        
+        return (
+          <>
+            {/* Theory Course Table */}
+            {isTheoryCourse && (
+          <section className="co-attainment-section" style={{marginTop: '30px'}}>
+            <h2>CO Attainment - Theory Courses</h2>
+            
+            {clos.length === 0 && (
+              <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
+            )}
+            
+            {clos.length > 0 && coAttainmentData.length === 0 && (
+              <p style={{padding: '20px', color: '#7f8c8d'}}>No student data available.</p>
+            )}
+            
+            {clos.length > 0 && coAttainmentData.length > 0 && (
+              <div className="table-wrapper">
+                <table className="co-attainment-table">
+                  <thead>
+                    <tr>
+                      <th rowSpan="2">Roll</th>
+                      <th colSpan={clos.length}>Attainment of COs in % (only Theory)</th>
+                      <th colSpan={clos.length}>CO Achievement&gt;=55%</th>
+                      <th colSpan={clos.length}>Binary Achievement&gt;=55%</th>
+                    </tr>
+                    <tr>
+                      {/* CO headers for attainment % */}
+                      {clos.map((clo, idx) => {
+                        const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                        return <th key={`att-${idx}`}>{coNumber}</th>;
+                      })}
+                      {/* CO headers for Y/N achievement */}
+                      {clos.map((clo, idx) => {
+                        const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                        return <th key={`ach-${idx}`}>{coNumber}</th>;
+                      })}
+                      {/* CO headers for binary achievement */}
+                      {clos.map((clo, idx) => {
+                        const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                        return <th key={`bin-${idx}`}>{coNumber}</th>;
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coAttainmentData.map((studentRow, studentIdx) => {
+                      return (
+                        <tr key={studentIdx}>
+                          <td className="roll-cell">{studentRow.rollNumber}</td>
+                          
+                          {/* Attainment of COs in % */}
+                          {clos.map((clo, coIdx) => {
+                            const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                            const percentage = studentRow.coValues[coNumber] || 0;
+                            return (
+                              <td key={`att-${coIdx}`} style={{textAlign: 'center'}}>
+                                {formatNumber(percentage)}%
+                              </td>
+                            );
+                          })}
+                          
+                          {/* CO Achievement>=55% (Y or N) */}
+                          {clos.map((clo, coIdx) => {
+                            const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                            const percentage = studentRow.coValues[coNumber] || 0;
+                            const achieved = percentage >= 55;
+                            return (
+                              <td key={`ach-${coIdx}`} style={{
+                                textAlign: 'center',
+                                fontWeight: '600',
+                                color: achieved ? '#27ae60' : '#e74c3c'
+                              }}>
+                                {achieved ? 'Y' : 'N'}
+                              </td>
+                            );
+                          })}
+                          
+                          {/* Binary Achievement>=55% (0 or 1) */}
+                          {clos.map((clo, coIdx) => {
+                            const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                            const percentage = studentRow.coValues[coNumber] || 0;
+                            const achieved = percentage >= 55;
+                            return (
+                              <td key={`bin-${coIdx}`} style={{
+                                textAlign: 'center',
+                                fontWeight: '600',
+                                backgroundColor: achieved ? '#d4edda' : '#f8d7da'
+                              }}>
+                                {achieved ? '1' : '0'}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td className="footer-label">Average</td>
+                      
+                      {/* Average attainment % for each CO */}
+                      {clos.map((clo, coIdx) => {
+                        const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                        const total = coAttainmentData.reduce((sum, studentRow) => 
+                          sum + (studentRow.coValues[coNumber] || 0), 0);
+                        const avg = coAttainmentData.length > 0 ? total / coAttainmentData.length : 0;
+                        return (
+                          <td key={`avg-att-${coIdx}`} style={{textAlign: 'center', fontWeight: 'bold'}}>
+                            {formatNumber(avg)}%
+                          </td>
+                        );
+                      })}
+                      
+                      {/* Average Y/N achievement for each CO */}
+                      {clos.map((clo, coIdx) => {
+                        const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                        const achievedCount = coAttainmentData.reduce((sum, studentRow) => 
+                          sum + ((studentRow.coValues[coNumber] || 0) >= 55 ? 1 : 0), 0);
+                        const achievedPercentage = coAttainmentData.length > 0 
+                          ? (achievedCount / coAttainmentData.length) * 100 
+                          : 0;
+                        return (
+                          <td key={`avg-ach-${coIdx}`} style={{textAlign: 'center', fontWeight: 'bold'}}>
+                            {formatNumber(achievedPercentage)}%
+                          </td>
+                        );
+                      })}
+                      
+                      {/* Average binary achievement for each CO */}
+                      {clos.map((clo, coIdx) => {
+                        const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                        const achievedCount = coAttainmentData.reduce((sum, studentRow) => 
+                          sum + ((studentRow.coValues[coNumber] || 0) >= 55 ? 1 : 0), 0);
+                        const avg = coAttainmentData.length > 0 ? achievedCount / coAttainmentData.length : 0;
+                        return (
+                          <td key={`avg-bin-${coIdx}`} style={{
+                            textAlign: 'center', 
+                            fontWeight: 'bold',
+                            backgroundColor: avg >= 0.5 ? '#d4edda' : '#f8d7da'
+                          }}>
+                            {formatNumber(avg)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </section>
+          )}
+            
+            {/* Lab/Project Course Table */}
+            {isLabCourse && (
+          <section className="co-attainment-section" style={{marginTop: '30px'}}>
+            <h2>CO Attainment - Lab/Project Courses</h2>
+              
+              {clos.length === 0 && (
+                <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
+              )}
+              
+              {clos.length > 0 && coAttainmentData.length === 0 && (
+                <p style={{padding: '20px', color: '#7f8c8d'}}>No student data available.</p>
+              )}
+              
+              {clos.length > 0 && coAttainmentData.length > 0 && (
+                <div className="table-wrapper">
+                  <table className="co-attainment-table">
+                    <thead>
+                      <tr>
+                        <th rowSpan="2">Roll</th>
+                        <th colSpan={clos.length}>Attainment of COs in % (only Lab)</th>
+                        <th colSpan={clos.length}>CO Achievement&gt;=55%</th>
+                        <th colSpan={clos.length}>Binary Achievement&gt;=55%</th>
+                      </tr>
+                      <tr>
+                        {/* CO headers for attainment % */}
+                        {clos.map((clo, idx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          return <th key={`att-lab-${idx}`}>{coNumber}</th>;
+                        })}
+                        {/* CO headers for Y/N achievement */}
+                        {clos.map((clo, idx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          return <th key={`ach-lab-${idx}`}>{coNumber}</th>;
+                        })}
+                        {/* CO headers for binary achievement */}
+                        {clos.map((clo, idx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          return <th key={`bin-lab-${idx}`}>{coNumber}</th>;
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {coAttainmentData.map((studentRow, studentIdx) => {
+                        return (
+                          <tr key={studentIdx}>
+                            <td className="roll-cell">{studentRow.rollNumber}</td>
+                            
+                            {/* Attainment of COs in % */}
+                            {clos.map((clo, coIdx) => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              const percentage = studentRow.coValues[coNumber] || 0;
+                              return (
+                                <td key={`att-lab-${coIdx}`} style={{textAlign: 'center'}}>
+                                  {formatNumber(percentage)}%
+                                </td>
+                              );
+                            })}
+                            
+                            {/* CO Achievement>=55% (Y or N) */}
+                            {clos.map((clo, coIdx) => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              const percentage = studentRow.coValues[coNumber] || 0;
+                              const achieved = percentage >= 55;
+                              return (
+                                <td key={`ach-lab-${coIdx}`} style={{
+                                  textAlign: 'center',
+                                  fontWeight: '600',
+                                  color: achieved ? '#27ae60' : '#e74c3c'
+                                }}>
+                                  {achieved ? 'Y' : 'N'}
+                                </td>
+                              );
+                            })}
+                            
+                            {/* Binary Achievement>=55% (0 or 1) */}
+                            {clos.map((clo, coIdx) => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              const percentage = studentRow.coValues[coNumber] || 0;
+                              const achieved = percentage >= 55;
+                              return (
+                                <td key={`bin-lab-${coIdx}`} style={{
+                                  textAlign: 'center',
+                                  fontWeight: '600',
+                                  backgroundColor: achieved ? '#d4edda' : '#f8d7da'
+                                }}>
+                                  {achieved ? '1' : '0'}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td className="footer-label">Average</td>
+                        
+                        {/* Average attainment % for each CO */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const total = coAttainmentData.reduce((sum, studentRow) => 
+                            sum + (studentRow.coValues[coNumber] || 0), 0);
+                          const avg = coAttainmentData.length > 0 ? total / coAttainmentData.length : 0;
+                          return (
+                            <td key={`avg-att-lab-${coIdx}`} style={{textAlign: 'center', fontWeight: 'bold'}}>
+                              {formatNumber(avg)}%
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Average Y/N achievement for each CO */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const achievedCount = coAttainmentData.reduce((sum, studentRow) => 
+                            sum + ((studentRow.coValues[coNumber] || 0) >= 55 ? 1 : 0), 0);
+                          const achievedPercentage = coAttainmentData.length > 0 
+                            ? (achievedCount / coAttainmentData.length) * 100 
+                            : 0;
+                          return (
+                            <td key={`avg-ach-lab-${coIdx}`} style={{textAlign: 'center', fontWeight: 'bold'}}>
+                              {formatNumber(achievedPercentage)}%
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Average binary achievement for each CO */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const achievedCount = coAttainmentData.reduce((sum, studentRow) => 
+                            sum + ((studentRow.coValues[coNumber] || 0) >= 55 ? 1 : 0), 0);
+                          const avg = coAttainmentData.length > 0 ? achievedCount / coAttainmentData.length : 0;
+                          return (
+                            <td key={`avg-bin-lab-${coIdx}`} style={{
+                              textAlign: 'center', 
+                              fontWeight: 'bold',
+                              backgroundColor: avg >= 0.5 ? '#d4edda' : '#f8d7da'
+                            }}>
+                              {formatNumber(avg)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+          </section>
+          )}
+            
+            {/* Combined Theory+Lab Table (shown for all courses) */}
+            <section className="co-attainment-section" style={{marginTop: '30px'}}>
+              <h2>CO Attainment - Combined (Theory+Lab)</h2>
+            
+            {clos.length === 0 && (
+              <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
+            )}
+            
+            {clos.length > 0 && coAttainmentData.length === 0 && (
+              <p style={{padding: '20px', color: '#7f8c8d'}}>No student data available.</p>
+            )}
+            
+            {clos.length > 0 && coAttainmentData.length > 0 && (
+              <div className="table-wrapper">
+                <table className="co-attainment-table">
+                  <thead>
+                    <tr>
+                      <th rowSpan="2">Roll</th>
+                      <th colSpan={clos.length}>Attainment of COs in % (only Lab)</th>
+                      <th colSpan={clos.length}>CO Achievement&gt;=55%</th>
+                      <th colSpan={clos.length}>Binary Achievement&gt;=55%</th>
+                    </tr>
+                  <tr>
+                    {/* CO headers for attainment % */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`att-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* CO headers for Y/N achievement */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`ach-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* CO headers for binary achievement */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`bin-${idx}`}>{coNumber}</th>;
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {coAttainmentData.map((studentRow, studentIdx) => {
+                    return (
+                      <tr key={studentIdx}>
+                        <td className="roll-cell">{studentRow.rollNumber}</td>
+                        
+                        {/* Attainment of COs in % */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const percentage = studentRow.coValues[coNumber] || 0;
+                          return (
+                            <td key={`att-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(percentage)}%
+                            </td>
+                          );
+                        })}
+                        
+                        {/* CO Achievement>=55% (Y or N) */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const percentage = studentRow.coValues[coNumber] || 0;
+                          const achieved = percentage >= 55;
+                          return (
+                            <td key={`ach-${coIdx}`} style={{
+                              textAlign: 'center',
+                              fontWeight: '600',
+                              color: achieved ? '#27ae60' : '#e74c3c'
+                            }}>
+                              {achieved ? 'Y' : 'N'}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Binary Achievement>=55% (0 or 1) */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const percentage = studentRow.coValues[coNumber] || 0;
+                          const achieved = percentage >= 55;
+                          return (
+                            <td key={`bin-${coIdx}`} style={{
+                              textAlign: 'center',
+                              fontWeight: '600',
+                              backgroundColor: achieved ? '#d4edda' : '#f8d7da'
+                            }}>
+                              {achieved ? '1' : '0'}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td className="footer-label">Average</td>
+                    
+                    {/* Average attainment % for each CO */}
+                    {clos.map((clo, coIdx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      const total = coAttainmentData.reduce((sum, studentRow) => 
+                        sum + (studentRow.coValues[coNumber] || 0), 0);
+                      const avg = coAttainmentData.length > 0 ? total / coAttainmentData.length : 0;
+                      return (
+                        <td key={`avg-att-${coIdx}`} style={{textAlign: 'center', fontWeight: 'bold'}}>
+                          {formatNumber(avg)}%
+                        </td>
+                      );
+                    })}
+                    
+                    {/* Average Y/N achievement for each CO */}
+                    {clos.map((clo, coIdx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      const achievedCount = coAttainmentData.reduce((sum, studentRow) => 
+                        sum + ((studentRow.coValues[coNumber] || 0) >= 55 ? 1 : 0), 0);
+                      const achievedPercentage = coAttainmentData.length > 0 
+                        ? (achievedCount / coAttainmentData.length) * 100 
+                        : 0;
+                      return (
+                        <td key={`avg-ach-${coIdx}`} style={{textAlign: 'center', fontWeight: 'bold'}}>
+                          {formatNumber(achievedPercentage)}%
+                        </td>
+                      );
+                    })}
+                    
+                    {/* Average binary achievement for each CO */}
+                    {clos.map((clo, coIdx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      const achievedCount = coAttainmentData.reduce((sum, studentRow) => 
+                        sum + ((studentRow.coValues[coNumber] || 0) >= 55 ? 1 : 0), 0);
+                      const avg = coAttainmentData.length > 0 ? achievedCount / coAttainmentData.length : 0;
+                      return (
+                        <td key={`avg-bin-${coIdx}`} style={{
+                          textAlign: 'center', 
+                          fontWeight: 'bold',
+                          backgroundColor: avg >= 0.5 ? '#d4edda' : '#f8d7da'
+                        }}>
+                          {formatNumber(avg)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </section>
+        </>
+        );
+      })()}
+
+      {/* COCalc Section - Only for theory courses */}
+      {(() => {
+        if (selectedSheet !== 'COCalc') return null;
+        
+        const courseCode = selectedCourse?.courseCode || '';
+        const lastDigit = parseInt(courseCode.slice(-1));
+        const isTheoryCourse = !isNaN(lastDigit) && lastDigit % 2 === 1;
+        
+        if (!isTheoryCourse) return null;
+        
+        return (
+        <>
+        <section className="co-calc-section">
+          <h2>CO Calculation - Section A & B Marks</h2>
+          
+          {clos.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>No student data available.</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length > 0 && (
+            <div className="table-wrapper">
+              <table className="co-calc-table">
+                <thead>
+                  <tr>
+                    <th rowSpan="3">Roll</th>
+                    <th colSpan={clos.length * 2}>Section A</th>
+                    <th colSpan={clos.length * 2}>Section B</th>
+                  </tr>
+                  <tr>
+                    <th colSpan={clos.length}>Marks Obtained</th>
+                    <th colSpan={clos.length}>Marks Distribution</th>
+                    <th colSpan={clos.length}>Marks Obtained</th>
+                    <th colSpan={clos.length}>Marks Distribution</th>
+                  </tr>
+                  <tr>
+                    {/* Section A - Marks Obtained CO headers */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`sectA-obt-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* Section A - Marks Distribution CO headers */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`sectA-dist-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* Section B - Marks Obtained CO headers */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`sectB-obt-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* Section B - Marks Distribution CO headers */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`sectB-dist-${idx}`}>{coNumber}</th>;
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {coCalcData.map((studentRow, studentIdx) => {
+                    return (
+                      <tr key={studentIdx}>
+                        <td className="roll-cell">{studentRow.rollNumber}</td>
+                        
+                        {/* Section A - Marks Obtained */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.sectionA.marksObtained[coNumber] || 0;
+                          return (
+                            <td key={`sectA-obt-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Section A - Marks Distribution */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.sectionA.marksDistribution[coNumber] || 0;
+                          return (
+                            <td key={`sectA-dist-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Section B - Marks Obtained */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.sectionB.marksObtained[coNumber] || 0;
+                          return (
+                            <td key={`sectB-obt-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Section B - Marks Distribution */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.sectionB.marksDistribution[coNumber] || 0;
+                          return (
+                            <td key={`sectB-dist-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+        
+        {/* Second Table: CO-PO Percentage (Theory: CT+Assign+A+B) */}
+        <section className="co-po-percentage-section" style={{marginTop: '30px'}}>
+          <h2>CO-PO percentage (Theory: CT+Assign+A+B)</h2>
+          
+          {clos.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>No student data available.</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length > 0 && (
+            <div className="table-wrapper">
+              <table className="co-po-percentage-table">
+                <thead>
+                  <tr>
+                    <th rowSpan="2">Roll</th>
+                    <th colSpan={clos.length}>Total Mark Obtained</th>
+                    <th colSpan={clos.length}>Total Marks Distribution</th>
+                    <th colSpan={clos.length} style={{backgroundColor: '#16a085', color: '#fff'}}>CO Attainment (Theory)</th>
+                  </tr>
+                  <tr>
+                    {/* CO headers for Total Mark Obtained */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`obt-co-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* CO headers for Total Marks Distribution */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`dist-co-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* CO headers for CO Attainment */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`theory-attain-co-${idx}`} style={{backgroundColor: '#16a085', color: '#fff'}}>{coNumber}</th>;
+                    })}
+                  </tr>
+                  <tr>
+                    <th style={{fontSize: '13px', fontWeight: '600'}}>CO msrd</th>
+                    {/* CO msrd row for Total Mark Obtained */}
+                    {clos.map((clo, coIdx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      // Calculate total obtained and allocated across all students
+                      let totalObtained = 0;
+                      let totalAllocated = 0;
+                      coCalcData.forEach(student => {
+                        totalObtained += student.total.marksObtained[coNumber] || 0;
+                        totalAllocated += student.total.marksDistribution[coNumber] || 0;
+                      });
+                      const percentage = totalAllocated > 0 ? (totalObtained / totalAllocated) * 100 : 0;
+                      return (
+                        <th key={`msrd-${coIdx}`} style={{fontSize: '13px', fontWeight: '600'}}>
+                          {formatNumber(percentage)}%
+                        </th>
+                      );
+                    })}
+                    
+                    {/* Empty cells for Total Marks Distribution */}
+                    {clos.map((clo, coIdx) => {
+                      return <th key={`msrd-empty-${coIdx}`}></th>;
+                    })}
+                    
+                    {/* Empty cells for CO Attainment */}
+                    {clos.map((clo, coIdx) => {
+                      return <th key={`theory-attain-msrd-${coIdx}`} style={{backgroundColor: '#16a085', borderLeft: 'none', borderRight: 'none'}}></th>;
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Student rows */}
+                  {coCalcData.map((studentRow, studentIdx) => {
+                    return (
+                      <tr key={studentIdx}>
+                        <td className="roll-cell">{studentRow.rollNumber}</td>
+                        
+                        {/* Total Mark Obtained for each CO */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.total.marksObtained[coNumber] || 0;
+                          return (
+                            <td key={`total-obt-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Total Marks Distribution for each CO */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.total.marksDistribution[coNumber] || 0;
+                          return (
+                            <td key={`total-dist-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* CO Attainment percentage for each CO */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          // Find the matching student in coAttainmentData
+                          const attainmentStudent = coAttainmentData.find(s => s.rollNumber === studentRow.rollNumber);
+                          const percentage = attainmentStudent ? (attainmentStudent.coValues[coNumber] || 0) : 0;
+                          return (
+                            <td key={`theory-attain-${coIdx}`} style={{textAlign: 'center', backgroundColor: '#a8e6d7'}}>
+                              {formatNumber(percentage)}%
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+        
+        {/* Third Table: CT and Assignment Marks */}
+        <section className="ct-assignment-section" style={{marginTop: '30px'}}>
+          <h2>CT and Assignment Marks</h2>
+          
+          {clos.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>No student data available.</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length > 0 && (
+            <div className="table-wrapper">
+              <table className="ct-assignment-table">
+                <thead>
+                  <tr>
+                    <th rowSpan="3">Roll</th>
+                    <th colSpan={clos.length}>CT</th>
+                    <th colSpan={clos.length}>Assignment</th>
+                    <th rowSpan="4">Attn</th>
+                    <th rowSpan="4">Total</th>
+                    <th rowSpan="4">Ltr Grade</th>
+                  </tr>
+                  <tr>
+                    <th colSpan={clos.length}>Mark Obtained + Distribution</th>
+                    <th colSpan={clos.length}>Mark Obtained + Distribution</th>
+                  </tr>
+                  <tr>
+                    {/* CT CO headers */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`ct-co-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* Assignment CO headers */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`assign-co-${idx}`}>{coNumber}</th>;
+                    })}
+                  </tr>
+                  <tr>
+                    <th style={{fontSize: '13px', fontWeight: '600'}}>CO msrd</th>
+                    {/* CT CO msrd */}
+                    {clos.map((clo, coIdx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      let totalObtained = 0;
+                      let totalAllocated = 0;
+                      coCalcData.forEach(student => {
+                        totalObtained += student.ct.marksObtained[coNumber] || 0;
+                        totalAllocated += student.ct.marksDistribution[coNumber] || 0;
+                      });
+                      const percentage = totalAllocated > 0 ? (totalObtained / totalAllocated) * 100 : 0;
+                      return (
+                        <th key={`ct-msrd-${coIdx}`} style={{fontSize: '13px', fontWeight: '600'}}>
+                          {formatNumber(percentage)}%
+                        </th>
+                      );
+                    })}
+                    {/* Assignment CO msrd */}
+                    {clos.map((clo, coIdx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      let totalObtained = 0;
+                      let totalAllocated = 0;
+                      coCalcData.forEach(student => {
+                        totalObtained += student.assignment.marksObtained[coNumber] || 0;
+                        totalAllocated += student.assignment.marksDistribution[coNumber] || 0;
+                      });
+                      const percentage = totalAllocated > 0 ? (totalObtained / totalAllocated) * 100 : 0;
+                      return (
+                        <th key={`assign-msrd-${coIdx}`} style={{fontSize: '13px', fontWeight: '600'}}>
+                          {formatNumber(percentage)}%
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {coCalcData.map((studentRow, studentIdx) => {
+                    return (
+                      <tr key={studentIdx}>
+                        <td className="roll-cell">{studentRow.rollNumber}</td>
+                        
+                        {/* CT - Mark Obtained */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const obtained = studentRow.ct.marksObtained[coNumber] || 0;
+                          return (
+                            <td key={`ct-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(obtained)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Assignment - Mark Obtained */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const obtained = studentRow.assignment.marksObtained[coNumber] || 0;
+                          return (
+                            <td key={`assign-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(obtained)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Attendance */}
+                        <td style={{textAlign: 'center', fontWeight: '600'}}>
+                          {formatNumber(studentRow.attendance || 0)}
+                        </td>
+                        
+                        {/* Total */}
+                        <td style={{textAlign: 'center', fontWeight: '600', backgroundColor: '#e8f4f8'}}>
+                          {(() => {
+                            let total = 0;
+                            // Sum all CT marks
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.ct.marksObtained[coNumber] || 0;
+                            });
+                            // Sum all Assignment marks
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.assignment.marksObtained[coNumber] || 0;
+                            });
+                            // Add attendance
+                            total += studentRow.attendance || 0;
+                            return formatNumber(total);
+                          })()}
+                        </td>
+                        
+                        {/* Letter Grade */}
+                        <td style={{
+                          textAlign: 'center', 
+                          fontWeight: '700', 
+                          fontSize: '15px',
+                          backgroundColor: (() => {
+                            let total = 0;
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.ct.marksObtained[coNumber] || 0;
+                            });
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.assignment.marksObtained[coNumber] || 0;
+                            });
+                            total += studentRow.attendance || 0;
+                            
+                            // Color based on grade
+                            if (total < 119) return '#f8d7da'; // F - light red
+                            else if (total < 134) return '#ffe5cc'; // D - light orange
+                            else if (total < 149) return '#fff3cd'; // C - light yellow
+                            else if (total < 164) return '#e7f5e0'; // C+ - very light green
+                            else if (total < 179) return '#d4edda'; // B- - light green
+                            else if (total < 194) return '#c3e6cb'; // B - green
+                            else if (total < 209) return '#b2dfbb'; // B+ - medium green
+                            else if (total < 224) return '#a1d9ab'; // A- - darker green
+                            else if (total < 239) return '#8fd19e'; // A - even darker green
+                            else return '#7ec98f'; // A+ - darkest green
+                          })(),
+                          color: (() => {
+                            let total = 0;
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.ct.marksObtained[coNumber] || 0;
+                            });
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.assignment.marksObtained[coNumber] || 0;
+                            });
+                            total += studentRow.attendance || 0;
+                            
+                            // F should have red text
+                            if (total < 119) return '#c82333';
+                            else return '#2c3e50';
+                          })()
+                        }}>
+                          {(() => {
+                            let total = 0;
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.ct.marksObtained[coNumber] || 0;
+                            });
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.assignment.marksObtained[coNumber] || 0;
+                            });
+                            total += studentRow.attendance || 0;
+                            
+                            // Grade calculation
+                            if (total < 119) return 'F';
+                            else if (total < 134) return 'D';
+                            else if (total < 149) return 'C';
+                            else if (total < 164) return 'C+';
+                            else if (total < 179) return 'B-';
+                            else if (total < 194) return 'B';
+                            else if (total < 209) return 'B+';
+                            else if (total < 224) return 'A-';
+                            else if (total < 239) return 'A';
+                            else return 'A+';
+                          })()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+        
+        </>
+        );
+      })()}
+
+      {/* CO-PO Percentage (Theory + Lab) - For all courses */}
+      {(() => {
+        if (selectedSheet !== 'COCalc') return null;
+        
+        return (
+        <>
+        <section className="co-po-combined-section" style={{marginTop: '30px'}}>
+          <h2>CO - PO percentage (theory + Lab)</h2>
+          
+          {clos.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>No student data available.</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length > 0 && (
+            <div className="table-wrapper">
+              <table className="co-po-percentage-table">
+                <thead>
+                  <tr>
+                    <th rowSpan="2">Roll</th>
+                    <th colSpan={clos.length}>Total Mark Obtained</th>
+                    <th colSpan={clos.length}>Total Marks Distribution</th>
+                    <th colSpan={clos.length} style={{backgroundColor: '#16a085', color: '#fff'}}>CO attainment (theory+Lab)</th>
+                  </tr>
+                  <tr>
+                    {/* CO headers for Total Mark Obtained */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`combined-obt-co-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* CO headers for Total Marks Distribution */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`combined-dist-co-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* CO headers for CO attainment */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`combined-attain-co-${idx}`} style={{backgroundColor: '#16a085', color: '#fff'}}>{coNumber}</th>;
+                    })}
+                  </tr>
+                  <tr>
+                    <th style={{fontSize: '13px', fontWeight: '600'}}>CO msrd</th>
+                    {/* CO msrd row for Total Mark Obtained */}
+                    {clos.map((clo, coIdx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      // Calculate total obtained across all students
+                      let totalObtained = 0;
+                      coCalcData.forEach(student => {
+                        totalObtained += student.total.marksObtained[coNumber] || 0;
+                      });
+                      return (
+                        <th key={`combined-msrd-${coIdx}`} style={{fontSize: '13px', fontWeight: '600'}}>
+                          {formatNumber(totalObtained)}
+                        </th>
+                      );
+                    })}
+                    
+                    {/* CO msrd for Total Marks Distribution */}
+                    {clos.map((clo, coIdx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      // Calculate total allocated across all students
+                      let totalAllocated = 0;
+                      coCalcData.forEach(student => {
+                        totalAllocated += student.total.marksDistribution[coNumber] || 0;
+                      });
+                      const avgAllocated = coCalcData.length > 0 ? totalAllocated / coCalcData.length : 0;
+                      return (
+                        <th key={`combined-msrd-dist-${coIdx}`} style={{fontSize: '13px', fontWeight: '600'}}>
+                          {formatNumber(avgAllocated)}
+                        </th>
+                      );
+                    })}
+                    
+                    {/* Empty cells for CO attainment */}
+                    {clos.map((clo, coIdx) => {
+                      return <th key={`combined-msrd-attain-${coIdx}`} style={{backgroundColor: '#16a085', borderLeft: 'none', borderRight: 'none'}}></th>;
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Student rows */}
+                  {coCalcData.map((studentRow, studentIdx) => {
+                    return (
+                      <tr key={studentIdx}>
+                        <td className="roll-cell">{studentRow.rollNumber}</td>
+                        
+                        {/* Total Mark Obtained for each CO */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.total.marksObtained[coNumber] || 0;
+                          return (
+                            <td key={`combined-total-obt-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Total Marks Distribution for each CO */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.total.marksDistribution[coNumber] || 0;
+                          return (
+                            <td key={`combined-total-dist-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* CO attainment percentage for each CO */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const obtained = studentRow.total.marksObtained[coNumber] || 0;
+                          const allocated = studentRow.total.marksDistribution[coNumber] || 0;
+                          const percentage = allocated > 0 ? (obtained / allocated) * 100 : 0;
+                          return (
+                            <td key={`combined-attain-${coIdx}`} style={{textAlign: 'center', backgroundColor: '#a8e6d7'}}>
+                              {formatNumber(percentage)}%
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+        </>
+        );
+      })()}
+
+      {/* COCalc_LabUnnorm Section - Same as COCalc */}
+      {(() => {
+        if (selectedSheet !== 'COCalc_LabUnnorm') return null;
+        
+        // No course type restriction - show for all courses
+        
+        return (
+        <>
+        <section className="co-calc-section">
+          <h2>CO Calculation - Section A & B Marks</h2>
+          
+          {clos.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>No student data available.</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length > 0 && (
+            <div className="table-wrapper">
+              <table className="co-calc-table">
+                <thead>
+                  <tr>
+                    <th rowSpan="3">Roll</th>
+                    <th colSpan={clos.length * 2}>Section A</th>
+                    <th colSpan={clos.length * 2}>Section B</th>
+                  </tr>
+                  <tr>
+                    <th colSpan={clos.length}>Marks Obtained</th>
+                    <th colSpan={clos.length}>Marks Distribution</th>
+                    <th colSpan={clos.length}>Marks Obtained</th>
+                    <th colSpan={clos.length}>Marks Distribution</th>
+                  </tr>
+                  <tr>
+                    {/* Section A - Marks Obtained CO headers */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`sectA-obt-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* Section A - Marks Distribution CO headers */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`sectA-dist-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* Section B - Marks Obtained CO headers */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`sectB-obt-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* Section B - Marks Distribution CO headers */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`sectB-dist-${idx}`}>{coNumber}</th>;
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {coCalcData.map((studentRow, studentIdx) => {
+                    return (
+                      <tr key={studentIdx}>
+                        <td className="roll-cell">{studentRow.rollNumber}</td>
+                        
+                        {/* Section A - Marks Obtained */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.sectionA.marksObtained[coNumber] || 0;
+                          return (
+                            <td key={`sectA-obt-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Section A - Marks Distribution */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.sectionA.marksDistribution[coNumber] || 0;
+                          return (
+                            <td key={`sectA-dist-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Section B - Marks Obtained */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.sectionB.marksObtained[coNumber] || 0;
+                          return (
+                            <td key={`sectB-obt-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Section B - Marks Distribution */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.sectionB.marksDistribution[coNumber] || 0;
+                          return (
+                            <td key={`sectB-dist-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+        
+        {/* Second Table: CO-PO Percentage (Theory: CT+Assign+A+B) */}
+        <section className="co-po-percentage-section" style={{marginTop: '30px'}}>
+          <h2>CO-PO percentage (Theory: CT+Assign+A+B)</h2>
+          
+          {clos.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>No student data available.</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length > 0 && (
+            <div className="table-wrapper">
+              <table className="co-po-percentage-table">
+                <thead>
+                  <tr>
+                    <th rowSpan="2">Roll</th>
+                    <th colSpan={clos.length}>Total Mark Obtained</th>
+                    <th colSpan={clos.length}>Total Marks Distribution</th>
+                    <th colSpan={clos.length} style={{backgroundColor: '#16a085', color: '#fff'}}>CO Attainment (Theory)</th>
+                  </tr>
+                  <tr>
+                    {/* CO headers for Total Mark Obtained */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`obt-co-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* CO headers for Total Marks Distribution */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`dist-co-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* CO headers for CO Attainment */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`theory-attain-co-${idx}`} style={{backgroundColor: '#16a085', color: '#fff'}}>{coNumber}</th>;
+                    })}
+                  </tr>
+                  <tr>
+                    <th style={{fontSize: '13px', fontWeight: '600'}}>CO msrd</th>
+                    {/* CO msrd row for Total Mark Obtained */}
+                    {clos.map((clo, coIdx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      // Calculate total obtained and allocated across all students
+                      let totalObtained = 0;
+                      let totalAllocated = 0;
+                      coCalcData.forEach(student => {
+                        totalObtained += student.total.marksObtained[coNumber] || 0;
+                        totalAllocated += student.total.marksDistribution[coNumber] || 0;
+                      });
+                      const percentage = totalAllocated > 0 ? (totalObtained / totalAllocated) * 100 : 0;
+                      return (
+                        <th key={`msrd-${coIdx}`} style={{fontSize: '13px', fontWeight: '600'}}>
+                          {formatNumber(percentage)}%
+                        </th>
+                      );
+                    })}
+                    
+                    {/* Empty cells for Total Marks Distribution */}
+                    {clos.map((clo, coIdx) => {
+                      return <th key={`msrd-empty-${coIdx}`}></th>;
+                    })}
+                    
+                    {/* Empty cells for CO Attainment */}
+                    {clos.map((clo, coIdx) => {
+                      return <th key={`theory-attain-msrd-${coIdx}`} style={{backgroundColor: '#16a085', borderLeft: 'none', borderRight: 'none'}}></th>;
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Student rows */}
+                  {coCalcData.map((studentRow, studentIdx) => {
+                    return (
+                      <tr key={studentIdx}>
+                        <td className="roll-cell">{studentRow.rollNumber}</td>
+                        
+                        {/* Total Mark Obtained for each CO */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.total.marksObtained[coNumber] || 0;
+                          return (
+                            <td key={`total-obt-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Total Marks Distribution for each CO */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.total.marksDistribution[coNumber] || 0;
+                          return (
+                            <td key={`total-dist-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* CO Attainment percentage for each CO */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          // Find the matching student in coAttainmentData
+                          const attainmentStudent = coAttainmentData.find(s => s.rollNumber === studentRow.rollNumber);
+                          const percentage = attainmentStudent ? (attainmentStudent.coValues[coNumber] || 0) : 0;
+                          return (
+                            <td key={`theory-attain-${coIdx}`} style={{textAlign: 'center', backgroundColor: '#a8e6d7'}}>
+                              {formatNumber(percentage)}%
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+        
+        {/* Third Table: CT and Assignment Marks */}
+        <section className="ct-assignment-section" style={{marginTop: '30px'}}>
+          <h2>CT and Assignment Marks</h2>
+          
+          {clos.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>No student data available.</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length > 0 && (
+            <div className="table-wrapper">
+              <table className="ct-assignment-table">
+                <thead>
+                  <tr>
+                    <th rowSpan="3">Roll</th>
+                    <th colSpan={clos.length}>CT</th>
+                    <th colSpan={clos.length}>Assignment</th>
+                    <th rowSpan="4">Attn</th>
+                    <th rowSpan="4">Total</th>
+                    <th rowSpan="4">Ltr Grade</th>
+                  </tr>
+                  <tr>
+                    <th colSpan={clos.length}>Mark Obtained + Distribution</th>
+                    <th colSpan={clos.length}>Mark Obtained + Distribution</th>
+                  </tr>
+                  <tr>
+                    {/* CT CO headers */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`ct-co-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* Assignment CO headers */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`assign-co-${idx}`}>{coNumber}</th>;
+                    })}
+                  </tr>
+                  <tr>
+                    <th style={{fontSize: '13px', fontWeight: '600'}}>CO msrd</th>
+                    {/* CT CO msrd */}
+                    {clos.map((clo, coIdx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      let totalObtained = 0;
+                      let totalAllocated = 0;
+                      coCalcData.forEach(student => {
+                        totalObtained += student.ct.marksObtained[coNumber] || 0;
+                        totalAllocated += student.ct.marksDistribution[coNumber] || 0;
+                      });
+                      const percentage = totalAllocated > 0 ? (totalObtained / totalAllocated) * 100 : 0;
+                      return (
+                        <th key={`ct-msrd-${coIdx}`} style={{fontSize: '13px', fontWeight: '600'}}>
+                          {formatNumber(percentage)}%
+                        </th>
+                      );
+                    })}
+                    {/* Assignment CO msrd */}
+                    {clos.map((clo, coIdx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      let totalObtained = 0;
+                      let totalAllocated = 0;
+                      coCalcData.forEach(student => {
+                        totalObtained += student.assignment.marksObtained[coNumber] || 0;
+                        totalAllocated += student.assignment.marksDistribution[coNumber] || 0;
+                      });
+                      const percentage = totalAllocated > 0 ? (totalObtained / totalAllocated) * 100 : 0;
+                      return (
+                        <th key={`assign-msrd-${coIdx}`} style={{fontSize: '13px', fontWeight: '600'}}>
+                          {formatNumber(percentage)}%
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {coCalcData.map((studentRow, studentIdx) => {
+                    return (
+                      <tr key={studentIdx}>
+                        <td className="roll-cell">{studentRow.rollNumber}</td>
+                        
+                        {/* CT - Mark Obtained */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const obtained = studentRow.ct.marksObtained[coNumber] || 0;
+                          return (
+                            <td key={`ct-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(obtained)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Assignment - Mark Obtained */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const obtained = studentRow.assignment.marksObtained[coNumber] || 0;
+                          return (
+                            <td key={`assign-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(obtained)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Attendance */}
+                        <td style={{textAlign: 'center', fontWeight: '600'}}>
+                          {formatNumber(studentRow.attendance || 0)}
+                        </td>
+                        
+                        {/* Total */}
+                        <td style={{textAlign: 'center', fontWeight: '600', backgroundColor: '#e8f4f8'}}>
+                          {(() => {
+                            let total = 0;
+                            // Sum all CT marks
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.ct.marksObtained[coNumber] || 0;
+                            });
+                            // Sum all Assignment marks
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.assignment.marksObtained[coNumber] || 0;
+                            });
+                            // Add attendance
+                            total += studentRow.attendance || 0;
+                            return formatNumber(total);
+                          })()}
+                        </td>
+                        
+                        {/* Letter Grade */}
+                        <td style={{
+                          textAlign: 'center', 
+                          fontWeight: '700', 
+                          fontSize: '15px',
+                          backgroundColor: (() => {
+                            let total = 0;
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.ct.marksObtained[coNumber] || 0;
+                            });
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.assignment.marksObtained[coNumber] || 0;
+                            });
+                            total += studentRow.attendance || 0;
+                            
+                            // Color based on grade
+                            if (total < 119) return '#f8d7da'; // F - red
+                            if (total < 134) return '#fbdcca'; // D
+                            if (total < 149) return '#fee2b3'; // C
+                            if (total < 164) return '#fff4cd'; // C+
+                            if (total < 179) return '#e8f5e9'; // B-
+                            if (total < 194) return '#d4edda'; // B
+                            if (total < 209) return '#c3e6cb'; // B+
+                            if (total < 224) return '#a8ddb5'; // A-
+                            if (total < 239) return '#7bccc4'; // A
+                            return '#7ec98f'; // A+ - dark green
+                          })(),
+                          color: (() => {
+                            let total = 0;
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.ct.marksObtained[coNumber] || 0;
+                            });
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.assignment.marksObtained[coNumber] || 0;
+                            });
+                            total += studentRow.attendance || 0;
+                            
+                            // Darker text for lighter backgrounds
+                            if (total < 119) return '#721c24'; // F
+                            if (total < 134) return '#7a4a23'; // D
+                            if (total < 149) return '#7c5e10'; // C
+                            if (total < 164) return '#856404'; // C+
+                            if (total < 179) return '#155724'; // B- onwards
+                            return '#155724';
+                          })()
+                        }}>
+                          {(() => {
+                            let total = 0;
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.ct.marksObtained[coNumber] || 0;
+                            });
+                            clos.forEach(clo => {
+                              const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                              total += studentRow.assignment.marksObtained[coNumber] || 0;
+                            });
+                            total += studentRow.attendance || 0;
+                            
+                            // Grade mapping
+                            if (total < 119) return 'F';
+                            if (total < 134) return 'D';
+                            if (total < 149) return 'C';
+                            if (total < 164) return 'C+';
+                            if (total < 179) return 'B-';
+                            if (total < 194) return 'B';
+                            if (total < 209) return 'B+';
+                            if (total < 224) return 'A-';
+                            if (total < 239) return 'A';
+                            return 'A+';
+                          })()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+        
+        {/* Fourth Table: CO-PO percentage (theory + Lab) */}
+        <section className="co-po-combined-section" style={{marginTop: '30px'}}>
+          <h2>CO - PO percentage (theory + Lab)</h2>
+          
+          {clos.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>Loading course outcomes...</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length === 0 && (
+            <p style={{padding: '20px', color: '#7f8c8d'}}>No student data available.</p>
+          )}
+          
+          {clos.length > 0 && coCalcData.length > 0 && (
+            <div className="table-wrapper">
+              <table className="co-po-percentage-table">
+                <thead>
+                  <tr>
+                    <th rowSpan="2">Roll</th>
+                    <th colSpan={clos.length}>Total Mark Obtained</th>
+                    <th colSpan={clos.length}>Total Marks Distribution</th>
+                    <th colSpan={clos.length} style={{backgroundColor: '#16a085', color: '#fff'}}>CO attainment (theory+Lab)</th>
+                  </tr>
+                  <tr>
+                    {/* CO headers for Total Mark Obtained */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`combined-obt-co-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* CO headers for Total Marks Distribution */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`combined-dist-co-${idx}`}>{coNumber}</th>;
+                    })}
+                    {/* CO headers for CO attainment */}
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return <th key={`combined-attain-co-${idx}`} style={{backgroundColor: '#16a085', color: '#fff'}}>{coNumber}</th>;
+                    })}
+                  </tr>
+                  <tr>
+                    <th style={{fontSize: '13px', fontWeight: '600'}}>CO msrd</th>
+                    {/* CO msrd row for Total Mark Obtained */}
+                    {clos.map((clo, coIdx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      // Calculate total obtained across all students
+                      let totalObtained = 0;
+                      coCalcData.forEach(student => {
+                        totalObtained += student.total.marksObtained[coNumber] || 0;
+                      });
+                      return (
+                        <th key={`combined-msrd-${coIdx}`} style={{fontSize: '13px', fontWeight: '600'}}>
+                          {formatNumber(totalObtained)}
+                        </th>
+                      );
+                    })}
+                    
+                    {/* CO msrd for Total Marks Distribution */}
+                    {clos.map((clo, coIdx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      // Calculate total allocated across all students
+                      let totalAllocated = 0;
+                      coCalcData.forEach(student => {
+                        totalAllocated += student.total.marksDistribution[coNumber] || 0;
+                      });
+                      const avgAllocated = coCalcData.length > 0 ? totalAllocated / coCalcData.length : 0;
+                      return (
+                        <th key={`combined-msrd-dist-${coIdx}`} style={{fontSize: '13px', fontWeight: '600'}}>
+                          {formatNumber(avgAllocated)}
+                        </th>
+                      );
+                    })}
+                    
+                    {/* Empty cells for CO attainment */}
+                    {clos.map((clo, coIdx) => {
+                      return <th key={`combined-msrd-attain-${coIdx}`} style={{backgroundColor: '#16a085', borderLeft: 'none', borderRight: 'none'}}></th>;
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Student rows */}
+                  {coCalcData.map((studentRow, studentIdx) => {
+                    return (
+                      <tr key={studentIdx}>
+                        <td className="roll-cell">{studentRow.rollNumber}</td>
+                        
+                        {/* Total Mark Obtained for each CO */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.total.marksObtained[coNumber] || 0;
+                          return (
+                            <td key={`combined-total-obt-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* Total Marks Distribution for each CO */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const marks = studentRow.total.marksDistribution[coNumber] || 0;
+                          return (
+                            <td key={`combined-total-dist-${coIdx}`} style={{textAlign: 'center'}}>
+                              {formatNumber(marks)}
+                            </td>
+                          );
+                        })}
+                        
+                        {/* CO attainment percentage for each CO */}
+                        {clos.map((clo, coIdx) => {
+                          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                          const obtained = studentRow.total.marksObtained[coNumber] || 0;
+                          const allocated = studentRow.total.marksDistribution[coNumber] || 0;
+                          const percentage = allocated > 0 ? (obtained / allocated) * 100 : 0;
+                          return (
+                            <td key={`combined-attain-${coIdx}`} style={{textAlign: 'center', backgroundColor: '#a8e6d7'}}>
+                              {formatNumber(percentage)}%
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+        </>
+        );
+      })()}
+
+      {/* CO-PO Mapping Table */}
+      {(() => {
+        if (selectedSheet !== 'COPOMap') return null;
+        
+        return (
+        <>
+        <section className="co-po-map-section">
+          <h3>CO-PO Mapping Table</h3>
+          
+          {!clos || clos.length === 0 ? (
+            <p>No Course Outcomes available. Please load course profile data.</p>
+          ) : !programOutcomes || programOutcomes.length === 0 ? (
+            <p>Loading Program Outcomes...</p>
+          ) : (
+            <>
+            <div className="table-container">
+              <table className="co-po-map-table">
+                <thead>
+                  <tr>
+                    <th style={{backgroundColor: '#2980b9', color: 'white'}}>CO/PO</th>
+                    {programOutcomes.map((po, idx) => (
+                      <th key={idx} style={{backgroundColor: '#2980b9', color: 'white'}}>
+                        {po.poCode || `PO${idx + 1}`}
+                      </th>
+                    ))}
+                    <th style={{backgroundColor: '#2980b9', color: 'white'}}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clos.map((clo, coIdx) => {
+                    const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                    
+                    // Parse ploAssessed field which contains comma-separated PO numbers
+                    // Expected format: "1, 2, 5" or "1, 3, 7, 11"
+                    const ploAssessed = clo.ploAssessed || '';
+                    const mappedPOs = new Set();
+                    
+                    console.log(`${coNumber} ploAssessed:`, ploAssessed);
+                    
+                    if (ploAssessed && ploAssessed.trim()) {
+                      // Split by comma and parse numbers
+                      const parts = ploAssessed.split(',').map(p => p.trim());
+                      parts.forEach(part => {
+                        const poNum = parseInt(part);
+                        if (!isNaN(poNum) && poNum > 0) {
+                          mappedPOs.add(poNum);
+                        }
+                      });
+                    }
+                    
+                    console.log(`${coNumber} mapped PO numbers:`, Array.from(mappedPOs));
+                    
+                    // Calculate row total
+                    const rowTotal = mappedPOs.size;
+                    
+                    return (
+                      <tr key={coIdx}>
+                        <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                          {coNumber}
+                        </td>
+                        {programOutcomes.map((po, poIdx) => {
+                          const poNumber = poIdx + 1; // PO1, PO2, PO3, ...
+                          const isMapped = mappedPOs.has(poNumber);
+                          
+                          return (
+                            <td 
+                              key={poIdx} 
+                              style={{
+                                textAlign: 'center',
+                                backgroundColor: isMapped ? '#d5f4e6' : 'white',
+                                fontWeight: isMapped ? 'bold' : 'normal'
+                              }}
+                            >
+                              {isMapped ? '1' : '-'}
+                            </td>
+                          );
+                        })}
+                        <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd'}}>
+                          {rowTotal}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  
+                  {/* Column Totals Row */}
+                  <tr>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                      Total
+                    </td>
+                    {programOutcomes.map((po, poIdx) => {
+                      const poNumber = poIdx + 1;
+                      // Count how many COs map to this PO
+                      let columnTotal = 0;
+                      clos.forEach(clo => {
+                        const ploAssessed = clo.ploAssessed || '';
+                        if (ploAssessed && ploAssessed.trim()) {
+                          const parts = ploAssessed.split(',').map(p => p.trim());
+                          parts.forEach(part => {
+                            const poNum = parseInt(part);
+                            if (poNum === poNumber) {
+                              columnTotal++;
+                            }
+                          });
+                        }
+                      });
+                      
+                      return (
+                        <td 
+                          key={poIdx} 
+                          style={{
+                            textAlign: 'center',
+                            fontWeight: 'bold',
+                            backgroundColor: '#fff3cd'
+                          }}
+                        >
+                          {columnTotal}
+                        </td>
+                      );
+                    })}
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd'}}>
+                      -
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Normalized CO-PO Mapping Table (divided by column totals) */}
+            <div className="table-container" style={{marginTop: '30px'}}>
+              <h4 style={{marginBottom: '15px', color: '#2c3e50'}}>Normalized CO-PO Mapping (Contribution per PO)</h4>
+              <table className="co-po-map-table">
+                <thead>
+                  <tr>
+                    <th style={{backgroundColor: '#2980b9', color: 'white'}}>CO/PO</th>
+                    {programOutcomes.map((po, idx) => (
+                      <th key={idx} style={{backgroundColor: '#2980b9', color: 'white'}}>
+                        {po.poCode || `PO${idx + 1}`}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    // Calculate column totals first
+                    const columnTotals = programOutcomes.map((po, poIdx) => {
+                      const poNumber = poIdx + 1;
+                      let columnTotal = 0;
+                      clos.forEach(clo => {
+                        const ploAssessed = clo.ploAssessed || '';
+                        if (ploAssessed && ploAssessed.trim()) {
+                          const parts = ploAssessed.split(',').map(p => p.trim());
+                          parts.forEach(part => {
+                            const poNum = parseInt(part);
+                            if (poNum === poNumber) {
+                              columnTotal++;
+                            }
+                          });
+                        }
+                      });
+                      return columnTotal;
+                    });
+
+                    return clos.map((clo, coIdx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      
+                      const ploAssessed = clo.ploAssessed || '';
+                      const mappedPOs = new Set();
+                      
+                      if (ploAssessed && ploAssessed.trim()) {
+                        const parts = ploAssessed.split(',').map(p => p.trim());
+                        parts.forEach(part => {
+                          const poNum = parseInt(part);
+                          if (!isNaN(poNum) && poNum > 0) {
+                            mappedPOs.add(poNum);
+                          }
+                        });
+                      }
+                      
+                      return (
+                        <tr key={coIdx}>
+                          <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                            {coNumber}
+                          </td>
+                          {programOutcomes.map((po, poIdx) => {
+                            const poNumber = poIdx + 1;
+                            const isMapped = mappedPOs.has(poNumber);
+                            const columnTotal = columnTotals[poIdx];
+                            const normalizedValue = (isMapped && columnTotal > 0) ? (1 / columnTotal) : 0;
+                            
+                            return (
+                              <td 
+                                key={poIdx} 
+                                style={{
+                                  textAlign: 'center',
+                                  backgroundColor: isMapped ? '#d5f4e6' : 'white',
+                                  fontWeight: isMapped ? 'bold' : 'normal'
+                                }}
+                              >
+                                {normalizedValue > 0 ? parseFloat(normalizedValue.toFixed(4)) : '-'}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    });
+                  })()}
+                  
+                  {/* Column Totals Row - should sum to 1.0 for each column */}
+                  <tr>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                      Total
+                    </td>
+                    {programOutcomes.map((po, poIdx) => {
+                      const poNumber = poIdx + 1;
+                      let columnSum = 0;
+                      
+                      // Get original column total
+                      let originalColumnTotal = 0;
+                      clos.forEach(clo => {
+                        const ploAssessed = clo.ploAssessed || '';
+                        if (ploAssessed && ploAssessed.trim()) {
+                          const parts = ploAssessed.split(',').map(p => p.trim());
+                          parts.forEach(part => {
+                            const poNum = parseInt(part);
+                            if (poNum === poNumber) {
+                              originalColumnTotal++;
+                            }
+                          });
+                        }
+                      });
+                      
+                      // Sum normalized values
+                      clos.forEach(clo => {
+                        const ploAssessed = clo.ploAssessed || '';
+                        if (ploAssessed && ploAssessed.trim()) {
+                          const parts = ploAssessed.split(',').map(p => p.trim());
+                          parts.forEach(part => {
+                            const poNum = parseInt(part);
+                            if (poNum === poNumber && originalColumnTotal > 0) {
+                              columnSum += 1 / originalColumnTotal;
+                            }
+                          });
+                        }
+                      });
+                      
+                      return (
+                        <td 
+                          key={poIdx}
+                          style={{
+                            textAlign: 'center',
+                            fontWeight: 'bold',
+                            backgroundColor: '#fff3cd'
+                          }}
+                        >
+                          {columnSum > 0 ? parseFloat(columnSum.toFixed(4)) : '-'}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Combined CO-PO Mapping Table (Theory + Lab) */}
+            {combinedCOPOMatrix && matchingCourseCode && (
+              <>
+              <div className="table-container" style={{marginTop: '30px'}}>
+                <h4 style={{marginBottom: '15px', color: '#2c3e50'}}>
+                  Combined CO-PO Mapping ({selectedCourse.courseCode} + {matchingCourseCode})
+                </h4>
+                <table className="co-po-map-table">
+                  <thead>
+                    <tr>
+                      <th style={{backgroundColor: '#2980b9', color: 'white'}}>CO/PO</th>
+                      {programOutcomes.map((po, idx) => (
+                        <th key={idx} style={{backgroundColor: '#2980b9', color: 'white'}}>
+                          {po.poCode || `PO${idx + 1}`}
+                        </th>
+                      ))}
+                      <th style={{backgroundColor: '#2980b9', color: 'white'}}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.keys(combinedCOPOMatrix).sort().map((coNumber, coIdx) => {
+                      const mappedPOs = combinedCOPOMatrix[coNumber];
+                      const rowTotal = mappedPOs.length;
+                      
+                      return (
+                        <tr key={coIdx}>
+                          <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                            {coNumber}
+                          </td>
+                          {programOutcomes.map((po, poIdx) => {
+                            const poNumber = poIdx + 1;
+                            const isMapped = mappedPOs.includes(poNumber);
+                            
+                            return (
+                              <td 
+                                key={poIdx} 
+                                style={{
+                                  textAlign: 'center',
+                                  backgroundColor: isMapped ? '#d5f4e6' : 'white',
+                                  fontWeight: isMapped ? 'bold' : 'normal'
+                                }}
+                              >
+                                {isMapped ? '1' : '-'}
+                              </td>
+                            );
+                          })}
+                          <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd'}}>
+                            {rowTotal}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    
+                    {/* Column Totals Row */}
+                    <tr>
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                        Total
+                      </td>
+                      {programOutcomes.map((po, poIdx) => {
+                        const poNumber = poIdx + 1;
+                        let columnTotal = 0;
+                        Object.keys(combinedCOPOMatrix).forEach(coNumber => {
+                          if (combinedCOPOMatrix[coNumber].includes(poNumber)) {
+                            columnTotal++;
+                          }
+                        });
+                        
+                        return (
+                          <td 
+                            key={poIdx} 
+                            style={{
+                              textAlign: 'center',
+                              fontWeight: 'bold',
+                              backgroundColor: '#fff3cd'
+                            }}
+                          >
+                            {columnTotal}
+                          </td>
+                        );
+                      })}
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd'}}>
+                        -
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Normalized Combined CO-PO Mapping Table */}
+              <div className="table-container" style={{marginTop: '30px'}}>
+                <h4 style={{marginBottom: '15px', color: '#2c3e50'}}>
+                  Normalized Combined CO-PO Mapping ({selectedCourse.courseCode} + {matchingCourseCode})
+                </h4>
+                <table className="co-po-map-table">
+                  <thead>
+                    <tr>
+                      <th style={{backgroundColor: '#2980b9', color: 'white'}}>CO/PO</th>
+                      {programOutcomes.map((po, idx) => (
+                        <th key={idx} style={{backgroundColor: '#2980b9', color: 'white'}}>
+                          {po.poCode || `PO${idx + 1}`}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      // First, calculate column totals
+                      const columnTotals = programOutcomes.map((po, poIdx) => {
+                        const poNumber = poIdx + 1;
+                        let total = 0;
+                        Object.keys(combinedCOPOMatrix).forEach(coNumber => {
+                          if (combinedCOPOMatrix[coNumber].includes(poNumber)) {
+                            total++;
+                          }
+                        });
+                        return total;
+                      });
+                      
+                      return (
+                        <>
+                          {Object.keys(combinedCOPOMatrix).sort().map((coNumber, coIdx) => {
+                            const mappedPOs = combinedCOPOMatrix[coNumber];
+                            
+                            return (
+                              <tr key={coIdx}>
+                                <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                                  {coNumber}
+                                </td>
+                                {programOutcomes.map((po, poIdx) => {
+                                  const poNumber = poIdx + 1;
+                                  const isMapped = mappedPOs.includes(poNumber);
+                                  const columnTotal = columnTotals[poIdx];
+                                  const normalizedValue = isMapped && columnTotal > 0 
+                                    ? parseFloat((1 / columnTotal).toFixed(4))
+                                    : 0;
+                                  
+                                  return (
+                                    <td 
+                                      key={poIdx} 
+                                      style={{
+                                        textAlign: 'center',
+                                        backgroundColor: isMapped ? '#d5f4e6' : 'white',
+                                        fontWeight: isMapped ? 'bold' : 'normal'
+                                      }}
+                                    >
+                                      {isMapped ? normalizedValue : '-'}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                          
+                          {/* Column Totals Row */}
+                          <tr>
+                            <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                              Total
+                            </td>
+                            {columnTotals.map((total, poIdx) => {
+                              // Sum of normalized values in each column should equal 1
+                              return (
+                                <td 
+                                  key={poIdx} 
+                                  style={{
+                                    textAlign: 'center',
+                                    fontWeight: 'bold',
+                                    backgroundColor: '#fff3cd'
+                                  }}
+                                >
+                                  {total > 0 ? parseFloat((1).toFixed(4)) : '-'}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        </>
+                      );
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+              </>
+            )}
+            </>
+          )}
+        </section>
+        </>
+        );
+      })()}
+
+      {/* PO Calculation Max Tables */}
+      {(() => {
+        if (selectedSheet !== 'POCalcMax') return null;
+        
+        // Determine if course is theory or lab based on last digit of course code
+        const courseCode = selectedCourse?.courseCode || '';
+        const lastDigit = parseInt(courseCode.charAt(courseCode.length - 1));
+        const isTheoryCourse = lastDigit % 2 === 1; // odd = theory
+        const isLabCourse = lastDigit % 2 === 0; // even = lab
+        
+        return (
+        <>
+        <section className="po-calc-max-section">
+          <h3>PO Calculation Max</h3>
+          
+          {!programOutcomes || programOutcomes.length === 0 ? (
+            <p>Loading Program Outcomes...</p>
+          ) : !poCalcStudents || poCalcStudents.length === 0 ? (
+            <p>Loading Students...</p>
+          ) : (
+            <>
+            {/* Theory Only Table - Show only in theory courses */}
+            {isTheoryCourse && (
+            <div className="table-container" style={{marginTop: '20px'}}>
+              <h4 style={{marginBottom: '15px', color: '#2c3e50'}}>Theory only</h4>
+              <table className="co-po-map-table">
+                <thead>
+                  <tr>
+                    <th style={{backgroundColor: '#2980b9', color: 'white'}}>Roll</th>
+                    {programOutcomes.map((po, idx) => (
+                      <th key={idx} style={{backgroundColor: '#2980b9', color: 'white'}}>
+                        {po.poCode || `PO${idx + 1}`}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {poCalcStudents.map((student, sIdx) => (
+                    <tr key={sIdx}>
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                        {student.rollNumber}
+                      </td>
+                      {programOutcomes.map((po, pIdx) => (
+                        <td key={pIdx} style={{textAlign: 'center'}}>-</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            )}
+
+            {/* Lab Only Table - Show only in lab courses */}
+            {isLabCourse && (
+            <div className="table-container" style={{marginTop: '30px'}}>
+              <h4 style={{marginBottom: '15px', color: '#2c3e50'}}>Lab Only</h4>
+              <table className="co-po-map-table">
+                <thead>
+                  <tr>
+                    <th style={{backgroundColor: '#2980b9', color: 'white'}}>Roll</th>
+                    {programOutcomes.map((po, idx) => (
+                      <th key={idx} style={{backgroundColor: '#2980b9', color: 'white'}}>
+                        {po.poCode || `PO${idx + 1}`}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {poCalcStudents.map((student, sIdx) => (
+                    <tr key={sIdx}>
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                        {student.rollNumber}
+                      </td>
+                      {programOutcomes.map((po, pIdx) => (
+                        <td key={pIdx} style={{textAlign: 'center'}}>-</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            )}
+
+            {/* Theory+Lab Table */}
+            <div className="table-container" style={{marginTop: '30px'}}>
+              <h4 style={{marginBottom: '15px', color: '#2c3e50'}}>Theory+Lab</h4>
+              <table className="co-po-map-table">
+                <thead>
+                  <tr>
+                    <th style={{backgroundColor: '#2980b9', color: 'white'}}>Roll</th>
+                    {programOutcomes.map((po, idx) => (
+                      <th key={idx} style={{backgroundColor: '#2980b9', color: 'white'}}>
+                        {po.poCode || `PO${idx + 1}`}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {poCalcStudents.map((student, sIdx) => (
+                    <tr key={sIdx}>
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                        {student.rollNumber}
+                      </td>
+                      {programOutcomes.map((po, pIdx) => (
+                        <td key={pIdx} style={{textAlign: 'center'}}>-</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Theory+Lab(unnorm) Table */}
+            <div className="table-container" style={{marginTop: '30px'}}>
+              <h4 style={{marginBottom: '15px', color: '#2c3e50'}}>Theory+Lab(unnorm)</h4>
+              <table className="co-po-map-table">
+                <thead>
+                  <tr>
+                    <th style={{backgroundColor: '#2980b9', color: 'white'}}>Roll</th>
+                    {programOutcomes.map((po, idx) => (
+                      <th key={idx} style={{backgroundColor: '#2980b9', color: 'white'}}>
+                        {po.poCode || `PO${idx + 1}`}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {poCalcStudents.map((student, sIdx) => (
+                    <tr key={sIdx}>
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                        {student.rollNumber}
+                      </td>
+                      {programOutcomes.map((po, pIdx) => (
+                        <td key={pIdx} style={{textAlign: 'center'}}>-</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Theory+Lab(Eq Wt) Table */}
+            <div className="table-container" style={{marginTop: '30px'}}>
+              <h4 style={{marginBottom: '15px', color: '#2c3e50'}}>Theory+Lab(Eq Wt)</h4>
+              <table className="co-po-map-table">
+                <thead>
+                  <tr>
+                    <th style={{backgroundColor: '#2980b9', color: 'white'}}>Roll</th>
+                    {programOutcomes.map((po, idx) => (
+                      <th key={idx} style={{backgroundColor: '#2980b9', color: 'white'}}>
+                        {po.poCode || `PO${idx + 1}`}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {poCalcStudents.map((student, sIdx) => (
+                    <tr key={sIdx}>
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                        {student.rollNumber}
+                      </td>
+                      {programOutcomes.map((po, pIdx) => (
+                        <td key={pIdx} style={{textAlign: 'center'}}>-</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            </>
+          )}
+        </section>
+        </>
+        );
+      })()}
+
+      {/* Charts Section */}
+      {(() => {
+        if (selectedSheet !== 'Charts') return null;
+        
+        // Determine matching course code for theory + lab pairing
+        const courseCode = selectedCourse?.courseCode || '';
+        const lastDigit = parseInt(courseCode.charAt(courseCode.length - 1));
+        const baseCode = courseCode.substring(0, courseCode.length - 1);
+        const isTheory = lastDigit % 2 === 1;
+        const theoryCourseCode = isTheory ? courseCode : baseCode + (lastDigit - 1);
+        const labCourseCode = isTheory ? baseCode + (lastDigit + 1) : courseCode;
+        
+        return (
+        <>
+        <section className="charts-section">
+          <h3>Charts</h3>
+          
+          {!clos || clos.length === 0 ? (
+            <p>Loading Course Outcomes...</p>
+          ) : !programOutcomes || programOutcomes.length === 0 ? (
+            <p>Loading Program Outcomes...</p>
+          ) : (
+            <>
+            {/* CO Achievement Table */}
+            <div className="table-container" style={{marginTop: '20px'}}>
+              <h4 style={{marginBottom: '15px', color: '#2c3e50'}}>
+                CO Attainment of {theoryCourseCode} + {labCourseCode}
+              </h4>
+              <table className="co-po-map-table">
+                <thead>
+                  <tr>
+                    <th style={{backgroundColor: '#2980b9', color: 'white'}}>Metric</th>
+                    {clos.map((clo, idx) => {
+                      const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                      return (
+                        <th key={idx} style={{backgroundColor: '#2980b9', color: 'white'}}>
+                          {coNumber}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                      Achieved(%)
+                    </td>
+                    {clos.map((clo, idx) => (
+                      <td key={idx} style={{textAlign: 'center'}}>-</td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                      Unnorm Achieved(%)
+                    </td>
+                    {clos.map((clo, idx) => (
+                      <td key={idx} style={{textAlign: 'center'}}>-</td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                      Eq. Wt. Achieved(%)
+                    </td>
+                    {clos.map((clo, idx) => (
+                      <td key={idx} style={{textAlign: 'center'}}>-</td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* PO Achievement Table */}
+            <div className="table-container" style={{marginTop: '30px'}}>
+              <h4 style={{marginBottom: '15px', color: '#2c3e50'}}>
+                PO Attainment of {theoryCourseCode} + {labCourseCode}
+              </h4>
+              <table className="co-po-map-table">
+                <thead>
+                  <tr>
+                    <th style={{backgroundColor: '#2980b9', color: 'white'}}>Metric</th>
+                    {programOutcomes.map((po, idx) => (
+                      <th key={idx} style={{backgroundColor: '#2980b9', color: 'white'}}>
+                        {po.poCode || `PO${idx + 1}`}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                      Achieved(%)
+                    </td>
+                    {programOutcomes.map((po, idx) => (
+                      <td key={idx} style={{textAlign: 'center'}}>-</td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                      Unnorm Achieved(%)
+                    </td>
+                    {programOutcomes.map((po, idx) => (
+                      <td key={idx} style={{textAlign: 'center'}}>-</td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                      Eq. Wt. Achieved(%)
+                    </td>
+                    {programOutcomes.map((po, idx) => (
+                      <td key={idx} style={{textAlign: 'center'}}>-</td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            </>
+          )}
+        </section>
+        </>
+        );
+      })()}
+
+      {/* CheckPO Section */}
+      {(() => {
+        if (selectedSheet !== 'CheckPO') return null;
+        
+        return (
+        <>
+        <section className="check-po-section">
+          <h3>Check PO</h3>
+          
+          {!programOutcomes || programOutcomes.length === 0 ? (
+            <p>Loading Program Outcomes...</p>
+          ) : !poCalcStudents || poCalcStudents.length === 0 ? (
+            <p>Loading Students...</p>
+          ) : (
+            <>
+            <div className="table-container" style={{marginTop: '20px'}}>
+              <table className="co-po-map-table">
+                <thead>
+                  <tr>
+                    <th style={{backgroundColor: '#2980b9', color: 'white'}}>Roll</th>
+                    {programOutcomes.map((po, idx) => (
+                      <th key={idx} style={{backgroundColor: '#2980b9', color: 'white'}}>
+                        {po.poCode || `PO${idx + 1}`}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {poCalcStudents.map((student, sIdx) => (
+                    <tr key={sIdx}>
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                        {student.rollNumber}
+                      </td>
+                      {programOutcomes.map((po, pIdx) => (
+                        <td key={pIdx} style={{textAlign: 'center'}}>Ok</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            </>
+          )}
+        </section>
+        </>
+        );
+      })()}
+
+      {/* POCalc Section */}
+      {(() => {
+        if (selectedSheet !== 'POCalc') return null;
+        
+        // Determine if course is theory or lab based on last digit of course code
+        const courseCode = selectedCourse?.courseCode || '';
+        const lastDigit = parseInt(courseCode.charAt(courseCode.length - 1));
+        const isTheoryCourse = lastDigit % 2 === 1; // odd = theory
+        const isLabCourse = lastDigit % 2 === 0; // even = lab
+        
+        return (
+        <>
+        <section className="po-calc-section">
+          <h3>PO Calculation</h3>
+          
+          {!programOutcomes || programOutcomes.length === 0 ? (
+            <p>Loading Program Outcomes...</p>
+          ) : !poCalcStudents || poCalcStudents.length === 0 ? (
+            <p>Loading Students...</p>
+          ) : (
+            <>
+            {/* Theory Only Table - Show only in theory courses */}
+            {isTheoryCourse && (
+            <div className="table-container" style={{marginTop: '20px'}}>
+              <h4 style={{marginBottom: '15px', color: '#2c3e50'}}>Theory only</h4>
+              <table className="co-po-map-table">
+                <thead>
+                  <tr>
+                    <th style={{backgroundColor: '#2980b9', color: 'white'}}>Roll</th>
+                    {programOutcomes.map((po, idx) => (
+                      <th key={idx} style={{backgroundColor: '#2980b9', color: 'white'}}>
+                        {po.poCode || `PO${idx + 1}`}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {poCalcStudents.map((student, sIdx) => (
+                    <tr key={sIdx}>
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                        {student.rollNumber}
+                      </td>
+                      {programOutcomes.map((po, pIdx) => (
+                        <td key={pIdx} style={{textAlign: 'center'}}>-</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            )}
+
+            {/* Lab Only Table - Show only in lab courses */}
+            {isLabCourse && (
+            <div className="table-container" style={{marginTop: '30px'}}>
+              <h4 style={{marginBottom: '15px', color: '#2c3e50'}}>Lab Only</h4>
+              <table className="co-po-map-table">
+                <thead>
+                  <tr>
+                    <th style={{backgroundColor: '#2980b9', color: 'white'}}>Roll</th>
+                    {programOutcomes.map((po, idx) => (
+                      <th key={idx} style={{backgroundColor: '#2980b9', color: 'white'}}>
+                        {po.poCode || `PO${idx + 1}`}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {poCalcStudents.map((student, sIdx) => (
+                    <tr key={sIdx}>
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                        {student.rollNumber}
+                      </td>
+                      {programOutcomes.map((po, pIdx) => (
+                        <td key={pIdx} style={{textAlign: 'center'}}>-</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            )}
+
+            {/* Theory+Lab Table */}
+            <div className="table-container" style={{marginTop: '30px'}}>
+              <h4 style={{marginBottom: '15px', color: '#2c3e50'}}>Theory+Lab</h4>
+              <table className="co-po-map-table">
+                <thead>
+                  <tr>
+                    <th style={{backgroundColor: '#2980b9', color: 'white'}}>Roll</th>
+                    {programOutcomes.map((po, idx) => (
+                      <th key={idx} style={{backgroundColor: '#2980b9', color: 'white'}}>
+                        {po.poCode || `PO${idx + 1}`}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {poCalcStudents.map((student, sIdx) => (
+                    <tr key={sIdx}>
+                      <td style={{textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8'}}>
+                        {student.rollNumber}
+                      </td>
+                      {programOutcomes.map((po, pIdx) => (
+                        <td key={pIdx} style={{textAlign: 'center'}}>-</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            </>
+          )}
+        </section>
+        </>
+        );
+      })()}
     </div>
   );
 };

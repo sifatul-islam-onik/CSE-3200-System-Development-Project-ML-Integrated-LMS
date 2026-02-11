@@ -128,3 +128,43 @@ export const getCTData = async (courseId) => {
     throw error.response?.data || error.message;
   }
 };
+
+/**
+ * Save Assignment/Attendance attainment data
+ * @param {string} courseId - Course ID
+ * @param {object} data - Assignment data to save
+ */
+export const saveAssignmentData = async (courseId, data) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(
+      `${API_URL}/attainment/assignment/${courseId}`,
+      data,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Get Assignment/Attendance attainment data for a course
+ * @param {string} courseId - Course ID
+ */
+export const getAssignmentData = async (courseId) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(
+      `${API_URL}/attainment/assignment/${courseId}`,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};

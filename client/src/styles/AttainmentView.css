@@ -171,7 +171,6 @@ section {
 .ct-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 900px;
   border: 1px solid #ddd;
   border-radius: 8px;
   overflow: hidden;
@@ -507,4 +506,580 @@ section {
 
 .section-a-table tfoot tr:last-child {
   border-top: 2px solid #d5d5d5;
+}
+
+/* CO Attainment Table Styles */
+.co-attainment-section {
+  margin-bottom: 40px;
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.co-attainment-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1000px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.co-attainment-table th,
+.co-attainment-table td {
+  padding: 10px 8px;
+  text-align: center;
+  border: 1px solid #ddd;
+}
+
+.co-attainment-table thead th {
+  background-color: #3498db;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.co-attainment-table thead tr:first-child th {
+  background-color: #2980b9;
+}
+
+.co-attainment-table .roll-cell {
+  background-color: #ecf0f1;
+  font-weight: 600;
+  color: #2c3e50;
+  text-align: left;
+  padding-left: 12px;
+}
+
+.co-attainment-table .footer-label {
+  background-color: #ecf0f1;
+  font-weight: 600;
+  color: #2c3e50;
+  text-align: left;
+  padding-left: 12px;
+}
+
+.co-attainment-table tfoot td {
+  background-color: #f8f9fa;
+  font-weight: 600;
+}
+
+/* COCalc Section Styles */
+.co-calc-section {
+  margin-top: 30px;
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.co-calc-section h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 22px;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 10px;
+}
+
+.co-calc-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1000px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.co-calc-table th,
+.co-calc-table td {
+  padding: 10px 12px;
+  text-align: center;
+  border: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.co-calc-table thead tr:first-child th {
+  background-color: #2980b9;
+  color: white;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.co-calc-table thead tr:nth-child(2) th {
+  background-color: #2980b9;
+  color: white;
+  font-weight: 600;
+}
+
+.co-calc-table thead tr:nth-child(3) th {
+  background-color: #2980b9;
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.co-calc-table .roll-cell {
+  background-color: #ecf0f1;
+  font-weight: 600;
+  color: #2c3e50;
+  text-align: left;
+  padding-left: 12px;
+}
+
+.co-calc-table tbody td {
+  background-color: #ffffff;
+}
+
+.co-calc-table tbody tr:nth-child(even) td {
+  background-color: #f8f9fa;
+}
+
+.co-calc-table tbody tr:hover td {
+  background-color: #e8f4f8;
+}
+
+/* CO-PO Percentage Section Styles */
+.co-po-percentage-section {
+  margin-top: 30px;
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.co-po-percentage-section h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 22px;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 10px;
+}
+
+.co-po-percentage-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.co-po-percentage-table th,
+.co-po-percentage-table td {
+  padding: 10px 12px;
+  text-align: center;
+  border: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.co-po-percentage-table thead tr:first-child th {
+  background-color: #2980b9;
+  color: white;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.co-po-percentage-table thead tr:nth-child(2) th {
+  background-color: #2980b9;
+  color: white;
+  font-weight: 600;
+}
+
+.co-po-percentage-table thead tr:nth-child(3) th {
+  background-color: #2980b9;
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.co-po-percentage-table .roll-cell {
+  background-color: #ecf0f1;
+  font-weight: 600;
+  color: #2c3e50;
+  text-align: left;
+  padding-left: 12px;
+}
+
+.co-po-percentage-table tbody td {
+  background-color: #ffffff;
+}
+
+.co-po-percentage-table tbody tr:nth-child(even) td {
+  background-color: #f8f9fa;
+}
+
+.co-po-percentage-table tbody tr:hover td {
+  background-color: #e8f4f8;
+}
+
+/* CT and Assignment Section Styles */
+.ct-assignment-section {
+  margin-top: 30px;
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.ct-assignment-section h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 22px;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 10px;
+}
+
+.ct-assignment-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1200px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ct-assignment-table th,
+.ct-assignment-table td {
+  padding: 10px 12px;
+  text-align: center;
+  border: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.ct-assignment-table thead tr:first-child th {
+  background-color: #2980b9;
+  color: white;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.ct-assignment-table thead tr:nth-child(2) th {
+  background-color: #2980b9;
+  color: white;
+  font-weight: 600;
+}
+
+.ct-assignment-table thead tr:nth-child(3) th {
+  background-color: #2980b9;
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.ct-assignment-table thead tr:nth-child(4) th {
+  background-color: #2980b9;
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.ct-assignment-table .roll-cell {
+  background-color: #ecf0f1;
+  font-weight: 600;
+  color: #2c3e50;
+  text-align: left;
+  padding-left: 12px;
+}
+
+.ct-assignment-table tbody td {
+  background-color: #ffffff;
+}
+
+.ct-assignment-table tbody tr:nth-child(even) td {
+  background-color: #f8f9fa;
+}
+
+.ct-assignment-table tbody tr:hover td {
+  background-color: #e8f4f8;
+}
+
+/* CO-PO Combined Section Styles */
+.co-po-combined-section {
+  margin-top: 30px;
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.co-po-combined-section h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 22px;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 10px;
+}
+
+/* CO-PO Mapping Section */
+.co-po-map-section {
+  margin-top: 30px;
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.co-po-map-section h3 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 22px;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 10px;
+}
+
+.co-po-map-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.co-po-map-table th,
+.co-po-map-table td {
+  padding: 12px;
+  text-align: center;
+  border: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.co-po-map-table th {
+  background-color: #2980b9;
+  color: white;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.co-po-map-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+/* PO Calc Max Section */
+.po-calc-max-section {
+  margin-top: 30px;
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.po-calc-max-section h3 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 22px;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 10px;
+}
+
+.po-calc-max-section h4 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Charts Section */
+.charts-section {
+  margin-top: 30px;
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.charts-section h3 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 22px;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 10px;
+}
+
+.charts-section h4 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* CheckPO Section */
+.check-po-section {
+  margin-top: 30px;
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.check-po-section h3 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 22px;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 10px;
+}
+
+/* POCalc Section */
+.po-calc-section {
+  margin-top: 30px;
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.po-calc-section h3 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 22px;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 10px;
+}
+
+.po-calc-section h4 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Action Buttons Container */
+.action-buttons-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Save Status Badge */
+.save-status-badge {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+.save-status-badge.saving {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+}
+
+.save-status-badge.saved {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.save-status-badge.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* Professional Buttons */
+.btn-professional {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-professional:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-professional:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.btn-professional:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Button Variants */
+.btn-save {
+  background-color: #27ae60;
+  color: white;
+}
+
+.btn-save:hover:not(:disabled) {
+  background-color: #229954;
+}
+
+.btn-save:disabled {
+  background-color: #95a5a6;
+}
+
+.btn-primary {
+  background-color: #3498db;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #2980b9;
+}
+
+.btn-secondary {
+  background-color: #95a5a6;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #7f8c8d;
+}
+
+.btn-info {
+  background-color: #17a2b8;
+  color: white;
+}
+
+.btn-info:hover:not(:disabled) {
+  background-color: #138496;
+}
+
+/* Responsive Design */
+@media screen and (max-width: 768px) {
+  .action-buttons-container {
+    justify-content: stretch;
+    flex-direction: column;
+  }
+  
+  .btn-professional {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .save-status-badge {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .btn-professional {
+    padding: 12px 16px;
+    font-size: 13px;
+  }
+  
+  .save-status-badge {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
 }
