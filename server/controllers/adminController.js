@@ -968,12 +968,28 @@ exports.assignTeacherToCourse = async (req, res) => {
     }
 
     const { courseId } = req.params;
-    const { teacherId } = req.body;
+    const { teacherId, section } = req.body;
 
     if (!teacherId) {
       return res.status(400).json({
         success: false,
         message: 'Teacher ID is required'
+      });
+    }
+
+    // Validate section is required
+    if (!section) {
+      return res.status(400).json({
+        success: false,
+        message: 'Section is required'
+      });
+    }
+
+    // Validate section value
+    if (!['A', 'B'].includes(section)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Section must be either A or B'
       });
     }
 
@@ -1041,15 +1057,34 @@ exports.assignTeacherToCourse = async (req, res) => {
       });
     }
 
+    // Check if section is already assigned to another teacher
+    const sectionAlreadyAssigned = course.assignedTeachers.find(
+      a => a.section === section
+    );
+
+    if (sectionAlreadyAssigned) {
+      return res.status(400).json({
+        success: false,
+        message: `Section ${section} is already assigned to another teacher`
+      });
+    }
+
     // Add teacher to assignedTeachers array
     course.assignedTeachers.push({
       teacher: teacherId,
-      section: null
+      section: section
     });
     await course.save();
 
     // Populate teacher info for response
     await course.populate('assignedTeachers.teacher', 'name email designation');
+
+    // Ensure section field is preserved in response
+    const assignedTeachersWithSection = course.assignedTeachers.map(assignment => ({
+      teacher: assignment.teacher,
+      section: assignment.section,
+      _id: assignment._id
+    }));
 
     res.status(200).json({
       success: true,
@@ -1058,7 +1093,7 @@ exports.assignTeacherToCourse = async (req, res) => {
         courseId: course._id,
         courseCode: course.courseCode,
         courseTitle: course.courseTitle,
-        assignedTeachers: course.assignedTeachers
+        assignedTeachers: assignedTeachersWithSection
       }
     });
 

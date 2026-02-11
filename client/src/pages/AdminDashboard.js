@@ -89,6 +89,7 @@ const AdminDashboard = () => {
   const [assignmentLoading, setAssignmentLoading] = useState(false);
   const [assignmentError, setAssignmentError] = useState('');
   const [assignmentSuccess, setAssignmentSuccess] = useState('');
+  const [teacherSectionSelections, setTeacherSectionSelections] = useState({});
   const [teacherFilter, setTeacherFilter] = useState('');
   const [showBatchAssignmentModal, setShowBatchAssignmentModal] = useState(false);
   const [selectedCourseForBatch, setSelectedCourseForBatch] = useState(null);
@@ -807,7 +808,7 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleAssignTeacher = async (teacherId) => {
+  const handleAssignTeacher = async (teacherId, section) => {
     if (!selectedCourseForAssignment) return;
     
     setAssignmentLoading(true);
@@ -817,21 +818,34 @@ const AdminDashboard = () => {
     console.log('Assigning teacher:', {
       courseId: selectedCourseForAssignment._id,
       teacherId,
-      section: null
+      section
     });
     
     try {
-      const response = await assignTeacherToCourse(selectedCourseForAssignment._id, teacherId);
+      const response = await assignTeacherToCourse(selectedCourseForAssignment._id, teacherId, section);
       console.log('Teacher assignment response:', response);
+      console.log('assignedTeachers from response:', JSON.stringify(response.data?.assignedTeachers, null, 2));
       setAssignmentSuccess('Teacher assigned successfully');
       
       // Update the selected course with the new assignment data
       if (response.data?.assignedTeachers) {
-        setSelectedCourseForAssignment(prev => ({
-          ...prev,
-          assignedTeachers: response.data.assignedTeachers
-        }));
+        console.log('Updating selectedCourseForAssignment state with:', JSON.stringify(response.data.assignedTeachers, null, 2));
+        setSelectedCourseForAssignment(prev => {
+          const updated = {
+            ...prev,
+            assignedTeachers: response.data.assignedTeachers
+          };
+          console.log('New selectedCourseForAssignment:', JSON.stringify(updated.assignedTeachers, null, 2));
+          return updated;
+        });
       }
+      
+      // Clear the section selection for this teacher
+      setTeacherSectionSelections(prev => {
+        const updated = { ...prev };
+        delete updated[teacherId];
+        return updated;
+      });
       
       fetchCourses(); // Refresh courses list
       setTimeout(() => setAssignmentSuccess(''), 3000);
@@ -3057,10 +3071,30 @@ const AdminDashboard = () => {
                   Currently Assigned Teachers
                 </h4>
                 {selectedCourseForAssignment.assignedTeachers && selectedCourseForAssignment.assignedTeachers.length > 0 ? (
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                  <>
+                    {selectedCourseForAssignment.assignedTeachers.some(a => !a.section) && (
+                      <div style={{
+                        padding: '10px 12px',
+                        backgroundColor: '#fef3c7',
+                        border: '1px solid #fbbf24',
+                        borderRadius: '6px',
+                        marginBottom: '12px',
+                        fontSize: '13px',
+                        color: '#92400e'
+                      }}>
+                        <strong>⚠️ Warning:</strong> Some teachers don't have a section assigned. Please remove and reassign them with a section.
+                      </div>
+                    )}
+                    <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                     {selectedCourseForAssignment.assignedTeachers.map((assignment, idx) => {
                       const teacher = assignment.teacher || assignment;
                       const section = assignment.section;
+                      console.log(`Rendering teacher ${idx}:`, { 
+                        assignment: JSON.stringify(assignment), 
+                        teacher: teacher?.name, 
+                        section: section,
+                        sectionType: typeof section
+                      });
                       return (
                         <div 
                           key={`${teacher._id}-${section || idx}`}
@@ -3077,6 +3111,31 @@ const AdminDashboard = () => {
                           <div style={{flex: 1}}>
                             <div style={{fontWeight: 500, fontSize: '14px', color: '#1f2937'}}>
                               {teacher.name}
+                              {section ? (
+                                <span style={{
+                                  marginLeft: '8px',
+                                  padding: '2px 8px',
+                                  backgroundColor: '#dbeafe',
+                                  color: '#1e40af',
+                                  borderRadius: '4px',
+                                  fontSize: '12px',
+                                  fontWeight: 600
+                                }}>
+                                  Section {section}
+                                </span>
+                              ) : (
+                                <span style={{
+                                  marginLeft: '8px',
+                                  padding: '2px 8px',
+                                  backgroundColor: '#fef3c7',
+                                  color: '#92400e',
+                                  borderRadius: '4px',
+                                  fontSize: '12px',
+                                  fontWeight: 600
+                                }}>
+                                  No Section
+                                </span>
+                              )}
                             </div>
                             <div style={{fontSize: '12px', color: '#6b7280', marginTop: '2px'}}>
                               {teacher.email}
@@ -3095,6 +3154,7 @@ const AdminDashboard = () => {
                       );
                     })}
                   </div>
+                  </>
                 ) : (
                   <div style={{
                     padding: '16px',
@@ -3203,13 +3263,29 @@ const AdminDashboard = () => {
                           <FontAwesomeIcon icon={faExclamationTriangle} /> Maximum 2 teachers reached. Remove one to add another.
                         </div>
                       )}
-                      {availableTeachers.map((teacher) => (
+                      {availableTeachers.map((teacher) => {
+                        // Get already assigned sections from database
+                        const assignedSections = selectedCourseForAssignment.assignedTeachers
+                          .map(a => a.section)
+                          .filter(s => s);
+                        
+                        // Get sections selected by OTHER teachers (not this one)
+                        const sectionsSelectedByOthers = Object.entries(teacherSectionSelections)
+                          .filter(([tid, section]) => tid !== teacher._id && section)
+                          .map(([tid, section]) => section);
+                        
+                        // Check if Section A is unavailable for this teacher
+                        const isSectionAUnavailable = assignedSections.includes('A') || sectionsSelectedByOthers.includes('A');
+                        const isSectionBUnavailable = assignedSections.includes('B') || sectionsSelectedByOthers.includes('B');
+                        
+                        return (
                         <div 
                           key={teacher._id}
                           style={{
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'center',
+                            gap: '10px',
                             padding: '10px 12px',
                             backgroundColor: '#fff',
                             border: '1px solid #e5e7eb',
@@ -3225,17 +3301,51 @@ const AdminDashboard = () => {
                               {teacher.designation && ` • ${teacher.designation}`}
                             </div>
                           </div>
-                          <button
-                            className="btn btn-sm btn-primary"
-                            onClick={() => handleAssignTeacher(teacher._id)}
+                          <select
+                            value={teacherSectionSelections[teacher._id] || ''}
+                            onChange={(e) => {
+                              const newSection = e.target.value;
+                              // Check if section is already taken by another teacher
+                              const isTaken = sectionsSelectedByOthers.includes(newSection) || assignedSections.includes(newSection);
+                              if (!isTaken || !newSection) {
+                                setTeacherSectionSelections(prev => ({
+                                  ...prev,
+                                  [teacher._id]: newSection
+                                }));
+                              }
+                            }}
+                            style={{
+                              padding: '6px 10px',
+                              fontSize: '12px',
+                              borderRadius: '4px',
+                              border: '1px solid #d1d5db',
+                              backgroundColor: 'white',
+                              cursor: 'pointer',
+                              minWidth: '120px'
+                            }}
                             disabled={assignmentLoading || hasReachedMaxTeachers}
+                          >
+                            <option value="" disabled>Select Section</option>
+                            <option value="A" disabled={isSectionAUnavailable}>Section A {isSectionAUnavailable ? '(Taken)' : ''}</option>
+                            <option value="B" disabled={isSectionBUnavailable}>Section B {isSectionBUnavailable ? '(Taken)' : ''}</option>
+                          </select>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleAssignTeacher(teacher._id, teacherSectionSelections[teacher._id]);
+                            }}
+                            disabled={assignmentLoading || hasReachedMaxTeachers || !teacherSectionSelections[teacher._id]}
                             style={{fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}
-                            title={hasReachedMaxTeachers ? 'Maximum 2 teachers reached' : 'Assign teacher'}
+                            title={hasReachedMaxTeachers ? 'Maximum 2 teachers reached' : !teacherSectionSelections[teacher._id] ? 'Please select a section first' : 'Assign teacher'}
                           >
                             Assign
                           </button>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   );
                 })()}

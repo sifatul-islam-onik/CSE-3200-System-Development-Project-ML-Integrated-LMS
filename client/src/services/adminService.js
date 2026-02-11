@@ -243,11 +243,11 @@ export const exportTeacherCredentials = async (dept) => {
 // Course assignment functions
 
 // Assign a teacher to a course
-export const assignTeacherToCourse = async (courseId, teacherId) => {
+export const assignTeacherToCourse = async (courseId, teacherId, section = null) => {
   try {
     const response = await axios.post(
       `${API_URL}/admin/courses/${courseId}/assign-teacher`,
-      { teacherId },
+      { teacherId, section },
       getAuthHeader()
     );
     return response.data;

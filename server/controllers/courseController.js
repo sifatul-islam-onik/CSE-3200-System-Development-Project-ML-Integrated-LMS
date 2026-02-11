@@ -535,6 +535,16 @@ exports.getAllCourses = async (req, res) => {
         if (Array.isArray(courseObj.assignedBatches) && courseObj.assignedBatches.length > 1) {
           courseObj.assignedBatches = [courseObj.assignedBatches[courseObj.assignedBatches.length - 1]];
         }
+        
+        // Ensure section field is preserved in assignedTeachers
+        if (courseObj.assignedTeachers) {
+          courseObj.assignedTeachers = courseObj.assignedTeachers.map(assignment => ({
+            teacher: assignment.teacher,
+            section: assignment.section,
+            _id: assignment._id
+          }));
+        }
+        
         return {
           ...courseObj,
           courseOutcomes: outcomesWithMappings
@@ -563,7 +573,8 @@ exports.getAllCourses = async (req, res) => {
 exports.getCourse = async (req, res) => {
   try {
     const course = await Course.findById(req.params.id)
-      .populate('createdBy', 'name email');
+      .populate('createdBy', 'name email')
+      .populate('assignedTeachers.teacher', 'name email designation');
 
     if (!course) {
       return res.status(404).json({
@@ -575,6 +586,15 @@ exports.getCourse = async (req, res) => {
     const courseObj = course.toObject();
     if (Array.isArray(courseObj.assignedBatches) && courseObj.assignedBatches.length > 1) {
       courseObj.assignedBatches = [courseObj.assignedBatches[courseObj.assignedBatches.length - 1]];
+    }
+    
+    // Ensure section field is preserved in assignedTeachers
+    if (courseObj.assignedTeachers) {
+      courseObj.assignedTeachers = courseObj.assignedTeachers.map(assignment => ({
+        teacher: assignment.teacher,
+        section: assignment.section,
+        _id: assignment._id
+      }));
     }
 
     res.status(200).json({
