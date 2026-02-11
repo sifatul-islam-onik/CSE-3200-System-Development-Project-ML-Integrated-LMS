@@ -525,11 +525,45 @@ const TeacherDashboard = () => {
                       const sortedTypeCourses = sortCoursesByCode(typeCourses);
                       return (
                         <div className="tree-content">
-                          {sortedTypeCourses.map((course) => (
+                          {sortedTypeCourses.map((course) => {
+                            // Find teacher's section for this course
+                            const assignment = course.assignedTeachers?.find(at => {
+                              const teacherId = at.teacher?._id || at.teacher;
+                              return teacherId.toString() === user.userId;
+                            });
+                            const teacherSection = assignment?.section || null;
+                            
+                            return (
                             <div key={course._id} className="course-item">
                               <div className="course-item-header">
                                 <div className="course-info">
                                   <span className="course-code">{course.courseCode}</span>
+                                  {teacherSection && (
+                                    <span style={{
+                                      padding: '2px 8px',
+                                      backgroundColor: '#dbeafe',
+                                      color: '#1e40af',
+                                      borderRadius: '4px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      marginLeft: '8px'
+                                    }}>
+                                      Section {teacherSection}
+                                    </span>
+                                  )}
+                                  {!teacherSection && course.course_type === 'THEORY' && (
+                                    <span style={{
+                                      padding: '2px 8px',
+                                      backgroundColor: '#fef3c7',
+                                      color: '#92400e',
+                                      borderRadius: '4px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      marginLeft: '8px'
+                                    }}>
+                                      No Section ⚠️
+                                    </span>
+                                  )}
                                   <span className="course-title">{course.courseTitle}</span>
                                   <span className="course-credit">{course.credit} Cr</span>
                                 </div>
@@ -552,7 +586,7 @@ const TeacherDashboard = () => {
                                     // Find teacher's section for this course
                                     const assignment = course.assignedTeachers?.find(at => {
                                       const teacherId = at.teacher?._id || at.teacher;
-                                      return teacherId.toString() === user._id;
+                                      return teacherId.toString() === user.userId;
                                     });
                                     const section = assignment?.section || null;
                                     
@@ -586,7 +620,7 @@ const TeacherDashboard = () => {
                                     // Find teacher's section for this course
                                     const assignment = course.assignedTeachers?.find(at => {
                                       const teacherId = at.teacher?._id || at.teacher;
-                                      return teacherId.toString() === user._id;
+                                      return teacherId.toString() === user.userId;
                                     });
                                     const section = assignment?.section || null;
                                     
@@ -628,7 +662,7 @@ const TeacherDashboard = () => {
                                     // Find teacher's section for this course
                                     const assignment = course.assignedTeachers?.find(at => {
                                       const teacherId = at.teacher?._id || at.teacher;
-                                      return teacherId.toString() === user._id;
+                                      return teacherId.toString() === user.userId;
                                     });
                                     const section = assignment?.section || null;
                                     
@@ -675,7 +709,8 @@ const TeacherDashboard = () => {
                                 </button>
                               </div>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       );
                     })()

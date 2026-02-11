@@ -168,3 +168,24 @@ export const getAssignmentData = async (courseId) => {
     throw error.response?.data || error.message;
   }
 };
+
+/**
+ * Get term exam marks for attainment calculations
+ * @param {string} courseId - Course ID
+ * @param {string} section - Section (A or B) for theory courses
+ */
+export const getTermExamMarks = async (courseId, section = null) => {
+  try {
+    const token = localStorage.getItem('token');
+    const params = section ? `?section=${section}` : '';
+    const response = await axios.get(
+      `${API_URL}/attainment/term/${courseId}${params}`,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};

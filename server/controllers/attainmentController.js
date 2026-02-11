@@ -6,6 +6,7 @@ const {
 } = require('../utils/attainmentExcelUtil');
 const Course = require('../models/Course');
 const CTAttainment = require('../models/CTAttainment');
+const TermExamMarks = require('../models/TermExamMarks');
 
 /**
  * Get teacher's assigned courses
@@ -228,8 +229,12 @@ exports.getCTData = async (req, res) => {
   try {
     const { courseId } = req.params;
 
-    // Verify course exists and user has access
-    const course = await Course.findById(courseId);
+    // Parallel course check and CT data fetch for better performance
+    const [course, ctData] = await Promise.all([
+      Course.findById(courseId).select('assignedTeachers').lean(),
+      CTAttainment.findOne({ course: courseId }).lean()
+    ]);
+
     if (!course) {
       return res.status(404).json({
         success: false,
@@ -252,9 +257,6 @@ exports.getCTData = async (req, res) => {
       }
     }
 
-    // Get CT attainment data
-    const ctData = await CTAttainment.findOne({ course: courseId });
-
     if (!ctData) {
       return res.json({
         success: true,
@@ -269,6 +271,85 @@ exports.getCTData = async (req, res) => {
     });
   } catch (error) {
     console.error('Error getting CT data:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get term exam marks for attainment calculations
+ * GET /api/attainment/term/:courseId
+ */
+exports.getTermExamMarks = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { section } = req.query;
+
+    // Build query
+    const query = { course: courseId };
+    if (section) {
+      query.section = section;
+    }
+
+    // Parallel fetch for better performance
+    const [course, termMarks] = await Promise.all([
+      Course.findById(courseId).select('assignedTeachers').lean(),
+      TermExamMarks.find(query)
+        .populate('student', 'name roll email')
+        .populate('enteredBy', 'name email')
+        .sort({ 'student.roll': 1 })
+        .lean()
+    ]);
+
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+
+    // For teachers, verify they are assigned to this course
+    if (req.user.role === 'teacher') {
+      const isAssigned = course.assignedTeachers.some(assignment => {
+        const teacherId = assignment.teacher?._id || assignment.teacher;
+        const matches = teacherId.toString() === req.user._id.toString();
+        // If section is provided, also check section match
+        if (section && matches) {
+          return assignment.section === section;
+        }
+        return matches;
+      });
+
+      if (!isAssigned) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You are not assigned to this course.'
+        });
+      }
+    }
+
+    // Format the data for attainment calculations
+    const formattedMarks = termMarks.map(mark => ({
+      studentId: mark.student._id,
+      rollNumber: mark.student.roll,
+      name: mark.student.name,
+      section: mark.section,
+      marks: mark.marks,
+      totalMarks: mark.totalMarks,
+      imageUrl: mark.imageUrl,
+      enteredBy: mark.enteredBy,
+      lastModified: mark.lastModified
+    }));
+
+    res.json({
+      success: true,
+      count: formattedMarks.length,
+      data: formattedMarks
+    });
+  } catch (error) {
+    console.error('Error getting term exam marks for attainment:', error);
     res.status(500).json({
       success: false,
       error: error.message

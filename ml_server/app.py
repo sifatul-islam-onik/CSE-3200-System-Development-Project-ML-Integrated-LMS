@@ -282,35 +282,57 @@ def extract_table_from_image(image_path: str, confidence_threshold: float = 0.55
             shutil.rmtree(temp_dir)
 
 def parse_marks_from_table(table_data: List[List[str]]) -> Dict[str, Dict[str, str]]:
-    """Parse marks from table data into row/question structure"""
+    """Parse marks from table data into row/question structure with section support"""
     marks = {
-        "a": {"1": "", "2": "", "3": "", "4": ""},
-        "b": {"1": "", "2": "", "3": "", "4": ""},
-        "c": {"1": "", "2": "", "3": "", "4": ""},
-        "d": {"1": "", "2": "", "3": "", "4": ""},
-        "e": {"1": "", "2": "", "3": "", "4": ""},
-        "f": {"1": "", "2": "", "3": "", "4": ""},
-        "g": {"1": "", "2": "", "3": "", "4": ""}
+        "a": {"1": "", "2": "", "3": "", "4": "", "5": "", "6": "", "7": "", "8": ""},
+        "b": {"1": "", "2": "", "3": "", "4": "", "5": "", "6": "", "7": "", "8": ""},
+        "c": {"1": "", "2": "", "3": "", "4": "", "5": "", "6": "", "7": "", "8": ""},
+        "d": {"1": "", "2": "", "3": "", "4": "", "5": "", "6": "", "7": "", "8": ""},
+        "e": {"1": "", "2": "", "3": "", "4": "", "5": "", "6": "", "7": "", "8": ""},
+        "f": {"1": "", "2": "", "3": "", "4": "", "5": "", "6": "", "7": "", "8": ""},
+        "g": {"1": "", "2": "", "3": "", "4": "", "5": "", "6": "", "7": "", "8": ""}
     }
     
     if len(table_data) < 2:
         return marks
     
-    # Find header row (contains multiple question numbers 1-4)
+    # Detect section type by checking header row for question numbers
+    # Section A has questions 1-4, Section B has questions 5-8
+    section_type = None  # 'A' or 'B'
     header_row_idx = -1
+    
     for idx, row in enumerate(table_data):
         if len(row) < 4:
             continue
-        # Count how many cells contain question numbers
-        question_count = sum(1 for cell in row if cell.strip() in ['1', '2', '3', '4'])
-        if question_count >= 3:
+        
+        # Check for Section A indicators (questions 1,2,3,4)
+        section_a_count = sum(1 for cell in row if cell.strip() in ['1', '2', '3', '4'])
+        # Check for Section B indicators (questions 5,6,7,8)
+        section_b_count = sum(1 for cell in row if cell.strip() in ['5', '6', '7', '8'])
+        
+        if section_a_count >= 3:
+            section_type = 'A'
             header_row_idx = idx
-            print(f"  Found header row at {idx}: {row}")
+            print(f"  Detected Section A header at row {idx}: {row}")
+            break
+        elif section_b_count >= 3:
+            section_type = 'B'
+            header_row_idx = idx
+            print(f"  Detected Section B header at row {idx}: {row}")
             break
     
     if header_row_idx == -1:
-        print("  Warning: No header row found, assuming row 0")
+        print("  Warning: No clear section header found, assuming Section A at row 0")
         header_row_idx = 0
+        section_type = 'A'
+    
+    # Determine question numbers based on section
+    if section_type == 'B':
+        question_numbers = ['5', '6', '7', '8']
+    else:  # Section A (default)
+        question_numbers = ['1', '2', '3', '4']
+    
+    print(f"  Processing as Section {section_type} with questions {question_numbers}")
     
     # Position-based parsing: rows after header are a, b, c, d, e, f, g in order
     row_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
@@ -354,11 +376,11 @@ def parse_marks_from_table(table_data: List[List[str]]) -> Dict[str, Dict[str, s
         while len(numeric_values) < 4:
             numeric_values.append('')
         
-        # Map to questions 1-4
-        for i, question in enumerate(['1', '2', '3', '4']):
+        # Map to appropriate question numbers based on section
+        for i, question in enumerate(question_numbers):
             marks[row_key][question] = numeric_values[i]
         
-        print(f"  Parsed position {student_idx} as {row_key}: {marks[row_key]} (detected label: '{first_cell}')")
+        print(f"  Parsed position {student_idx} as {row_key}: Q{question_numbers[0]}-{question_numbers[3]} = {numeric_values} (detected label: '{first_cell}')")
         student_idx += 1
         
         # Stop after finding all 7 students
