@@ -336,35 +336,45 @@ exports.getTermExamMarks = async (req, res) => {
     // Format the data for attainment calculations
     // Convert Map to plain object for Section A/B (only a, b, c, d rows needed, ignore e, f, g)
     const formattedMarks = termMarks.map(mark => {
-      // Convert marks Map to plain object
+      // Convert marks Map/Object to plain object - handles nested Maps from .lean()
       const marksObj = {};
-      if (mark.marks instanceof Map) {
-        mark.marks.forEach((value, key) => {
-          if (['a', 'b', 'c', 'd'].includes(key)) { // Only include a, b, c, d (ignore e, f, g)
-            if (value instanceof Map) {
-              marksObj[key] = {};
-              value.forEach((qVal, qKey) => {
-                // Include all questions (1-8: 1-4 for Section A, 5-8 for Section B)
-                marksObj[key][qKey] = qVal;
-              });
-            } else {
-              marksObj[key] = value;
+      
+      // When using .lean(), Maps become plain objects, but we need to ensure proper structure
+      const sourceMarks = mark.marks;
+      
+      if (sourceMarks) {
+        // Handle both Map and Object cases
+        const marksEntries = sourceMarks instanceof Map ? 
+          Array.from(sourceMarks.entries()) : 
+          Object.entries(sourceMarks);
+        
+        for (const [key, value] of marksEntries) {
+          // Only include a, b, c, d rows (ignore e, f, g)
+          if (['a', 'b', 'c', 'd'].includes(key)) {
+            marksObj[key] = {};
+            
+            // Handle nested Map or Object
+            const questionEntries = value instanceof Map ? 
+              Array.from(value.entries()) : 
+              Object.entries(value || {});
+            
+            for (const [qKey, qVal] of questionEntries) {
+              // Include all questions (1-8: 1-4 for Section A, 5-8 for Section B)
+              marksObj[key][qKey] = qVal;
             }
           }
-        });
-      } else {
-        // Already an object - filter to only a, b, c, d
-        ['a', 'b', 'c', 'd'].forEach(key => {
-          if (mark.marks && mark.marks[key]) {
-            marksObj[key] = mark.marks[key];
-          }
-        });
+        }
       }
       
       return {
-        studentId: mark.student._id,
-        rollNumber: mark.student.roll,
-        name: mark.student.name,
+        student: {
+          _id: mark.student._id,
+          roll: mark.student.roll,
+          rollNumber: mark.student.roll,
+          name: mark.student.name,
+          email: mark.student.email
+        },
+        rollNumber: mark.student.roll, // Also provide at top level for convenience
         section: mark.section,
         marks: marksObj, // Only a, b, c, d rows (not e, f, g)
         totalMarks: mark.totalMarks,
@@ -803,28 +813,37 @@ exports.getSectionAData = async (req, res) => {
         }
       }
       
-      // Helper function to safely get mark value
+      // Helper function to safely get mark value - handles Maps and Objects
       const getMark = (marksObj, row, question) => {
         try {
-          // Handle if marksObj itself is a Map
-          const marks = marksObj instanceof Map ? Object.fromEntries(marksObj) : marksObj;
+          // Convert marksObj to plain object if it's a Map
+          let marks = marksObj;
+          if (marksObj instanceof Map) {
+            marks = {};
+            for (const [key, value] of marksObj.entries()) {
+              marks[key] = value instanceof Map ? Object.fromEntries(value) : value;
+            }
+          }
           
           if (!marks || !marks[row]) {
             console.log(`[getMark] No data for row ${row}`);
             return 0;
           }
           
-          const rowData = marks[row];
+          let rowData = marks[row];
           
-          // Handle if rowData is a Map
-          const rowObj = rowData instanceof Map ? Object.fromEntries(rowData) : rowData;
+          // Convert rowData to plain object if it's a Map
+          if (rowData instanceof Map) {
+            rowData = Object.fromEntries(rowData);
+          }
           
-          if (!rowObj) {
-            console.log(`[getMark] No rowObj for row ${row}`);
+          if (!rowData || typeof rowData !== 'object') {
+            console.log(`[getMark] Invalid rowData for row ${row}`);
             return 0;
           }
           
-          const value = rowObj[question];
+          // Try both string and number keys
+          const value = rowData[question] !== undefined ? rowData[question] : rowData[String(question)];
           console.log(`[getMark] row=${row}, question=${question}, raw value="${value}"`);
           
           if (value === '' || value === null || value === undefined) {
