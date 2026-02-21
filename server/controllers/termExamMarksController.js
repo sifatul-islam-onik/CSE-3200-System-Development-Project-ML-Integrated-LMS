@@ -9,6 +9,20 @@ exports.saveTermExamMarks = async (req, res) => {
   try {
     const { studentId, courseId, section, marks, totalMarks, imageUrl } = req.body;
 
+    console.log('[saveTermExamMarks] ========== SAVING MARKS ==========');
+    console.log('[saveTermExamMarks] Student ID:', studentId);
+    console.log('[saveTermExamMarks] Course ID:', courseId);
+    console.log('[saveTermExamMarks] Section:', section);
+    console.log('[saveTermExamMarks] Total Marks:', totalMarks);
+    console.log('[saveTermExamMarks] Marks type:', typeof marks);
+    console.log('[saveTermExamMarks] Marks structure:', JSON.stringify(marks, null, 2));
+    console.log('[saveTermExamMarks] Sample values:');
+    console.log('  marks.a:', marks?.a);
+    console.log('  marks.a.1:', marks?.a?.['1']);
+    console.log('  marks.b.1:', marks?.b?.['1']);
+    console.log('  marks.c.1:', marks?.c?.['1']);
+    console.log('  marks.d.1:', marks?.d?.['1']);
+
     // Validate required fields
     if (!studentId || !courseId || !marks) {
       return res.status(400).json({
@@ -91,6 +105,12 @@ exports.saveTermExamMarks = async (req, res) => {
         runValidators: true
       }
     );
+
+    console.log('[saveTermExamMarks] ✅ Marks saved to database!');
+    console.log('[saveTermExamMarks] Saved document ID:', termExamMarks._id);
+    console.log('[saveTermExamMarks] Saved marks structure:', JSON.stringify(termExamMarks.marks, null, 2));
+    console.log('[saveTermExamMarks] Saved marks.a.1:', termExamMarks.marks?.a?.['1'] || termExamMarks.marks?.get('a')?.get('1'));
+    console.log('[saveTermExamMarks] Marks is Map?:', termExamMarks.marks instanceof Map);
 
     res.status(200).json({
       success: true,

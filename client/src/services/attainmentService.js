@@ -189,3 +189,84 @@ export const getTermExamMarks = async (courseId, section = null) => {
     throw error.response?.data || error.message;
   }
 };
+
+/**
+ * Save Lab Activity attainment data
+ * @param {string} courseId - Course ID
+ * @param {object} data - Lab Activity data to save
+ */
+export const saveLabActivityData = async (courseId, data) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(
+      `${API_URL}/attainment/labactivity/${courseId}`,
+      data,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Get Lab Activity attainment data for a course
+ * @param {string} courseId - Course ID
+ */
+export const getLabActivityData = async (courseId) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(
+      `${API_URL}/attainment/labactivity/${courseId}`,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Save Section A attainment data
+ * @param {string} courseId - Course ID
+ * @param {object} data - Section A data to save
+ */
+export const saveSectionAData = async (courseId, data) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(
+      `${API_URL}/attainment/section-a/${courseId}`,
+      data,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Get Section A attainment data for a course
+ * @param {string} courseId - Course ID
+ */
+export const getSectionAData = async (courseId) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(
+      `${API_URL}/attainment/section-a/${courseId}`,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
