@@ -95,9 +95,7 @@ export const loadAttainmentDatasets = async (selectedCourse, dataTypes = []) => 
   const promises = {};
 
   // Import services dynamically to avoid circular dependencies
-  const { getCTData } = await import('./attainmentService');
-  const { getAssignmentData } = await import('./attainmentService');
-  const { getTermExamMarks } = await import('./attainmentService');
+  const { getCTData, getAssignmentData, getTermExamMarks, getAttainmentData } = await import('./attainmentService');
 
   if (dataTypes.includes('ct')) {
     promises.ct = getCTData(selectedCourse._id)
@@ -109,6 +107,30 @@ export const loadAttainmentDatasets = async (selectedCourse, dataTypes = []) => 
     promises.assignment = getAssignmentData(selectedCourse._id)
       .then(resp => (resp.success && resp.data ? resp.data : null))
       .catch(() => null);
+  }
+
+  if (dataTypes.includes('sectionA')) {
+    promises.sectionA = getAttainmentData('Section A')
+      .then(resp => {
+        if (resp.success && resp.data) {
+          // Return the data array with CO-aggregated structure
+          return { data: Array.isArray(resp.data) ? resp.data : [] };
+        }
+        return { data: [] };
+      })
+      .catch(() => ({ data: [] }));
+  }
+
+  if (dataTypes.includes('sectionB')) {
+    promises.sectionB = getAttainmentData('Section B')
+      .then(resp => {
+        if (resp.success && resp.data) {
+          // Return the data array with CO-aggregated structure
+          return { data: Array.isArray(resp.data) ? resp.data : [] };
+        }
+        return { data: [] };
+      })
+      .catch(() => ({ data: [] }));
   }
 
   if (dataTypes.includes('termExam')) {

@@ -671,12 +671,12 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         }
       }));
       
-      alert('Marks saved successfully!');
+      console.log('✅ Marks saved successfully for', currentStudent.name, currentStudent.roll);
     } catch (error) {
       console.error('Error saving marks:', error);
       alert('Failed to save marks: ' + error.message);
     }
-  }, [currentStudent._id, course._id, normalizedSection, marks, totalMarks, capturedImage]);
+  }, [currentStudent._id, currentStudent.name, currentStudent.roll, course._id, course.courseCode, normalizedSection, marks, totalMarks, capturedImage]);
 
   // Save and go to next student
   const handleNext = useCallback(async () => {
@@ -695,6 +695,8 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           imageUrl: capturedImage && !capturedImage.startsWith('blob:') && capturedImage !== 'skipped' ? capturedImage : null
         });
         
+        console.log(`✅ Auto-saved marks for ${currentStudent.name} (${currentStudent.roll})`);
+        console.log('Saved marks:', marks);
         
         // Update in-memory cache (without blob URLs)
         setStudentData(prev => ({
@@ -707,6 +709,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         
       } catch (error) {
         console.error('Error saving marks:', error);
+        alert(`⚠️ Failed to auto-save marks for ${currentStudent.name}: ${error.message}`);
         // Continue anyway - marks saved in memory
       }
     }
