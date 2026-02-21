@@ -181,9 +181,12 @@ const AttainmentView = () => {
     if (selectedCourse && cloDependentSheets.includes(selectedSheet)) {
       loadCourseProfile();
     } else {
-      setClos([]);
+      // Only clear if not already empty to avoid creating new array references
+      if (clos.length > 0) {
+        setClos([]);
+      }
     }
-  }, [selectedCourse, selectedSheet, loadCourseProfile, cloDependentSheets]);
+  }, [selectedCourse, selectedSheet, loadCourseProfile, cloDependentSheets, clos.length]);
 
   // Initialize CT matrix rows when clos is available and CT is selected
   useEffect(() => {
@@ -232,7 +235,7 @@ const AttainmentView = () => {
       setCtSummary({ ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 });
       ctDataLoadedRef.current = false; // Reset when leaving the sheet
     }
-  }, [selectedSheet, clos, ctRows]);
+  }, [selectedSheet, clos]);
 
   // Initialize Assignment matrix rows when clos is available and Attn_Assign is selected
   useEffect(() => {
@@ -287,7 +290,7 @@ const AttainmentView = () => {
       setAttendanceMarks(0);
       assignmentDataLoadedRef.current = false; // Reset when leaving the sheet
     }
-  }, [selectedSheet, clos, selectedCourse, assignmentRows]);
+  }, [selectedSheet, clos, selectedCourse]);
 
   // Initialize SectionA matrix rows when clos is available and SectionA is selected
   useEffect(() => {
@@ -752,9 +755,12 @@ const AttainmentView = () => {
       console.log('[initObtainedRows] Skipping LabActivity initialization - saved data already loaded');
       return;
     }
-    // For Section A/B: Always initialize obtained rows (student marks)
-    // The flag only prevents re-initializing allocated rows (CO mappings)
-    // because obtained rows should always be regenerated from term marks
+    // For Section A/B: Check if data has already been loaded from backend
+    if ((forSheet === 'SectionA' || forSheet === 'SectionB') && sectionADataLoadedRef.current) {
+      console.log(`[initObtainedRows] Skipping ${forSheet} initialization - saved data already loaded`);
+      return;
+    }
+    
     console.log(`[initObtainedRows] Initializing ${forSheet} obtained rows`);
 
     console.log('[initObtainedRows] Initializing obtained rows for:', forSheet);
@@ -1032,125 +1038,6 @@ const AttainmentView = () => {
     else if (selectedSheet === 'SectionB') initObtainedRows('SectionB');
     else if (selectedSheet === 'LabActivity') initObtainedRows('LabActivity');
   }, [selectedSheet, initObtainedRows]);
-
-  // Auto-populate Section A and Section B from Term Marks
-  useEffect(() => {
-    if (!termExamMarks || termExamMarks.length === 0) return;
-
-    console.log('[Auto-populate] Term marks data:', termExamMarks);
-    console.log('[Auto-populate] Section A rows:', sectionAObtainedRows);
-    console.log('[Auto-populate] Section B rows:', sectionBObtainedRows);
-
-    // Populate Section A (questions 1-4 from term marks)
-    if (sectionAObtainedRows.length > 0) {
-      const populatedSectionA = sectionAObtainedRows.map(row => {
-        const studentTermMarks = termExamMarks.find(tm => {
-          if (!tm.student) return false;
-          
-          // Match by roll number
-          const termRoll = tm.student.roll || tm.student.rollNumber;
-          if (termRoll && String(termRoll).trim() === String(row.rollNumber).trim()) {
-            return true;
-          }
-          
-          return false;
-        });
-
-        if (studentTermMarks && studentTermMarks.marks) {
-          console.log('[Section A] Found marks for', row.rollNumber, ':', studentTermMarks.marks);
-          const marks = studentTermMarks.marks;
-          
-          // Helper function to safely get numeric value
-          const getValue = (rowKey, question) => {
-            const val = marks[rowKey]?.[question] || marks[rowKey]?.[String(question)];
-            if (val === null || val === undefined || val === '') return 0;
-            const num = parseFloat(val);
-            return isNaN(num) ? 0 : num;
-          };
-          
-          return {
-            ...row,
-            Q1a: getValue('a', '1'),
-            Q1b: getValue('b', '1'),
-            Q1c: getValue('c', '1'),
-            Q1d: getValue('d', '1'),
-            Q2a: getValue('a', '2'),
-            Q2b: getValue('b', '2'),
-            Q2c: getValue('c', '2'),
-            Q2d: getValue('d', '2'),
-            Q3a: getValue('a', '3'),
-            Q3b: getValue('b', '3'),
-            Q3c: getValue('c', '3'),
-            Q3d: getValue('d', '3'),
-            Q4a: getValue('a', '4'),
-            Q4b: getValue('b', '4'),
-            Q4c: getValue('c', '4'),
-            Q4d: getValue('d', '4'),
-          };
-        } else {
-          console.log('[Section A] No marks found for', row.rollNumber);
-        }
-        return row;
-      });
-      setSectionAObtainedRows(populatedSectionA);
-    }
-
-    // Populate Section B (questions 5-8 from term marks, displayed as Q1-Q4)
-    if (sectionBObtainedRows.length > 0) {
-      const populatedSectionB = sectionBObtainedRows.map(row => {
-        const studentTermMarks = termExamMarks.find(tm => {
-          if (!tm.student) return false;
-          
-          // Match by roll number
-          const termRoll = tm.student.roll || tm.student.rollNumber;
-          if (termRoll && String(termRoll).trim() === String(row.rollNumber).trim()) {
-            return true;
-          }
-          
-          return false;
-        });
-
-        if (studentTermMarks && studentTermMarks.marks) {
-          console.log('[Section B] Found marks for', row.rollNumber, ':', studentTermMarks.marks);
-          const marks = studentTermMarks.marks;
-          
-          // Helper function to safely get numeric value
-          const getValue = (rowKey, question) => {
-            const val = marks[rowKey]?.[question] || marks[rowKey]?.[String(question)];
-            if (val === null || val === undefined || val === '') return 0;
-            const num = parseFloat(val);
-            return isNaN(num) ? 0 : num;
-          };
-          
-          return {
-            ...row,
-            // Section B uses questions 5-8 from term marks
-            Q1a: getValue('a', '5'),
-            Q1b: getValue('b', '5'),
-            Q1c: getValue('c', '5'),
-            Q1d: getValue('d', '5'),
-            Q2a: getValue('a', '6'),
-            Q2b: getValue('b', '6'),
-            Q2c: getValue('c', '6'),
-            Q2d: getValue('d', '6'),
-            Q3a: getValue('a', '7'),
-            Q3b: getValue('b', '7'),
-            Q3c: getValue('c', '7'),
-            Q3d: getValue('d', '7'),
-            Q4a: getValue('a', '8'),
-            Q4b: getValue('b', '8'),
-            Q4c: getValue('c', '8'),
-            Q4d: getValue('d', '8'),
-          };
-        } else {
-          console.log('[Section B] No marks found for', row.rollNumber);
-        }
-        return row;
-      });
-      setSectionBObtainedRows(populatedSectionB);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [termExamMarks]); // Only depend on termExamMarks to avoid infinite loops
 
   // Load Program Outcomes when COPOMap, POCalcMax, Charts, CheckPO, or POCalc is selected
   useEffect(() => {
@@ -1908,7 +1795,6 @@ const AttainmentView = () => {
             
             if (!hasAllocatedData) {
               console.log('[loadSectionAData] No allocated rows data, initializing with COs');
-              sectionADataLoadedRef.current = false;
               
               // Initialize with COs if available
               if (clos.length > 0) {
@@ -1927,17 +1813,77 @@ const AttainmentView = () => {
                 setSectionBRows(initialRows);
               }
               
-              // Even without allocated data, load obtained rows from backend if available
-              if (savedSectionAObtainedRows && savedSectionAObtainedRows.length > 0) {
-                console.log('[loadSectionAData] Setting sectionAObtainedRows with', savedSectionAObtainedRows.length, 'rows from backend (no allocated data case)');
-                setSectionAObtainedRows(savedSectionAObtainedRows);
+              // Get all enrolled students and merge with saved data
+              let allStudents = [];
+              try {
+                const resp = await getCourseStudents(selectedCourse._id);
+                if (resp.success && Array.isArray(resp.data) && resp.data.length > 0) {
+                  allStudents = resp.data.map(s => ({ 
+                    rollNumber: s.roll || s.rollNumber, 
+                    name: s.name 
+                  }));
+                }
+              } catch (error) {
+                console.error('[loadSectionAData] Error fetching students:', error);
+              }
+
+              // Filter and sort students by roll number
+              const uniqueByRoll = [];
+              const seen = new Set();
+              for (const stu of allStudents) {
+                let rn = String(stu.rollNumber || '').trim();
+                if (!rn || seen.has(rn)) continue;
+                const rollPattern = /^[0-9]{4,}$/;
+                if (!rollPattern.test(rn)) continue;
+                seen.add(rn);
+                uniqueByRoll.push({ rollNumber: rn, name: stu.name || '' });
               }
               
-              if (savedSectionBObtainedRows && savedSectionBObtainedRows.length > 0) {
-                console.log('[loadSectionAData] Setting sectionBObtainedRows with', savedSectionBObtainedRows.length, 'rows from backend (no allocated data case)');
-                setSectionBObtainedRows(savedSectionBObtainedRows);
-              }
+              uniqueByRoll.sort((a, b) => {
+                const aNum = String(a.rollNumber).replace(/\D/g, '');
+                const bNum = String(b.rollNumber).replace(/\D/g, '');
+                return aNum.localeCompare(bNum, undefined, { numeric: true });
+              });
+
+              // Merge saved Section A data with all students
+              const mergedSectionA = uniqueByRoll.map(stu => {
+                const savedRow = savedSectionAObtainedRows?.find(r => String(r.rollNumber) === String(stu.rollNumber));
+                if (savedRow) {
+                  return { ...savedRow };
+                }
+                return {
+                  rollNumber: stu.rollNumber,
+                  name: stu.name,
+                  Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
+                  Q2a: 0, Q2b: 0, Q2c: 0, Q2d: 0,
+                  Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
+                  Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
+                };
+              });
+
+              // Merge saved Section B data with all students
+              const mergedSectionB = uniqueByRoll.map(stu => {
+                const savedRow = savedSectionBObtainedRows?.find(r => String(r.rollNumber) === String(stu.rollNumber));
+                if (savedRow) {
+                  return { ...savedRow };
+                }
+                return {
+                  rollNumber: stu.rollNumber,
+                  name: stu.name,
+                  Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
+                  Q2a: 0, Q2b: 0, Q2c: 0, Q2d: 0,
+                  Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
+                  Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
+                };
+              });
+
+              console.log('[loadSectionAData] Setting Section A with', mergedSectionA.length, 'students (merged)');
+              setSectionAObtainedRows(mergedSectionA);
               
+              console.log('[loadSectionAData] Setting Section B with', mergedSectionB.length, 'students (merged)');
+              setSectionBObtainedRows(mergedSectionB);
+              
+              sectionADataLoadedRef.current = true;
               return; // Exit early
             }
             
@@ -1954,22 +1900,75 @@ const AttainmentView = () => {
               setSectionBRows(savedSectionBRows);
             }
             
-            // Load obtained rows from backend (populated from TermExamMarks)
-            if (savedSectionAObtainedRows && savedSectionAObtainedRows.length > 0) {
-              console.log('[loadSectionAData] Setting sectionAObtainedRows with', savedSectionAObtainedRows.length, 'rows from backend');
-              setSectionAObtainedRows(savedSectionAObtainedRows);
-            } else {
-              console.log('[loadSectionAData] No Section A obtained rows from backend');
-              setSectionAObtainedRows([]);
+            // Get all enrolled students and merge with saved obtained rows data
+            let allStudents = [];
+            try {
+              const resp = await getCourseStudents(selectedCourse._id);
+              if (resp.success && Array.isArray(resp.data) && resp.data.length > 0) {
+                allStudents = resp.data.map(s => ({ 
+                  rollNumber: s.roll || s.rollNumber, 
+                  name: s.name 
+                }));
+              }
+            } catch (error) {
+              console.error('[loadSectionAData] Error fetching students:', error);
+            }
+
+            // Filter and sort students by roll number
+            const uniqueByRoll = [];
+            const seen = new Set();
+            for (const stu of allStudents) {
+              let rn = String(stu.rollNumber || '').trim();
+              if (!rn || seen.has(rn)) continue;
+              const rollPattern = /^[0-9]{4,}$/;
+              if (!rollPattern.test(rn)) continue;
+              seen.add(rn);
+              uniqueByRoll.push({ rollNumber: rn, name: stu.name || '' });
             }
             
-            if (savedSectionBObtainedRows && savedSectionBObtainedRows.length > 0) {
-              console.log('[loadSectionAData] Setting sectionBObtainedRows with', savedSectionBObtainedRows.length, 'rows from backend');
-              setSectionBObtainedRows(savedSectionBObtainedRows);
-            } else {
-              console.log('[loadSectionAData] No Section B obtained rows from backend');
-              setSectionBObtainedRows([]);
-            }
+            uniqueByRoll.sort((a, b) => {
+              const aNum = String(a.rollNumber).replace(/\D/g, '');
+              const bNum = String(b.rollNumber).replace(/\D/g, '');
+              return aNum.localeCompare(bNum, undefined, { numeric: true });
+            });
+
+            // Merge saved Section A data with all students
+            const mergedSectionA = uniqueByRoll.map(stu => {
+              const savedRow = savedSectionAObtainedRows?.find(r => String(r.rollNumber) === String(stu.rollNumber));
+              if (savedRow) {
+                return { ...savedRow };
+              }
+              return {
+                rollNumber: stu.rollNumber,
+                name: stu.name,
+                Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
+                Q2a: 0, Q2b: 0, Q2c: 0, Q2d: 0,
+                Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
+                Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
+              };
+            });
+
+            // Merge saved Section B data with all students
+            const mergedSectionB = uniqueByRoll.map(stu => {
+              const savedRow = savedSectionBObtainedRows?.find(r => String(r.rollNumber) === String(stu.rollNumber));
+              if (savedRow) {
+                return { ...savedRow };
+              }
+              return {
+                rollNumber: stu.rollNumber,
+                name: stu.name,
+                Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
+                Q2a: 0, Q2b: 0, Q2c: 0, Q2d: 0,
+                Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
+                Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
+              };
+            });
+
+            console.log('[loadSectionAData] Setting Section A with', mergedSectionA.length, 'students (all enrolled, sorted)');
+            setSectionAObtainedRows(mergedSectionA);
+            
+            console.log('[loadSectionAData] Setting Section B with', mergedSectionB.length, 'students (all enrolled, sorted)');
+            setSectionBObtainedRows(mergedSectionB);
           } else {
             console.log('[loadSectionAData] No saved data found or response not successful');
             // No data found - allow initialization
@@ -3699,7 +3698,7 @@ const AttainmentView = () => {
                         </thead>
                         <tbody>
                           {ctObtainedRows.map((row, idx) => (
-                            <tr key={row.rollNumber || idx}>
+                            <tr key={`ct-${row.rollNumber}-${idx}`}>
                               <td className="roll-cell" title={row.name || row.rollNumber}>{row.rollNumber || '-'}</td>
                               {getActiveCTFields().map(field => (
                                 <td key={`obt_${field}_${idx}`}>
@@ -4005,7 +4004,7 @@ const AttainmentView = () => {
                         </thead>
                         <tbody>
                           {sectionAObtainedRows.length > 0 ? sectionAObtainedRows.map((row, idx) => (
-                            <tr key={row.rollNumber || idx}>
+                            <tr key={`sectA-${row.rollNumber}-${idx}`}>
                               <td className="roll-cell" title={row.name || row.rollNumber}>{row.rollNumber || '-'}</td>
                               <td style={{ textAlign: 'center' }}>{row.Q1a || 0}</td>
                               <td style={{ textAlign: 'center' }}>{row.Q1b || 0}</td>
@@ -4303,7 +4302,7 @@ const AttainmentView = () => {
                         </thead>
                         <tbody>
                           {sectionBObtainedRows.length > 0 ? sectionBObtainedRows.map((row, idx) => (
-                            <tr key={row.rollNumber || idx}>
+                            <tr key={`sectB-${row.rollNumber}-${idx}`}>
                               <td className="roll-cell" title={row.name || row.rollNumber}>{row.rollNumber || '-'}</td>
                               <td style={{ textAlign: 'center' }}>{row.Q1a || 0}</td>
                               <td style={{ textAlign: 'center' }}>{row.Q1b || 0}</td>
@@ -4871,7 +4870,7 @@ const AttainmentView = () => {
                         </thead>
                         <tbody>
                           {labActivityObtainedRows.length > 0 ? labActivityObtainedRows.map((row, idx) => (
-                            <tr key={row.rollNumber || idx}>
+                            <tr key={`lab-${row.rollNumber}-${idx}`}>
                               <td>{row.rollNumber || '-'}</td>
                               <td>
                                 <input
@@ -5296,7 +5295,7 @@ const AttainmentView = () => {
                         </thead>
                         <tbody>
                           {attnAssignObtainedRows.length > 0 ? attnAssignObtainedRows.map((row, idx) => (
-                            <tr key={row.rollNumber || idx}>
+                            <tr key={`assign-${row.rollNumber}-${idx}`}>
                               <td>{row.rollNumber || '-'}</td>
                               <td>
                                 <input
@@ -5650,7 +5649,7 @@ const AttainmentView = () => {
                     </thead>
                     <tbody>
                       {ctObtainedRows.map((studentRow, studentIdx) => (
-                        <tr key={studentRow.rollNumber || studentIdx}>
+                        <tr key={`ct-co-${studentRow.rollNumber}-${studentIdx}`}>
                           <td className="roll-cell" title={studentRow.name || studentRow.rollNumber}>
                             {studentRow.rollNumber || '-'}
                           </td>
@@ -5765,7 +5764,7 @@ const AttainmentView = () => {
                     </thead>
                     <tbody>
                       {attnAssignObtainedRows.map((studentRow, studentIdx) => (
-                        <tr key={studentRow.rollNumber || studentIdx}>
+                        <tr key={`assign-co-${studentRow.rollNumber}-${studentIdx}`}>
                           <td className="roll-cell" title={studentRow.name || studentRow.rollNumber}>
                             {studentRow.rollNumber || '-'}
                           </td>
@@ -6186,7 +6185,7 @@ const AttainmentView = () => {
                 </thead>
                 <tbody>
                   {sectionAObtainedRows.length > 0 ? sectionAObtainedRows.map((studentRow, idx) => (
-                    <tr key={studentRow.rollNumber || idx}>
+                    <tr key={`sectA-co-${studentRow.rollNumber}-${idx}`}>
                       <td className="roll-cell" title={studentRow.name || studentRow.rollNumber}>
                         {studentRow.rollNumber || '-'}
                       </td>
@@ -6558,7 +6557,7 @@ const AttainmentView = () => {
                 </thead>
                 <tbody>
                   {sectionBObtainedRows.length > 0 ? sectionBObtainedRows.map((studentRow, idx) => (
-                    <tr key={studentRow.rollNumber || idx}>
+                    <tr key={`sectB-co-${studentRow.rollNumber}-${idx}`}>
                       <td className="roll-cell" title={studentRow.name || studentRow.rollNumber}>
                         {studentRow.rollNumber || '-'}
                       </td>
@@ -6989,7 +6988,7 @@ const AttainmentView = () => {
                   </thead>
                   <tbody>
                     {labActivityObtainedRows.map((studentRow, idx) => (
-                      <tr key={studentRow.rollNumber || idx}>
+                      <tr key={`lab-co-${studentRow.rollNumber}-${idx}`}>
                         <td>{studentRow.rollNumber || '-'}</td>
                         {/* CO wise marks out of CO Total */}
                         {labActivityRows.map((coRow, coIdx) => (
@@ -7050,7 +7049,7 @@ const AttainmentView = () => {
                       const hasRollNumber = studentRow.rollNumber && String(studentRow.rollNumber).trim() !== '';
                       
                       return (
-                        <tr key={studentRow.rollNumber || idx}>
+                        <tr key={`lab-att-${studentRow.rollNumber}-${idx}`}>
                           <td>{studentRow.rollNumber || '-'}</td>
                           {/* CO attainment values */}
                           {labActivityRows.map((coRow, coIdx) => {
