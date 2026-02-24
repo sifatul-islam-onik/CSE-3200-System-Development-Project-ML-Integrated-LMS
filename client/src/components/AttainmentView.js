@@ -59,6 +59,7 @@ const AttainmentView = () => {
   const [saveStatus, setSaveStatus] = useState(''); // 'saving', 'saved', 'error'
   const [labActivitySaveStatus, setLabActivitySaveStatus] = useState(''); // 'saving', 'saved', 'error' for Lab Activity section
   const [sectionASaveStatus, setSectionASaveStatus] = useState(''); // 'saving', 'saved', 'error' for Section A section
+  const [sectionBSaveStatus, setSectionBSaveStatus] = useState(''); // 'saving', 'saved', 'error' for Section B section
   const saveTimeoutRef = useRef(null);
   const assignmentDataLoadedRef = useRef(false);
   const ctDataLoadedRef = useRef(false);
@@ -320,7 +321,7 @@ const AttainmentView = () => {
 
   // Initialize SectionB matrix rows when clos is available and SectionB is selected
   useEffect(() => {
-    if (selectedSheet === 'SectionB' && clos.length > 0 && !sectionADataLoadedRef.current) {
+    if (selectedSheet === 'SectionB' && clos.length > 0) {
       // Only initialize if we don't already have rows
       if (sectionBRows.length === 0) {
         console.log('[SectionB Init] Initializing Section B rows with', clos.length, 'COs');
@@ -337,9 +338,6 @@ const AttainmentView = () => {
         }));
         setSectionBRows(initial);
       }
-    }
-    if (selectedSheet !== 'SectionB' && !sectionADataLoadedRef.current) {
-      setSectionBRows([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSheet, clos]);
@@ -1558,6 +1556,60 @@ const AttainmentView = () => {
     }
   };
 
+  // Manual save function for Section B allocated marks
+  const handleManualSaveSectionB = async () => {
+    if (!selectedCourse || !selectedCourse._id) {
+      alert('Please select a course first');
+      return;
+    }
+
+    try {
+      console.log('[handleManualSaveSectionB] Starting save...');
+      console.log('[handleManualSaveSectionB] Course ID:', selectedCourse._id);
+      console.log('[handleManualSaveSectionB] sectionARows count:', sectionARows?.length);
+      console.log('[handleManualSaveSectionB] sectionBRows count:', sectionBRows?.length);
+
+      setSectionBSaveStatus('saving');
+
+      const dataToSave = {
+        sectionARows,
+        sectionAObtainedRows,
+        sectionBRows,
+        sectionBObtainedRows
+      };
+
+      console.log('[handleManualSaveSectionB] Data to save:', {
+        sectionARowsCount: dataToSave.sectionARows?.length,
+        sectionAObtainedRowsCount: dataToSave.sectionAObtainedRows?.length,
+        sectionBRowsCount: dataToSave.sectionBRows?.length,
+        sectionBObtainedRowsCount: dataToSave.sectionBObtainedRows?.length
+      });
+
+      await saveSectionAData(selectedCourse._id, dataToSave);
+
+      console.log('[handleManualSaveSectionB] Save successful');
+      alert('Section A & B data saved successfully!');
+      setSectionBSaveStatus('saved');
+
+      // Clear saved status after 2 seconds
+      setTimeout(() => setSectionBSaveStatus(''), 2000);
+    } catch (error) {
+      console.error('[handleManualSaveSectionB] Error:', error);
+      console.error('[handleManualSaveSectionB] Error details:', {
+        message: error.message,
+        error: error.error,
+        response: error.response?.data,
+        status: error.response?.status,
+        fullError: JSON.stringify(error)
+      });
+      const errorMessage = error.message || error.error || (typeof error === 'string' ? error : 'Unknown error occurred');
+      alert(`Error saving Section B data: ${errorMessage}`);
+      logger.error('[Manual Save Section B] Error:', error);
+      setSectionBSaveStatus('error');
+      setTimeout(() => setSectionBSaveStatus(''), 3000);
+    }
+  };
+
   // Load saved CT data when course and CT sheet selected (also load for COCalc sheets)
   useEffect(() => {
     const loadCTData = async () => {
@@ -1771,6 +1823,7 @@ const AttainmentView = () => {
           
           console.log('[loadSectionAData] Full response:', response);
           console.log('[loadSectionAData] Section A Obtained Rows:', response.data?.sectionAObtainedRows);
+          console.log('[loadSectionAData] Section B Obtained Rows:', response.data?.sectionBObtainedRows);
           
           if (response.success && response.data) {
             const {
@@ -1786,7 +1839,9 @@ const AttainmentView = () => {
               hasSectionBRows: !!savedSectionBRows,
               hasSectionBObtained: !!savedSectionBObtainedRows,
               sectionARowsCount: savedSectionARows?.length,
-              sectionAObtainedCount: savedSectionAObtainedRows?.length
+              sectionAObtainedCount: savedSectionAObtainedRows?.length,
+              sectionBRowsCount: savedSectionBRows?.length,
+              sectionBObtainedCount: savedSectionBObtainedRows?.length
             });
             
             // Check if we have allocated rows data (CO mappings)
@@ -1862,11 +1917,14 @@ const AttainmentView = () => {
               });
 
               // Merge saved Section B data with all students
+              console.log('[loadSectionAData] Merging Section B - savedSectionBObtainedRows:', savedSectionBObtainedRows);
               const mergedSectionB = uniqueByRoll.map(stu => {
                 const savedRow = savedSectionBObtainedRows?.find(r => String(r.rollNumber) === String(stu.rollNumber));
                 if (savedRow) {
+                  console.log('[loadSectionAData] Found Section B saved data for', stu.rollNumber, ':', savedRow);
                   return { ...savedRow };
                 }
+                console.log('[loadSectionAData] No Section B saved data for', stu.rollNumber, ', using zeros');
                 return {
                   rollNumber: stu.rollNumber,
                   name: stu.name,
@@ -1880,7 +1938,7 @@ const AttainmentView = () => {
               console.log('[loadSectionAData] Setting Section A with', mergedSectionA.length, 'students (merged)');
               setSectionAObtainedRows(mergedSectionA);
               
-              console.log('[loadSectionAData] Setting Section B with', mergedSectionB.length, 'students (merged)');
+              console.log('[loadSectionAData] Setting Section B with', mergedSectionB.length, 'students (merged):', mergedSectionB);
               setSectionBObtainedRows(mergedSectionB);
               
               sectionADataLoadedRef.current = true;
@@ -1949,11 +2007,14 @@ const AttainmentView = () => {
             });
 
             // Merge saved Section B data with all students
+            console.log('[loadSectionAData] Merging Section B (with allocated) - savedSectionBObtainedRows:', savedSectionBObtainedRows);
             const mergedSectionB = uniqueByRoll.map(stu => {
               const savedRow = savedSectionBObtainedRows?.find(r => String(r.rollNumber) === String(stu.rollNumber));
               if (savedRow) {
+                console.log('[loadSectionAData] Found Section B saved data for', stu.rollNumber, ':', savedRow);
                 return { ...savedRow };
               }
+              console.log('[loadSectionAData] No Section B saved data for', stu.rollNumber, ', using zeros');
               return {
                 rollNumber: stu.rollNumber,
                 name: stu.name,
@@ -1967,7 +2028,7 @@ const AttainmentView = () => {
             console.log('[loadSectionAData] Setting Section A with', mergedSectionA.length, 'students (all enrolled, sorted)');
             setSectionAObtainedRows(mergedSectionA);
             
-            console.log('[loadSectionAData] Setting Section B with', mergedSectionB.length, 'students (all enrolled, sorted)');
+            console.log('[loadSectionAData] Setting Section B with', mergedSectionB.length, 'students (all enrolled, sorted):', mergedSectionB);
             setSectionBObtainedRows(mergedSectionB);
           } else {
             console.log('[loadSectionAData] No saved data found or response not successful');
@@ -2322,20 +2383,46 @@ const AttainmentView = () => {
     return answeredQuestions.length > 0 ? answeredQuestions.join(',') : 'None';
   };
 
-  // Helper: Get CO marks distribution - returns the total allocated marks for that CO from the allocation table
+  // Helper: Convert answer combination string to combination key
+  const answerCombinationToKey = (answerCombination) => {
+    if (!answerCombination || answerCombination === 'None') return 'none';
+    
+    // Map answer combinations to their keys
+    const combinationMap = {
+      '1,2,3': 'q123',
+      '1,2,4': 'q124',
+      '1,3,4': 'q134',
+      '2,3,4': 'q234',
+      '1,2': 'q12',
+      '1,3': 'q13',
+      '1,4': 'q14',
+      '2,3': 'q23',
+      '2,4': 'q24',
+      '3,4': 'q34',
+      '1': 'q1',
+      '2': 'q2',
+      '3': 'q3',
+      '4': 'q4'
+    };
+    
+    return combinationMap[answerCombination] || 'none';
+  };
+
+  // Helper: Get CO marks distribution - HLOOKUP equivalent
+  // Returns the allocated marks for the specific answer combination the student chose
   const getStudentCODistribution = (studentRow, coNumber) => {
     const coRow = sectionARows.find(r => r.coNumber === coNumber);
     if (!coRow) return 0;
 
-    // Sum all allocated marks for this CO across all question parts
-    const parts = ['a', 'b', 'c', 'd'];
-    return [1, 2, 3, 4].reduce((total, qNum) => {
-      return total + parts.reduce((qSum, part) => {
-        const field = `Q${qNum}${part}`;
-        const allocated = parseFloat(coRow[field]) || 0;
-        return qSum + allocated;
-      }, 0);
-    }, 0);
+    // Get the student's answer combination (e.g., "1,2,3")
+    const answerCombination = getStudentAnswerCombination(studentRow);
+    
+    // Convert to combination key (e.g., "q123")
+    const combinationKey = answerCombinationToKey(answerCombination);
+    
+    // Look up the value in the Possible Answer Combinations table
+    // This is equivalent to HLOOKUP in Excel
+    return getAutoGeneratedCombination(coRow, combinationKey);
   };
 
   // ========== Section B Calculation Functions ==========
@@ -2467,19 +2554,46 @@ const AttainmentView = () => {
     return answeredQuestions.length > 0 ? answeredQuestions.join(',') : 'None';
   };
 
-  // Helper: Get CO marks distribution for Section B
+  // Helper: Convert answer combination string to combination key (Section B)
+  const answerCombinationToKeyB = (answerCombination) => {
+    if (!answerCombination || answerCombination === 'None') return 'none';
+    
+    // Map answer combinations to their keys (same as Section A)
+    const combinationMap = {
+      '1,2,3': 'q123',
+      '1,2,4': 'q124',
+      '1,3,4': 'q134',
+      '2,3,4': 'q234',
+      '1,2': 'q12',
+      '1,3': 'q13',
+      '1,4': 'q14',
+      '2,3': 'q23',
+      '2,4': 'q24',
+      '3,4': 'q34',
+      '1': 'q1',
+      '2': 'q2',
+      '3': 'q3',
+      '4': 'q4'
+    };
+    
+    return combinationMap[answerCombination] || 'none';
+  };
+
+  // Helper: Get CO marks distribution for Section B - HLOOKUP equivalent
+  // Returns the allocated marks for the specific answer combination the student chose
   const getStudentCODistributionB = (studentRow, coNumber) => {
     const coRow = sectionBRows.find(r => r.coNumber === coNumber);
     if (!coRow) return 0;
 
-    const parts = ['a', 'b', 'c', 'd'];
-    return [1, 2, 3, 4].reduce((total, qNum) => {
-      return total + parts.reduce((qSum, part) => {
-        const field = `Q${qNum}${part}`;
-        const allocated = parseFloat(coRow[field]) || 0;
-        return qSum + allocated;
-      }, 0);
-    }, 0);
+    // Get the student's answer combination (e.g., "1,2,3")
+    const answerCombination = getStudentAnswerCombinationB(studentRow);
+    
+    // Convert to combination key (e.g., "q123")
+    const combinationKey = answerCombinationToKeyB(answerCombination);
+    
+    // Look up the value in the Possible Answer Combinations table
+    // This is equivalent to HLOOKUP in Excel
+    return getAutoGeneratedCombinationB(coRow, combinationKey);
   };
 
   const sectionAColumnTotals = () => {
@@ -4053,20 +4167,43 @@ const AttainmentView = () => {
             <section className="section-b-section" style={{ marginTop: '30px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h2 style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>Allocated marks for Section-B in final question</h2>
-                <button
-                  onClick={() => setShowSectionBGeneratedModal(true)}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#3498db',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                >
-                  View Generated Table
-                </button>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <button
+                    onClick={handleManualSaveSectionB}
+                    disabled={sectionBSaveStatus === 'saving'}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: sectionBSaveStatus === 'saving' ? '#95a5a6' : '#27ae60',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: sectionBSaveStatus === 'saving' ? 'not-allowed' : 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    {sectionBSaveStatus === 'saving' ? 'Saving...' : 'Save Table'}
+                  </button>
+                  {sectionBSaveStatus === 'saved' && (
+                    <span style={{ color: '#27ae60', fontSize: '14px', fontWeight: 'bold' }}>✓ Saved</span>
+                  )}
+                  {sectionBSaveStatus === 'error' && (
+                    <span style={{ color: '#e74c3c', fontSize: '14px', fontWeight: 'bold' }}>✗ Error</span>
+                  )}
+                  <button
+                    onClick={() => setShowSectionBGeneratedModal(true)}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#3498db',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    View Generated Table
+                  </button>
+                </div>
               </div>
 
               {clos.length === 0 && (
@@ -4079,16 +4216,16 @@ const AttainmentView = () => {
                       <thead>
                         <tr>
                           <th rowSpan="2">CO No.</th>
-                          <th colSpan="4">1</th>
-                          <th style={{ borderLeft: '2px solid #d5d5d5' }} colSpan="4">2</th>
-                          <th style={{ borderLeft: '2px solid #d5d5d5' }} colSpan="4">3</th>
-                          <th style={{ borderLeft: '2px solid #d5d5d5' }} colSpan="4">4</th>
+                          <th colSpan="4">5</th>
+                          <th style={{ borderLeft: '2px solid #d5d5d5' }} colSpan="4">6</th>
+                          <th style={{ borderLeft: '2px solid #d5d5d5' }} colSpan="4">7</th>
+                          <th style={{ borderLeft: '2px solid #d5d5d5' }} colSpan="4">8</th>
                         </tr>
                         <tr>
-                          <th>1(a)</th><th>1(b)</th><th>1(c)</th><th>1(d)</th>
-                          <th style={{ borderLeft: '2px solid #d5d5d5' }}>2(a)</th><th>2(b)</th><th>2(c)</th><th>2(d)</th>
-                          <th style={{ borderLeft: '2px solid #d5d5d5' }}>3(a)</th><th>3(b)</th><th>3(c)</th><th>3(d)</th>
-                          <th style={{ borderLeft: '2px solid #d5d5d5' }}>4(a)</th><th>4(b)</th><th>4(c)</th><th>4(d)</th>
+                          <th>5(a)</th><th>5(b)</th><th>5(c)</th><th>5(d)</th>
+                          <th style={{ borderLeft: '2px solid #d5d5d5' }}>6(a)</th><th>6(b)</th><th>6(c)</th><th>6(d)</th>
+                          <th style={{ borderLeft: '2px solid #d5d5d5' }}>7(a)</th><th>7(b)</th><th>7(c)</th><th>7(d)</th>
+                          <th style={{ borderLeft: '2px solid #d5d5d5' }}>8(a)</th><th>8(b)</th><th>8(c)</th><th>8(d)</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -4239,7 +4376,6 @@ const AttainmentView = () => {
                                 style={{ width: '80px' }}
                               />
                             </td>
-                            <td className="co-total">{computeSectionBCOTotal(row)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -4257,7 +4393,6 @@ const AttainmentView = () => {
                               </>
                             );
                           })()}
-                          <td>{sectionBRows.reduce((sum, r) => sum + computeSectionBCOTotal(r), 0)}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -4287,17 +4422,17 @@ const AttainmentView = () => {
                         <thead>
                           <tr>
                             <th rowSpan="2">Roll</th>
-                            <th colSpan="4">1</th>
-                            <th style={{ borderLeft: '2px solid #d5d5d5' }} colSpan="4">2</th>
-                            <th style={{ borderLeft: '2px solid #d5d5d5' }} colSpan="4">3</th>
-                            <th style={{ borderLeft: '2px solid #d5d5d5' }} colSpan="4">4</th>
+                            <th colSpan="4">5</th>
+                            <th style={{ borderLeft: '2px solid #d5d5d5' }} colSpan="4">6</th>
+                            <th style={{ borderLeft: '2px solid #d5d5d5' }} colSpan="4">7</th>
+                            <th style={{ borderLeft: '2px solid #d5d5d5' }} colSpan="4">8</th>
                             <th rowSpan="2">Total</th>
                           </tr>
                           <tr>
-                            <th>1(a)</th><th>1(b)</th><th>1(c)</th><th>1(d)</th>
-                            <th style={{ borderLeft: '2px solid #d5d5d5' }}>2(a)</th><th>2(b)</th><th>2(c)</th><th>2(d)</th>
-                            <th style={{ borderLeft: '2px solid #d5d5d5' }}>3(a)</th><th>3(b)</th><th>3(c)</th><th>3(d)</th>
-                            <th style={{ borderLeft: '2px solid #d5d5d5' }}>4(a)</th><th>4(b)</th><th>4(c)</th><th>4(d)</th>
+                            <th>5(a)</th><th>5(b)</th><th>5(c)</th><th>5(d)</th>
+                            <th style={{ borderLeft: '2px solid #d5d5d5' }}>6(a)</th><th>6(b)</th><th>6(c)</th><th>6(d)</th>
+                            <th style={{ borderLeft: '2px solid #d5d5d5' }}>7(a)</th><th>7(b)</th><th>7(c)</th><th>7(d)</th>
+                            <th style={{ borderLeft: '2px solid #d5d5d5' }}>8(a)</th><th>8(b)</th><th>8(c)</th><th>8(d)</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -6290,26 +6425,26 @@ const AttainmentView = () => {
                     <th colSpan="15">Possible ans comb.</th>
                     <th rowSpan="2">CO msrd</th>
                     <th rowSpan="2">Unit V</th>
-                    <th rowSpan="2">(1,2,3)</th>
-                    <th rowSpan="2">(1,2,4)</th>
-                    <th rowSpan="2">(1,3,4)</th>
-                    <th rowSpan="2">(2,3,4)</th>
+                    <th rowSpan="2">(5,6,7)</th>
+                    <th rowSpan="2">(5,6,8)</th>
+                    <th rowSpan="2">(5,7,8)</th>
+                    <th rowSpan="2">(6,7,8)</th>
                   </tr>
                   <tr>
-                    <th>1,2,3</th>
-                    <th>1,2,4</th>
-                    <th>1,3,4</th>
-                    <th>2,3,4</th>
-                    <th>1,2</th>
-                    <th>1,3</th>
-                    <th>1,4</th>
-                    <th>2,3</th>
-                    <th>2,4</th>
-                    <th>3,4</th>
-                    <th>1</th>
-                    <th>2</th>
-                    <th>3</th>
-                    <th>4</th>
+                    <th>5,6,7</th>
+                    <th>5,6,8</th>
+                    <th>5,7,8</th>
+                    <th>6,7,8</th>
+                    <th>5,6</th>
+                    <th>5,7</th>
+                    <th>5,8</th>
+                    <th>6,7</th>
+                    <th>6,8</th>
+                    <th>7,8</th>
+                    <th>5</th>
+                    <th>6</th>
+                    <th>7</th>
+                    <th>8</th>
                     <th>None</th>
                   </tr>
                 </thead>
@@ -6546,10 +6681,10 @@ const AttainmentView = () => {
                     {sectionBRows.map((row, idx) => (
                       <th key={`co-header-${idx}`}>{row.coNumber}</th>
                     ))}
-                    <th>1</th>
-                    <th>2</th>
-                    <th>3</th>
-                    <th>4</th>
+                    <th>5</th>
+                    <th>6</th>
+                    <th>7</th>
+                    <th>8</th>
                     {sectionBRows.map((row, idx) => (
                       <th key={`co-dist-header-${idx}`}>{row.coNumber}</th>
                     ))}
