@@ -202,12 +202,7 @@ const AttainmentView = () => {
         })
       );
 
-      console.log('[initCtRows] shouldInitialize:', shouldInitialize,
-        'dataLoaded:', ctDataLoadedRef.current,
-        'current length:', ctRows.length, 'expected length:', clos.length);
-
       if (shouldInitialize) {
-        console.log('[initCtRows] Initializing with blank data');
         const initial = clos.map(clo => ({
           coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
           CT1_Q1: 0, CT1_Q2: 0, CT1_Q3: 0,
@@ -223,8 +218,6 @@ const AttainmentView = () => {
         setCtEqWts({ CT1: 0, CT2: 0, CT3: 0 });
         setCtManualWts(manualInit);
         setCtSummary({ ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 });
-      } else {
-        console.log('[initCtRows] Skipping initialization - data already exists or loaded');
       }
     }
     // Don't clear CT data when on COCalc sheets (they need CT data for calculations)
@@ -252,12 +245,7 @@ const AttainmentView = () => {
         })
       );
 
-      console.log('[initAssignmentRows] shouldInitialize:', shouldInitialize,
-        'dataLoaded:', assignmentDataLoadedRef.current,
-        'current length:', assignmentRows.length, 'expected length:', clos.length);
-
       if (shouldInitialize) {
-        console.log('[initAssignmentRows] Initializing with blank data');
         const initial = clos.map(clo => ({
           coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
           attendance: 0,
@@ -280,8 +268,6 @@ const AttainmentView = () => {
         } else {
           setAttendanceMarks(0);
         }
-      } else {
-        console.log('[initAssignmentRows] Skipping initialization - data already exists or loaded');
       }
     }
     // Don't clear Assignment data when on COCalc sheets (they need Assignment data for calculations)
@@ -298,7 +284,6 @@ const AttainmentView = () => {
     if (selectedSheet === 'SectionA' && clos.length > 0 && !sectionADataLoadedRef.current) {
       // Only initialize if we don't already have rows
       if (sectionARows.length === 0) {
-        console.log('[SectionA Init] Initializing Section A rows with', clos.length, 'COs');
         const initial = clos.map(clo => ({
           coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
           Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
@@ -324,7 +309,6 @@ const AttainmentView = () => {
     if (selectedSheet === 'SectionB' && clos.length > 0) {
       // Only initialize if we don't already have rows
       if (sectionBRows.length === 0) {
-        console.log('[SectionB Init] Initializing Section B rows with', clos.length, 'COs');
         const initial = clos.map(clo => ({
           coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
           Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
@@ -347,7 +331,6 @@ const AttainmentView = () => {
     if (selectedSheet === 'LabActivity' && clos.length > 0) {
       // Only initialize if no saved data has been loaded
       if (!labActivityDataLoadedRef.current) {
-        console.log('[Initialize LabActivity] Initializing empty rows');
         const initial = clos.map(clo => ({
           coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
           attn: 0,
@@ -525,40 +508,17 @@ const AttainmentView = () => {
         let termMarksData = [];
         try {
           setTermExamLoading(true);
-          console.log('[TERM MARKS LOADING] Fetching for course:', selectedCourse._id, 'section:', selectedCourse.section);
-          alert(`About to fetch term marks for course: ${selectedCourse.courseCode}, section: ${selectedCourse.section}`);
           
           const termResp = await getTermExamMarks(selectedCourse._id, selectedCourse.section);
-          console.log('[TERM MARKS LOADING] Response:', termResp);
-          
-          alert(`Term marks response: success=${termResp.success}, data length=${termResp.data?.length || 0}`);
           
           if (termResp.success && Array.isArray(termResp.data)) {
-            console.log('[TERM MARKS LOADING] Setting termExamMarks with', termResp.data.length, 'records');
-            console.log('[TERM MARKS LOADING] First record FULL:', JSON.stringify(termResp.data[0], null, 2));
-            
-            if (termResp.data.length > 0) {
-              alert(`Term marks loaded: ${termResp.data.length} students. First student: ${termResp.data[0]?.rollNumber}, marks.a: ${JSON.stringify(termResp.data[0]?.marks?.a)}`);
-            } else {
-              alert('Term marks loaded but array is EMPTY! No students have marks entered in database.');
-            }
-            
-            if (termResp.data[0]) {
-              console.log('[TERM MARKS LOADING] First record student:', termResp.data[0].student);
-              console.log('[TERM MARKS LOADING] First record rollNumber:', termResp.data[0].rollNumber);
-              console.log('[TERM MARKS LOADING] First record marks:', termResp.data[0].marks);
-              console.log('[TERM MARKS LOADING] First record marks.a:', termResp.data[0].marks?.a);
-              console.log('[TERM MARKS LOADING] First record marks.a[1]:', termResp.data[0].marks?.a?.['1']);
-            }
             setTermExamMarks(termResp.data);
             termMarksData = termResp.data;
           } else {
-            console.log('[TERM MARKS LOADING] No data or not array, setting empty');
-            alert('Term marks API returned NO DATA or not an array!');
             setTermExamMarks([]);
           }
         } catch (err) {
-          console.error('[TERM MARKS LOADING] Error:', err);
+          console.error('Error loading term exam marks:', err);
           setTermExamMarks([]);
         } finally {
           setTermExamLoading(false);
@@ -742,26 +702,19 @@ const AttainmentView = () => {
     // Don't initialize if we already have saved data for this sheet type
     // Only check the ref (not state length) because setState is async
     if (forSheet === 'CT' && ctDataLoadedRef.current) {
-      console.log('[initObtainedRows] Skipping CT initialization - saved data already loaded');
       return;
     }
     if (forSheet === 'Attn_Assign' && assignmentDataLoadedRef.current) {
-      console.log('[initObtainedRows] Skipping Attn_Assign initialization - saved data already loaded');
       return;
     }
     if (forSheet === 'LabActivity' && labActivityDataLoadedRef.current) {
-      console.log('[initObtainedRows] Skipping LabActivity initialization - saved data already loaded');
       return;
     }
     // For Section A/B: Check if data has already been loaded from backend
     if ((forSheet === 'SectionA' || forSheet === 'SectionB') && sectionADataLoadedRef.current) {
-      console.log(`[initObtainedRows] Skipping ${forSheet} initialization - saved data already loaded`);
       return;
     }
     
-    console.log(`[initObtainedRows] Initializing ${forSheet} obtained rows`);
-
-    console.log('[initObtainedRows] Initializing obtained rows for:', forSheet);
 
     let allStudents = [];
     if (selectedCourse && selectedCourse._id) {
@@ -849,14 +802,6 @@ const AttainmentView = () => {
         setAttnAssignObtainedRows(initial);
       }
       // Section A
-      console.log('[initObtainedRows Section A] Creating rows with termExamMarks:', {
-        termExamMarksAvailable: !!termExamMarks,
-        termExamMarksLength: termExamMarks?.length,
-        uniqueByRollLength: uniqueByRoll.length,
-        sampleStudent: uniqueByRoll[0],
-        sampleTermMark: termExamMarks?.[0]
-      });
-      
       const initialSectionA = uniqueByRoll.map(stu => {
         // Check if we have term marks for this student
         let studentData = {
@@ -877,23 +822,13 @@ const AttainmentView = () => {
           });
 
           if (studentTermMarks && studentTermMarks.marks) {
-            console.log('[initObtainedRows Section A] Found marks for', stu.rollNumber);
-            console.log('[initObtainedRows Section A] studentTermMarks:', studentTermMarks);
-            console.log('[initObtainedRows Section A] marks object:', studentTermMarks.marks);
-            console.log('[initObtainedRows Section A] marks.a:', studentTermMarks.marks.a);
-            console.log('[initObtainedRows Section A] marks.a type:', typeof studentTermMarks.marks.a);
-            console.log('[initObtainedRows Section A] marks.a keys:', studentTermMarks.marks.a ? Object.keys(studentTermMarks.marks.a) : 'N/A');
-            
             const marks = studentTermMarks.marks;
             
             // Helper function to safely get numeric value
             const getValue = (row, question) => {
-              console.log(`[initObtainedRows Section A] Getting value for row=${row} question=${question}`);
               const val = marks[row]?.[question] || marks[row]?.[String(question)];
-              console.log(`[initObtainedRows Section A] Raw value:`, val);
               if (val === null || val === undefined || val === '') return 0;
               const num = parseFloat(val);
-              console.log(`[initObtainedRows Section A] Parsed value:`, num);
               return isNaN(num) ? 0 : num;
             };
             
@@ -916,20 +851,15 @@ const AttainmentView = () => {
               Q4c: getValue('c', '4'),
               Q4d: getValue('d', '4'),
             };
-            console.log('[initObtainedRows Section A] Populated data for', stu.rollNumber, ':', studentData);
           } else {
-            console.log('[initObtainedRows Section A] No marks found for', stu.rollNumber);
           }
         } else {
-          console.log('[initObtainedRows Section A] No termExamMarks available');
         }
 
         return studentData;
       });
-      console.log('[initObtainedRows Section A] Setting sectionAObtainedRows:', initialSectionA);
       setSectionAObtainedRows(initialSectionA);
       // Section B
-      console.log('[initObtainedRows Section B] Creating rows with termExamMarks');
       
       const initialSectionB = uniqueByRoll.map(stu => {
         // Check if we have term marks for this student
@@ -951,7 +881,6 @@ const AttainmentView = () => {
           });
 
           if (studentTermMarks && studentTermMarks.marks) {
-            console.log('[initObtainedRows Section B] Found marks for', stu.rollNumber);
             const marks = studentTermMarks.marks;
             
             // Helper function to safely get numeric value
@@ -982,7 +911,6 @@ const AttainmentView = () => {
               Q4c: getValue('c', '8'),
               Q4d: getValue('d', '8'),
             };
-            console.log('[initObtainedRows Section B] Populated data for', stu.rollNumber);
           }
         }
 
@@ -1005,10 +933,8 @@ const AttainmentView = () => {
           otherMeasured: 0,
           other: 0,
         }));
-        console.log('[Initialize from attainmentData] Setting LabActivity obtained rows with', initial.length, 'students');
         setLabActivityObtainedRows(initial);
       } else {
-        console.log('[Initialize from attainmentData] Skipping LabActivity - saved data already loaded');
       }
     } else {
       // Don't clear if saved data has been loaded
@@ -1332,10 +1258,7 @@ const AttainmentView = () => {
 
   // Manual save function (saves immediately without debounce)
   const handleManualSave = async () => {
-    console.log('[handleManualSave] Called with:', { selectedCourse: !!selectedCourse, selectedSheet });
-
     if (!selectedCourse || !selectedCourse._id) {
-      console.log('[handleManualSave] Missing selectedCourse or courseId');
       setSaveStatus('error');
       setTimeout(() => setSaveStatus(''), 3000);
       return;
@@ -1358,9 +1281,7 @@ const AttainmentView = () => {
         ctObtainedRows
       };
 
-      console.log('[handleManualSave] Saving data:', dataToSave);
       const response = await saveCTData(selectedCourse._id, dataToSave);
-      console.log('[handleManualSave] Save response:', response);
 
       setSaveStatus('saved');
 
@@ -1376,10 +1297,7 @@ const AttainmentView = () => {
 
   // Manual save function for Assignment/Attendance (saves immediately without debounce)
   const handleManualSaveAssignment = async () => {
-    console.log('[handleManualSaveAssignment] Called with:', { selectedCourse: !!selectedCourse, selectedSheet });
-
     if (!selectedCourse || !selectedCourse._id) {
-      console.log('[handleManualSaveAssignment] Missing selectedCourse or courseId');
       setSaveStatus('error');
       setTimeout(() => setSaveStatus(''), 3000);
       return;
@@ -1401,9 +1319,7 @@ const AttainmentView = () => {
         attnAssignObtainedRows
       };
 
-      console.log('[handleManualSaveAssignment] Saving data:', dataToSave);
       const response = await saveAssignmentData(selectedCourse._id, dataToSave);
-      console.log('[handleManualSaveAssignment] Save response:', response);
 
       setSaveStatus('saved');
 
@@ -1419,11 +1335,7 @@ const AttainmentView = () => {
 
   // Manual save function for Lab Activity (saves immediately without debounce)
   const handleManualSaveLabActivity = async () => {
-    console.log('[handleManualSaveLabActivity] Called with:', { selectedCourse: !!selectedCourse, selectedSheet });
-    console.log('[handleManualSaveLabActivity] Current labActivityObtainedRows:', labActivityObtainedRows);
-
     if (!selectedCourse || !selectedCourse._id) {
-      console.log('[handleManualSaveLabActivity] Missing selectedCourse or courseId');
       alert('Please select a course first');
       setLabActivitySaveStatus('error');
       setTimeout(() => setLabActivitySaveStatus(''), 3000);
@@ -1445,8 +1357,6 @@ const AttainmentView = () => {
         totalMeasuredTotal += totals[`activity${i}`] || 0;
       }
       
-      console.log('[handleManualSaveLabActivity] totalMeasuredTotal:', totalMeasuredTotal);
-      
       const rowsWithCalculatedOther = labActivityObtainedRows.map(row => {
         if (totalMeasuredTotal === 0) {
           return { ...row, other: 0 };
@@ -1458,8 +1368,6 @@ const AttainmentView = () => {
         const rounded = Math.round(calculatedOther * 10000) / 10000;
         return { ...row, other: rounded };
       });
-
-      console.log('[handleManualSaveLabActivity] rowsWithCalculatedOther:', rowsWithCalculatedOther);
 
       const dataToSave = {
         labActivityRows,
@@ -1477,11 +1385,7 @@ const AttainmentView = () => {
         labActivityObtainedRows: rowsWithCalculatedOther
       };
 
-      console.log('[handleManualSaveLabActivity] Saving data:', dataToSave);
-      console.log('[handleManualSaveLabActivity] Course ID:', selectedCourse._id);
-      
       const response = await saveLabActivityData(selectedCourse._id, dataToSave);
-      console.log('[handleManualSaveLabActivity] Save response:', response);
 
       alert('Lab Activity data saved successfully!');
       setLabActivitySaveStatus('saved');
@@ -1510,11 +1414,6 @@ const AttainmentView = () => {
     }
 
     try {
-      console.log('[handleManualSaveSectionA] Starting save...');
-      console.log('[handleManualSaveSectionA] Course ID:', selectedCourse._id);
-      console.log('[handleManualSaveSectionA] sectionARows count:', sectionARows?.length);
-      console.log('[handleManualSaveSectionA] sectionBRows count:', sectionBRows?.length);
-
       setSectionASaveStatus('saving');
 
       const dataToSave = {
@@ -1524,16 +1423,8 @@ const AttainmentView = () => {
         sectionBObtainedRows
       };
 
-      console.log('[handleManualSaveSectionA] Data to save:', {
-        sectionARowsCount: dataToSave.sectionARows?.length,
-        sectionAObtainedRowsCount: dataToSave.sectionAObtainedRows?.length,
-        sectionBRowsCount: dataToSave.sectionBRows?.length,
-        sectionBObtainedRowsCount: dataToSave.sectionBObtainedRows?.length
-      });
-
       await saveSectionAData(selectedCourse._id, dataToSave);
 
-      console.log('[handleManualSaveSectionA] Save successful');
       alert('Section A & B data saved successfully!');
       setSectionASaveStatus('saved');
 
@@ -1564,11 +1455,6 @@ const AttainmentView = () => {
     }
 
     try {
-      console.log('[handleManualSaveSectionB] Starting save...');
-      console.log('[handleManualSaveSectionB] Course ID:', selectedCourse._id);
-      console.log('[handleManualSaveSectionB] sectionARows count:', sectionARows?.length);
-      console.log('[handleManualSaveSectionB] sectionBRows count:', sectionBRows?.length);
-
       setSectionBSaveStatus('saving');
 
       const dataToSave = {
@@ -1578,16 +1464,8 @@ const AttainmentView = () => {
         sectionBObtainedRows
       };
 
-      console.log('[handleManualSaveSectionB] Data to save:', {
-        sectionARowsCount: dataToSave.sectionARows?.length,
-        sectionAObtainedRowsCount: dataToSave.sectionAObtainedRows?.length,
-        sectionBRowsCount: dataToSave.sectionBRows?.length,
-        sectionBObtainedRowsCount: dataToSave.sectionBObtainedRows?.length
-      });
-
       await saveSectionAData(selectedCourse._id, dataToSave);
 
-      console.log('[handleManualSaveSectionB] Save successful');
       alert('Section A & B data saved successfully!');
       setSectionBSaveStatus('saved');
 
@@ -1624,20 +1502,10 @@ const AttainmentView = () => {
         // Set the flag immediately to prevent initialization from running during load
         ctDataLoadedRef.current = true;
         try {
-          console.log('[loadCTData] Loading saved data for course:', selectedCourse._id);
           const response = await getCTData(selectedCourse._id);
           if (response.success && response.data) {
             const { ctRows: savedRows, ctFactors: savedFactors, ctManualWts: savedManual,
               ctEqWts: savedEq, ctSummary: savedSummary, ctObtainedRows: savedObtained } = response.data;
-
-            console.log('[loadCTData] Loaded saved data:', {
-              hasRows: !!savedRows,
-              hasFactors: !!savedFactors,
-              hasManual: !!savedManual,
-              hasEq: !!savedEq,
-              hasSummary: !!savedSummary,
-              hasObtained: !!savedObtained
-            });
 
             if (savedRows && savedRows.length > 0) {
               setCtRows(savedRows);
@@ -1653,7 +1521,6 @@ const AttainmentView = () => {
               ctDataLoadedRef.current = false;
             }
           } else {
-            console.log('[loadCTData] No saved data found or response not successful');
             // No data found - allow initialization and trigger it immediately
             ctDataLoadedRef.current = false;
             initObtainedRows('CT');
@@ -1683,20 +1550,11 @@ const AttainmentView = () => {
         // Set the flag immediately to prevent initialization from running during load
         assignmentDataLoadedRef.current = true;
         try {
-          console.log('[loadAssignmentData] Loading saved data for course:', selectedCourse._id);
           const response = await getAssignmentData(selectedCourse._id);
           if (response.success && response.data) {
             const { assignmentRows: savedRows, assignmentManualWts: savedManual,
               assignmentSummary: savedSummary, attendanceMarks: savedAttendance,
               attnAssignObtainedRows: savedObtained } = response.data;
-
-            console.log('[loadAssignmentData] Loaded saved data:', {
-              hasRows: !!savedRows,
-              hasManual: !!savedManual,
-              hasSummary: !!savedSummary,
-              hasAttendance: savedAttendance !== undefined,
-              hasObtained: !!savedObtained
-            });
 
             if (savedRows && savedRows.length > 0) {
               setAssignmentRows(savedRows);
@@ -1711,7 +1569,6 @@ const AttainmentView = () => {
               assignmentDataLoadedRef.current = false;
             }
           } else {
-            console.log('[loadAssignmentData] No saved data found or response not successful');
             // No data found - allow initialization and trigger it immediately
             assignmentDataLoadedRef.current = false;
             initObtainedRows('Attn_Assign');
@@ -1741,7 +1598,6 @@ const AttainmentView = () => {
         // Set the flag immediately to prevent initialization from running during load
         labActivityDataLoadedRef.current = true;
         try {
-          console.log('[loadLabActivityData] Loading saved data for course:', selectedCourse._id);
           const response = await getLabActivityData(selectedCourse._id);
           if (response.success && response.data) {
             const {
@@ -1759,16 +1615,6 @@ const AttainmentView = () => {
               useEqWtActivity: savedUseEqWt,
               labActivityObtainedRows: savedObtained
             } = response.data;
-
-            console.log('[loadLabActivityData] Loaded saved data:', {
-              hasRows: !!savedRows,
-              hasFactors: !!savedFactors,
-              hasEqWts: !!savedEqWts,
-              hasManualWts: !!savedManualWts,
-              hasObtained: !!savedObtained,
-              obtainedCount: savedObtained?.length,
-              firstObtainedRow: savedObtained?.[0]
-            });
             
             if (savedRows && savedRows.length > 0) {
               setLabActivityRows(savedRows);
@@ -1785,14 +1631,10 @@ const AttainmentView = () => {
             if (savedCoMapped !== undefined) setCoMappedActivityMarks(savedCoMapped);
             if (savedUseEqWt !== undefined) setUseEqWtActivity(savedUseEqWt);
             if (savedObtained && savedObtained.length > 0) {
-              console.log('[loadLabActivityData] Setting labActivityObtainedRows with', savedObtained.length, 'rows');
-              console.log('[loadLabActivityData] Sample row:', savedObtained[0]);
               setLabActivityObtainedRows(savedObtained);
             } else {
-              console.log('[loadLabActivityData] No obtained marks data to load');
             }
           } else {
-            console.log('[loadLabActivityData] No saved data found or response not successful');
             // No data found - allow initialization
             labActivityDataLoadedRef.current = false;
           }
@@ -1818,12 +1660,7 @@ const AttainmentView = () => {
 
       if (selectedCourse && selectedCourse._id) {
         try {
-          console.log('[loadSectionAData] Loading saved data for course:', selectedCourse._id);
           const response = await getSectionAData(selectedCourse._id);
-          
-          console.log('[loadSectionAData] Full response:', response);
-          console.log('[loadSectionAData] Section A Obtained Rows:', response.data?.sectionAObtainedRows);
-          console.log('[loadSectionAData] Section B Obtained Rows:', response.data?.sectionBObtainedRows);
           
           if (response.success && response.data) {
             const {
@@ -1832,28 +1669,15 @@ const AttainmentView = () => {
               sectionBRows: savedSectionBRows,
               sectionBObtainedRows: savedSectionBObtainedRows
             } = response.data;
-
-            console.log('[loadSectionAData] Loaded saved data:', {
-              hasSectionARows: !!savedSectionARows,
-              hasSectionAObtained: !!savedSectionAObtainedRows,
-              hasSectionBRows: !!savedSectionBRows,
-              hasSectionBObtained: !!savedSectionBObtainedRows,
-              sectionARowsCount: savedSectionARows?.length,
-              sectionAObtainedCount: savedSectionAObtainedRows?.length,
-              sectionBRowsCount: savedSectionBRows?.length,
-              sectionBObtainedCount: savedSectionBObtainedRows?.length
-            });
             
             // Check if we have allocated rows data (CO mappings)
             const hasAllocatedData = (savedSectionARows && savedSectionARows.length > 0) ||
                                      (savedSectionBRows && savedSectionBRows.length > 0);
             
             if (!hasAllocatedData) {
-              console.log('[loadSectionAData] No allocated rows data, initializing with COs');
               
               // Initialize with COs if available
               if (clos.length > 0) {
-                console.log('[loadSectionAData] Initializing Section A/B rows with', clos.length, 'COs');
                 const initialRows = clos.map(clo => ({
                   coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
                   Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
@@ -1901,8 +1725,22 @@ const AttainmentView = () => {
               });
 
               // Merge saved Section A data with all students
+              // Deduplicate saved data - keep last occurrence of each roll number
+              const dedupedSectionA = [];
+              const seenRollsA = new Set();
+              if (savedSectionAObtainedRows) {
+                for (let i = savedSectionAObtainedRows.length - 1; i >= 0; i--) {
+                  const row = savedSectionAObtainedRows[i];
+                  const roll = String(row.rollNumber);
+                  if (!seenRollsA.has(roll)) {
+                    seenRollsA.add(roll);
+                    dedupedSectionA.unshift(row);
+                  }
+                }
+              }
+              
               const mergedSectionA = uniqueByRoll.map(stu => {
-                const savedRow = savedSectionAObtainedRows?.find(r => String(r.rollNumber) === String(stu.rollNumber));
+                const savedRow = dedupedSectionA?.find(r => String(r.rollNumber) === String(stu.rollNumber));
                 if (savedRow) {
                   return { ...savedRow };
                 }
@@ -1917,14 +1755,27 @@ const AttainmentView = () => {
               });
 
               // Merge saved Section B data with all students
-              console.log('[loadSectionAData] Merging Section B - savedSectionBObtainedRows:', savedSectionBObtainedRows);
+              
+              // Deduplicate saved data - keep last occurrence of each roll number
+              const dedupedSectionB = [];
+              const seenRolls = new Set();
+              if (savedSectionBObtainedRows) {
+                // Process in reverse to keep last occurrence
+                for (let i = savedSectionBObtainedRows.length - 1; i >= 0; i--) {
+                  const row = savedSectionBObtainedRows[i];
+                  const roll = String(row.rollNumber);
+                  if (!seenRolls.has(roll)) {
+                    seenRolls.add(roll);
+                    dedupedSectionB.unshift(row);
+                  }
+                }
+              }
+              
               const mergedSectionB = uniqueByRoll.map(stu => {
-                const savedRow = savedSectionBObtainedRows?.find(r => String(r.rollNumber) === String(stu.rollNumber));
+                const savedRow = dedupedSectionB?.find(r => String(r.rollNumber) === String(stu.rollNumber));
                 if (savedRow) {
-                  console.log('[loadSectionAData] Found Section B saved data for', stu.rollNumber, ':', savedRow);
                   return { ...savedRow };
                 }
-                console.log('[loadSectionAData] No Section B saved data for', stu.rollNumber, ', using zeros');
                 return {
                   rollNumber: stu.rollNumber,
                   name: stu.name,
@@ -1935,10 +1786,8 @@ const AttainmentView = () => {
                 };
               });
 
-              console.log('[loadSectionAData] Setting Section A with', mergedSectionA.length, 'students (merged)');
               setSectionAObtainedRows(mergedSectionA);
               
-              console.log('[loadSectionAData] Setting Section B with', mergedSectionB.length, 'students (merged):', mergedSectionB);
               setSectionBObtainedRows(mergedSectionB);
               
               sectionADataLoadedRef.current = true;
@@ -1950,11 +1799,9 @@ const AttainmentView = () => {
             sectionADataLoadedRef.current = true; // Mark as loaded to prevent re-initialization
             
             if (savedSectionARows && savedSectionARows.length > 0) {
-              console.log('[loadSectionAData] Setting sectionARows with', savedSectionARows.length, 'rows');
               setSectionARows(savedSectionARows);
             }
             if (savedSectionBRows && savedSectionBRows.length > 0) {
-              console.log('[loadSectionAData] Setting sectionBRows with', savedSectionBRows.length, 'rows');
               setSectionBRows(savedSectionBRows);
             }
             
@@ -1991,8 +1838,22 @@ const AttainmentView = () => {
             });
 
             // Merge saved Section A data with all students
+            // Deduplicate saved data - keep last occurrence of each roll number
+            const dedupedSectionA = [];
+            const seenRollsA = new Set();
+            if (savedSectionAObtainedRows) {
+              for (let i = savedSectionAObtainedRows.length - 1; i >= 0; i--) {
+                const row = savedSectionAObtainedRows[i];
+                const roll = String(row.rollNumber);
+                if (!seenRollsA.has(roll)) {
+                  seenRollsA.add(roll);
+                  dedupedSectionA.unshift(row);
+                }
+              }
+            }
+            
             const mergedSectionA = uniqueByRoll.map(stu => {
-              const savedRow = savedSectionAObtainedRows?.find(r => String(r.rollNumber) === String(stu.rollNumber));
+              const savedRow = dedupedSectionA?.find(r => String(r.rollNumber) === String(stu.rollNumber));
               if (savedRow) {
                 return { ...savedRow };
               }
@@ -2007,14 +1868,27 @@ const AttainmentView = () => {
             });
 
             // Merge saved Section B data with all students
-            console.log('[loadSectionAData] Merging Section B (with allocated) - savedSectionBObtainedRows:', savedSectionBObtainedRows);
+            
+            // Deduplicate saved data - keep last occurrence of each roll number
+            const dedupedSectionB = [];
+            const seenRolls = new Set();
+            if (savedSectionBObtainedRows) {
+              // Process in reverse to keep last occurrence
+              for (let i = savedSectionBObtainedRows.length - 1; i >= 0; i--) {
+                const row = savedSectionBObtainedRows[i];
+                const roll = String(row.rollNumber);
+                if (!seenRolls.has(roll)) {
+                  seenRolls.add(roll);
+                  dedupedSectionB.unshift(row);
+                }
+              }
+            }
+            
             const mergedSectionB = uniqueByRoll.map(stu => {
-              const savedRow = savedSectionBObtainedRows?.find(r => String(r.rollNumber) === String(stu.rollNumber));
+              const savedRow = dedupedSectionB?.find(r => String(r.rollNumber) === String(stu.rollNumber));
               if (savedRow) {
-                console.log('[loadSectionAData] Found Section B saved data for', stu.rollNumber, ':', savedRow);
                 return { ...savedRow };
               }
-              console.log('[loadSectionAData] No Section B saved data for', stu.rollNumber, ', using zeros');
               return {
                 rollNumber: stu.rollNumber,
                 name: stu.name,
@@ -2025,19 +1899,15 @@ const AttainmentView = () => {
               };
             });
 
-            console.log('[loadSectionAData] Setting Section A with', mergedSectionA.length, 'students (all enrolled, sorted)');
             setSectionAObtainedRows(mergedSectionA);
             
-            console.log('[loadSectionAData] Setting Section B with', mergedSectionB.length, 'students (all enrolled, sorted):', mergedSectionB);
             setSectionBObtainedRows(mergedSectionB);
           } else {
-            console.log('[loadSectionAData] No saved data found or response not successful');
             // No data found - allow initialization
             sectionADataLoadedRef.current = false;
             
             // Initialize with COs if available
             if (clos.length > 0) {
-              console.log('[loadSectionAData] Initializing Section A/B rows with', clos.length, 'COs');
               const initialRows = clos.map(clo => ({
                 coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
                 Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
@@ -2059,7 +1929,6 @@ const AttainmentView = () => {
           
           // Initialize with COs if available
           if (clos.length > 0) {
-            console.log('[loadSectionAData] Initializing Section A/B rows with', clos.length, 'COs after error');
             const initialRows = clos.map(clo => ({
               coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
               Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
@@ -4496,12 +4365,6 @@ const AttainmentView = () => {
                   )}
                   <button
                     onClick={() => {
-                      console.log('[LabActivity SaveTable] Button clicked');
-                      console.log('[LabActivity SaveTable] labActivityRows:', labActivityRows);
-                      console.log('[LabActivity SaveTable] labActivityFactors:', labActivityFactors);
-                      console.log('[LabActivity SaveTable] labActivityEqWts:', labActivityEqWts);
-                      console.log('[LabActivity SaveTable] labActivityManualWts:', labActivityManualWts);
-                      console.log('[LabActivity SaveTable] labActivityObtainedRows:', labActivityObtainedRows);
                       handleManualSaveLabActivity();
                     }}
                     disabled={labActivitySaveStatus === 'saving'}
@@ -4925,7 +4788,6 @@ const AttainmentView = () => {
                     )}
                     <button
                       onClick={() => {
-                        console.log('[LabActivity Summary SaveTable] Button clicked');
                         handleManualSaveLabActivity();
                       }}
                       disabled={labActivitySaveStatus === 'saving'}
@@ -4949,7 +4811,6 @@ const AttainmentView = () => {
                         )}
                         <button
                           onClick={() => {
-                            console.log('[LabActivity Obtained SaveTable] Button clicked');
                             handleManualSaveLabActivity();
                           }}
                           disabled={labActivitySaveStatus === 'saving'}
@@ -5153,12 +5014,6 @@ const AttainmentView = () => {
                   )}
                   <button
                     onClick={() => {
-                      console.log('[AllocatedMarks SaveTable] Button clicked');
-                      console.log('[AllocatedMarks SaveTable] assignmentRows:', assignmentRows);
-                      console.log('[AllocatedMarks SaveTable] assignmentManualWts:', assignmentManualWts);
-                      console.log('[AllocatedMarks SaveTable] assignmentSummary:', assignmentSummary);
-                      console.log('[AllocatedMarks SaveTable] attendanceMarks:', attendanceMarks);
-                      console.log('[AllocatedMarks SaveTable] attnAssignObtainedRows:', attnAssignObtainedRows);
                       handleManualSaveAssignment();
                     }}
                     disabled={saveStatus === 'saving'}
@@ -5370,14 +5225,6 @@ const AttainmentView = () => {
                         )}
                         <button
                           onClick={() => {
-                            console.log('[ObtainedMarks SaveTable] Button clicked');
-                            console.log('[ObtainedMarks SaveTable] assignmentRows:', assignmentRows);
-                            console.log('[ObtainedMarks SaveTable] assignmentManualWts:', assignmentManualWts);
-                            console.log('[ObtainedMarks SaveTable] assignmentSummary:', assignmentSummary);
-                            console.log('[ObtainedMarks SaveTable] attendanceMarks:', attendanceMarks);
-                            console.log('[ObtainedMarks SaveTable] attnAssignObtainedRows:', attnAssignObtainedRows);
-                            console.log('[ObtainedMarks SaveTable] selectedCourse:', selectedCourse);
-                            console.log('[ObtainedMarks SaveTable] selectedSheet:', selectedSheet);
                             handleManualSaveAssignment();
                           }}
                           disabled={saveStatus === 'saving'}

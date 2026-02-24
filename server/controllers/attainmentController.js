@@ -759,17 +759,16 @@ exports.getSectionAData = async (req, res) => {
   try {
     const { courseId } = req.params;
 
-    console.log('[getSectionAData] Received request for courseId:', courseId);
-
-    // Parallel course check and section A data fetch for better performance
-    const [course, sectionAData, termExamMarks] = await Promise.all([
+    // Parallel course check and section A/B data fetch for better performance
+    // IMPORTANT: Section A uses questions 1-4, Section B uses questions 5-8
+    const [course, sectionAData, termExamMarksA, termExamMarksB] = await Promise.all([
       Course.findById(courseId).select('assignedTeachers').lean(),
       TermExamAttainment.findOne({ course: courseId }).lean(),
-      TermExamMarks.find({ course: courseId }).populate('student', 'roll name').lean()
+      TermExamMarks.find({ course: courseId, section: 'A' }).populate('student', 'roll name').lean(),
+      TermExamMarks.find({ course: courseId, section: 'B' }).populate('student', 'roll name').lean()
     ]);
 
     if (!course) {
-      console.log('[getSectionAData] Course not found:', courseId);
       return res.status(404).json({
         success: false,
         message: 'Course not found'
@@ -784,7 +783,6 @@ exports.getSectionAData = async (req, res) => {
       });
 
       if (!isAssigned) {
-        console.log('[getSectionAData] Access denied for teacher:', req.user._id);
         return res.status(403).json({
           success: false,
           message: 'Access denied. You are not assigned to this course.'
@@ -793,26 +791,12 @@ exports.getSectionAData = async (req, res) => {
     }
 
     // Transform TermExamMarks data to sectionAObtainedRows and sectionBObtainedRows format
+    // IMPORTANT: Both sections use questions 1-4, differentiated by section field in database
     let sectionAObtainedRows = [];
     let sectionBObtainedRows = [];
     
-    if (termExamMarks && termExamMarks.length > 0) {
-      console.log('[getSectionAData] Processing', termExamMarks.length, 'term exam marks records');
-      
-      // Log the structure of the first record for debugging
-      if (termExamMarks[0]) {
-        console.log('[getSectionAData] Sample marks structure:', JSON.stringify(termExamMarks[0].marks, null, 2));
-        console.log('[getSectionAData] marks type:', typeof termExamMarks[0].marks);
-        console.log('[getSectionAData] marks is Map?:', termExamMarks[0].marks instanceof Map);
-        if (termExamMarks[0].marks) {
-          const firstKey = Object.keys(termExamMarks[0].marks)[0];
-          console.log('[getSectionAData] First key:', firstKey);
-          console.log('[getSectionAData] First value type:', typeof termExamMarks[0].marks[firstKey]);
-          console.log('[getSectionAData] First value is Map?:', termExamMarks[0].marks[firstKey] instanceof Map);
-          console.log('[getSectionAData] First value:', termExamMarks[0].marks[firstKey]);
-        }
-      }
-      
+    // Process Section A records (section='A', questions 1-4)
+    if (termExamMarksA && termExamMarksA.length > 0) {
       // Helper function to safely get mark value - handles Maps and Objects
       const getMark = (marksObj, row, question) => {
         try {
@@ -826,7 +810,6 @@ exports.getSectionAData = async (req, res) => {
           }
           
           if (!marks || !marks[row]) {
-            console.log(`[getMark] No data for row ${row}`);
             return 0;
           }
           
@@ -838,13 +821,11 @@ exports.getSectionAData = async (req, res) => {
           }
           
           if (!rowData || typeof rowData !== 'object') {
-            console.log(`[getMark] Invalid rowData for row ${row}`);
             return 0;
           }
           
           // Try both string and number keys
           const value = rowData[question] !== undefined ? rowData[question] : rowData[String(question)];
-          console.log(`[getMark] row=${row}, question=${question}, raw value="${value}"`);
           
           if (value === '' || value === null || value === undefined) {
             return 0;
@@ -852,7 +833,6 @@ exports.getSectionAData = async (req, res) => {
           
           const parsed = parseFloat(value);
           const result = isNaN(parsed) ? 0 : parsed;
-          console.log(`[getMark] Parsed to: ${result}`);
           return result;
         } catch (error) {
           console.error(`[getMark] Error getting mark for ${row}${question}:`, error);
@@ -860,11 +840,10 @@ exports.getSectionAData = async (req, res) => {
         }
       };
       
-      termExamMarks.forEach((examMark, index) => {
+      // Process Section A records
+      termExamMarksA.forEach((examMark) => {
         const student = examMark.student;
         const marks = examMark.marks;
-        
-        console.log(`[getSectionAData] Processing student ${index + 1}:`, student?.roll);
         
         // Build Section A row (Questions 1-4)
         const sectionARow = {
@@ -892,43 +871,87 @@ exports.getSectionAData = async (req, res) => {
           Q4d: getMark(marks, 'd', '4')
         };
         
-        console.log(`[getSectionAData] Section A row for ${student?.roll}:`, sectionARow);
         sectionAObtainedRows.push(sectionARow);
+      });
+    }
+    
+    // Process Section B records (section='B', uses questions 5-8 which map to UI Q1-Q4)
+    if (termExamMarksB && termExamMarksB.length > 0) {
+      // Helper function to safely get mark value - handles Maps and Objects
+      const getMark = (marksObj, row, question) => {
+        try {
+          // Convert marksObj to plain object if it's a Map
+          let marks = marksObj;
+          if (marksObj instanceof Map) {
+            marks = {};
+            for (const [key, value] of marksObj.entries()) {
+              marks[key] = value instanceof Map ? Object.fromEntries(value) : value;
+            }
+          }
+          
+          if (!marks || !marks[row]) {
+            return 0;
+          }
+          
+          let rowData = marks[row];
+          
+          // Convert rowData to plain object if it's a Map
+          if (rowData instanceof Map) {
+            rowData = Object.fromEntries(rowData);
+          }
+          
+          if (!rowData || typeof rowData !== 'object') {
+            return 0;
+          }
+          
+          // Try both string and number keys
+          const value = rowData[question] !== undefined ? rowData[question] : rowData[String(question)];
+          
+          if (value === '' || value === null || value === undefined) {
+            return 0;
+          }
+          
+          const parsed = parseFloat(value);
+          const result = isNaN(parsed) ? 0 : parsed;
+          return result;
+        } catch (error) {
+          console.error(`[getMark] Error getting mark for ${row}${question}:`, error);
+          return 0;
+        }
+      };
+      
+      // Process Section B records - use questions 5-8 (map to UI Q1-Q4)
+      termExamMarksB.forEach((examMark) => {
+        const student = examMark.student;
+        const marks = examMark.marks;
         
-        // Build Section B row (Questions 5-8, mapped to Q1-Q4 in the schema)
+        // Build Section B row (Questions 5-8 map to UI Q1-Q4)
         const sectionBRow = {
           rollNumber: student?.roll || 'N/A',
           name: student?.name || 'Unknown',
-          // Question 5 (mapped as Q1 in Section B)
+          // Question 5 → UI Q1
           Q1a: getMark(marks, 'a', '5'),
           Q1b: getMark(marks, 'b', '5'),
           Q1c: getMark(marks, 'c', '5'),
           Q1d: getMark(marks, 'd', '5'),
-          // Question 6 (mapped as Q2 in Section B)
+          // Question 6 → UI Q2
           Q2a: getMark(marks, 'a', '6'),
           Q2b: getMark(marks, 'b', '6'),
           Q2c: getMark(marks, 'c', '6'),
           Q2d: getMark(marks, 'd', '6'),
-          // Question 7 (mapped as Q3 in Section B)
+          // Question 7 → UI Q3
           Q3a: getMark(marks, 'a', '7'),
           Q3b: getMark(marks, 'b', '7'),
           Q3c: getMark(marks, 'c', '7'),
           Q3d: getMark(marks, 'd', '7'),
-          // Question 8 (mapped as Q4 in Section B)
+          // Question 8 → UI Q4
           Q4a: getMark(marks, 'a', '8'),
           Q4b: getMark(marks, 'b', '8'),
           Q4c: getMark(marks, 'c', '8'),
           Q4d: getMark(marks, 'd', '8')
         };
-        console.log(`[getSectionAData] Section B row for ${student?.roll}:`, sectionBRow);
         sectionBObtainedRows.push(sectionBRow);
       });
-      
-      console.log('[getSectionAData] Generated', sectionAObtainedRows.length, 'Section A obtained rows');
-      console.log('[getSectionAData] Generated', sectionBObtainedRows.length, 'Section B obtained rows');
-      if (sectionBObtainedRows.length > 0) {
-        console.log('[getSectionAData] Sample Section B row:', sectionBObtainedRows[0]);
-      }
     }
 
     // Prepare response data
@@ -952,8 +975,6 @@ exports.getSectionAData = async (req, res) => {
         sectionBObtainedRows
       };
     }
-
-    console.log('[getSectionAData] Returning data with', sectionAObtainedRows.length, 'Section A obtained rows and', sectionBObtainedRows.length, 'Section B obtained rows');
 
     res.json({
       success: true,
