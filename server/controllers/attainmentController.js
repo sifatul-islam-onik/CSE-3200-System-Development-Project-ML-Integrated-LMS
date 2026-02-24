@@ -896,7 +896,7 @@ exports.getSectionAData = async (req, res) => {
         sectionAObtainedRows.push(sectionARow);
         
         // Build Section B row (Questions 5-8, mapped to Q1-Q4 in the schema)
-        sectionBObtainedRows.push({
+        const sectionBRow = {
           rollNumber: student?.roll || 'N/A',
           name: student?.name || 'Unknown',
           // Question 5 (mapped as Q1 in Section B)
@@ -919,11 +919,16 @@ exports.getSectionAData = async (req, res) => {
           Q4b: getMark(marks, 'b', '8'),
           Q4c: getMark(marks, 'c', '8'),
           Q4d: getMark(marks, 'd', '8')
-        });
+        };
+        console.log(`[getSectionAData] Section B row for ${student?.roll}:`, sectionBRow);
+        sectionBObtainedRows.push(sectionBRow);
       });
       
       console.log('[getSectionAData] Generated', sectionAObtainedRows.length, 'Section A obtained rows');
       console.log('[getSectionAData] Generated', sectionBObtainedRows.length, 'Section B obtained rows');
+      if (sectionBObtainedRows.length > 0) {
+        console.log('[getSectionAData] Sample Section B row:', sectionBObtainedRows[0]);
+      }
     }
 
     // Prepare response data
