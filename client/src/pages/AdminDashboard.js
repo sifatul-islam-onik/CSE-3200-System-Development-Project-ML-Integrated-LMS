@@ -12,6 +12,7 @@ import '../styles/Dashboard.css';
 import '../styles/AdminDashboard.css';
 import '../styles/spinner.css';
 import '../styles/Profile.css';
+import { SkeletonTable } from '../components/attainment/LoadingSpinner';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -58,6 +59,7 @@ const AdminDashboard = () => {
   const [reviewComment, setReviewComment] = useState('');
   const [reviewError, setReviewError] = useState('');
   const [courseGroupPath, setCourseGroupPath] = useState(null);
+  const [courseSearch, setCourseSearch] = useState('');
   const [courseFormError, setCourseFormError] = useState('');
   const [adminProfileForm, setAdminProfileForm] = useState({
     name: '', father: '', mother: '', advisor: '', phone: '', address: '', hall: '', email: '', scholarship: '', gender: 'others', bloodGroup: '', religion: ''
@@ -127,7 +129,14 @@ const AdminDashboard = () => {
   // Organize courses by year-semester (e.g., 3-1, 1-2) and type
   const getOrganizedCourses = () => {
     const organized = {};
-    courses.forEach(course => {
+    const q = courseSearch.trim().toLowerCase();
+    const filtered = q
+      ? courses.filter(c =>
+          (c.courseCode || '').toLowerCase().includes(q) ||
+          (c.courseTitle || '').toLowerCase().includes(q)
+        )
+      : courses;
+    filtered.forEach(course => {
       const year = course.yearLevel !== null && course.yearLevel !== undefined ? course.yearLevel : 'Other';
       const term = course.term !== null && course.term !== undefined ? course.term : 'Other';
       const type = course.course_type || 'THEORY';
@@ -215,7 +224,7 @@ const AdminDashboard = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await getAllCourses();
+      const response = await getAllCourses({ lean: 'true' });
       setCourses(response.data || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch courses');
@@ -1793,11 +1802,33 @@ const AdminDashboard = () => {
                 </div>
               )}
 
-              {loading ? (
-                <div className="loading-container">
-                  <div className="spinner spinner-large"></div>
-                  <p>Loading courses...</p>
+              {!loading && courses.length > 0 && (
+                <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    placeholder="Search by code or title…"
+                    value={courseSearch}
+                    onChange={e => { setCourseSearch(e.target.value); setCourseGroupPath(null); }}
+                    style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px', width: '280px', outline: 'none' }}
+                  />
+                  {courseSearch && (
+                    <button
+                      onClick={() => setCourseSearch('')}
+                      style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#f3f4f6', cursor: 'pointer', fontSize: '13px' }}
+                    >
+                      ✕ Clear
+                    </button>
+                  )}
+                  {courseSearch && (
+                    <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                      {Object.values(getOrganizedCourses()).flatMap(t => Object.values(t)).flat().length} result(s)
+                    </span>
+                  )}
                 </div>
+              )}
+
+              {loading ? (
+                <SkeletonTable rows={8} cols={4} />
               ) : courses.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-icon"><FontAwesomeIcon icon={faBookOpen} /></div>

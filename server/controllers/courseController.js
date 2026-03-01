@@ -506,6 +506,26 @@ exports.getAllCourses = async (req, res) => {
       .populate('assignedTeachers.teacher', 'name email designation')
       .sort({ createdAt: -1 });
 
+    // ── Lean mode: skip expensive CO/PO N+1 queries for list views ──────────────
+    if (req.query.lean === 'true') {
+      const leanData = courses.map(course => {
+        const obj = course.toObject();
+        if (Array.isArray(obj.assignedBatches) && obj.assignedBatches.length > 1) {
+          obj.assignedBatches = [obj.assignedBatches[obj.assignedBatches.length - 1]];
+        }
+        if (obj.assignedTeachers) {
+          obj.assignedTeachers = obj.assignedTeachers.map(a => ({
+            teacher: a.teacher,
+            section: a.section,
+            _id: a._id
+          }));
+        }
+        return obj;
+      });
+      return res.status(200).json({ success: true, count: leanData.length, data: leanData });
+    }
+    // ──────────────────────────────────────────────────────────────────
+
     // Populate course outcomes with their PO mappings for each course
     const coursesWithOutcomes = await Promise.all(
       courses.map(async (course) => {
