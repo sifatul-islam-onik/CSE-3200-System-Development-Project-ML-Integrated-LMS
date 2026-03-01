@@ -1612,8 +1612,21 @@ const AttainmentView = () => {
       if (selectedCourse && selectedCourse._id && (selectedSheet === 'CT' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm')) {
         // Set the flag immediately to prevent initialization from running during load
         ctDataLoadedRef.current = true;
+
+        // For lab courses on COCalc sheets, use the paired theory course's CT data
+        let courseIdToUse = selectedCourse._id;
+        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm') {
+          const courseCode = selectedCourse.courseCode || '';
+          const lastDigit = parseInt(courseCode.slice(-1));
+          if (!isNaN(lastDigit) && lastDigit % 2 === 0) {
+            const pairedCode = courseCode.slice(0, -1) + (lastDigit - 1);
+            const theoryCourse = teacherCourses.find(c => c.courseCode === pairedCode);
+            if (theoryCourse) courseIdToUse = theoryCourse._id;
+          }
+        }
+
         try {
-          const response = await getCTData(selectedCourse._id);
+          const response = await getCTData(courseIdToUse);
           if (response.success && response.data) {
             const { ctRows: savedRows, ctFactors: savedFactors, ctManualWts: savedManual,
               ctEqWts: savedEq, ctSummary: savedSummary, ctObtainedRows: savedObtained } = response.data;
@@ -1645,7 +1658,8 @@ const AttainmentView = () => {
       }
     };
     loadCTData();
-  }, [selectedCourse, selectedSheet, initObtainedRows]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCourse, selectedSheet, initObtainedRows, teacherCourses]);
 
   // Load saved Assignment/Attendance data when course and Attn_Assign sheet selected (also load for COCalc sheets)
   useEffect(() => {
@@ -1660,8 +1674,21 @@ const AttainmentView = () => {
       if (selectedCourse && selectedCourse._id && (selectedSheet === 'Attn_Assign' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm')) {
         // Set the flag immediately to prevent initialization from running during load
         assignmentDataLoadedRef.current = true;
+
+        // For lab courses on COCalc sheets, use the paired theory course's assignment data
+        let courseIdToUse = selectedCourse._id;
+        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm') {
+          const courseCode = selectedCourse.courseCode || '';
+          const lastDigit = parseInt(courseCode.slice(-1));
+          if (!isNaN(lastDigit) && lastDigit % 2 === 0) {
+            const pairedCode = courseCode.slice(0, -1) + (lastDigit - 1);
+            const theoryCourse = teacherCourses.find(c => c.courseCode === pairedCode);
+            if (theoryCourse) courseIdToUse = theoryCourse._id;
+          }
+        }
+
         try {
-          const response = await getAssignmentData(selectedCourse._id);
+          const response = await getAssignmentData(courseIdToUse);
           if (response.success && response.data) {
             const { assignmentRows: savedRows, assignmentManualWts: savedManual,
               assignmentSummary: savedSummary, attendanceMarks: savedAttendance,
@@ -1693,7 +1720,8 @@ const AttainmentView = () => {
       }
     };
     loadAssignmentData();
-  }, [selectedCourse, selectedSheet, initObtainedRows]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCourse, selectedSheet, initObtainedRows, teacherCourses]);
 
   // Load saved Lab Activity data when course and LabActivity sheet selected (also load for COCalc sheets)
   useEffect(() => {
@@ -1708,8 +1736,21 @@ const AttainmentView = () => {
       if (selectedCourse && selectedCourse._id && (selectedSheet === 'LabActivity' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm')) {
         // Set the flag immediately to prevent initialization from running during load
         labActivityDataLoadedRef.current = true;
+
+        // For theory courses on COCalc sheets, use the paired lab course's lab activity data
+        let courseIdToUse = selectedCourse._id;
+        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm') {
+          const courseCode = selectedCourse.courseCode || '';
+          const lastDigit = parseInt(courseCode.slice(-1));
+          if (!isNaN(lastDigit) && lastDigit % 2 === 1) {
+            const pairedCode = courseCode.slice(0, -1) + (lastDigit + 1);
+            const labCourse = teacherCourses.find(c => c.courseCode === pairedCode);
+            if (labCourse) courseIdToUse = labCourse._id;
+          }
+        }
+
         try {
-          const response = await getLabActivityData(selectedCourse._id);
+          const response = await getLabActivityData(courseIdToUse);
           if (response.success && response.data) {
             const {
               labActivityRows: savedRows,
@@ -1757,7 +1798,8 @@ const AttainmentView = () => {
       }
     };
     loadLabActivityData();
-  }, [selectedCourse, selectedSheet]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCourse, selectedSheet, teacherCourses]);
 
   // Load saved Section A data when course is selected
   useEffect(() => {
@@ -1770,8 +1812,20 @@ const AttainmentView = () => {
       }
 
       if (selectedCourse && selectedCourse._id) {
+        // For lab courses on COCalc sheets, use the paired theory course's section A/B data
+        let courseIdToUse = selectedCourse._id;
+        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm') {
+          const courseCode = selectedCourse.courseCode || '';
+          const lastDigit = parseInt(courseCode.slice(-1));
+          if (!isNaN(lastDigit) && lastDigit % 2 === 0) {
+            const pairedCode = courseCode.slice(0, -1) + (lastDigit - 1);
+            const theoryCourse = teacherCourses.find(c => c.courseCode === pairedCode);
+            if (theoryCourse) courseIdToUse = theoryCourse._id;
+          }
+        }
+
         try {
-          const response = await getSectionAData(selectedCourse._id);
+          const response = await getSectionAData(courseIdToUse);
 
           if (response.success && response.data) {
             const {
@@ -2057,7 +2111,8 @@ const AttainmentView = () => {
       }
     };
     loadSectionAData();
-  }, [selectedCourse, clos]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCourse, selectedSheet, clos, teacherCourses]);
 
   const handleCTCellChange = (index, field, value) => {
     const num = Number(value);
@@ -8244,7 +8299,9 @@ const AttainmentView = () => {
                           let sumOfDistribution = 0;
                           coCalcData.forEach(studentRow => {
                             const theoryDist = studentRow.total.marksDistribution[coNumber] || 0;
-                            const labActivityStudent = labActivityObtainedRows.find(s => s.rollNumber === studentRow.rollNumber);
+                            const labActivityStudent = labActivityObtainedRows.find(s =>
+                              String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
+                            );
                             const labDist = getLabActivityStudentCOMappedMarks(labActivityStudent, coNumber);
                             sumOfDistribution += theoryDist + labDist;
                           });
@@ -8296,9 +8353,12 @@ const AttainmentView = () => {
                               const ctObt = getStudentCTFactoredMarks(studentRow.rollNumber, coNumber);
                               const assignObt = getStudentAssignmentFactoredMarks(studentRow.rollNumber, coNumber);
                               const theoryMarks = sectionAObt + sectionBObt + ctObt + assignObt;
-                              // Lab: CO wise obtained marks out of {coMappedActivityMarks} from Generated Lab Activity Obtained Marks table
-                              const labActivityStudent = labActivityObtainedRows.find(s => s.rollNumber === studentRow.rollNumber);
+                              // Lab: CO wise obtained marks (Factored) from Generated Table - Lab Activity Obtained Marks
+                              const labActivityStudent = labActivityObtainedRows.find(s =>
+                                String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
+                              );
                               const labMarks = getLabActivityStudentCOMappedMarks(labActivityStudent, coNumber);
+                              // Total = Theory total from CO-PO% (Theory) table + Lab CO wise obtained marks (Factored)
                               const totalMarks = theoryMarks + labMarks;
                               return (
                                 <td key={`co-po-comb-total-obt-${coIdx}`} style={{ textAlign: 'center' }}>
@@ -8312,7 +8372,9 @@ const AttainmentView = () => {
                               const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
                               const theoryDist = studentRow.total.marksDistribution[coNumber] || 0;
                               // Get lab activity marks from rightmost CO-wise obtained marks
-                              const labActivityStudent = labActivityObtainedRows.find(s => s.rollNumber === studentRow.rollNumber);
+                              const labActivityStudent = labActivityObtainedRows.find(s =>
+                                String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
+                              );
                               const labDist = getLabActivityStudentCOMappedMarks(labActivityStudent, coNumber);
                               const totalDist = theoryDist + labDist;
                               return (
@@ -8371,8 +8433,11 @@ const AttainmentView = () => {
                               const ctObt = getStudentCTFactoredMarks(studentRow.rollNumber, coNumber);
                               const assignObt = getStudentAssignmentFactoredMarks(studentRow.rollNumber, coNumber);
                               const theoryMarks = sectionAObt + sectionBObt + ctObt + assignObt;
-                              const labActivityStudent = labActivityObtainedRows.find(s => s.rollNumber === studentRow.rollNumber);
+                              const labActivityStudent = labActivityObtainedRows.find(s =>
+                                String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
+                              );
                               const labMarks = getLabActivityStudentCOMappedMarks(labActivityStudent, coNumber);
+                              // Total = Theory total from CO-PO% (Theory) table + Lab CO wise obtained marks (Factored)
                               const totalMarksObtained = theoryMarks + labMarks;
 
                               // Calculate Total Marks Distribution (Theory + Lab)
@@ -8985,7 +9050,9 @@ const AttainmentView = () => {
                           let totalDistribution = 0;
                           coCalcData.forEach(student => {
                             const theoryDist = student.total.marksDistribution[coNumber] || 0;
-                            const labActivityStudent = labActivityObtainedRows.find(s => s.rollNumber === student.rollNumber);
+                            const labActivityStudent = labActivityObtainedRows.find(s =>
+                              String(s.rollNumber || '').trim().toLowerCase() === String(student.rollNumber || '').trim().toLowerCase()
+                            );
                             const labDist = labActivityStudent ? getLabActivityStudentCOMappedMarks(labActivityStudent, coNumber) : 0;
                             totalDistribution += theoryDist + labDist;
                           });
@@ -9034,9 +9101,12 @@ const AttainmentView = () => {
                               const ctObt = getStudentCTFactoredMarks(studentRow.rollNumber, coNumber);
                               const assignObt = getStudentAssignmentFactoredMarks(studentRow.rollNumber, coNumber);
                               const theoryMarks = sectionAObt + sectionBObt + ctObt + assignObt;
-                              // Lab: CO wise obtained marks out of {coMappedActivityMarks} from Generated Lab Activity table
-                              const labActivityStudent = labActivityObtainedRows.find(s => s.rollNumber === studentRow.rollNumber);
+                              // Lab: CO wise obtained marks (Factored) from Generated Table - Lab Activity Obtained Marks
+                              const labActivityStudent = labActivityObtainedRows.find(s =>
+                                String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
+                              );
                               const labMarks = getLabActivityStudentCOMappedMarks(labActivityStudent, coNumber);
+                              // Total = Theory total from CO-PO% (Theory) table + Lab CO wise obtained marks (Factored)
                               const totalMarks = theoryMarks + labMarks;
                               return (
                                 <td key={`combined-total-obt-${coIdx}`} style={{ textAlign: 'center' }}>
@@ -9050,7 +9120,9 @@ const AttainmentView = () => {
                               const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
                               const theoryDist = studentRow.total.marksDistribution[coNumber] || 0;
                               // Get lab activity marks from rightmost CO-wise obtained marks
-                              const labActivityStudent = labActivityObtainedRows.find(s => s.rollNumber === studentRow.rollNumber);
+                              const labActivityStudent = labActivityObtainedRows.find(s =>
+                                String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
+                              );
                               const labDist = getLabActivityStudentCOMappedMarks(labActivityStudent, coNumber);
                               const totalDist = theoryDist + labDist;
                               return (
@@ -9063,13 +9135,15 @@ const AttainmentView = () => {
                             {/* CO attainment percentage for each CO */}
                             {clos.map((clo, coIdx) => {
                               const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-                              // Calculate Total Mark Obtained (Theory + Lab) - factored, same as theory+Lab table
+                              // Calculate Total Mark Obtained: Theory total (CO-PO% Theory table) + Lab CO wise obtained marks (Factored)
                               const sectionAObt = studentRow.sectionA.marksObtained[coNumber] || 0;
                               const sectionBObt = studentRow.sectionB.marksObtained[coNumber] || 0;
                               const ctObt = getStudentCTFactoredMarks(studentRow.rollNumber, coNumber);
                               const assignObt = getStudentAssignmentFactoredMarks(studentRow.rollNumber, coNumber);
                               const theoryMarks = sectionAObt + sectionBObt + ctObt + assignObt;
-                              const labActivityStudent = labActivityObtainedRows.find(s => s.rollNumber === studentRow.rollNumber);
+                              const labActivityStudent = labActivityObtainedRows.find(s =>
+                                String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
+                              );
                               const labMarks = getLabActivityStudentCOMappedMarks(labActivityStudent, coNumber);
                               const totalMarksObtained = theoryMarks + labMarks;
 
