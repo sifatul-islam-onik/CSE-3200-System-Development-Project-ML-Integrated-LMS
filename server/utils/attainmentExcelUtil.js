@@ -180,7 +180,9 @@ const readAttainmentData = async (sheetName = null) => {
     : workbook.worksheets[0];
   
   if (!worksheet) {
-    throw new Error('Worksheet not found');
+    // Worksheet not found - return empty data instead of crashing the server
+    console.warn(`[readAttainmentData] Worksheet "${sheetName || '(first)'}" not found in Excel file, returning empty data`);
+    return [];
   }
   
   return {
