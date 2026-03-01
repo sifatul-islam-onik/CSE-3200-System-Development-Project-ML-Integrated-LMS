@@ -693,6 +693,13 @@ section {
   font-size: 13px;
 }
 
+.co-po-percentage-table thead tr:nth-child(4) th {
+  background-color: #2980b9;
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+}
+
 .co-po-percentage-table .roll-cell {
   background-color: #ecf0f1;
   font-weight: 600;

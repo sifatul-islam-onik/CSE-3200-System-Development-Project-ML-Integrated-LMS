@@ -7059,7 +7059,7 @@ const AttainmentView = () => {
                   <thead>
                     <tr>
                       <th rowSpan="3">Roll</th>
-                      <th colSpan={labActivityRows.length}>CO wise obtained marks out of {(() => {
+                      <th colSpan={labActivityRows.length}>CO wise obtained marks (Unweighted) out of {(() => {
                         // Calculate total CO marks from allocated table
                         let total = 0;
                         labActivityRows.forEach(row => {
@@ -7067,7 +7067,7 @@ const AttainmentView = () => {
                         });
                         return formatNumber(total);
                       })()}</th>
-                      <th colSpan={labActivityRows.length}>CO wise obtained marks out of {coMappedActivityMarks}</th>
+                      <th colSpan={labActivityRows.length}>CO wise obtained marks (Factored) out of {coMappedActivityMarks}</th>
                     </tr>
                     <tr>
                       {/* First set of CO columns */}
@@ -8094,54 +8094,61 @@ const AttainmentView = () => {
                   <table className="co-po-percentage-table">
                     <thead>
                       <tr>
-                        <th rowSpan="2">Roll</th>
-                        <th colSpan={clos.length}>Total Mark Obtained</th>
-                        <th colSpan={clos.length}>Total Marks Distribution</th>
+                        <th rowSpan="3">Roll</th>
+                        <th colSpan={clos.length}>CT</th>
+                        <th colSpan={clos.length}>Assignment</th>
                       </tr>
                       <tr>
-                        {/* CO headers for Total Mark Obtained */}
+                        {/* CT columns */}
+                        <th colSpan={clos.length}>Mark Obtained + Distribution</th>
+                        {/* Assignment columns */}
+                        <th colSpan={clos.length}>Mark Obtained + Distribution</th>
+                      </tr>
+                      <tr>
+                        {/* CT CO headers */}
                         {clos.map((clo, idx) => {
                           const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-                          return <th key={`combined-obt-co-${idx}`}>{coNumber}</th>;
+                          return <th key={`ct-co-${idx}`}>{coNumber}</th>;
                         })}
-                        {/* CO headers for Total Marks Distribution */}
+                        {/* Assignment CO headers */}
                         {clos.map((clo, idx) => {
                           const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-                          return <th key={`combined-dist-co-${idx}`}>{coNumber}</th>;
+                          return <th key={`assign-co-${idx}`}>{coNumber}</th>;
                         })}
                       </tr>
                       <tr>
                         <th style={{ fontSize: '13px', fontWeight: '600' }}>CO msrd</th>
-                        {/* CO msrd row for Total Mark Obtained */}
+                        {/* CT CO msrd - mirrors CO Total in CT Generated Table (factored) */}
                         {clos.map((clo, coIdx) => {
                           const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-                          // Calculate total distribution across all students (theory + lab)
-                          let totalDistribution = 0;
-                          coCalcData.forEach(student => {
-                            const theoryDist = student.total.marksDistribution[coNumber] || 0;
-                            const labActivityStudent = labActivityObtainedRows.find(s => s.rollNumber === student.rollNumber);
-                            const labDist = labActivityStudent ? getLabActivityStudentCOMappedMarks(labActivityStudent, coNumber) : 0;
-                            totalDistribution += theoryDist + labDist;
-                          });
-                          // CO msrd is 1 if totalDistribution > 0, otherwise 0
-                          const coMsrd = totalDistribution > 0 ? 1 : 0;
+                          const ctRow = ctRows.find(r => r.coNumber === coNumber);
+                          const coTotal = ctRow
+                            ? getActiveCTFields().reduce((sum, field) => {
+                                const ctKey = field.replace(/(_Q[123])$/, '');
+                                const factor = calculateAutoFactor()[ctKey] || 0;
+                                return sum + (factor * (ctRow[field] || 0));
+                              }, 0)
+                            : 0;
                           return (
-                            <th key={`combined-msrd-${coIdx}`} style={{ fontSize: '13px', fontWeight: '600' }}>
-                              {coMsrd}
+                            <th key={`ct-msrd-${coIdx}`} style={{ fontSize: '13px', fontWeight: '600' }}>
+                              {formatNumber(coTotal)}
                             </th>
                           );
                         })}
-
-                        {/* CO msrd for Total Marks Distribution */}
+                        {/* Assignment CO msrd - mirrors CO Total in Assignment Generated Table (factored) */}
                         {clos.map((clo, coIdx) => {
                           const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-                          // Get the total from rightmost CO-wise obtained marks (CO Mapped Activity Marks) from Lab Activity Obtained table
-                          const totalLabActivityObtained = labActivityObtainedRows.reduce((sum, studentRow) => {
-                            return sum + getLabActivityStudentCOMappedMarks(studentRow, coNumber);
-                          }, 0);
+                          const assignRow = assignmentRows.find(r => r.coNumber === coNumber);
+                          const coTotal = assignRow
+                            ? getActiveAssignmentFields().reduce((sum, field) => {
+                                const assignmentKey = field.replace(/(_Q[123])$/, '');
+                                const factor = calculateAutoAssignmentFactor()[assignmentKey] || 0;
+                                return sum + (factor * (assignRow[field] || 0));
+                              }, 0)
+                            : 0;
                           return (
-                            <th key={`combined-msrd-dist-${coIdx}`} style={{ fontSize: '13px', fontWeight: '600' }}>
-                              {formatNumber(totalLabActivityObtained)}
+                            <th key={`assign-msrd-${coIdx}`} style={{ fontSize: '13px', fontWeight: '600' }}>
+                              {formatNumber(coTotal)}
                             </th>
                           );
                         })}
@@ -8154,32 +8161,24 @@ const AttainmentView = () => {
                           <tr key={studentIdx}>
                             <td className="roll-cell">{studentRow.rollNumber}</td>
 
-                            {/* Total Mark Obtained for each CO (Theory + Lab) */}
+                            {/* CT Mark Obtained for each CO */}
                             {clos.map((clo, coIdx) => {
                               const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-                              const theoryMarks = studentRow.total.marksObtained[coNumber] || 0;
-                              // Get lab activity marks from rightmost CO-wise obtained marks
-                              const labActivityStudent = labActivityObtainedRows.find(s => s.rollNumber === studentRow.rollNumber);
-                              const labMarks = getLabActivityStudentCOMappedMarks(labActivityStudent, coNumber);
-                              const totalMarks = theoryMarks + labMarks;
+                              const ctMarks = getStudentCTFactoredMarks(studentRow.rollNumber, coNumber);
                               return (
-                                <td key={`combined-total-obt-${coIdx}`} style={{ textAlign: 'center' }}>
-                                  {formatNumber(totalMarks)}
+                                <td key={`ct-${coIdx}`} style={{ textAlign: 'center' }}>
+                                  {formatNumber(ctMarks)}
                                 </td>
                               );
                             })}
 
-                            {/* Total Marks Distribution for each CO (Theory + Lab) */}
+                            {/* Assignment Mark Obtained for each CO */}
                             {clos.map((clo, coIdx) => {
                               const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-                              const theoryDist = studentRow.total.marksDistribution[coNumber] || 0;
-                              // Get lab activity marks from rightmost CO-wise obtained marks
-                              const labActivityStudent = labActivityObtainedRows.find(s => s.rollNumber === studentRow.rollNumber);
-                              const labDist = getLabActivityStudentCOMappedMarks(labActivityStudent, coNumber);
-                              const totalDist = theoryDist + labDist;
+                              const assignMarks = getStudentAssignmentFactoredMarks(studentRow.rollNumber, coNumber);
                               return (
-                                <td key={`combined-total-dist-${coIdx}`} style={{ textAlign: 'center' }}>
-                                  {formatNumber(totalDist)}
+                                <td key={`assign-${coIdx}`} style={{ textAlign: 'center' }}>
+                                  {formatNumber(assignMarks)}
                                 </td>
                               );
                             })}
@@ -8291,8 +8290,13 @@ const AttainmentView = () => {
                             {/* Total Mark Obtained for each CO (Theory + Lab) */}
                             {clos.map((clo, coIdx) => {
                               const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-                              const theoryMarks = studentRow.total.marksObtained[coNumber] || 0;
-                              // Get lab activity marks from 2nd "CO wise obtained marks out of" column (rightmost)
+                              // Theory: same as CO-PO percentage (Theory: CT+Assign+A+B) table
+                              const sectionAObt = studentRow.sectionA.marksObtained[coNumber] || 0;
+                              const sectionBObt = studentRow.sectionB.marksObtained[coNumber] || 0;
+                              const ctObt = getStudentCTFactoredMarks(studentRow.rollNumber, coNumber);
+                              const assignObt = getStudentAssignmentFactoredMarks(studentRow.rollNumber, coNumber);
+                              const theoryMarks = sectionAObt + sectionBObt + ctObt + assignObt;
+                              // Lab: CO wise obtained marks out of {coMappedActivityMarks} from Generated Lab Activity Obtained Marks table
                               const labActivityStudent = labActivityObtainedRows.find(s => s.rollNumber === studentRow.rollNumber);
                               const labMarks = getLabActivityStudentCOMappedMarks(labActivityStudent, coNumber);
                               const totalMarks = theoryMarks + labMarks;
@@ -8361,8 +8365,12 @@ const AttainmentView = () => {
                             {/* CO attainment percentage for each CO */}
                             {clos.map((clo, coIdx) => {
                               const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-                              // Calculate Total Mark Obtained (Theory + Lab)
-                              const theoryMarks = studentRow.total.marksObtained[coNumber] || 0;
+                              // Calculate Total Mark Obtained (Theory + Lab) - same as CO-PO percentage theory+Lab table
+                              const sectionAObt = studentRow.sectionA.marksObtained[coNumber] || 0;
+                              const sectionBObt = studentRow.sectionB.marksObtained[coNumber] || 0;
+                              const ctObt = getStudentCTFactoredMarks(studentRow.rollNumber, coNumber);
+                              const assignObt = getStudentAssignmentFactoredMarks(studentRow.rollNumber, coNumber);
+                              const theoryMarks = sectionAObt + sectionBObt + ctObt + assignObt;
                               const labActivityStudent = labActivityObtainedRows.find(s => s.rollNumber === studentRow.rollNumber);
                               const labMarks = getLabActivityStudentCOMappedMarks(labActivityStudent, coNumber);
                               const totalMarksObtained = theoryMarks + labMarks;
@@ -9020,8 +9028,13 @@ const AttainmentView = () => {
                             {/* Total Mark Obtained for each CO (Theory + Lab) */}
                             {clos.map((clo, coIdx) => {
                               const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-                              const theoryMarks = studentRow.total.marksObtained[coNumber] || 0;
-                              // Get lab activity marks from rightmost CO-wise obtained marks
+                              // Theory: same as CO-PO percentage (Theory: CT+Assign+A+B) table
+                              const sectionAObt = studentRow.sectionA.marksObtained[coNumber] || 0;
+                              const sectionBObt = studentRow.sectionB.marksObtained[coNumber] || 0;
+                              const ctObt = getStudentCTFactoredMarks(studentRow.rollNumber, coNumber);
+                              const assignObt = getStudentAssignmentFactoredMarks(studentRow.rollNumber, coNumber);
+                              const theoryMarks = sectionAObt + sectionBObt + ctObt + assignObt;
+                              // Lab: CO wise obtained marks out of {coMappedActivityMarks} from Generated Lab Activity table
                               const labActivityStudent = labActivityObtainedRows.find(s => s.rollNumber === studentRow.rollNumber);
                               const labMarks = getLabActivityStudentCOMappedMarks(labActivityStudent, coNumber);
                               const totalMarks = theoryMarks + labMarks;
@@ -9050,8 +9063,12 @@ const AttainmentView = () => {
                             {/* CO attainment percentage for each CO */}
                             {clos.map((clo, coIdx) => {
                               const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-                              // Calculate Total Mark Obtained (Theory + Lab)
-                              const theoryMarks = studentRow.total.marksObtained[coNumber] || 0;
+                              // Calculate Total Mark Obtained (Theory + Lab) - factored, same as theory+Lab table
+                              const sectionAObt = studentRow.sectionA.marksObtained[coNumber] || 0;
+                              const sectionBObt = studentRow.sectionB.marksObtained[coNumber] || 0;
+                              const ctObt = getStudentCTFactoredMarks(studentRow.rollNumber, coNumber);
+                              const assignObt = getStudentAssignmentFactoredMarks(studentRow.rollNumber, coNumber);
+                              const theoryMarks = sectionAObt + sectionBObt + ctObt + assignObt;
                               const labActivityStudent = labActivityObtainedRows.find(s => s.rollNumber === studentRow.rollNumber);
                               const labMarks = getLabActivityStudentCOMappedMarks(labActivityStudent, coNumber);
                               const totalMarksObtained = theoryMarks + labMarks;
