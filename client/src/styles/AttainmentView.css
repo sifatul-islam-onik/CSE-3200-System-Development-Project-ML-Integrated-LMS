@@ -56,12 +56,168 @@
 }
 
 /* Loading and Error States */
-.attainment-loading,
 .attainment-error,
 .attainment-empty {
   text-align: center;
   padding: 40px;
   font-size: 18px;
+}
+
+/* ── Spinner rings ───────────────────────────────────────────── */
+@keyframes attainment-spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes attainment-spin-reverse {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(-360deg); }
+}
+
+.attainment-spinner {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.attainment-spinner--lg { width: 72px; height: 72px; }
+.attainment-spinner--md { width: 40px; height: 40px; }
+
+.attainment-spinner__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 4px solid transparent;
+  border-top-color: #3498db;
+  border-right-color: #2ecc71;
+  animation: attainment-spin 0.9s cubic-bezier(0.4,0,0.2,1) infinite;
+}
+.attainment-spinner--md .attainment-spinner__ring {
+  border-width: 3px;
+}
+.attainment-spinner__ring--delay {
+  inset: 8px;
+  border-top-color: transparent;
+  border-bottom-color: #9b59b6;
+  border-left-color: #e74c3c;
+  animation-name: attainment-spin-reverse;
+  animation-duration: 0.7s;
+}
+.attainment-spinner--md .attainment-spinner__ring--delay {
+  inset: 6px;
+}
+
+/* ── Full-page loader ────────────────────────────────────────── */
+@keyframes attainment-fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.attainment-page-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f0f4f8 0%, #e8f4fd 100%);
+}
+.attainment-page-loader__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  animation: attainment-fade-in 0.4s ease both;
+}
+.attainment-page-loader__text {
+  font-size: 16px;
+  color: #34495e;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  margin: 0;
+  animation: attainment-pulse 1.6s ease-in-out infinite;
+}
+@keyframes attainment-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+/* ── Sheet inline loader ─────────────────────────────────────── */
+.attainment-sheet-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 48px 24px;
+  animation: attainment-fade-in 0.3s ease both;
+}
+.attainment-sheet-loader__label {
+  font-size: 15px;
+  color: #555;
+  font-weight: 500;
+  animation: attainment-pulse 1.4s ease-in-out infinite;
+}
+
+/* ── Skeleton shimmer ────────────────────────────────────────── */
+@keyframes attainment-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+.attainment-skeleton-wrap {
+  padding: 24px 0;
+  animation: attainment-fade-in 0.3s ease both;
+}
+.attainment-skeleton-header {
+  height: 28px;
+  width: 260px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  background: linear-gradient(90deg, #e8edf2 25%, #d0dae4 50%, #e8edf2 75%);
+  background-size: 800px 100%;
+  animation: attainment-shimmer 1.4s infinite linear;
+}
+.attainment-skeleton-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.attainment-skeleton-table th,
+.attainment-skeleton-table td {
+  padding: 10px 12px;
+  border: 1px solid #eaecf0;
+}
+.attainment-skeleton-table thead th {
+  background: #f0f4f8;
+}
+.attainment-skeleton-cell {
+  height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #e8edf2 25%, #d0dae4 50%, #e8edf2 75%);
+  background-size: 800px 100%;
+  animation: attainment-shimmer 1.4s infinite linear;
+}
+.attainment-skeleton-cell--th {
+  height: 16px;
+  background: linear-gradient(90deg, #d6dfe8 25%, #bfccd9 50%, #d6dfe8 75%);
+  background-size: 800px 100%;
+}
+
+/* ── Loading inline banner (mid-session) ─────────────────────── */
+.attainment-loading-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: linear-gradient(90deg, #eaf4ff, #f0faf4);
+  border: 1px solid #bee3f8;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  animation: attainment-fade-in 0.25s ease both;
+}
+.attainment-loading-banner__text {
+  font-size: 14px;
+  color: #2c7be5;
+  font-weight: 500;
+  animation: attainment-pulse 1.5s ease-in-out infinite;
+  margin: 0;
 }
 
 .attainment-error {
@@ -1090,3 +1246,4 @@ section {
     font-size: 12px;
   }
 }
+
