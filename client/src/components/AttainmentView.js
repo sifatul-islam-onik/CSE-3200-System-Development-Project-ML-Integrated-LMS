@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { PageLoader, SheetLoader, SkeletonTable } from './attainment/LoadingSpinner';
 import CourseProfileSheet from './attainment/CourseProfileSheet';
 import CTSheet from './attainment/CTSheet';
 import SectionASheet from './attainment/SectionASheet';
@@ -3486,12 +3487,20 @@ const AttainmentView = () => {
   }, [selectedSheet, refreshTeacherCourses]);
 
   if (loading && !attainmentData) {
-    return <div className="attainment-loading">Loading...</div>;
+    return <PageLoader />;
   }
 
   return (
     <div className="attainment-container">
       <h1>Course Outcome Attainment</h1>
+
+      {/* Mid-session loading banner */}
+      {loading && attainmentData && (
+        <div className="attainment-loading-banner">
+          <SheetLoader label="" />
+          <p className="attainment-loading-banner__text">Refreshing sheet data…</p>
+        </div>
+      )}
 
       {error && (
         <div className="attainment-error" style={{ marginBottom: '20px' }}>
@@ -3701,9 +3710,7 @@ const AttainmentView = () => {
 
       {/* Show message if no data loaded yet */}
       {!attainmentData && !loading && selectedSheet && (
-        <div className="attainment-empty" style={{ textAlign: 'center', padding: '40px' }}>
-          Loading data for {selectedSheet}...
-        </div>
+        <SkeletonTable rows={7} cols={6} />
       )}
 
       {/* CT / Attn_Assign Modals */}

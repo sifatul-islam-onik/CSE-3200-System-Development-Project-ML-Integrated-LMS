@@ -10,6 +10,7 @@ import CourseForm from '../components/CourseForm';
 import AttainmentView from '../components/AttainmentView';
 import CourseOBEView from '../components/CourseOBEView';
 import MarkEntry from '../components/MarkEntry';
+import { SheetLoader, SkeletonTable } from '../components/attainment/LoadingSpinner';
 import '../styles/Dashboard.css';
 import '../styles/AdminDashboard.css';
 import '../styles/spinner.css';
@@ -370,7 +371,7 @@ const TeacherDashboard = () => {
               {error && <div className="alert alert-error">{error}</div>}
 
               {loading ? (
-                <div className="loading-container"><div className="spinner"></div></div>
+                <SheetLoader label="Loading proposals…" />
               ) : proposals.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-icon"><FontAwesomeIcon icon={faBook} /></div>
@@ -462,7 +463,7 @@ const TeacherDashboard = () => {
               {error && <div className="alert alert-error">{error}</div>}
 
               {loading ? (
-                <div className="loading-container"><div className="spinner"></div></div>
+                <SkeletonTable rows={8} cols={4} />
               ) : courses.length === 0 ? (
                 <div className="empty-state">
                   <h3>No Courses Available</h3>
