@@ -3328,48 +3328,55 @@ const AttainmentView = () => {
     labActivityObtainedRows, labActivityRows, activityTaken]);
 
   // CO Attainment – Equal Wt (Theory+Lab): forces equal weight across all lab activities regardless of manual-wt setting
+  // CO Attainment – Equal Wt (Theory+Lab):
+  // Excel formula: =B6:G6*$H$143:$M$143 + U6:Z6*$H$144:$M$144
+  // B6:G6  = theoryCoAttainmentData CO % per student
+  // U6:Z6  = labCoAttainmentData CO % per student
+  // H143:M143 = Wt table Theory row  (theoryBin[CO] / sumBin[CO])
+  // H144:M144 = Wt table Lab row     (labBin[CO]   / sumBin[CO])
   const equalWtCoAttainmentData = useMemo(() => {
-    if (!coCalcData.length || !clos.length) return [];
-    const factoredTotals = calculateFactoredCOTotals();
-    const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
-    const eqWt = activityTaken > 0 ? (coMappedActivityMarks || 0) / activityTaken : 0;
-    const actTotals = labActivityActivityTotals();
-    return coCalcData.map(studentRow => {
+    if (!clos.length) return [];
+    if (!theoryCoAttainmentData.length && !labCoAttainmentData.length) return [];
+
+    const coNumbers = clos.map(clo => (clo.cloNumber || '').toString().replace('CLO', 'CO'));
+
+    // Binary presence per CO in each dataset
+    const hasAny = (dataset, cn) =>
+      Array.isArray(dataset) && dataset.some(s => (s.coValues?.[cn] || 0) > 0) ? 1 : 0;
+
+    const theoryWt = {};
+    const labWt = {};
+    coNumbers.forEach(cn => {
+      const tBin = hasAny(theoryCoAttainmentData, cn);
+      const lBin = hasAny(labCoAttainmentData, cn);
+      const s = tBin + lBin;
+      theoryWt[cn] = s > 0 ? tBin / s : 0;
+      labWt[cn]    = s > 0 ? lBin / s : 0;
+    });
+
+    // Union of all students from both datasets
+    const rollSet = new Set([
+      ...theoryCoAttainmentData.map(s => String(s.rollNumber || '').trim()),
+      ...labCoAttainmentData.map(s => String(s.rollNumber || '').trim()),
+    ]);
+
+    return [...rollSet].filter(Boolean).map(roll => {
+      const theoryRow = theoryCoAttainmentData.find(s =>
+        String(s.rollNumber || '').trim().toLowerCase() === roll.toLowerCase()
+      );
+      const labRow = labCoAttainmentData.find(s =>
+        String(s.rollNumber || '').trim().toLowerCase() === roll.toLowerCase()
+      );
       const coValues = {};
-      clos.forEach(clo => {
-        const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-        const labStudent = labActivityObtainedRows.find(s =>
-          String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
-        );
-        const labRow = labActivityRows.find(r => r.coNumber === cn);
-        let labObt = 0;
-        let labCoTotal = 0;
-        if (labRow && labStudent && activityTaken > 0) {
-          for (let i = 1; i <= activityTaken; i++) {
-            const actTotal = actTotals[`activity${i}`] || 0;
-            const factor = actTotal > 0 ? eqWt / actTotal : 0;
-            if ((labRow[`Activity${i}_Q1`] || 0) > 0) { labObt += (parseFloat(labStudent[`Activity${i}_Q1`]) || 0) * factor; labCoTotal += eqWt; }
-            if ((labRow[`Activity${i}_Q2`] || 0) > 0) { labObt += (parseFloat(labStudent[`Activity${i}_Q2`]) || 0) * factor; labCoTotal += eqWt; }
-            if ((labRow[`Activity${i}_Q3`] || 0) > 0) { labObt += (parseFloat(labStudent[`Activity${i}_Q3`]) || 0) * factor; labCoTotal += eqWt; }
-          }
-        }
-        const theoryObt = (studentRow.sectionA.marksObtained[cn] || 0)
-          + (studentRow.sectionB.marksObtained[cn] || 0)
-          + getStudentCTFactoredMarks(studentRow.rollNumber, cn)
-          + getStudentAssignmentFactoredMarks(studentRow.rollNumber, cn);
-        const totalObt = theoryObt + labObt;
-        const theoryDist = (studentRow.sectionA.marksDistribution[cn] || 0)
-          + (studentRow.sectionB.marksDistribution[cn] || 0)
-          + (factoredTotals[cn] || 0)
-          + (factoredAssignmentTotals[cn] || 0);
-        const totalDist = theoryDist + labCoTotal;
-        coValues[cn] = totalDist > 0 ? parseFloat(((totalObt / totalDist) * 100).toFixed(4)) : 0;
+      coNumbers.forEach(cn => {
+        const tVal = theoryRow?.coValues?.[cn] || 0;
+        const lVal = labRow?.coValues?.[cn] || 0;
+        coValues[cn] = parseFloat(((tVal * theoryWt[cn]) + (lVal * labWt[cn])).toFixed(4));
       });
-      return { rollNumber: studentRow.rollNumber, coValues };
+      return { rollNumber: roll, coValues };
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coCalcData, clos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary,
-    labActivityObtainedRows, labActivityRows, activityTaken, coMappedActivityMarks]);
+  }, [theoryCoAttainmentData, labCoAttainmentData, clos]);
 
   // Effect 1: Reset ready-gate whenever the user navigates to a different course/sheet.
   const coAttainmentKeyRef = useRef('');

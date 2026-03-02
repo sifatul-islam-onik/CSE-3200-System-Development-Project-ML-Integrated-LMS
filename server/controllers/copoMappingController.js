@@ -183,58 +183,9 @@ exports.getCOPOMatrixForCourse = async (req, res) => {
       });
     }
 
-    // Get all COs for this course
-    let courseOutcomes = await CourseOutcome.find({ course: courseId })
+    // Get all COs for this course only
+    const courseOutcomes = await CourseOutcome.find({ course: courseId })
       .sort({ co_code: 1 });
-
-    // Merge with theory/lab course COs
-    const courseCode = course.courseCode;
-    const codeMatch = courseCode.match(/^([A-Z]+)\s*(\d+)$/i);
-    
-    if (codeMatch) {
-      const prefix = codeMatch[1];
-      const number = parseInt(codeMatch[2]);
-      
-      // Determine if this is theory (odd) or lab (even)
-      const isLab = number % 2 === 0;
-      const theoryCode = isLab ? `${prefix} ${number - 1}` : courseCode;
-      const labCode = `${prefix} ${isLab ? number : number + 1}`;
-      
-      // If current course is lab, get COs from theory course
-      // If current course is theory, get COs from lab course (theory + 1)
-      const relatedCourseCode = isLab ? theoryCode : labCode;
-      
-      try {
-        const relatedCourse = await Course.findOne({ 
-          courseCode: { $regex: new RegExp(`^${relatedCourseCode}$`, 'i') }
-        });
-        
-        if (relatedCourse) {
-          const relatedOutcomes = await CourseOutcome.find({ 
-            course: relatedCourse._id 
-          }).sort({ co_code: 1 });
-          
-          // Merge outcomes (union) - remove duplicates by CO code
-          const coMap = new Map();
-          
-          // Add all outcomes from both courses
-          [...courseOutcomes, ...relatedOutcomes].forEach(co => {
-            const coCode = co.co_code.toUpperCase();
-            if (!coMap.has(coCode)) {
-              coMap.set(coCode, co);
-            }
-          });
-          
-          // Convert back to array and sort
-          courseOutcomes = Array.from(coMap.values()).sort((a, b) => 
-            a.co_code.localeCompare(b.co_code)
-          );
-        }
-      } catch (err) {
-        // If related course doesn't exist, just return current course COs
-        console.log('Related course not found, returning current course COs only');
-      }
-    }
 
     if (courseOutcomes.length === 0) {
       return res.status(404).json({

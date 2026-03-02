@@ -1247,3 +1247,89 @@ section {
   }
 }
 
+/* ── CO Summary Tables (CO measured & Wt) ─────────────────────────────────── */
+.co-summary-tables-container {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  margin: 20px 0 24px 0;
+  box-sizing: border-box;
+}
+
+.co-summary-table-wrap {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-x: auto;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  border: 1px solid #d0dce8;
+}
+
+.co-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: auto;
+}
+
+.co-summary-table th,
+.co-summary-table td {
+  border: 1px solid #d0dce8;
+  padding: 7px 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.co-summary-th-label {
+  background-color: #2980b9;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  text-align: left;
+  padding-left: 12px !important;
+  white-space: nowrap;
+}
+
+.co-summary-table thead tr th:not(.co-summary-th-label) {
+  background-color: #3498db;
+  color: #fff;
+  font-weight: 600;
+}
+
+.co-summary-row-label {
+  background-color: #eaf2fb;
+  font-weight: 600;
+  color: #2c3e50;
+  text-align: left;
+  padding-left: 12px !important;
+}
+
+.co-summary-row-label--sum {
+  background-color: #d6eaf8;
+  color: #1a5276;
+}
+
+.co-summary-bin {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.co-summary-bin--1 {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.co-summary-bin--0 {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.co-summary-bin--sum {
+  background-color: #fef9e7;
+  color: #7d6608;
+  font-weight: 700;
+}
+
