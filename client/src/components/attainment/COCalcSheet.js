@@ -115,7 +115,7 @@ const SectionABTable = ({ clos, coCalcData, formatNumber }) => (
 );
 
 // ─── Table 2: CO-PO percentage (Theory: CT+Assign+A+B) ──────────────────────
-const TheoryCOPOTable = ({ clos, coCalcData, attnAssignObtainedRows, calculateFactoredCOTotals, calculateFactoredAssignmentCOTotals, getStudentCTFactoredMarks, getStudentAssignmentFactoredMarks, formatNumber }) => (
+const TheoryCOPOTable = ({ clos, coCalcData, attnAssignObtainedRows, attendanceMarks, calculateFactoredCOTotals, calculateFactoredAssignmentCOTotals, getStudentCTFactoredMarks, getStudentAssignmentFactoredMarks, formatNumber }) => (
   <section className="co-po-percentage-section" style={{ marginTop: '30px' }}>
     <h2>CO-PO percentage (Theory: CT+Assign+A+B)</h2>
     {clos.length === 0 && <p style={{ padding: '20px', color: '#7f8c8d' }}>Loading course outcomes...</p>}
@@ -153,7 +153,7 @@ const TheoryCOPOTable = ({ clos, coCalcData, attnAssignObtainedRows, calculateFa
                 coCalcData.forEach(student => {
                   totalDistribution += (student.sectionA.marksDistribution[cn] || 0)
                     + (student.sectionB.marksDistribution[cn] || 0)
-                    + ctCoTotal + assignmentCoTotal + (student.attendance || 0);
+                    + ctCoTotal + assignmentCoTotal;
                 });
                 return <th key={`msrd-${coIdx}`} style={{ fontSize: '13px', fontWeight: '600' }}>{totalDistribution > 0 ? 1 : 0}</th>;
               })}
@@ -179,25 +179,16 @@ const TheoryCOPOTable = ({ clos, coCalcData, attnAssignObtainedRows, calculateFa
                     const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
                     const factoredTotals = calculateFactoredCOTotals();
                     const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
-                    const attnStudent = attnAssignObtainedRows.find(s =>
-                      String(s.rollNumber || '').trim().toLowerCase() ===
-                      String(studentRow.rollNumber || '').trim().toLowerCase()
-                    );
                     const marks = (studentRow.sectionA.marksDistribution[cn] || 0)
                       + (studentRow.sectionB.marksDistribution[cn] || 0)
                       + (factoredTotals[cn] || 0)
-                      + (factoredAssignmentTotals[cn] || 0)
-                      + (attnStudent ? (attnStudent.attendance || 0) : 0);
+                      + (factoredAssignmentTotals[cn] || 0);
                     return <td key={`total-dist-${coIdx}`} style={{ textAlign: 'center' }}>{formatNumber(marks)}</td>;
                   })}
                   {clos.map((clo, coIdx) => {
                     const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
                     const factoredTotals = calculateFactoredCOTotals();
                     const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
-                    const attnStudent = attnAssignObtainedRows.find(s =>
-                      String(s.rollNumber || '').trim().toLowerCase() ===
-                      String(studentRow.rollNumber || '').trim().toLowerCase()
-                    );
                     const totalObt = (studentRow.sectionA.marksObtained[cn] || 0)
                       + (studentRow.sectionB.marksObtained[cn] || 0)
                       + getStudentCTFactoredMarks(studentRow.rollNumber, cn)
@@ -205,8 +196,7 @@ const TheoryCOPOTable = ({ clos, coCalcData, attnAssignObtainedRows, calculateFa
                     const totalDist = (studentRow.sectionA.marksDistribution[cn] || 0)
                       + (studentRow.sectionB.marksDistribution[cn] || 0)
                       + (factoredTotals[cn] || 0)
-                      + (factoredAssignmentTotals[cn] || 0)
-                      + (attnStudent ? (attnStudent.attendance || 0) : 0);
+                      + (factoredAssignmentTotals[cn] || 0);
                     const pct = totalDist > 0 ? parseFloat(((totalObt / totalDist) * 100).toFixed(4)) : 0;
                     return <td key={`th-attain-${coIdx}`} style={{ textAlign: 'center', backgroundColor: '#a8e6d7' }}>{formatNumber(pct)}%</td>;
                   })}
@@ -376,10 +366,12 @@ const CombinedCOPOTable = ({
   attnAssignObtainedRows,
   calculateFactoredCOTotals, calculateFactoredAssignmentCOTotals,
   getStudentCTFactoredMarks, getStudentAssignmentFactoredMarks,
-  getLabActivityStudentCOMappedMarks, formatNumber, tablePrefix,
+  getLabActivityStudentCOMappedMarks, getLabActivityStudentCOMarks,
+  computeLabActivityCOTotal,
+  formatNumber, tablePrefix, tableTitle, useUnweightedLab,
 }) => (
   <section className="co-po-combined-percentage-section" style={{ marginTop: '30px' }}>
-    <h2>CO - PO percentage (theory + Lab)</h2>
+    <h2>{tableTitle || 'CO - PO percentage (theory + Lab)'}</h2>
     {clos.length === 0 && <p style={{ padding: '20px', color: '#7f8c8d' }}>Loading course outcomes...</p>}
     {clos.length > 0 && coCalcData.length === 0 && <p style={{ padding: '20px', color: '#7f8c8d' }}>No student data available.</p>}
     {clos.length > 0 && coCalcData.length > 0 && (
@@ -401,37 +393,37 @@ const CombinedCOPOTable = ({
                 const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
                 const factoredTotals = calculateFactoredCOTotals();
                 const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
+                // BV$4 = fixed lab distribution total for this CO
+                const labActivityRow = labActivityRows.find(r => r.coNumber === cn);
+                let labCoTotal = 0;
+                if (labActivityRow) {
+                  if (useUnweightedLab) {
+                    labCoTotal = computeLabActivityCOTotal(labActivityRow);
+                  } else if (activityTaken > 0) {
+                    const eqWt = (coMappedActivityMarks || 0) / (activityTaken || 1);
+                    for (let i = 0; i < activityTaken; i++) {
+                      const n = i + 1;
+                      if ((labActivityRow[`Activity${n}_Q1`] || 0) !== 0) labCoTotal += eqWt;
+                      if ((labActivityRow[`Activity${n}_Q2`] || 0) !== 0) labCoTotal += eqWt;
+                      if ((labActivityRow[`Activity${n}_Q3`] || 0) !== 0) labCoTotal += eqWt;
+                    }
+                  }
+                }
                 let sumOfDistribution = 0;
                 coCalcData.forEach(studentRow => {
-                  const attnStudent = attnAssignObtainedRows.find(s =>
-                    String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
-                  );
+                  // AO5 = same theory dist formula as TheoryCOPOTable (no attendance)
                   const theoryDist = (studentRow.sectionA.marksDistribution[cn] || 0)
                     + (studentRow.sectionB.marksDistribution[cn] || 0)
                     + (factoredTotals[cn] || 0)
-                    + (factoredAssignmentTotals[cn] || 0)
-                    + (attnStudent ? (attnStudent.attendance || 0) : 0);
-                  const labActivityStudent = labActivityObtainedRows.find(s =>
-                    String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
-                  );
-                  const labDist = getLabActivityStudentCOMappedMarks(labActivityStudent, cn);
-                  sumOfDistribution += theoryDist + labDist;
+                    + (factoredAssignmentTotals[cn] || 0);
+                  sumOfDistribution += theoryDist + labCoTotal;
                 });
                 return <th key={`${tablePrefix}-msrd-${coIdx}`} style={{ fontSize: '13px', fontWeight: '600' }}>{sumOfDistribution > 0 ? 1 : 0}</th>;
               })}
               {clos.map((clo, coIdx) => {
                 const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
                 const labActivityRow = labActivityRows.find(r => r.coNumber === cn);
-                let coTotal = 0;
-                if (labActivityRow && activityTaken > 0) {
-                  const eqWt = (coMappedActivityMarks || 0) / (activityTaken || 1);
-                  for (let i = 0; i < activityTaken; i++) {
-                    const n = i + 1;
-                    if ((labActivityRow[`Activity${n}_Q1`] || 0) !== 0) coTotal += eqWt;
-                    if ((labActivityRow[`Activity${n}_Q2`] || 0) !== 0) coTotal += eqWt;
-                    if ((labActivityRow[`Activity${n}_Q3`] || 0) !== 0) coTotal += eqWt;
-                  }
-                }
+                const coTotal = labActivityRow ? computeLabActivityCOTotal(labActivityRow) : 0;
                 return <th key={`${tablePrefix}-msrd-dist-${coIdx}`} style={{ fontSize: '13px', fontWeight: '600' }}>{formatNumber(coTotal)}</th>;
               })}
             </tr>
@@ -445,30 +437,43 @@ const CombinedCOPOTable = ({
                   const labActivityStudent = labActivityObtainedRows.find(s =>
                     String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
                   );
-                  const labMarks = getLabActivityStudentCOMappedMarks(labActivityStudent, cn);
+                  // AI5 = theory obtained for this student/CO
                   const theoryObt = (studentRow.sectionA.marksObtained[cn] || 0)
                     + (studentRow.sectionB.marksObtained[cn] || 0)
                     + getStudentCTFactoredMarks(studentRow.rollNumber, cn)
                     + getStudentAssignmentFactoredMarks(studentRow.rollNumber, cn);
+                  // W32 = unweighted lab CO marks (unnorm) OR factored lab CO marks (norm)
+                  const labMarks = useUnweightedLab
+                    ? getLabActivityStudentCOMarks(labActivityStudent, cn)
+                    : getLabActivityStudentCOMappedMarks(labActivityStudent, cn);
                   return <td key={`${tablePrefix}-obt-${coIdx}`} style={{ textAlign: 'center' }}>{formatNumber(theoryObt + labMarks)}</td>;
                 })}
                 {clos.map((clo, coIdx) => {
                   const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
                   const factoredTotals = calculateFactoredCOTotals();
                   const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
-                  const attnStudent = attnAssignObtainedRows.find(s =>
-                    String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
-                  );
+                  // AO5 = theory dist for this student (no attendance)
                   const theoryDist = (studentRow.sectionA.marksDistribution[cn] || 0)
                     + (studentRow.sectionB.marksDistribution[cn] || 0)
                     + (factoredTotals[cn] || 0)
-                    + (factoredAssignmentTotals[cn] || 0)
-                    + (attnStudent ? (attnStudent.attendance || 0) : 0);
-                  const labActivityStudent = labActivityObtainedRows.find(s =>
-                    String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
-                  );
-                  const labDist = getLabActivityStudentCOMappedMarks(labActivityStudent, cn);
-                  return <td key={`${tablePrefix}-dist-${coIdx}`} style={{ textAlign: 'center' }}>{formatNumber(theoryDist + labDist)}</td>;
+                    + (factoredAssignmentTotals[cn] || 0);
+                  // BV$4 = fixed lab distribution total for this CO
+                  const labActivityRow = labActivityRows.find(r => r.coNumber === cn);
+                  let labCoTotal = 0;
+                  if (labActivityRow) {
+                    if (useUnweightedLab) {
+                      labCoTotal = computeLabActivityCOTotal(labActivityRow);
+                    } else if (activityTaken > 0) {
+                      const eqWt = (coMappedActivityMarks || 0) / (activityTaken || 1);
+                      for (let i = 0; i < activityTaken; i++) {
+                        const n = i + 1;
+                        if ((labActivityRow[`Activity${n}_Q1`] || 0) !== 0) labCoTotal += eqWt;
+                        if ((labActivityRow[`Activity${n}_Q2`] || 0) !== 0) labCoTotal += eqWt;
+                        if ((labActivityRow[`Activity${n}_Q3`] || 0) !== 0) labCoTotal += eqWt;
+                      }
+                    }
+                  }
+                  return <td key={`${tablePrefix}-dist-${coIdx}`} style={{ textAlign: 'center' }}>{formatNumber(theoryDist + labCoTotal)}</td>;
                 })}
               </tr>
             ))}
@@ -480,9 +485,16 @@ const CombinedCOPOTable = ({
 );
 
 // ─── Table 5: CO attainment (theory+Lab) ─────────────────────────────────────
-const COAttainmentCombinedTable = ({ clos, coCalcData, labActivityObtainedRows, getLabActivityStudentCOMappedMarks, formatNumber, tablePrefix }) => (
+const COAttainmentCombinedTable = ({
+  clos, coCalcData, labActivityRows, labActivityObtainedRows,
+  activityTaken, coMappedActivityMarks,
+  calculateFactoredCOTotals, calculateFactoredAssignmentCOTotals,
+  getStudentCTFactoredMarks, getStudentAssignmentFactoredMarks,
+  getLabActivityStudentCOMappedMarks, getLabActivityStudentCOMarks,
+  computeLabActivityCOTotal, formatNumber, tablePrefix, useUnweightedLab,
+}) => (
   <section className="co-attainment-combined-section" style={{ marginTop: '30px' }}>
-    <h2>CO attainment (theory+Lab)</h2>
+    <h2>{useUnweightedLab ? 'CO attainment (theory+Lab) unnorm' : 'CO attainment (theory+Lab)'}</h2>
     {clos.length === 0 && <p style={{ padding: '20px', color: '#7f8c8d' }}>Loading course outcomes...</p>}
     {clos.length > 0 && coCalcData.length === 0 && <p style={{ padding: '20px', color: '#7f8c8d' }}>No student data available.</p>}
     {clos.length > 0 && coCalcData.length > 0 && (
@@ -504,15 +516,41 @@ const COAttainmentCombinedTable = ({ clos, coCalcData, labActivityObtainedRows, 
                 <td className="roll-cell">{studentRow.rollNumber}</td>
                 {clos.map((clo, coIdx) => {
                   const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                  // BP5 = Total Mark Obtained (theory + lab)
                   const labActivityStudent = labActivityObtainedRows.find(s =>
                     String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
                   );
-                  const labMarks = getLabActivityStudentCOMappedMarks(labActivityStudent, cn);
-                  const theoryDist = studentRow.total?.marksDistribution?.[cn] || 0;
-                  const totalDist = theoryDist + labMarks;
-                  // total obtained — use theoretical total + lab
-                  const theoryObt = studentRow.total?.marksObtained?.[cn] || 0;
-                  const totalObt = theoryObt + labMarks;
+                  const labObt = useUnweightedLab
+                    ? getLabActivityStudentCOMarks(labActivityStudent, cn)
+                    : getLabActivityStudentCOMappedMarks(labActivityStudent, cn);
+                  const theoryObt = (studentRow.sectionA.marksObtained[cn] || 0)
+                    + (studentRow.sectionB.marksObtained[cn] || 0)
+                    + getStudentCTFactoredMarks(studentRow.rollNumber, cn)
+                    + getStudentAssignmentFactoredMarks(studentRow.rollNumber, cn);
+                  const totalObt = theoryObt + labObt;
+                  // BV5 = Total Marks Distribution (theory + lab)
+                  const factoredTotals = calculateFactoredCOTotals();
+                  const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
+                  const theoryDist = (studentRow.sectionA.marksDistribution[cn] || 0)
+                    + (studentRow.sectionB.marksDistribution[cn] || 0)
+                    + (factoredTotals[cn] || 0)
+                    + (factoredAssignmentTotals[cn] || 0);
+                  const labActivityRow = labActivityRows.find(r => r.coNumber === cn);
+                  let labCoTotal = 0;
+                  if (labActivityRow) {
+                    if (useUnweightedLab) {
+                      labCoTotal = computeLabActivityCOTotal(labActivityRow);
+                    } else if (activityTaken > 0) {
+                      const eqWt = (coMappedActivityMarks || 0) / (activityTaken || 1);
+                      for (let i = 0; i < activityTaken; i++) {
+                        const n = i + 1;
+                        if ((labActivityRow[`Activity${n}_Q1`] || 0) !== 0) labCoTotal += eqWt;
+                        if ((labActivityRow[`Activity${n}_Q2`] || 0) !== 0) labCoTotal += eqWt;
+                        if ((labActivityRow[`Activity${n}_Q3`] || 0) !== 0) labCoTotal += eqWt;
+                      }
+                    }
+                  }
+                  const totalDist = theoryDist + labCoTotal;
                   const pct = totalDist > 0 ? parseFloat(((totalObt / totalDist) * 100).toFixed(4)) : 0;
                   return (
                     <td key={`${tablePrefix}-co-attain-${coIdx}`} style={{ textAlign: 'center', backgroundColor: '#a8e6d7' }}>
@@ -538,6 +576,7 @@ const COCalcSheet = ({
   ctRows,
   assignmentRows,
   attnAssignObtainedRows,
+  attendanceMarks,
   labActivityRows,
   labActivityObtainedRows,
   activityTaken,
@@ -547,6 +586,8 @@ const COCalcSheet = ({
   getStudentCTFactoredMarks,
   getStudentAssignmentFactoredMarks,
   getLabActivityStudentCOMappedMarks,
+  getLabActivityStudentCOMarks,
+  computeLabActivityCOTotal,
   getActiveCTFields,
   getActiveAssignmentFields,
   calculateAutoFactor,
@@ -563,7 +604,8 @@ const COCalcSheet = ({
     attnAssignObtainedRows,
     calculateFactoredCOTotals, calculateFactoredAssignmentCOTotals,
     getStudentCTFactoredMarks, getStudentAssignmentFactoredMarks,
-    getLabActivityStudentCOMappedMarks, formatNumber,
+    getLabActivityStudentCOMappedMarks, getLabActivityStudentCOMarks,
+    computeLabActivityCOTotal, formatNumber,
   };
 
   if (selectedSheet === 'COCalc') {
@@ -574,6 +616,7 @@ const COCalcSheet = ({
             <SectionABTable clos={clos} coCalcData={coCalcData} formatNumber={formatNumber} />
             <TheoryCOPOTable
               clos={clos} coCalcData={coCalcData} attnAssignObtainedRows={attnAssignObtainedRows}
+              attendanceMarks={attendanceMarks}
               calculateFactoredCOTotals={calculateFactoredCOTotals}
               calculateFactoredAssignmentCOTotals={calculateFactoredAssignmentCOTotals}
               getStudentCTFactoredMarks={getStudentCTFactoredMarks}
@@ -591,12 +634,7 @@ const COCalcSheet = ({
           </>
         )}
         <CombinedCOPOTable {...commonProps} tablePrefix="calc" />
-        <COAttainmentCombinedTable
-          clos={clos} coCalcData={coCalcData}
-          labActivityObtainedRows={labActivityObtainedRows}
-          getLabActivityStudentCOMappedMarks={getLabActivityStudentCOMappedMarks}
-          formatNumber={formatNumber} tablePrefix="calc"
-        />
+        <COAttainmentCombinedTable {...commonProps} tablePrefix="calc" />
       </>
     );
   }
@@ -604,30 +642,30 @@ const COCalcSheet = ({
   if (selectedSheet === 'COCalc_LabUnnorm') {
     return (
       <>
-        <SectionABTable clos={clos} coCalcData={coCalcData} formatNumber={formatNumber} />
-        <TheoryCOPOTable
-          clos={clos} coCalcData={coCalcData} attnAssignObtainedRows={attnAssignObtainedRows}
-          calculateFactoredCOTotals={calculateFactoredCOTotals}
-          calculateFactoredAssignmentCOTotals={calculateFactoredAssignmentCOTotals}
-          getStudentCTFactoredMarks={getStudentCTFactoredMarks}
-          getStudentAssignmentFactoredMarks={getStudentAssignmentFactoredMarks}
-          formatNumber={formatNumber}
-        />
-        <CTAssignmentTableV2
-          clos={clos} coCalcData={coCalcData} attnAssignObtainedRows={attnAssignObtainedRows}
-          calculateFactoredCOTotals={calculateFactoredCOTotals}
-          calculateFactoredAssignmentCOTotals={calculateFactoredAssignmentCOTotals}
-          getStudentCTFactoredMarks={getStudentCTFactoredMarks}
-          getStudentAssignmentFactoredMarks={getStudentAssignmentFactoredMarks}
-          formatNumber={formatNumber}
-        />
-        <CombinedCOPOTable {...commonProps} tablePrefix="unnorm" />
-        <COAttainmentCombinedTable
-          clos={clos} coCalcData={coCalcData}
-          labActivityObtainedRows={labActivityObtainedRows}
-          getLabActivityStudentCOMappedMarks={getLabActivityStudentCOMappedMarks}
-          formatNumber={formatNumber} tablePrefix="unnorm"
-        />
+        {isTheoryCourse && (
+          <>
+            <SectionABTable clos={clos} coCalcData={coCalcData} formatNumber={formatNumber} />
+            <TheoryCOPOTable
+              clos={clos} coCalcData={coCalcData} attnAssignObtainedRows={attnAssignObtainedRows}
+              attendanceMarks={attendanceMarks}
+              calculateFactoredCOTotals={calculateFactoredCOTotals}
+              calculateFactoredAssignmentCOTotals={calculateFactoredAssignmentCOTotals}
+              getStudentCTFactoredMarks={getStudentCTFactoredMarks}
+              getStudentAssignmentFactoredMarks={getStudentAssignmentFactoredMarks}
+              formatNumber={formatNumber}
+            />
+            <CTAssignmentTableV2
+              clos={clos} coCalcData={coCalcData} attnAssignObtainedRows={attnAssignObtainedRows}
+              calculateFactoredCOTotals={calculateFactoredCOTotals}
+              calculateFactoredAssignmentCOTotals={calculateFactoredAssignmentCOTotals}
+              getStudentCTFactoredMarks={getStudentCTFactoredMarks}
+              getStudentAssignmentFactoredMarks={getStudentAssignmentFactoredMarks}
+              formatNumber={formatNumber}
+            />
+          </>
+        )}
+        <CombinedCOPOTable {...commonProps} tablePrefix="unnorm" tableTitle="CO - PO percentage (theory + Lab) unnorm lab" useUnweightedLab={true} />
+        <COAttainmentCombinedTable {...commonProps} tablePrefix="unnorm" useUnweightedLab={true} />
       </>
     );
   }

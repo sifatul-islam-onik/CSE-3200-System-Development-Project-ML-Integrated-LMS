@@ -123,7 +123,7 @@ const AttainmentTable = ({ clos, coAttainmentData, formatNumber, keyPrefix, titl
   </section>
 );
 
-const COAttainmentSheet = ({ selectedCourse, clos, coAttainmentData, formatNumber }) => {
+const COAttainmentSheet = ({ selectedCourse, clos, coAttainmentData, theoryCoAttainmentData, labCoAttainmentData, combinedCoAttainmentData, unnormedCoAttainmentData, equalWtCoAttainmentData, formatNumber }) => {
   const courseCode = selectedCourse?.courseCode || '';
   const lastDigit = parseInt(courseCode.slice(-1));
   const isTheoryCourse = !isNaN(lastDigit) && lastDigit % 2 === 1;
@@ -140,7 +140,7 @@ const COAttainmentSheet = ({ selectedCourse, clos, coAttainmentData, formatNumbe
       {isTheoryCourse && (
         <AttainmentTable
           clos={clos}
-          coAttainmentData={coAttainmentData}
+          coAttainmentData={theoryCoAttainmentData && theoryCoAttainmentData.length > 0 ? theoryCoAttainmentData : coAttainmentData}
           formatNumber={formatNumber}
           keyPrefix="theory"
           title="CO Attainment - Theory Courses"
@@ -149,7 +149,7 @@ const COAttainmentSheet = ({ selectedCourse, clos, coAttainmentData, formatNumbe
       {isLabCourse && (
         <AttainmentTable
           clos={clos}
-          coAttainmentData={coAttainmentData}
+          coAttainmentData={labCoAttainmentData && labCoAttainmentData.length > 0 ? labCoAttainmentData : coAttainmentData}
           formatNumber={formatNumber}
           keyPrefix="lab"
           title="CO Attainment - Lab/Project Courses"
@@ -157,10 +157,24 @@ const COAttainmentSheet = ({ selectedCourse, clos, coAttainmentData, formatNumbe
       )}
       <AttainmentTable
         clos={clos}
-        coAttainmentData={coAttainmentData}
+        coAttainmentData={combinedCoAttainmentData && combinedCoAttainmentData.length > 0 ? combinedCoAttainmentData : coAttainmentData}
         formatNumber={formatNumber}
         keyPrefix="combined"
         title="CO Attainment - Combined (Theory+Lab)"
+      />
+      <AttainmentTable
+        clos={clos}
+        coAttainmentData={unnormedCoAttainmentData && unnormedCoAttainmentData.length > 0 ? unnormedCoAttainmentData : coAttainmentData}
+        formatNumber={formatNumber}
+        keyPrefix="unnormed"
+        title="Attainment of COs in % (Theory+Lab) Unnormed"
+      />
+      <AttainmentTable
+        clos={clos}
+        coAttainmentData={equalWtCoAttainmentData && equalWtCoAttainmentData.length > 0 ? equalWtCoAttainmentData : coAttainmentData}
+        formatNumber={formatNumber}
+        keyPrefix="equalwt"
+        title="Attainment of COs in % (Theory+Lab) Equal Wt"
       />
     </>
   );

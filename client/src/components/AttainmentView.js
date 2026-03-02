@@ -158,6 +158,10 @@ const AttainmentView = () => {
 
   // CO Attainment state
   const [coAttainmentData, setCoAttainmentData] = useState([]);
+  // Gate: prevent rendering tables while async loaders are still updating state.
+  // Reset whenever any feed-state changes; show tables only after 400ms of no updates.
+  const [coAttainmentReady, setCoAttainmentReady] = useState(false);
+  const coAttainmentSettleTimerRef = useRef(null);
 
   // COCalc state
   const [coCalcData, setCoCalcData] = useState([]);
@@ -238,8 +242,8 @@ const AttainmentView = () => {
         setCtSummary({ ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 });
       }
     }
-    // Don't clear CT data when on COCalc sheets (they need CT data for calculations)
-    if (selectedSheet !== 'CT' && selectedSheet !== 'COCalc' && selectedSheet !== 'COCalc_LabUnnorm') {
+    // Don't clear CT data when on COCalc/COAttainment sheets (they need CT data for calculations)
+    if (selectedSheet !== 'CT' && selectedSheet !== 'COCalc' && selectedSheet !== 'COCalc_LabUnnorm' && selectedSheet !== 'COAttainment') {
       setCtRows([]);
       setCtFactors({});
       setCtEqWts({});
@@ -288,8 +292,8 @@ const AttainmentView = () => {
         }
       }
     }
-    // Don't clear Assignment data when on COCalc sheets (they need Assignment data for calculations)
-    if (selectedSheet !== 'Attn_Assign' && selectedSheet !== 'COCalc' && selectedSheet !== 'COCalc_LabUnnorm') {
+    // Don't clear Assignment data when on COCalc/COAttainment sheets (they need Assignment data for calculations)
+    if (selectedSheet !== 'Attn_Assign' && selectedSheet !== 'COCalc' && selectedSheet !== 'COCalc_LabUnnorm' && selectedSheet !== 'COAttainment') {
       setAssignmentRows([]);
       setAssignmentManualWts({});
       setAttendanceMarks(0);
@@ -371,8 +375,8 @@ const AttainmentView = () => {
         setLabVivaMarks(0);
       }
     }
-    // Don't clear Lab Activity data when on COCalc (it needs Lab Activity data for calculations)
-    if (selectedSheet !== 'LabActivity' && selectedSheet !== 'COCalc') {
+    // Don't clear Lab Activity data when on COCalc/COAttainment (they need Lab Activity data for calculations)
+    if (selectedSheet !== 'LabActivity' && selectedSheet !== 'COCalc' && selectedSheet !== 'COCalc_LabUnnorm' && selectedSheet !== 'COAttainment') {
       setLabActivityRows([]);
     }
   }, [selectedSheet, clos]);
@@ -448,7 +452,7 @@ const AttainmentView = () => {
   // Initialize COCalc data when COCalc or COCalc_LabUnnorm sheet is selected
   useEffect(() => {
     const loadCOCalcData = async () => {
-      if ((selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm') && selectedCourse && clos.length > 0) {
+      if ((selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment') && selectedCourse && clos.length > 0) {
 
         // Get students list
         let allStudents = [];
@@ -1627,13 +1631,13 @@ const AttainmentView = () => {
         previousCourseIdRef.current = currentCourseId;
       }
 
-      if (selectedCourse && selectedCourse._id && (selectedSheet === 'CT' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm')) {
+      if (selectedCourse && selectedCourse._id && (selectedSheet === 'CT' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment')) {
         // Set the flag immediately to prevent initialization from running during load
         ctDataLoadedRef.current = true;
 
-        // For lab courses on COCalc sheets, use the paired theory course's CT data
+        // For lab courses on COCalc/COAttainment sheets, use the paired theory course's CT data
         let courseIdToUse = selectedCourse._id;
-        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm') {
+        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment') {
           const courseCode = selectedCourse.courseCode || '';
           const lastDigit = parseInt(courseCode.slice(-1));
           if (!isNaN(lastDigit) && lastDigit % 2 === 0) {
@@ -1689,13 +1693,13 @@ const AttainmentView = () => {
         previousCourseIdForAssignmentRef.current = currentCourseId;
       }
 
-      if (selectedCourse && selectedCourse._id && (selectedSheet === 'Attn_Assign' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm')) {
+      if (selectedCourse && selectedCourse._id && (selectedSheet === 'Attn_Assign' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment')) {
         // Set the flag immediately to prevent initialization from running during load
         assignmentDataLoadedRef.current = true;
 
-        // For lab courses on COCalc sheets, use the paired theory course's assignment data
+        // For lab courses on COCalc/COAttainment sheets, use the paired theory course's assignment data
         let courseIdToUse = selectedCourse._id;
-        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm') {
+        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment') {
           const courseCode = selectedCourse.courseCode || '';
           const lastDigit = parseInt(courseCode.slice(-1));
           if (!isNaN(lastDigit) && lastDigit % 2 === 0) {
@@ -1751,13 +1755,13 @@ const AttainmentView = () => {
         previousCourseIdForLabActivityRef.current = currentCourseId;
       }
 
-      if (selectedCourse && selectedCourse._id && (selectedSheet === 'LabActivity' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm')) {
+      if (selectedCourse && selectedCourse._id && (selectedSheet === 'LabActivity' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment')) {
         // Set the flag immediately to prevent initialization from running during load
         labActivityDataLoadedRef.current = true;
 
-        // For theory courses on COCalc sheets, use the paired lab course's lab activity data
+        // For theory courses on COCalc/COAttainment sheets, use the paired lab course's lab activity data
         let courseIdToUse = selectedCourse._id;
-        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm') {
+        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment') {
           const courseCode = selectedCourse.courseCode || '';
           const lastDigit = parseInt(courseCode.slice(-1));
           if (!isNaN(lastDigit) && lastDigit % 2 === 1) {
@@ -1766,9 +1770,16 @@ const AttainmentView = () => {
             if (labCourse) courseIdToUse = labCourse._id;
           }
         }
+        console.log('[loadLabActivityData] sheet:', selectedSheet, 'courseId:', courseIdToUse);
 
         try {
           const response = await getLabActivityData(courseIdToUse);
+          console.log('[loadLabActivityData] response success:', response.success, 'hasData:', !!response.data,
+            'savedRows:', response.data?.labActivityRows?.length,
+            'savedObtained:', response.data?.labActivityObtainedRows?.length,
+            'activityTaken:', response.data?.activityTaken,
+            'useEqWt:', response.data?.useEqWtActivity,
+            'coMapped:', response.data?.coMappedActivityMarks);
           if (response.success && response.data) {
             const {
               labActivityRows: savedRows,
@@ -1803,10 +1814,14 @@ const AttainmentView = () => {
             if (savedObtained && savedObtained.length > 0) {
               setLabActivityObtainedRows(savedObtained);
             } else {
+              // No saved obtained rows - allow initialization
+              labActivityDataLoadedRef.current = false;
+              initObtainedRows('LabActivity');
             }
           } else {
             // No data found - allow initialization
             labActivityDataLoadedRef.current = false;
+            initObtainedRows('LabActivity');
           }
         } catch (error) {
           console.error('[loadLabActivityData] Error loading saved data:', error);
@@ -1830,9 +1845,9 @@ const AttainmentView = () => {
       }
 
       if (selectedCourse && selectedCourse._id) {
-        // For lab courses on COCalc sheets, use the paired theory course's section A/B data
+        // For lab courses on COCalc/COAttainment sheets, use the paired theory course's section A/B data
         let courseIdToUse = selectedCourse._id;
-        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm') {
+        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment') {
           const courseCode = selectedCourse.courseCode || '';
           const lastDigit = parseInt(courseCode.slice(-1));
           if (!isNaN(lastDigit) && lastDigit % 2 === 0) {
@@ -3053,6 +3068,36 @@ const AttainmentView = () => {
     return result;
   };
 
+  // CO Attainment (Lab) – AK32*100, where AK32 = getLabActivityCOAttainment (a 0-1 ratio).
+  // Placed after labActivityActivityTotals to avoid TDZ (all transitively called consts must be above).
+  const labCoAttainmentData = useMemo(() => {
+    console.log('[labCoAttainmentData] recomputing', {
+      obtainedRows: labActivityObtainedRows.length,
+      allocatedRows: labActivityRows.length,
+      clos: clos.length,
+      useEqWtActivity,
+      coMappedActivityMarks,
+      activityTaken,
+      labActivityManualWts,
+      sampleObtained: labActivityObtainedRows[0],
+      sampleAllocated: labActivityRows[0],
+    });
+    if (!labActivityObtainedRows.length || !clos.length) return [];
+    return labActivityObtainedRows
+      .filter(student => student.rollNumber)
+      .map(student => {
+        const coValues = {};
+        clos.forEach(clo => {
+          const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+          const ratio = getLabActivityCOAttainment(student, cn);
+          console.log('[labCoAttainmentData] student', student.rollNumber, 'co', cn, 'ratio', ratio);
+          coValues[cn] = ratio != null ? parseFloat((ratio * 100).toFixed(4)) : 0;
+        });
+        return { rollNumber: student.rollNumber, coValues };
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labActivityObtainedRows, labActivityRows, clos, useEqWtActivity, coMappedActivityMarks, activityTaken, labActivityManualWts]);
+
   const columnTotals = () => {
     const fields = ['CT1_Q1', 'CT1_Q2', 'CT1_Q3', 'CT2_Q1', 'CT2_Q2', 'CT2_Q3', 'CT3_Q1', 'CT3_Q2', 'CT3_Q3'];
     const totals = {};
@@ -3176,6 +3221,181 @@ const AttainmentView = () => {
 
     return result;
   };
+
+  // CO Attainment (Theory) – exact same formula as TheoryCOPOTable CO Attainment (Theory) column.
+  // Placed after calculateAutoFactor to avoid temporal dead zone (const TDZ).
+  // CT/Assignment states are preserved for COAttainment tab so factored helpers work correctly.
+  const theoryCoAttainmentData = useMemo(() => {
+    if (!coCalcData.length || !clos.length) return [];
+    const factoredTotals = calculateFactoredCOTotals();
+    const factoredAssignTotals = calculateFactoredAssignmentCOTotals();
+    return coCalcData.map(studentRow => {
+      const coValues = {};
+      clos.forEach(clo => {
+        const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+        const totalObt = (studentRow.sectionA.marksObtained[cn] || 0)
+          + (studentRow.sectionB.marksObtained[cn] || 0)
+          + getStudentCTFactoredMarks(studentRow.rollNumber, cn)
+          + getStudentAssignmentFactoredMarks(studentRow.rollNumber, cn);
+        const totalDist = (studentRow.sectionA.marksDistribution[cn] || 0)
+          + (studentRow.sectionB.marksDistribution[cn] || 0)
+          + (factoredTotals[cn] || 0)
+          + (factoredAssignTotals[cn] || 0);
+        coValues[cn] = totalDist > 0 ? parseFloat(((totalObt / totalDist) * 100).toFixed(4)) : 0;
+      });
+      return { rollNumber: studentRow.rollNumber, coValues };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coCalcData, clos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary]);
+
+  // CO Attainment – Combined (Theory+Lab): =IFERROR(BP5/BV5, 0)*100
+  // BP5 = totalObt (theory + lab obtained), BV5 = totalDist (theory + lab distribution)
+  // Mirrors the CombinedCOPOTable logic in COCalcSheet.js.
+  const combinedCoAttainmentData = useMemo(() => {
+    if (!coCalcData.length || !clos.length) return [];
+    const factoredTotals = calculateFactoredCOTotals();
+    const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
+    return coCalcData.map(studentRow => {
+      const coValues = {};
+      clos.forEach(clo => {
+        const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+        // BP5: theory obtained + lab activity obtained (factored/weighted)
+        const labStudent = labActivityObtainedRows.find(s =>
+          String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
+        );
+        const labObt = getLabActivityStudentCOMappedMarks(labStudent, cn);
+        const theoryObt = (studentRow.sectionA.marksObtained[cn] || 0)
+          + (studentRow.sectionB.marksObtained[cn] || 0)
+          + getStudentCTFactoredMarks(studentRow.rollNumber, cn)
+          + getStudentAssignmentFactoredMarks(studentRow.rollNumber, cn);
+        const totalObt = theoryObt + labObt;
+        // BV5: theory distribution + lab activity distribution (eq-wt per question)
+        const theoryDist = (studentRow.sectionA.marksDistribution[cn] || 0)
+          + (studentRow.sectionB.marksDistribution[cn] || 0)
+          + (factoredTotals[cn] || 0)
+          + (factoredAssignmentTotals[cn] || 0);
+        const labRow = labActivityRows.find(r => r.coNumber === cn);
+        let labCoTotal = 0;
+        if (labRow && activityTaken > 0) {
+          const eqWt = (coMappedActivityMarks || 0) / (activityTaken || 1);
+          for (let i = 1; i <= activityTaken; i++) {
+            if ((labRow[`Activity${i}_Q1`] || 0) !== 0) labCoTotal += eqWt;
+            if ((labRow[`Activity${i}_Q2`] || 0) !== 0) labCoTotal += eqWt;
+            if ((labRow[`Activity${i}_Q3`] || 0) !== 0) labCoTotal += eqWt;
+          }
+        }
+        const totalDist = theoryDist + labCoTotal;
+        // IFERROR(BP5/BV5, 0) * 100
+        coValues[cn] = totalDist > 0 ? parseFloat(((totalObt / totalDist) * 100).toFixed(4)) : 0;
+      });
+      return { rollNumber: studentRow.rollNumber, coValues };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coCalcData, clos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary,
+    labActivityObtainedRows, labActivityRows, activityTaken, coMappedActivityMarks]);
+
+  // CO Attainment – Unnormed (Theory+Lab): raw lab marks / raw lab distribution, no weighting
+  const unnormedCoAttainmentData = useMemo(() => {
+    if (!coCalcData.length || !clos.length) return [];
+    const factoredTotals = calculateFactoredCOTotals();
+    const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
+    return coCalcData.map(studentRow => {
+      const coValues = {};
+      clos.forEach(clo => {
+        const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+        const labStudent = labActivityObtainedRows.find(s =>
+          String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
+        );
+        const labObt = getLabActivityStudentCOMarks(labStudent, cn);
+        const theoryObt = (studentRow.sectionA.marksObtained[cn] || 0)
+          + (studentRow.sectionB.marksObtained[cn] || 0)
+          + getStudentCTFactoredMarks(studentRow.rollNumber, cn)
+          + getStudentAssignmentFactoredMarks(studentRow.rollNumber, cn);
+        const totalObt = theoryObt + labObt;
+        const theoryDist = (studentRow.sectionA.marksDistribution[cn] || 0)
+          + (studentRow.sectionB.marksDistribution[cn] || 0)
+          + (factoredTotals[cn] || 0)
+          + (factoredAssignmentTotals[cn] || 0);
+        const labRow = labActivityRows.find(r => r.coNumber === cn);
+        const labCoTotal = computeLabActivityCOTotal(labRow);
+        const totalDist = theoryDist + labCoTotal;
+        coValues[cn] = totalDist > 0 ? parseFloat(((totalObt / totalDist) * 100).toFixed(4)) : 0;
+      });
+      return { rollNumber: studentRow.rollNumber, coValues };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coCalcData, clos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary,
+    labActivityObtainedRows, labActivityRows, activityTaken]);
+
+  // CO Attainment – Equal Wt (Theory+Lab): forces equal weight across all lab activities regardless of manual-wt setting
+  const equalWtCoAttainmentData = useMemo(() => {
+    if (!coCalcData.length || !clos.length) return [];
+    const factoredTotals = calculateFactoredCOTotals();
+    const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
+    const eqWt = activityTaken > 0 ? (coMappedActivityMarks || 0) / activityTaken : 0;
+    const actTotals = labActivityActivityTotals();
+    return coCalcData.map(studentRow => {
+      const coValues = {};
+      clos.forEach(clo => {
+        const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+        const labStudent = labActivityObtainedRows.find(s =>
+          String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
+        );
+        const labRow = labActivityRows.find(r => r.coNumber === cn);
+        let labObt = 0;
+        let labCoTotal = 0;
+        if (labRow && labStudent && activityTaken > 0) {
+          for (let i = 1; i <= activityTaken; i++) {
+            const actTotal = actTotals[`activity${i}`] || 0;
+            const factor = actTotal > 0 ? eqWt / actTotal : 0;
+            if ((labRow[`Activity${i}_Q1`] || 0) > 0) { labObt += (parseFloat(labStudent[`Activity${i}_Q1`]) || 0) * factor; labCoTotal += eqWt; }
+            if ((labRow[`Activity${i}_Q2`] || 0) > 0) { labObt += (parseFloat(labStudent[`Activity${i}_Q2`]) || 0) * factor; labCoTotal += eqWt; }
+            if ((labRow[`Activity${i}_Q3`] || 0) > 0) { labObt += (parseFloat(labStudent[`Activity${i}_Q3`]) || 0) * factor; labCoTotal += eqWt; }
+          }
+        }
+        const theoryObt = (studentRow.sectionA.marksObtained[cn] || 0)
+          + (studentRow.sectionB.marksObtained[cn] || 0)
+          + getStudentCTFactoredMarks(studentRow.rollNumber, cn)
+          + getStudentAssignmentFactoredMarks(studentRow.rollNumber, cn);
+        const totalObt = theoryObt + labObt;
+        const theoryDist = (studentRow.sectionA.marksDistribution[cn] || 0)
+          + (studentRow.sectionB.marksDistribution[cn] || 0)
+          + (factoredTotals[cn] || 0)
+          + (factoredAssignmentTotals[cn] || 0);
+        const totalDist = theoryDist + labCoTotal;
+        coValues[cn] = totalDist > 0 ? parseFloat(((totalObt / totalDist) * 100).toFixed(4)) : 0;
+      });
+      return { rollNumber: studentRow.rollNumber, coValues };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coCalcData, clos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary,
+    labActivityObtainedRows, labActivityRows, activityTaken, coMappedActivityMarks]);
+
+  // Effect 1: Reset ready-gate whenever the user navigates to a different course/sheet.
+  const coAttainmentKeyRef = useRef('');
+  useEffect(() => {
+    const key = `${selectedSheet}__${selectedCourse?._id || ''}`;
+    if (key !== coAttainmentKeyRef.current) {
+      coAttainmentKeyRef.current = key;
+      setCoAttainmentReady(false);
+      if (coAttainmentSettleTimerRef.current) clearTimeout(coAttainmentSettleTimerRef.current);
+    }
+  }, [selectedSheet, selectedCourse]);
+
+  // Effect 2: After data settles (400ms of no further changes), mark ready.
+  // Uses a separate effect so that data updates AFTER the first settle do NOT hide the tables.
+  useEffect(() => {
+    if (selectedSheet !== 'COAttainment') return;
+    if (coAttainmentSettleTimerRef.current) clearTimeout(coAttainmentSettleTimerRef.current);
+    coAttainmentSettleTimerRef.current = setTimeout(() => {
+      setCoAttainmentReady(true);
+    }, 400);
+    return () => {
+      if (coAttainmentSettleTimerRef.current) clearTimeout(coAttainmentSettleTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSheet, selectedCourse, coCalcData, ctObtainedRows, attnAssignObtainedRows,
+    labActivityObtainedRows, labActivityRows, activityTaken, coMappedActivityMarks]);
 
   const sumEqWtTotal = () => {
     const autoEqWt = calculateAutoEqWt();
@@ -3812,12 +4032,23 @@ const AttainmentView = () => {
 
           {/* CO Attainment */}
           {selectedCourse && selectedSheet === 'COAttainment' && (
-            <COAttainmentSheet
-              selectedCourse={selectedCourse}
-              clos={clos}
-              coAttainmentData={coAttainmentData}
-              formatNumber={formatNumber}
-            />
+            coAttainmentReady ? (
+              <COAttainmentSheet
+                selectedCourse={selectedCourse}
+                clos={clos}
+                coAttainmentData={coAttainmentData}
+                theoryCoAttainmentData={theoryCoAttainmentData}
+                labCoAttainmentData={labCoAttainmentData}
+                combinedCoAttainmentData={combinedCoAttainmentData}
+                unnormedCoAttainmentData={unnormedCoAttainmentData}
+                equalWtCoAttainmentData={equalWtCoAttainmentData}
+                formatNumber={formatNumber}
+              />
+            ) : (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#7f8c8d', fontSize: '15px' }}>
+                Calculating CO Attainment…
+              </div>
+            )
           )}
 
           {/* CO Calculation (COCalc and COCalc_LabUnnorm) */}
@@ -3830,6 +4061,7 @@ const AttainmentView = () => {
               ctRows={ctRows}
               assignmentRows={assignmentRows}
               attnAssignObtainedRows={attnAssignObtainedRows}
+              attendanceMarks={attendanceMarks}
               labActivityRows={labActivityRows}
               labActivityObtainedRows={labActivityObtainedRows}
               activityTaken={activityTaken}
@@ -3839,6 +4071,8 @@ const AttainmentView = () => {
               getStudentCTFactoredMarks={getStudentCTFactoredMarks}
               getStudentAssignmentFactoredMarks={getStudentAssignmentFactoredMarks}
               getLabActivityStudentCOMappedMarks={getLabActivityStudentCOMappedMarks}
+              computeLabActivityCOTotal={computeLabActivityCOTotal}
+              getLabActivityStudentCOMarks={getLabActivityStudentCOMarks}
               getActiveCTFields={getActiveCTFields}
               getActiveAssignmentFields={getActiveAssignmentFields}
               calculateAutoFactor={calculateAutoFactor}
