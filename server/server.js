@@ -13,11 +13,38 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// One-time migration: replace the old non-partial unique index on courseoutcomes
+// with a partial one so soft-deleted docs don't block re-use of the same co_code.
+const migrateCourseOutcomeIndex = async () => {
+  try {
+    const col = mongoose.connection.collection('courseoutcomes');
+    const indexes = await col.indexes();
+    const oldIndex = indexes.find(
+      ix => ix.name === 'course_1_co_code_1' && !ix.partialFilterExpression
+    );
+    if (oldIndex) {
+      await col.dropIndex('course_1_co_code_1');
+      await col.createIndex(
+        { course: 1, co_code: 1 },
+        {
+          unique: true,
+          partialFilterExpression: { is_deleted: { $ne: true } },
+          name: 'course_1_co_code_1'
+        }
+      );
+      console.log('Migrated courseoutcomes index to partial unique index');
+    }
+  } catch (err) {
+    console.error('courseoutcomes index migration error:', err.message);
+  }
+};
+
 // Database connection
 const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('MongoDB connected successfully');
+    await migrateCourseOutcomeIndex();
   } catch (error) {
     console.error('MongoDB connection error:', error);
     process.exit(1);

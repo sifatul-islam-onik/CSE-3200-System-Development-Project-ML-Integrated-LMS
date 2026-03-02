@@ -1,5 +1,92 @@
 import React from 'react';
 
+// ── Summary tables: CO measured & Wt ─────────────────────────────────────────
+const COSummaryTables = ({ clos, theoryCoAttainmentData, labCoAttainmentData }) => {
+  if (!clos.length) return null;
+
+  const coNumbers = clos.map(clo => (clo.cloNumber || '').toString().replace('CLO', 'CO'));
+
+  // Binary: 1 if this CO has any non-zero value in the given dataset
+  const hasData = (dataset, cn) =>
+    Array.isArray(dataset) && dataset.some(s => (s.coValues?.[cn] || 0) > 0) ? 1 : 0;
+
+  const theoryBin = coNumbers.map(cn => hasData(theoryCoAttainmentData, cn));
+  const labBin    = coNumbers.map(cn => hasData(labCoAttainmentData, cn));
+  const sumBin    = coNumbers.map((_, i) => theoryBin[i] + labBin[i]);
+
+  // Wt values: each binary cell divided by its column sum (0 if sum is 0)
+  const fmt = (v, s) => s === 0 ? '0' : Number(v / s).toFixed(2).replace(/\.?0+$/, '') || '0';
+  const theoryWt = coNumbers.map((_, i) => fmt(theoryBin[i], sumBin[i]));
+  const labWt    = coNumbers.map((_, i) => fmt(labBin[i],    sumBin[i]));
+
+  const renderMeasuredTable = () => (
+    <div className="co-summary-table-wrap">
+      <table className="co-summary-table">
+        <thead>
+          <tr>
+            <th className="co-summary-th-label">CO measured</th>
+            {coNumbers.map((cn, i) => <th key={i}>{cn}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className="co-summary-row-label">Theory</td>
+            {theoryBin.map((v, i) => (
+              <td key={i} className={v ? 'co-summary-bin co-summary-bin--1' : 'co-summary-bin co-summary-bin--0'}>{v}</td>
+            ))}
+          </tr>
+          <tr>
+            <td className="co-summary-row-label">Lab</td>
+            {labBin.map((v, i) => (
+              <td key={i} className={v ? 'co-summary-bin co-summary-bin--1' : 'co-summary-bin co-summary-bin--0'}>{v}</td>
+            ))}
+          </tr>
+          <tr>
+            <td className="co-summary-row-label co-summary-row-label--sum">Sum</td>
+            {sumBin.map((v, i) => (
+              <td key={i} className="co-summary-bin co-summary-bin--sum">{v}</td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+
+  const renderWtTable = () => (
+    <div className="co-summary-table-wrap">
+      <table className="co-summary-table">
+        <thead>
+          <tr>
+            <th className="co-summary-th-label">Wt</th>
+            {coNumbers.map((cn, i) => <th key={i}>{cn}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className="co-summary-row-label">Theory</td>
+            {theoryWt.map((v, i) => (
+              <td key={i} className={parseFloat(v) > 0 ? 'co-summary-bin co-summary-bin--1' : 'co-summary-bin co-summary-bin--0'}>{v}</td>
+            ))}
+          </tr>
+          <tr>
+            <td className="co-summary-row-label">Lab</td>
+            {labWt.map((v, i) => (
+              <td key={i} className={parseFloat(v) > 0 ? 'co-summary-bin co-summary-bin--1' : 'co-summary-bin co-summary-bin--0'}>{v}</td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <div className="co-summary-tables-container">
+      {renderMeasuredTable()}
+      {renderWtTable()}
+    </div>
+  );
+};
+
 const AttainmentTable = ({ clos, coAttainmentData, formatNumber, keyPrefix, title }) => (
   <section className="co-attainment-section" style={{ marginTop: '30px' }}>
     <h2>{title}</h2>
@@ -137,6 +224,11 @@ const COAttainmentSheet = ({ selectedCourse, clos, coAttainmentData, theoryCoAtt
 
   return (
     <>
+      <COSummaryTables
+        clos={clos}
+        theoryCoAttainmentData={theoryCoAttainmentData}
+        labCoAttainmentData={labCoAttainmentData}
+      />
       {isTheoryCourse && (
         <AttainmentTable
           clos={clos}

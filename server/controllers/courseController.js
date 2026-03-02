@@ -337,9 +337,16 @@ exports.createCourse = async (req, res) => {
         // Step 1: Create course
         const [course] = await Course.create([courseData], { session });
 
-        // Step 2: Create course outcomes
+        // Step 2: Create course outcomes (deduplicate by co_code within request)
         const createdCOs = [];
+        const seenCOCodes = new Set();
         for (const coData of courseOutcomes) {
+          const coCodeNorm = (coData.co_code || '').toUpperCase();
+          if (seenCOCodes.has(coCodeNorm)) {
+            console.log(`=== Skipping duplicate CO in request: ${coData.co_code} ===`);
+            continue;
+          }
+          seenCOCodes.add(coCodeNorm);
           console.log(`=== Creating CO: ${coData.co_code} ===`);
           console.log('CO Data:', JSON.stringify(coData, null, 2));
           console.log('Taxonomy levels being saved:', coData.taxonomy_levels);
@@ -530,61 +537,11 @@ exports.getAllCourses = async (req, res) => {
     const coursesWithOutcomes = await Promise.all(
       courses.map(async (course) => {
         // Exclude soft-deleted COs so removals are reflected in the UI
-        let courseOutcomes = await CourseOutcome.find({ 
+        const courseOutcomes = await CourseOutcome.find({ 
           course: course._id, 
           is_deleted: { $ne: true }
         });
 
-        // Merge with theory/lab course COs
-        const courseCode = course.courseCode;
-        const codeMatch = courseCode.match(/^([A-Z]+)\s*(\d+)$/i);
-        
-        if (codeMatch) {
-          const prefix = codeMatch[1];
-          const number = parseInt(codeMatch[2]);
-          
-          // Determine if this is theory (odd) or lab (even)
-          const isLab = number % 2 === 0;
-          const theoryCode = isLab ? `${prefix} ${number - 1}` : courseCode;
-          const labCode = `${prefix} ${isLab ? number : number + 1}`;
-          
-          // If current course is lab, get COs from theory course
-          // If current course is theory, get COs from lab course (theory + 1)
-          const relatedCourseCode = isLab ? theoryCode : labCode;
-          
-          try {
-            const relatedCourse = await Course.findOne({ 
-              courseCode: { $regex: new RegExp(`^${relatedCourseCode}$`, 'i') }
-            });
-            
-            if (relatedCourse) {
-              const relatedOutcomes = await CourseOutcome.find({ 
-                course: relatedCourse._id,
-                is_deleted: { $ne: true }
-              });
-              
-              // Merge outcomes (union) - remove duplicates by CO code
-              const coMap = new Map();
-              
-              // Add all outcomes from both courses
-              [...courseOutcomes, ...relatedOutcomes].forEach(co => {
-                const coCode = co.co_code.toUpperCase();
-                if (!coMap.has(coCode)) {
-                  coMap.set(coCode, co);
-                }
-              });
-              
-              // Convert back to array and sort
-              courseOutcomes = Array.from(coMap.values()).sort((a, b) => 
-                a.co_code.localeCompare(b.co_code)
-              );
-            }
-          } catch (err) {
-            // If related course doesn't exist, just return current course COs
-            console.log('Related course not found, returning current course COs only');
-          }
-        }
-        
         // For each CO, fetch its PO mappings
         const outcomesWithMappings = await Promise.all(
           courseOutcomes.map(async (co) => {
@@ -1027,55 +984,81 @@ exports.updateCourse = async (req, res) => {
         // Handle course outcomes updates/additions
         if (courseOutcomes && Array.isArray(courseOutcomes)) {
           for (const coData of courseOutcomes) {
+            let targetCO = null;
+
             if (coData._id) {
-              // Update existing CO
-              const existingCO = await CourseOutcome.findById(coData._id).session(session);
-              if (existingCO) {
-                existingCO.co_code = coData.co_code;
-                existingCO.description = coData.description;
-                existingCO.taxonomy_levels = coData.taxonomy_levels || [];
-                await existingCO.save({ session });
-                coStats.updated++;
-
-                // Update PO mappings
-                if (coData.po_mappings && Array.isArray(coData.po_mappings)) {
-                  // Delete existing mappings
-                  const deletedMappings = await COPOMapping.deleteMany({ 
-                    course_outcome: coData._id 
+              // Update existing CO by _id
+              targetCO = await CourseOutcome.findById(coData._id).session(session);
+              if (targetCO) {
+                const newCode = (coData.co_code || '').toUpperCase();
+                // If co_code is being renamed, remove any soft-deleted doc occupying the new code
+                if (targetCO.co_code !== newCode) {
+                  await CourseOutcome.deleteOne({
+                    course: course._id,
+                    co_code: newCode,
+                    is_deleted: true
                   }, { session });
-                  mappingStats.deleted += deletedMappings.deletedCount;
-
-                  // Create new mappings
-                  if (coData.po_mappings.length > 0) {
-                    const mappingsToCreate = coData.po_mappings.map(mapping => ({
-                      course_outcome: coData._id,
-                      program_outcome_code: mapping.program_outcome_code.toUpperCase(),
-                      level: Number(mapping.level)
-                    }));
-
-                    await COPOMapping.create(mappingsToCreate, { session, ordered: true });
-                    mappingStats.added += mappingsToCreate.length;
-                  }
                 }
+                targetCO.co_code = newCode;
+                targetCO.description = coData.description;
+                targetCO.taxonomy_levels = coData.taxonomy_levels || [];
+                targetCO.is_deleted = false;
+                await targetCO.save({ session });
+                coStats.updated++;
               }
-            } else {
-              // Add new CO
-              const [newCO] = await CourseOutcome.create([{
-                course: course._id,
-                co_code: coData.co_code,
-                description: coData.description,
-                taxonomy_levels: coData.taxonomy_levels || []
-              }], { session });
-              coStats.added++;
+            }
 
-              // Create PO mappings for new CO
-              if (coData.po_mappings && Array.isArray(coData.po_mappings) && coData.po_mappings.length > 0) {
+            if (!targetCO) {
+              // No _id supplied (new CO) or _id lookup failed – upsert by co_code
+              const coCodeNorm = (coData.co_code || '').toUpperCase();
+
+              // Hard-delete any soft-deleted stub with the same co_code so the
+              // unique index won't block the insert.
+              await CourseOutcome.deleteOne({
+                course: course._id,
+                co_code: coCodeNorm,
+                is_deleted: true
+              }, { session });
+
+              // Check if an active CO with this code already exists
+              targetCO = await CourseOutcome.findOne({
+                course: course._id,
+                co_code: coCodeNorm,
+                is_deleted: { $ne: true }
+              }).session(session);
+
+              if (targetCO) {
+                // Active CO exists – update in place
+                targetCO.description = coData.description;
+                targetCO.taxonomy_levels = coData.taxonomy_levels || [];
+                await targetCO.save({ session });
+                coStats.updated++;
+              } else {
+                // Truly new CO
+                const [newCO] = await CourseOutcome.create([{
+                  course: course._id,
+                  co_code: coCodeNorm,
+                  description: coData.description,
+                  taxonomy_levels: coData.taxonomy_levels || []
+                }], { session });
+                targetCO = newCO;
+                coStats.added++;
+              }
+            }
+
+            // Sync PO mappings for this CO
+            if (targetCO && coData.po_mappings && Array.isArray(coData.po_mappings)) {
+              const deletedMappings = await COPOMapping.deleteMany({
+                course_outcome: targetCO._id
+              }, { session });
+              mappingStats.deleted += deletedMappings.deletedCount;
+
+              if (coData.po_mappings.length > 0) {
                 const mappingsToCreate = coData.po_mappings.map(mapping => ({
-                  course_outcome: newCO._id,
+                  course_outcome: targetCO._id,
                   program_outcome_code: mapping.program_outcome_code.toUpperCase(),
                   level: Number(mapping.level)
                 }));
-
                 await COPOMapping.create(mappingsToCreate, { session, ordered: true });
                 mappingStats.added += mappingsToCreate.length;
               }
@@ -1259,57 +1242,11 @@ exports.validateCourseOBE = async (req, res) => {
       });
     }
 
-    // Fetch course outcomes with their PO mappings
-    let courseOutcomes = await CourseOutcome.find({ course: course._id });
-
-    // Merge with theory/lab course COs
-    const courseCode = course.courseCode;
-    const codeMatch = courseCode.match(/^([A-Z]+)\s*(\d+)$/i);
-    
-    if (codeMatch) {
-      const prefix = codeMatch[1];
-      const number = parseInt(codeMatch[2]);
-      
-      // Determine if this is theory (odd) or lab (even)
-      const isLab = number % 2 === 0;
-      const theoryCode = isLab ? `${prefix} ${number - 1}` : courseCode;
-      const labCode = `${prefix} ${isLab ? number : number + 1}`;
-      
-      // If current course is lab, get COs from theory course
-      // If current course is theory, get COs from lab course (theory + 1)
-      const relatedCourseCode = isLab ? theoryCode : labCode;
-      
-      try {
-        const relatedCourse = await Course.findOne({ 
-          courseCode: { $regex: new RegExp(`^${relatedCourseCode}$`, 'i') }
-        });
-        
-        if (relatedCourse) {
-          const relatedOutcomes = await CourseOutcome.find({ 
-            course: relatedCourse._id 
-          });
-          
-          // Merge outcomes (union) - remove duplicates by CO code
-          const coMap = new Map();
-          
-          // Add all outcomes from both courses
-          [...courseOutcomes, ...relatedOutcomes].forEach(co => {
-            const coCode = co.co_code.toUpperCase();
-            if (!coMap.has(coCode)) {
-              coMap.set(coCode, co);
-            }
-          });
-          
-          // Convert back to array and sort
-          courseOutcomes = Array.from(coMap.values()).sort((a, b) => 
-            a.co_code.localeCompare(b.co_code)
-          );
-        }
-      } catch (err) {
-        // If related course doesn't exist, just return current course COs
-        console.log('Related course not found, returning current course COs only');
-      }
-    }
+    // Fetch this course's own outcomes only (no theory/lab merging)
+    let courseOutcomes = await CourseOutcome.find({
+      course: course._id,
+      is_deleted: { $ne: true }
+    });
     
     // For each CO, fetch its PO mappings
     const outcomesWithMappings = await Promise.all(
