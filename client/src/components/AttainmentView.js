@@ -30,7 +30,7 @@ import {
   saveSectionAData,
   getSectionAData,
 } from '../services/attainmentService';
-import { getCourseProfile } from '../services/courseProfileService';
+import { getCourseProfile, getCombinedCourseProfile } from '../services/courseProfileService';
 import { getCourseStudents } from '../services/courseService';
 import { getAllCourses } from '../services/courseService';
 import { getAllProgramOutcomes } from '../services/programOutcomeService';
@@ -58,6 +58,7 @@ const AttainmentView = () => {
   const [saving, setSaving] = useState(false);
   const [userRole, setUserRole] = useState('');
   const [clos, setClos] = useState([]);
+  const [combinedClos, setCombinedClos] = useState([]);
   const [programOutcomes, setProgramOutcomes] = useState([]);
   const [combinedCOPOMatrix, setCombinedCOPOMatrix] = useState(null);
   const [matchingCourseCode, setMatchingCourseCode] = useState(null);
@@ -181,15 +182,28 @@ const AttainmentView = () => {
   const loadCourseProfile = useCallback(async () => {
     if (!selectedCourse) return;
     try {
-      const response = await getCourseProfile(selectedCourse.courseCode);
-      if (response.success && response.data) {
-        setClos(response.data);
+      // Own-course COs only (for Course Profile tab)
+      const ownResponse = await getCourseProfile(selectedCourse.courseCode);
+      if (ownResponse.success && ownResponse.data) {
+        setClos(ownResponse.data);
       } else {
         setClos([]);
       }
     } catch (err) {
-      logger.error('Failed to load course profile:', err);
+      logger.error('Failed to load course profile (own):', err);
       setClos([]);
+    }
+    try {
+      // Combined theory+lab COs (for COAttainment, COCalc, COPOMap, Charts)
+      const combinedResponse = await getCombinedCourseProfile(selectedCourse.courseCode);
+      if (combinedResponse.success && combinedResponse.data) {
+        setCombinedClos(combinedResponse.data);
+      } else {
+        setCombinedClos([]);
+      }
+    } catch (err) {
+      logger.error('Failed to load combined course profile:', err);
+      setCombinedClos([]);
     }
   }, [selectedCourse]);
 
@@ -208,8 +222,11 @@ const AttainmentView = () => {
       if (clos.length > 0) {
         setClos([]);
       }
+      if (combinedClos.length > 0) {
+        setCombinedClos([]);
+      }
     }
-  }, [selectedCourse, selectedSheet, loadCourseProfile, cloDependentSheets, clos.length]);
+  }, [selectedCourse, selectedSheet, loadCourseProfile, cloDependentSheets, clos.length, combinedClos.length]);
 
   // Initialize CT matrix rows when clos is available and CT is selected
   useEffect(() => {
@@ -2773,6 +2790,7 @@ const AttainmentView = () => {
   };
 
   const computeLabActivityCOTotal = (row) => {
+    if (!row) return 0;
     let sum = (row.attn || 0) + (row.quiz || 0) + (row.viva || 0);
     for (let i = 1; i <= (activityTaken || 5); i++) {
       sum += (row[`Activity${i}_Q1`] || 0) + (row[`Activity${i}_Q2`] || 0) + (row[`Activity${i}_Q3`] || 0);
@@ -4042,7 +4060,7 @@ const AttainmentView = () => {
             coAttainmentReady ? (
               <COAttainmentSheet
                 selectedCourse={selectedCourse}
-                clos={clos}
+                clos={combinedClos.length > 0 ? combinedClos : clos}
                 coAttainmentData={coAttainmentData}
                 theoryCoAttainmentData={theoryCoAttainmentData}
                 labCoAttainmentData={labCoAttainmentData}
@@ -4063,7 +4081,7 @@ const AttainmentView = () => {
             <COCalcSheet
               selectedSheet={selectedSheet}
               selectedCourse={selectedCourse}
-              clos={clos}
+              clos={combinedClos.length > 0 ? combinedClos : clos}
               coCalcData={coCalcData}
               ctRows={ctRows}
               assignmentRows={assignmentRows}
@@ -4092,7 +4110,7 @@ const AttainmentView = () => {
           {selectedSheet === 'COPOMap' && (
             <COPOMapSheet
               selectedCourse={selectedCourse}
-              clos={clos}
+              clos={combinedClos.length > 0 ? combinedClos : clos}
               programOutcomes={programOutcomes}
               combinedCOPOMatrix={combinedCOPOMatrix}
               matchingCourseCode={matchingCourseCode}
@@ -4112,7 +4130,7 @@ const AttainmentView = () => {
           {selectedSheet === 'Charts' && (
             <ChartsSheet
               selectedCourse={selectedCourse}
-              clos={clos}
+              clos={combinedClos.length > 0 ? combinedClos : clos}
               programOutcomes={programOutcomes}
             />
           )}
