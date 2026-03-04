@@ -86,7 +86,7 @@ const POTablePlaceholder = ({ title, programOutcomes, poCalcStudents }) => (
 
 // ─── Computed PO table ────────────────────────────────────────────────────────
 // Renders PO values computed via MMULT(binaryAchievementRow, coPOMapCol) capped at 1.
-const POTableComputed = ({ title, programOutcomes, computedRows }) => {
+const POTableComputed = ({ title, programOutcomes, computedRows, showYCount = false }) => {
   if (!computedRows || computedRows.length === 0) {
     return (
       <div className="table-container" style={{ marginTop: '20px' }}>
@@ -95,6 +95,9 @@ const POTableComputed = ({ title, programOutcomes, computedRows }) => {
       </div>
     );
   }
+
+  const totalStudents = computedRows.length;
+
   return (
     <div className="table-container" style={{ marginTop: '20px' }}>
       <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>{title}</h4>
@@ -127,6 +130,43 @@ const POTableComputed = ({ title, programOutcomes, computedRows }) => {
             </tr>
           ))}
         </tbody>
+        {showYCount && (
+          <tfoot>
+            <tr>
+              <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8', whiteSpace: 'nowrap' }}>
+                Y count
+              </td>
+              {programOutcomes.map((_, pIdx) => {
+                // =IF(COUNTIF(col,0)>=$D$135,"--",COUNTIF(col,1))
+                // $D$135 = total number of students
+                const zeroCount = computedRows.filter(r => r.poValues[pIdx] === 0).length;
+                const val = zeroCount >= totalStudents ? '--' : computedRows.filter(r => r.poValues[pIdx] === 1).length;
+                return (
+                  <td key={pIdx} style={{ textAlign: 'center', fontWeight: 'bold' }}>
+                    {val}
+                  </td>
+                );
+              })}
+            </tr>
+            <tr>
+              <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8', whiteSpace: 'nowrap' }}>
+                Achieved(%)
+              </td>
+              {programOutcomes.map((_, pIdx) => {
+                // =IFERROR(C132/$B$135*100,"--")
+                // C132 = Y count for this PO; $B$135 = total students
+                const zeroCount = computedRows.filter(r => r.poValues[pIdx] === 0).length;
+                const yCount = zeroCount >= totalStudents ? null : computedRows.filter(r => r.poValues[pIdx] === 1).length;
+                const val = yCount == null ? '--' : parseFloat((yCount / totalStudents * 100).toFixed(2));
+                return (
+                  <td key={pIdx} style={{ textAlign: 'center', fontWeight: 'bold' }}>
+                    {val === '--' ? '--' : `${val}%`}
+                  </td>
+                );
+              })}
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   );
@@ -185,16 +225,19 @@ const POCalcMaxSheet = ({ selectedCourse, clos, programOutcomes, poCalcStudents,
         title="Theory+Lab"
         programOutcomes={programOutcomes}
         computedRows={combinedPORows}
+        showYCount
       />
       <POTableComputed
         title="Theory+Lab(unnorm)"
         programOutcomes={programOutcomes}
         computedRows={unnormedPORows}
+        showYCount
       />
       <POTableComputed
         title="Theory+Lab(Eq Wt)"
         programOutcomes={programOutcomes}
         computedRows={equalWtPORows}
+        showYCount
       />
     </section>
   );
