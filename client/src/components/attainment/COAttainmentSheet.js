@@ -203,11 +203,15 @@ const AttainmentTable = ({ clos, coAttainmentData, formatNumber, keyPrefix, titl
   </section>
 );
 
-const COAttainmentSheet = ({ selectedCourse, clos, coAttainmentData, theoryCoAttainmentData, labCoAttainmentData, combinedCoAttainmentData, unnormedCoAttainmentData, equalWtCoAttainmentData, formatNumber }) => {
+const COAttainmentSheet = ({ selectedCourse, clos, ownClos, coAttainmentData, theoryCoAttainmentData, labCoAttainmentData, combinedCoAttainmentData, unnormedCoAttainmentData, equalWtCoAttainmentData, formatNumber }) => {
   const courseCode = selectedCourse?.courseCode || '';
   const lastDigit = parseInt(courseCode.replace(/\s/g, '').slice(-1));
   const isTheoryCourse = !isNaN(lastDigit) && lastDigit % 2 === 1;
   const isLabCourse    = !isNaN(lastDigit) && lastDigit % 2 === 0;
+
+  // Theory/Lab tables use own-course COs only (matching how theoryCoAttainmentData/labCoAttainmentData are computed).
+  // Combined/Unnormed/EqualWt tables use all combined COs.
+  const separatedClos = (ownClos && ownClos.length > 0) ? ownClos : clos;
 
   return (
     <>
@@ -218,7 +222,7 @@ const COAttainmentSheet = ({ selectedCourse, clos, coAttainmentData, theoryCoAtt
       />
       {isTheoryCourse && (
         <AttainmentTable
-          clos={clos}
+          clos={separatedClos}
           coAttainmentData={theoryCoAttainmentData && theoryCoAttainmentData.length > 0 ? theoryCoAttainmentData : coAttainmentData}
           formatNumber={formatNumber}
           keyPrefix="theory"
@@ -227,7 +231,7 @@ const COAttainmentSheet = ({ selectedCourse, clos, coAttainmentData, theoryCoAtt
       )}
       {isLabCourse && (
         <AttainmentTable
-          clos={clos}
+          clos={separatedClos}
           coAttainmentData={labCoAttainmentData && labCoAttainmentData.length > 0 ? labCoAttainmentData : coAttainmentData}
           formatNumber={formatNumber}
           keyPrefix="lab"

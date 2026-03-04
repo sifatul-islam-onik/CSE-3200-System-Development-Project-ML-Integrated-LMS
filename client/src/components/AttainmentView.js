@@ -4123,6 +4123,7 @@ const AttainmentView = () => {
               <COAttainmentSheet
                 selectedCourse={selectedCourse}
                 clos={combinedClos.length > 0 ? combinedClos : clos}
+                ownClos={clos}
                 coAttainmentData={coAttainmentData}
                 theoryCoAttainmentData={theoryCoAttainmentData}
                 labCoAttainmentData={labCoAttainmentData}
