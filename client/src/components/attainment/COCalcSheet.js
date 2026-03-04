@@ -572,6 +572,7 @@ const COCalcSheet = ({
   selectedSheet,
   selectedCourse,
   clos,
+  combinedClos,
   coCalcData,
   ctRows,
   assignmentRows,
@@ -598,8 +599,12 @@ const COCalcSheet = ({
   const lastDigit = parseInt(courseCode.slice(-1));
   const isTheoryCourse = !isNaN(lastDigit) && lastDigit % 2 === 1;
 
+  // Combined tables (CO-PO theory+Lab, CO attainment combined) use all COs from both courses.
+  // Theory-only tables (Section A&B, CO-PO Theory, CT/Assignment) use only the own-course COs.
+  const effectiveCombinedClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
+
   const commonProps = {
-    clos, coCalcData, labActivityRows, labActivityObtainedRows,
+    clos: effectiveCombinedClos, coCalcData, labActivityRows, labActivityObtainedRows,
     activityTaken, coMappedActivityMarks,
     attnAssignObtainedRows,
     calculateFactoredCOTotals, calculateFactoredAssignmentCOTotals,

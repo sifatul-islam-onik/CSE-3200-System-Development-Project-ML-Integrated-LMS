@@ -4168,7 +4168,8 @@ const AttainmentView = () => {
             <COCalcSheet
               selectedSheet={selectedSheet}
               selectedCourse={selectedCourse}
-              clos={combinedClos.length > 0 ? combinedClos : clos}
+              clos={clos}
+              combinedClos={combinedClos}
               coCalcData={coCalcData}
               ctRows={ctRows}
               assignmentRows={assignmentRows}
