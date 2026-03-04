@@ -205,7 +205,7 @@ const AttainmentView = () => {
 
   // Memoize sheets that require CLOs to avoid repeated string checks
   const cloDependentSheets = useMemo(() =>
-    ['CourseProfile', 'CT', 'Attn_Assign', 'SectionA', 'SectionB', 'LabActivity', 'COAttainment', 'COCalc', 'COCalc_LabUnnorm', 'COPOMap', 'Charts'],
+    ['CourseProfile', 'CT', 'Attn_Assign', 'SectionA', 'SectionB', 'LabActivity', 'COAttainment', 'COCalc', 'COCalc_LabUnnorm', 'COPOMap', 'Charts', 'POCalcMax'],
     []
   );
 
@@ -259,8 +259,8 @@ const AttainmentView = () => {
         setCtSummary({ ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 });
       }
     }
-    // Don't clear CT data when on COCalc/COAttainment sheets (they need CT data for calculations)
-    if (selectedSheet !== 'CT' && selectedSheet !== 'COCalc' && selectedSheet !== 'COCalc_LabUnnorm' && selectedSheet !== 'COAttainment') {
+    // Don't clear CT data when on COCalc/COAttainment/POCalcMax sheets (they need CT data for calculations)
+    if (selectedSheet !== 'CT' && selectedSheet !== 'COCalc' && selectedSheet !== 'COCalc_LabUnnorm' && selectedSheet !== 'COAttainment' && selectedSheet !== 'POCalcMax') {
       setCtRows([]);
       setCtFactors({});
       setCtEqWts({});
@@ -302,8 +302,8 @@ const AttainmentView = () => {
         setAttendanceMarks(0);
       }
     }
-    // Don't clear Assignment data when on COCalc/COAttainment sheets (they need Assignment data for calculations)
-    if (selectedSheet !== 'Attn_Assign' && selectedSheet !== 'COCalc' && selectedSheet !== 'COCalc_LabUnnorm' && selectedSheet !== 'COAttainment') {
+    // Don't clear Assignment data when on COCalc/COAttainment/POCalcMax sheets (they need Assignment data for calculations)
+    if (selectedSheet !== 'Attn_Assign' && selectedSheet !== 'COCalc' && selectedSheet !== 'COCalc_LabUnnorm' && selectedSheet !== 'COAttainment' && selectedSheet !== 'POCalcMax') {
       setAssignmentRows([]);
       setAssignmentManualWts({});
       setAttendanceMarks(0);
@@ -405,8 +405,8 @@ const AttainmentView = () => {
         setLabVivaMarks(0);
       }
     }
-    // Don't clear Lab Activity data when on COCalc/COAttainment (they need Lab Activity data for calculations)
-    if (selectedSheet !== 'LabActivity' && selectedSheet !== 'COCalc' && selectedSheet !== 'COCalc_LabUnnorm' && selectedSheet !== 'COAttainment') {
+    // Don't clear Lab Activity data when on COCalc/COAttainment/POCalcMax (they need Lab Activity data for calculations)
+    if (selectedSheet !== 'LabActivity' && selectedSheet !== 'COCalc' && selectedSheet !== 'COCalc_LabUnnorm' && selectedSheet !== 'COAttainment' && selectedSheet !== 'POCalcMax') {
       setLabActivityRows([]);
     }
   }, [selectedSheet, clos]);
@@ -482,7 +482,7 @@ const AttainmentView = () => {
   // Initialize COCalc data when COCalc or COCalc_LabUnnorm sheet is selected
   useEffect(() => {
     const loadCOCalcData = async () => {
-      if ((selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment') && selectedCourse && clos.length > 0) {
+      if ((selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax') && selectedCourse && clos.length > 0) {
 
         // Get students list
         let allStudents = [];
@@ -502,7 +502,7 @@ const AttainmentView = () => {
         // Fallback: try Section sheets
         if (allStudents.length === 0 && sheetNames.includes('Section A')) {
           try {
-            const sectAData = await getAttainmentData(selectedCourse._id, 'Section A');
+            const sectAData = await getAttainmentData('Section A');
             if (sectAData.success && Array.isArray(sectAData.data)) {
               allStudents = sectAData.data.map(s => ({ rollNumber: s.rollNumber }));
             }
@@ -571,7 +571,7 @@ const AttainmentView = () => {
 
         if (sheetNames.includes('Attn_Assign')) {
           try {
-            const assignResp = await getAttainmentData(selectedCourse._id, 'Attn_Assign');
+            const assignResp = await getAttainmentData('Attn_Assign');
             if (assignResp.success && Array.isArray(assignResp.data)) {
               assignData = assignResp.data;
             }
@@ -1171,7 +1171,7 @@ const AttainmentView = () => {
   // Load combined CO-PO matrix for theory and lab courses
   useEffect(() => {
     const loadCombinedCOPOMatrix = async () => {
-      if (selectedSheet === 'COPOMap' && selectedCourse && selectedCourse.courseCode) {
+      if ((selectedSheet === 'COPOMap' || selectedSheet === 'POCalcMax') && selectedCourse && selectedCourse.courseCode) {
         try {
           const courseCode = selectedCourse.courseCode;
           const lastDigit = parseInt(courseCode.slice(-1));
@@ -1664,13 +1664,13 @@ const AttainmentView = () => {
         previousCourseIdRef.current = currentCourseId;
       }
 
-      if (selectedCourse && selectedCourse._id && (selectedSheet === 'CT' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment')) {
+      if (selectedCourse && selectedCourse._id && (selectedSheet === 'CT' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax')) {
         // Set the flag immediately to prevent initialization from running during load
         ctDataLoadedRef.current = true;
 
-        // For lab courses on COCalc/COAttainment sheets, use the paired theory course's CT data
+        // For lab courses on COCalc/COAttainment/POCalcMax sheets, use the paired theory course's CT data
         let courseIdToUse = selectedCourse._id;
-        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment') {
+        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax') {
           const courseCode = selectedCourse.courseCode || '';
           const lastDigit = parseInt(courseCode.slice(-1));
           if (!isNaN(lastDigit) && lastDigit % 2 === 0) {
@@ -1742,13 +1742,13 @@ const AttainmentView = () => {
         previousCourseIdForAssignmentRef.current = currentCourseId;
       }
 
-      if (selectedCourse && selectedCourse._id && (selectedSheet === 'Attn_Assign' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment')) {
+      if (selectedCourse && selectedCourse._id && (selectedSheet === 'Attn_Assign' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax')) {
         // Set the flag immediately to prevent initialization from running during load
         assignmentDataLoadedRef.current = true;
 
-        // For lab courses on COCalc/COAttainment sheets, use the paired theory course's assignment data
+        // For lab courses on COCalc/COAttainment/POCalcMax sheets, use the paired theory course's assignment data
         let courseIdToUse = selectedCourse._id;
-        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment') {
+        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax') {
           const courseCode = selectedCourse.courseCode || '';
           const lastDigit = parseInt(courseCode.slice(-1));
           if (!isNaN(lastDigit) && lastDigit % 2 === 0) {
@@ -1821,13 +1821,13 @@ const AttainmentView = () => {
         previousCourseIdForLabActivityRef.current = currentCourseId;
       }
 
-      if (selectedCourse && selectedCourse._id && (selectedSheet === 'LabActivity' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment')) {
+      if (selectedCourse && selectedCourse._id && (selectedSheet === 'LabActivity' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax')) {
         // Set the flag immediately to prevent initialization from running during load
         labActivityDataLoadedRef.current = true;
 
-        // For theory courses on COCalc/COAttainment sheets, use the paired lab course's lab activity data
+        // For theory courses on COCalc/COAttainment/POCalcMax sheets, use the paired lab course's lab activity data
         let courseIdToUse = selectedCourse._id;
-        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment') {
+        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax') {
           const courseCode = selectedCourse.courseCode || '';
           const lastDigit = parseInt(courseCode.slice(-1));
           if (!isNaN(lastDigit) && lastDigit % 2 === 1) {
@@ -1928,9 +1928,9 @@ const AttainmentView = () => {
       }
 
       if (selectedCourse && selectedCourse._id) {
-        // For lab courses on COCalc/COAttainment sheets, use the paired theory course's section A/B data
+        // For lab courses on COCalc/COAttainment/POCalcMax sheets, use the paired theory course's section A/B data
         let courseIdToUse = selectedCourse._id;
-        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment') {
+        if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax') {
           const courseCode = selectedCourse.courseCode || '';
           const lastDigit = parseInt(courseCode.slice(-1));
           if (!isNaN(lastDigit) && lastDigit % 2 === 0) {
@@ -4198,7 +4198,7 @@ const AttainmentView = () => {
           {selectedSheet === 'COPOMap' && (
             <COPOMapSheet
               selectedCourse={selectedCourse}
-              clos={combinedClos.length > 0 ? combinedClos : clos}
+              clos={clos}
               programOutcomes={programOutcomes}
               combinedCOPOMatrix={combinedCOPOMatrix}
               matchingCourseCode={matchingCourseCode}
@@ -4209,8 +4209,15 @@ const AttainmentView = () => {
           {selectedSheet === 'POCalcMax' && (
             <POCalcMaxSheet
               selectedCourse={selectedCourse}
+              clos={clos}
               programOutcomes={programOutcomes}
               poCalcStudents={poCalcStudents}
+              theoryCoAttainmentData={theoryCoAttainmentData}
+              labCoAttainmentData={labCoAttainmentData}
+              combinedCoAttainmentData={combinedCoAttainmentData}
+              combinedCOPOMatrix={combinedCOPOMatrix}
+              unnormedCoAttainmentData={unnormedCoAttainmentData}
+              equalWtCoAttainmentData={equalWtCoAttainmentData}
             />
           )}
 
