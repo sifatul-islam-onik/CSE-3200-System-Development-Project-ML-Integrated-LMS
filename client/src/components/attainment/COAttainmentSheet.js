@@ -100,7 +100,7 @@ const COSummaryTables = ({ clos, theoryCoAttainmentData, labCoAttainmentData }) 
   );
 };
 
-const AttainmentTable = ({ clos, coAttainmentData, formatNumber, keyPrefix, title }) => (
+const AttainmentTable = ({ clos, coAttainmentData, formatNumber, keyPrefix, title, showAchievementAvg = false }) => (
   <section className="co-attainment-section" style={{ marginTop: '30px' }}>
     <h2>{title}</h2>
     {clos.length === 0 && (
@@ -189,13 +189,48 @@ const AttainmentTable = ({ clos, coAttainmentData, formatNumber, keyPrefix, titl
                   </td>
                 );
               })}
-              {clos.map((_, coIdx) => (
-                <td key={`avg-ach-${keyPrefix}-${coIdx}`} />
-              ))}
+              {clos.map((clo, coIdx) => {
+                if (!showAchievementAvg) return <td key={`avg-ach-${keyPrefix}-${coIdx}`} />;
+                const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                // =IF(COUNTIF(AT6:AT130,"--")>0,"--",COUNTIF(AT6:AT130,"Y"))
+                // "--" in CO Achievement>= column means the student has no data for that CO
+                const hasNoData = coAttainmentData.some(r => r.coValues?.[coNumber] == null);
+                const val = hasNoData ? '--' : coAttainmentData.filter(r => (r.coValues?.[coNumber] || 0) >= 55).length;
+                return (
+                  <td key={`avg-ach-${keyPrefix}-${coIdx}`} style={{ textAlign: 'center', fontWeight: 'bold' }}>
+                    {val}
+                  </td>
+                );
+              })}
               {clos.map((_, coIdx) => (
                 <td key={`avg-bin-${keyPrefix}-${coIdx}`} />
               ))}
             </tr>
+            {showAchievementAvg && (
+              <tr>
+                <td className="footer-label">Achieved(%)</td>
+                {/* Attainment of COs in % — empty */}
+                {clos.map((_, coIdx) => (
+                  <td key={`achpct-att-${keyPrefix}-${coIdx}`} />
+                ))}
+                {/* CO Achievement>= — =IFERROR(AT132/$B$133*100,"--") */}
+                {clos.map((clo, coIdx) => {
+                  const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                  const hasNoData = coAttainmentData.some(r => r.coValues?.[coNumber] == null);
+                  const yCount = hasNoData ? '--' : coAttainmentData.filter(r => (r.coValues?.[coNumber] || 0) >= 55).length;
+                  const val = yCount === '--' ? '--' : parseFloat((yCount / coAttainmentData.length * 100).toFixed(2));
+                  return (
+                    <td key={`achpct-ach-${keyPrefix}-${coIdx}`} style={{ textAlign: 'center', fontWeight: 'bold' }}>
+                      {val === '--' ? '--' : `${val}%`}
+                    </td>
+                  );
+                })}
+                {/* Binary — empty */}
+                {clos.map((_, coIdx) => (
+                  <td key={`achpct-bin-${keyPrefix}-${coIdx}`} />
+                ))}
+              </tr>
+            )}
           </tfoot>
         </table>
       </div>
@@ -244,6 +279,7 @@ const COAttainmentSheet = ({ selectedCourse, clos, ownClos, coAttainmentData, th
         formatNumber={formatNumber}
         keyPrefix="combined"
         title="CO Attainment - Combined (Theory+Lab)"
+        showAchievementAvg
       />
       <AttainmentTable
         clos={clos}
@@ -251,6 +287,7 @@ const COAttainmentSheet = ({ selectedCourse, clos, ownClos, coAttainmentData, th
         formatNumber={formatNumber}
         keyPrefix="unnormed"
         title="Attainment of COs in % (Theory+Lab) Unnormed"
+        showAchievementAvg
       />
       <AttainmentTable
         clos={clos}
@@ -258,6 +295,7 @@ const COAttainmentSheet = ({ selectedCourse, clos, ownClos, coAttainmentData, th
         formatNumber={formatNumber}
         keyPrefix="equalwt"
         title="Attainment of COs in % (Theory+Lab) Equal Wt"
+        showAchievementAvg
       />
     </>
   );
