@@ -368,12 +368,34 @@ exports.getCourseProfileData = async (req, res) => {
               is_deleted: false
             }).sort({ co_code: 1 });
 
+            // Track which CO codes belong to which source
+            const ownCoCodes = new Set(courseOutcomes.map(co => co.co_code.toUpperCase()));
+            const relatedCoCodes = new Set(relatedOutcomes.map(co => co.co_code.toUpperCase()));
+
             // Merge outcomes (union) - remove duplicates by CO code
             const coMap = new Map();
             [...courseOutcomes, ...relatedOutcomes].forEach(co => {
               const coCode = co.co_code.toUpperCase();
               if (!coMap.has(coCode)) {
                 coMap.set(coCode, co);
+              }
+            });
+
+            // Determine sourceType: current course is theory (odd) or lab (even)
+            // ownCoCodes → current course type, relatedCoCodes → opposite type
+            const currentType = isLab ? 'lab' : 'theory';
+            const relatedType = isLab ? 'theory' : 'lab';
+
+            // Attach sourceType directly on the outcome object (non-persisted property)
+            coMap.forEach((co, coCode) => {
+              const inOwn = ownCoCodes.has(coCode);
+              const inRelated = relatedCoCodes.has(coCode);
+              if (inOwn && inRelated) {
+                co._sourceType = 'both';
+              } else if (inOwn) {
+                co._sourceType = currentType;
+              } else {
+                co._sourceType = relatedType;
               }
             });
 
@@ -386,6 +408,10 @@ exports.getCourseProfileData = async (req, res) => {
         }
       }
     }
+
+    // Determine current course type for fallback sourceType
+    const codeMatchForType = courseCode.match(/^([A-Z]+)\s*(\d+)$/i);
+    const currentCourseType = (codeMatchForType && parseInt(codeMatchForType[2]) % 2 === 0) ? 'lab' : 'theory';
 
     // Get CO-PO mappings for all COs
     const coIds = courseOutcomes.map(co => co._id);
@@ -437,7 +463,8 @@ exports.getCourseProfileData = async (req, res) => {
         description: co.description,
         bloomLevels,
         ploAssessed: mappedPos.join(', '),
-        cloPloCorrelation: '' // Initially blank, editable
+        cloPloCorrelation: '', // Initially blank, editable
+        sourceType: co._sourceType || currentCourseType // 'theory', 'lab', or 'both'
       };
     });
 

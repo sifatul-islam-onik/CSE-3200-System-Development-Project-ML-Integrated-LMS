@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getCOPOMatrix } from '../services/courseService';
+import { getCOPOMatrix, getCourse } from '../services/courseService';
 import '../styles/CourseOBEView.css';
 
 // Helper function to format PO codes from PO_A to PO(a)
@@ -12,10 +12,21 @@ const formatPOCode = (code) => {
   return code;
 };
 
-const CourseOBEView = ({ course, onClose, viewingSemester = null }) => {
+const CourseOBEView = ({ course: courseProp, onClose, viewingSemester = null }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [copoMatrix, setCopoMatrix] = useState(null);
   const [loading, setLoading] = useState(false);
+  // Full course data fetched on mount so COs are always up-to-date
+  const [course, setCourse] = useState(courseProp);
+
+  // Fetch full course data (with courseOutcomes) on mount
+  useEffect(() => {
+    if (courseProp?._id) {
+      getCourse(courseProp._id)
+        .then(res => { if (res?.data) setCourse(res.data); })
+        .catch(() => { /* fall back to prop */ });
+    }
+  }, [courseProp?._id]);
 
   useEffect(() => {
     if (activeTab === 'copo' && !copoMatrix) {

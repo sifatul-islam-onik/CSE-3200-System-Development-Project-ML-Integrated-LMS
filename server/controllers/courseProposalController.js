@@ -200,9 +200,23 @@ exports.getProposalById = async (req, res) => {
       });
     }
 
+    // For UPDATE proposals, attach courseOutcomes to existingCourse (they are in a separate collection)
+    let proposalData = proposal.toObject();
+    if (proposalData.proposalType === 'UPDATE' && proposalData.existingCourse && proposalData.existingCourse._id) {
+      const existingCourseId = proposalData.existingCourse._id;
+      const courseOutcomes = await CourseOutcome.find({ course: existingCourseId, is_deleted: { $ne: true } }).lean();
+      const outcomesWithMappings = await Promise.all(
+        courseOutcomes.map(async (co) => {
+          const mappings = await COPOMapping.find({ course_outcome: co._id }).lean();
+          return { ...co, po_mappings: mappings };
+        })
+      );
+      proposalData.existingCourse = { ...proposalData.existingCourse, courseOutcomes: outcomesWithMappings };
+    }
+
     res.json({
       success: true,
-      data: proposal
+      data: proposalData
     });
   } catch (error) {
     console.error('Get proposal error:', error);

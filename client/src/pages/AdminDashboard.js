@@ -4,7 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faHourglass, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
 import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, setDepartmentHead, removeDepartmentHead, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers, updateUserProfile, assignBatchToCourse, unassignBatchFromCourse, getAssignedBatches, getStudentBatches } from '../services/adminService';
-import { createCourse, getAllCourses, updateCourse, deleteCourse } from '../services/courseService';
+import { createCourse, getAllCourses, getCourse, updateCourse, deleteCourse } from '../services/courseService';
 import { getAllProposals, getProposalById, approveProposal, rejectProposal } from '../services/courseProposalService';
 import CourseForm from '../components/CourseForm';
 import CourseOBEView from '../components/CourseOBEView';
@@ -1973,8 +1973,13 @@ const AdminDashboard = () => {
                                   </button>
                                   <button
                                     className="btn btn-sm btn-primary"
-                                    onClick={() => {
-                                      setEditingCourse(course);
+                                    onClick={async () => {
+                                      try {
+                                        const res = await getCourse(course._id);
+                                        setEditingCourse(res.data || course);
+                                      } catch (e) {
+                                        setEditingCourse(course);
+                                      }
                                       setShowCourseForm(true);
                                     }}
                                   >

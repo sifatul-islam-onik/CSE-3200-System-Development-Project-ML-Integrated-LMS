@@ -887,39 +887,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
               {/* Academic Year field removed */}
             </div>
 
-            {/* Assignment and Attendance Marks */}
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="attendanceMarks">Attendance Marks</label>
-                <input
-                  type="number"
-                  id="attendanceMarks"
-                  name="attendanceMarks"
-                  value={formData.attendanceMarks}
-                  onChange={handleChange}
-                  min="0"
-                  max="100"
-                  disabled={loading}
-                  placeholder="e.g., 10"
-                />
-                {errors.attendanceMarks && <span className="error-text">{errors.attendanceMarks}</span>}
-              </div>
-              <div className="form-group">
-                <label htmlFor="assignmentMarks">Assignment Marks</label>
-                <input
-                  type="number"
-                  id="assignmentMarks"
-                  name="assignmentMarks"
-                  value={formData.assignmentMarks}
-                  onChange={handleChange}
-                  min="0"
-                  max="100"
-                  disabled={loading}
-                  placeholder="e.g., 15"
-                />
-                {errors.assignmentMarks && <span className="error-text">{errors.assignmentMarks}</span>}
-              </div>
-            </div>
+
           </div>
 
           {/* Knowledge Required */}
@@ -1317,7 +1285,7 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
           {/* Course Outcomes & CO-PO Mapping */}
           <CourseOutcomeEditor
             courseOutcomes={formData.courseOutcomes}
-            onChange={(outcomes) => setFormData({ ...formData, courseOutcomes: outcomes })}
+            onChange={(outcomes) => setFormData(prev => ({ ...prev, courseOutcomes: outcomes }))}
             onValidationChange={(isValid) => setIsCOValidationValid(isValid)}
           />
 

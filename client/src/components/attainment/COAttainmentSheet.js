@@ -6,12 +6,25 @@ const COSummaryTables = ({ clos, theoryCoAttainmentData, labCoAttainmentData }) 
 
   const coNumbers = clos.map(clo => (clo.cloNumber || '').toString().replace('CLO', 'CO'));
 
-  // Binary: 1 if this CO has any non-zero value in the given dataset
-  const hasData = (dataset, cn) =>
-    Array.isArray(dataset) && dataset.some(s => (s.coValues?.[cn] || 0) > 0) ? 1 : 0;
+  // Use sourceType from Course Profile to determine theory/lab presence
+  // sourceType is 'theory', 'lab', or 'both' — falls back to data presence if missing
+  const theoryBin = clos.map((clo, i) => {
+    const cn = coNumbers[i];
+    if (clo.sourceType) {
+      return (clo.sourceType === 'theory' || clo.sourceType === 'both') ? 1 : 0;
+    }
+    // fallback: check if any student has non-zero value in theory data
+    return Array.isArray(theoryCoAttainmentData) && theoryCoAttainmentData.some(s => (s.coValues?.[cn] || 0) > 0) ? 1 : 0;
+  });
 
-  const theoryBin = coNumbers.map(cn => hasData(theoryCoAttainmentData, cn));
-  const labBin    = coNumbers.map(cn => hasData(labCoAttainmentData, cn));
+  const labBin = clos.map((clo, i) => {
+    const cn = coNumbers[i];
+    if (clo.sourceType) {
+      return (clo.sourceType === 'lab' || clo.sourceType === 'both') ? 1 : 0;
+    }
+    // fallback
+    return Array.isArray(labCoAttainmentData) && labCoAttainmentData.some(s => (s.coValues?.[cn] || 0) > 0) ? 1 : 0;
+  });
   const sumBin    = coNumbers.map((_, i) => theoryBin[i] + labBin[i]);
 
   // Wt values: each binary cell divided by its column sum (0 if sum is 0)
@@ -176,32 +189,12 @@ const AttainmentTable = ({ clos, coAttainmentData, formatNumber, keyPrefix, titl
                   </td>
                 );
               })}
-              {clos.map((clo, coIdx) => {
-                const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-                const achievedCount = coAttainmentData.reduce((sum, r) =>
-                  sum + ((r.coValues[coNumber] || 0) >= 55 ? 1 : 0), 0);
-                const achievedPercentage = coAttainmentData.length > 0
-                  ? (achievedCount / coAttainmentData.length) * 100 : 0;
-                return (
-                  <td key={`avg-ach-${keyPrefix}-${coIdx}`} style={{ textAlign: 'center', fontWeight: 'bold' }}>
-                    {formatNumber(achievedPercentage)}%
-                  </td>
-                );
-              })}
-              {clos.map((clo, coIdx) => {
-                const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-                const achievedCount = coAttainmentData.reduce((sum, r) =>
-                  sum + ((r.coValues[coNumber] || 0) >= 55 ? 1 : 0), 0);
-                const avg = coAttainmentData.length > 0 ? achievedCount / coAttainmentData.length : 0;
-                return (
-                  <td key={`avg-bin-${keyPrefix}-${coIdx}`} style={{
-                    textAlign: 'center', fontWeight: 'bold',
-                    backgroundColor: avg >= 0.5 ? '#d4edda' : '#f8d7da'
-                  }}>
-                    {formatNumber(avg)}
-                  </td>
-                );
-              })}
+              {clos.map((_, coIdx) => (
+                <td key={`avg-ach-${keyPrefix}-${coIdx}`} />
+              ))}
+              {clos.map((_, coIdx) => (
+                <td key={`avg-bin-${keyPrefix}-${coIdx}`} />
+              ))}
             </tr>
           </tfoot>
         </table>
@@ -212,15 +205,9 @@ const AttainmentTable = ({ clos, coAttainmentData, formatNumber, keyPrefix, titl
 
 const COAttainmentSheet = ({ selectedCourse, clos, coAttainmentData, theoryCoAttainmentData, labCoAttainmentData, combinedCoAttainmentData, unnormedCoAttainmentData, equalWtCoAttainmentData, formatNumber }) => {
   const courseCode = selectedCourse?.courseCode || '';
-  const lastDigit = parseInt(courseCode.slice(-1));
+  const lastDigit = parseInt(courseCode.replace(/\s/g, '').slice(-1));
   const isTheoryCourse = !isNaN(lastDigit) && lastDigit % 2 === 1;
-
-  const courseInfo = (selectedCourse?.courseTitle || '').toLowerCase();
-  const isProjectCourse = courseInfo.includes('project') ||
-    courseInfo.includes('thesis') ||
-    courseInfo.includes('research') ||
-    courseInfo.includes('dissertation');
-  const isLabCourse = (!isNaN(lastDigit) && lastDigit % 2 === 0) || isProjectCourse;
+  const isLabCourse    = !isNaN(lastDigit) && lastDigit % 2 === 0;
 
   return (
     <>

@@ -38,14 +38,10 @@ import { loadStudentsOptimized, loadAttainmentDatasets } from '../services/dataL
 import logger from '../utils/logger';
 import '../styles/AttainmentView.css';
 
-// Helper function to format numbers - show as integer if no decimal part, otherwise remove trailing zeros
+// Helper function to format numbers - round to 2 decimal places, strip trailing zeros
 const formatNumber = (num) => {
-  if (num === 0) return '0';
-  const str = num.toString();
-  if (str.includes('.')) {
-    return parseFloat(str).toString();
-  }
-  return str;
+  if (num === 0 || num === null || num === undefined || isNaN(num)) return '0';
+  return parseFloat(Number(num).toFixed(2)).toString();
 };
 
 const AttainmentView = () => {
@@ -228,28 +224,32 @@ const AttainmentView = () => {
     }
   }, [selectedCourse, selectedSheet, loadCourseProfile, cloDependentSheets, clos.length, combinedClos.length]);
 
-  // Initialize CT matrix rows when clos is available and CT is selected
+  // Initialize / reconcile CT matrix rows whenever clos changes (own-course COs only).
+  // Uses functional setState so we never stale-close over ctRows and always reconcile
+  // saved data with the live CO list — this also handles admin CO edits via Edit Course.
   useEffect(() => {
     if (selectedSheet === 'CT' && clos.length > 0) {
-      // Only initialize if we haven't loaded saved data and ctRows is empty or doesn't match the expected CO structure
-      const shouldInitialize = !ctDataLoadedRef.current && (
-        ctRows.length === 0 ||
-        ctRows.length !== clos.length ||
-        ctRows.some((row, idx) => {
-          const expectedCoNumber = (clos[idx].cloNumber || '').toString().replace('CLO', 'CO');
-          return row.coNumber !== expectedCoNumber;
-        })
-      );
-
-      if (shouldInitialize) {
-        const initial = clos.map(clo => ({
-          coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
-          CT1_Q1: 0, CT1_Q2: 0, CT1_Q3: 0,
-          CT2_Q1: 0, CT2_Q2: 0, CT2_Q3: 0,
-          CT3_Q1: 0, CT3_Q2: 0, CT3_Q3: 0,
-        }));
-        setCtRows(initial);
-        // initialize factors (default 1) and manual weights (default 0)
+      setCtRows(prevRows => {
+        const existingMap = {};
+        prevRows.forEach(row => { existingMap[row.coNumber] = row; });
+        const reconciled = clos.map(clo => {
+          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+          return existingMap[coNumber] || {
+            coNumber,
+            CT1_Q1: 0, CT1_Q2: 0, CT1_Q3: 0,
+            CT2_Q1: 0, CT2_Q2: 0, CT2_Q3: 0,
+            CT3_Q1: 0, CT3_Q2: 0, CT3_Q3: 0,
+          };
+        });
+        // Avoid re-render when nothing changed (same objects in same order)
+        if (reconciled.length === prevRows.length &&
+            reconciled.every((row, idx) => row === prevRows[idx])) {
+          return prevRows;
+        }
+        return reconciled;
+      });
+      // Only reset factors/weights on first load (no saved data yet)
+      if (!ctDataLoadedRef.current) {
         const fields = ['CT1_Q1', 'CT1_Q2', 'CT1_Q3', 'CT2_Q1', 'CT2_Q2', 'CT2_Q3', 'CT3_Q1', 'CT3_Q2', 'CT3_Q3'];
         const manualInit = {};
         fields.forEach(f => { manualInit[f] = 0; });
@@ -270,43 +270,36 @@ const AttainmentView = () => {
     }
   }, [selectedSheet, clos]);
 
-  // Initialize Assignment matrix rows when clos is available and Attn_Assign is selected
+  // Initialize / reconcile Assignment matrix rows whenever clos changes.
   useEffect(() => {
     if (selectedSheet === 'Attn_Assign' && clos.length > 0) {
-      // Only initialize if we haven't loaded saved data and assignmentRows is empty or doesn't match the expected CO structure
-      // This prevents overwriting saved data when clos updates
-      const shouldInitialize = !assignmentDataLoadedRef.current && (
-        assignmentRows.length === 0 ||
-        assignmentRows.length !== clos.length ||
-        assignmentRows.some((row, idx) => {
-          const expectedCoNumber = (clos[idx].cloNumber || '').toString().replace('CLO', 'CO');
-          return row.coNumber !== expectedCoNumber;
-        })
-      );
-
-      if (shouldInitialize) {
-        const initial = clos.map(clo => ({
-          coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
-          attendance: 0,
-          Assgn1_Q1: 0, Assgn1_Q2: 0, Assgn1_Q3: 0,
-          Assgn2_Q1: 0, Assgn2_Q2: 0, Assgn2_Q3: 0,
-          Assgn3_Q1: 0, Assgn3_Q2: 0, Assgn3_Q3: 0,
-        }));
-        setAssignmentRows(initial);
-
-        // Initialize manual wt
+      setAssignmentRows(prevRows => {
+        const existingMap = {};
+        prevRows.forEach(row => { existingMap[row.coNumber] = row; });
+        const reconciled = clos.map(clo => {
+          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+          return existingMap[coNumber] || {
+            coNumber,
+            attendance: 0,
+            Assgn1_Q1: 0, Assgn1_Q2: 0, Assgn1_Q3: 0,
+            Assgn2_Q1: 0, Assgn2_Q2: 0, Assgn2_Q3: 0,
+            Assgn3_Q1: 0, Assgn3_Q2: 0, Assgn3_Q3: 0,
+          };
+        });
+        if (reconciled.length === prevRows.length &&
+            reconciled.every((row, idx) => row === prevRows[idx])) {
+          return prevRows;
+        }
+        return reconciled;
+      });
+      // Only reset manual weights / attendance on first load
+      if (!assignmentDataLoadedRef.current) {
         const manualInit = {};
         ['Assgn1_Q1', 'Assgn1_Q2', 'Assgn1_Q3', 'Assgn2_Q1', 'Assgn2_Q2', 'Assgn2_Q3', 'Assgn3_Q1', 'Assgn3_Q2', 'Assgn3_Q3'].forEach(f => {
           manualInit[f] = 0;
         });
         setAssignmentManualWts(manualInit);
-
-        // Get attendance marks from course
-        if (selectedCourse && selectedCourse.attendanceMarks) {
-          setAttendanceMarks(selectedCourse.attendanceMarks);
-        } else {
-          setAttendanceMarks(0);
-        }
+        setAttendanceMarks(0);
       }
     }
     // Don't clear Assignment data when on COCalc/COAttainment sheets (they need Assignment data for calculations)
@@ -316,74 +309,94 @@ const AttainmentView = () => {
       setAttendanceMarks(0);
       assignmentDataLoadedRef.current = false; // Reset when leaving the sheet
     }
-  }, [selectedSheet, clos, selectedCourse]);
+  }, [selectedSheet, clos]);
 
-  // Initialize SectionA matrix rows when clos is available and SectionA is selected
+  // Initialize / reconcile SectionA matrix rows whenever clos changes.
   useEffect(() => {
-    if (selectedSheet === 'SectionA' && clos.length > 0 && !sectionADataLoadedRef.current) {
-      // Only initialize if we don't already have rows
-      if (sectionARows.length === 0) {
-        const initial = clos.map(clo => ({
-          coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
-          Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
-          Q2a: 0, Q2b: 0, Q2c: 0, Q2d: 0,
-          Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
-          Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
-          // Generated table combinations
-          q123: 0, q124: 0, q134: 0, q234: 0,
-          q12: 0, q13: 0, q14: 0, q23: 0, q24: 0, q34: 0,
-          q1: 0, q2: 0, q3: 0, q4: 0, none: 0
-        }));
-        setSectionARows(initial);
-      }
+    if (selectedSheet === 'SectionA' && clos.length > 0) {
+      setSectionARows(prevRows => {
+        const existingMap = {};
+        prevRows.forEach(row => { existingMap[row.coNumber] = row; });
+        const reconciled = clos.map(clo => {
+          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+          return existingMap[coNumber] || {
+            coNumber,
+            Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
+            Q2a: 0, Q2b: 0, Q2c: 0, Q2d: 0,
+            Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
+            Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
+            q123: 0, q124: 0, q134: 0, q234: 0,
+            q12: 0, q13: 0, q14: 0, q23: 0, q24: 0, q34: 0,
+            q1: 0, q2: 0, q3: 0, q4: 0, none: 0
+          };
+        });
+        if (reconciled.length === prevRows.length &&
+            reconciled.every((row, idx) => row === prevRows[idx])) {
+          return prevRows;
+        }
+        return reconciled;
+      });
     }
     if (selectedSheet !== 'SectionA' && !sectionADataLoadedRef.current) {
       setSectionARows([]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSheet, clos]);
 
-  // Initialize SectionB matrix rows when clos is available and SectionB is selected
+  // Initialize / reconcile SectionB matrix rows whenever clos changes.
   useEffect(() => {
     if (selectedSheet === 'SectionB' && clos.length > 0) {
-      // Only initialize if we don't already have rows
-      if (sectionBRows.length === 0) {
-        const initial = clos.map(clo => ({
-          coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
-          Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
-          Q2a: 0, Q2b: 0, Q2c: 0, Q2d: 0,
-          Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
-          Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
-          // Add combination fields
-          q123: 0, q124: 0, q134: 0, q234: 0,
-          q12: 0, q13: 0, q14: 0, q23: 0, q24: 0, q34: 0,
-          q1: 0, q2: 0, q3: 0, q4: 0, none: 0
-        }));
-        setSectionBRows(initial);
-      }
+      setSectionBRows(prevRows => {
+        const existingMap = {};
+        prevRows.forEach(row => { existingMap[row.coNumber] = row; });
+        const reconciled = clos.map(clo => {
+          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+          return existingMap[coNumber] || {
+            coNumber,
+            Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
+            Q2a: 0, Q2b: 0, Q2c: 0, Q2d: 0,
+            Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
+            Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
+            q123: 0, q124: 0, q134: 0, q234: 0,
+            q12: 0, q13: 0, q14: 0, q23: 0, q24: 0, q34: 0,
+            q1: 0, q2: 0, q3: 0, q4: 0, none: 0
+          };
+        });
+        if (reconciled.length === prevRows.length &&
+            reconciled.every((row, idx) => row === prevRows[idx])) {
+          return prevRows;
+        }
+        return reconciled;
+      });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSheet, clos]);
 
-  // Initialize LabActivity matrix rows when clos is available and LabActivity is selected
+  // Initialize / reconcile LabActivity matrix rows whenever clos changes.
   useEffect(() => {
     if (selectedSheet === 'LabActivity' && clos.length > 0) {
-      // Only initialize if no saved data has been loaded
+      setLabActivityRows(prevRows => {
+        const existingMap = {};
+        prevRows.forEach(row => { existingMap[row.coNumber] = row; });
+        const reconciled = clos.map(clo => {
+          const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+          return existingMap[coNumber] || {
+            coNumber,
+            attn: 0, quiz: 0, viva: 0,
+            Activity1_Q1: 0, Activity1_Q2: 0, Activity1_Q3: 0,
+            Activity2_Q1: 0, Activity2_Q2: 0, Activity2_Q3: 0,
+            Activity3_Q1: 0, Activity3_Q2: 0, Activity3_Q3: 0,
+            Activity4_Q1: 0, Activity4_Q2: 0, Activity4_Q3: 0,
+            Activity5_Q1: 0, Activity5_Q2: 0, Activity5_Q3: 0,
+            measuredTotal: 0, coTotal: 0
+          };
+        });
+        if (reconciled.length === prevRows.length &&
+            reconciled.every((row, idx) => row === prevRows[idx])) {
+          return prevRows;
+        }
+        return reconciled;
+      });
+      // Only reset extra lab fields on first load
       if (!labActivityDataLoadedRef.current) {
-        const initial = clos.map(clo => ({
-          coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
-          attn: 0,
-          quiz: 0,
-          viva: 0,
-          Activity1_Q1: 0, Activity1_Q2: 0, Activity1_Q3: 0,
-          Activity2_Q1: 0, Activity2_Q2: 0, Activity2_Q3: 0,
-          Activity3_Q1: 0, Activity3_Q2: 0, Activity3_Q3: 0,
-          Activity4_Q1: 0, Activity4_Q2: 0, Activity4_Q3: 0,
-          Activity5_Q1: 0, Activity5_Q2: 0, Activity5_Q3: 0,
-          measuredTotal: 0,
-          coTotal: 0
-        }));
-        setLabActivityRows(initial);
         setLabActivityFactors({});
         setLabActivityEqWts({});
         setLabActivityManualWts({});
@@ -1671,7 +1684,20 @@ const AttainmentView = () => {
               ctEqWts: savedEq, ctSummary: savedSummary, ctObtainedRows: savedObtained } = response.data;
 
             if (savedRows && savedRows.length > 0) {
-              setCtRows(savedRows);
+              setCtRows(() => {
+                if (clos.length === 0) return savedRows;
+                const savedMap = {};
+                savedRows.forEach(r => { savedMap[r.coNumber] = r; });
+                return clos.map(clo => {
+                  const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                  return savedMap[cn] || {
+                    coNumber: cn,
+                    CT1_Q1: 0, CT1_Q2: 0, CT1_Q3: 0,
+                    CT2_Q1: 0, CT2_Q2: 0, CT2_Q3: 0,
+                    CT3_Q1: 0, CT3_Q2: 0, CT3_Q3: 0,
+                  };
+                });
+              });
             }
             if (savedFactors) setCtFactors(savedFactors);
             if (savedManual) setCtManualWts(savedManual);
@@ -1734,7 +1760,21 @@ const AttainmentView = () => {
               attnAssignObtainedRows: savedObtained } = response.data;
 
             if (savedRows && savedRows.length > 0) {
-              setAssignmentRows(savedRows);
+              setAssignmentRows(() => {
+                if (clos.length === 0) return savedRows;
+                const savedMap = {};
+                savedRows.forEach(r => { savedMap[r.coNumber] = r; });
+                return clos.map(clo => {
+                  const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                  return savedMap[cn] || {
+                    coNumber: cn,
+                    attendance: 0,
+                    Assgn1_Q1: 0, Assgn1_Q2: 0, Assgn1_Q3: 0,
+                    Assgn2_Q1: 0, Assgn2_Q2: 0, Assgn2_Q3: 0,
+                    Assgn3_Q1: 0, Assgn3_Q2: 0, Assgn3_Q3: 0,
+                  };
+                });
+              });
             }
             if (savedManual) setAssignmentManualWts(savedManual);
             if (savedSummary) setAssignmentSummary(savedSummary);
@@ -1815,7 +1855,24 @@ const AttainmentView = () => {
             } = response.data;
 
             if (savedRows && savedRows.length > 0) {
-              setLabActivityRows(savedRows);
+              setLabActivityRows(() => {
+                if (clos.length === 0) return savedRows;
+                const savedMap = {};
+                savedRows.forEach(r => { savedMap[r.coNumber] = r; });
+                return clos.map(clo => {
+                  const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                  return savedMap[cn] || {
+                    coNumber: cn,
+                    attn: 0, quiz: 0, viva: 0,
+                    Activity1_Q1: 0, Activity1_Q2: 0, Activity1_Q3: 0,
+                    Activity2_Q1: 0, Activity2_Q2: 0, Activity2_Q3: 0,
+                    Activity3_Q1: 0, Activity3_Q2: 0, Activity3_Q3: 0,
+                    Activity4_Q1: 0, Activity4_Q2: 0, Activity4_Q3: 0,
+                    Activity5_Q1: 0, Activity5_Q2: 0, Activity5_Q3: 0,
+                    measuredTotal: 0, coTotal: 0
+                  };
+                });
+              });
             }
             if (savedFactors) setLabActivityFactors(savedFactors);
             if (savedEqWts) setLabActivityEqWts(savedEqWts);
@@ -2014,10 +2071,44 @@ const AttainmentView = () => {
             sectionADataLoadedRef.current = true; // Mark as loaded to prevent re-initialization
 
             if (savedSectionARows && savedSectionARows.length > 0) {
-              setSectionARows(savedSectionARows);
+              setSectionARows(() => {
+                if (clos.length === 0) return savedSectionARows;
+                const savedMap = {};
+                savedSectionARows.forEach(r => { savedMap[r.coNumber] = r; });
+                return clos.map(clo => {
+                  const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                  return savedMap[cn] || {
+                    coNumber: cn,
+                    Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
+                    Q2a: 0, Q2b: 0, Q2c: 0, Q2d: 0,
+                    Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
+                    Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
+                    q123: 0, q124: 0, q134: 0, q234: 0,
+                    q12: 0, q13: 0, q14: 0, q23: 0, q24: 0, q34: 0,
+                    q1: 0, q2: 0, q3: 0, q4: 0, none: 0
+                  };
+                });
+              });
             }
             if (savedSectionBRows && savedSectionBRows.length > 0) {
-              setSectionBRows(savedSectionBRows);
+              setSectionBRows(() => {
+                if (clos.length === 0) return savedSectionBRows;
+                const savedMap = {};
+                savedSectionBRows.forEach(r => { savedMap[r.coNumber] = r; });
+                return clos.map(clo => {
+                  const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
+                  return savedMap[cn] || {
+                    coNumber: cn,
+                    Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
+                    Q2a: 0, Q2b: 0, Q2c: 0, Q2d: 0,
+                    Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
+                    Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
+                    q123: 0, q124: 0, q134: 0, q234: 0,
+                    q12: 0, q13: 0, q14: 0, q23: 0, q24: 0, q34: 0,
+                    q1: 0, q2: 0, q3: 0, q4: 0, none: 0
+                  };
+                });
+              });
             }
 
             // Get all enrolled students and merge with saved obtained rows data
@@ -3358,15 +3449,21 @@ const AttainmentView = () => {
 
     const coNumbers = clos.map(clo => (clo.cloNumber || '').toString().replace('CLO', 'CO'));
 
-    // Binary presence per CO in each dataset
-    const hasAny = (dataset, cn) =>
-      Array.isArray(dataset) && dataset.some(s => (s.coValues?.[cn] || 0) > 0) ? 1 : 0;
-
+    // Use sourceType from combinedClos (Course Profile tag) when available,
+    // otherwise fall back to data-presence check — keeps weights in sync with the summary table
+    const effectiveClos = combinedClos.length > 0 ? combinedClos : clos;
     const theoryWt = {};
     const labWt = {};
-    coNumbers.forEach(cn => {
-      const tBin = hasAny(theoryCoAttainmentData, cn);
-      const lBin = hasAny(labCoAttainmentData, cn);
+    coNumbers.forEach((cn, i) => {
+      const clo = effectiveClos.find(c => (c.cloNumber || '').toString().replace('CLO', 'CO') === cn) || effectiveClos[i];
+      let tBin, lBin;
+      if (clo && clo.sourceType) {
+        tBin = (clo.sourceType === 'theory' || clo.sourceType === 'both') ? 1 : 0;
+        lBin = (clo.sourceType === 'lab'    || clo.sourceType === 'both') ? 1 : 0;
+      } else {
+        tBin = Array.isArray(theoryCoAttainmentData) && theoryCoAttainmentData.some(s => (s.coValues?.[cn] || 0) > 0) ? 1 : 0;
+        lBin = Array.isArray(labCoAttainmentData)    && labCoAttainmentData.some(s => (s.coValues?.[cn] || 0) > 0) ? 1 : 0;
+      }
       const s = tBin + lBin;
       theoryWt[cn] = s > 0 ? tBin / s : 0;
       labWt[cn]    = s > 0 ? lBin / s : 0;
@@ -3394,7 +3491,7 @@ const AttainmentView = () => {
       return { rollNumber: roll, coValues };
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theoryCoAttainmentData, labCoAttainmentData, clos]);
+  }, [theoryCoAttainmentData, labCoAttainmentData, clos, combinedClos]);
 
   // Effect 1: Reset ready-gate whenever the user navigates to a different course/sheet.
   const coAttainmentKeyRef = useRef('');
@@ -3460,23 +3557,15 @@ const AttainmentView = () => {
   // Filter sheets when course is selected
   useEffect(() => {
     if (selectedCourse && sheetNames.length > 0) {
-      // Get course info for detection
+      // Get course code for detection
       const courseCode = (selectedCourse.courseCode || '').toLowerCase();
-      const courseTitle = (selectedCourse.courseTitle || '').toLowerCase();
-      const courseInfo = `${courseCode} ${courseTitle}`;
 
-      // Determine course type from course code and title
-      const isLabCourse = /\d*[02468]$/.test(courseCode) || // Course codes ending with even digits
-        courseInfo.includes('lab');
-
-      const isSessionalCourse = courseInfo.includes('sessional') ||
-        courseInfo.includes('viva') ||
-        courseInfo.includes('presentation');
-
-      const isProjectCourse = courseInfo.includes('project') ||
-        courseInfo.includes('thesis') ||
-        courseInfo.includes('research') ||
-        courseInfo.includes('dissertation');
+      // Determine course type from course code last-digit convention:
+      // odd last digit = theory, even last digit = lab/sessional/project
+      const lastDigitMatch = courseCode.match(/(\d)(?:\s*)$/);
+      const lastDigitNum = lastDigitMatch ? parseInt(lastDigitMatch[1]) : NaN;
+      const isLabCourse = !isNaN(lastDigitNum) && lastDigitNum % 2 === 0;
+      const isTheoryCourse = !isNaN(lastDigitNum) && lastDigitNum % 2 === 1;
 
       // Define sheets for each course type
       const theorySheets = [
@@ -3488,40 +3577,14 @@ const AttainmentView = () => {
         'COCalc', 'COPOMap', 'POCalcMax', 'Charts', 'POCalc', 'CheckPO'
       ];
 
-      const sessionalSheets = [
-        'CourseProfile', 'LabActivity', 'COAttainment', 'COCalc', 'COPOMap', 'POCalcMax', 'Charts', 'POCalc', 'CheckPO'
-      ];
-
-      const projectSheets = [
-        'CourseProfile', 'LabActivity', 'COAttainment', 'COCalc', 'COPOMap', 'POCalcMax', 'Charts', 'POCalc', 'CheckPO'
-      ];
-
-      // Select appropriate sheet list - order matters for priority
-      let allowedSheets;
-      if (isLabCourse) {
-        allowedSheets = labSheets;
-      } else if (isSessionalCourse) {
-        allowedSheets = sessionalSheets;
-      } else if (isProjectCourse) {
-        allowedSheets = projectSheets;
-      } else {
-        // Default to theory courses
-        allowedSheets = theorySheets;
-      }
+      // Select appropriate sheet list based solely on odd/even digit
+      const allowedSheets = isTheoryCourse ? theorySheets : labSheets;
 
       // Filter sheets to only show allowed ones
       let filtered = sheetNames.filter(sheet => allowedSheets.includes(sheet));
 
       // Always include default sheets even if not in Excel file
-      let defaultSheets;
-      if (isLabCourse) {
-        defaultSheets = ['CourseProfile', 'LabActivity'];
-      } else if (isSessionalCourse || isProjectCourse) {
-        defaultSheets = ['CourseProfile', 'LabActivity'];
-      } else {
-        // Theory courses - no LabActivity
-        defaultSheets = ['CourseProfile'];
-      }
+      const defaultSheets = isTheoryCourse ? ['CourseProfile'] : ['CourseProfile', 'LabActivity'];
 
       defaultSheets.forEach(sheet => {
         if (!filtered.includes(sheet)) {
@@ -3530,10 +3593,9 @@ const AttainmentView = () => {
       });
 
       // For theory courses with specific section assignment, filter section sheets
-      if (!isLabCourse && !isSessionalCourse && !isProjectCourse && selectedCourse.section) {
+      if (isTheoryCourse && selectedCourse.section) {
         const teacherSection = `Section${selectedCourse.section}`;
         filtered = filtered.filter(sheet => {
-          // Keep all non-section sheets, and only the teacher's section sheet
           if (sheet.startsWith('Section')) {
             return sheet === teacherSection;
           }
