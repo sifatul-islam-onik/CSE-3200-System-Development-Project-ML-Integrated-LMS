@@ -624,9 +624,28 @@ exports.getCourse = async (req, res) => {
       }));
     }
 
+    // Fetch course outcomes with their PO mappings
+    const courseOutcomes = await CourseOutcome.find({
+      course: course._id,
+      is_deleted: { $ne: true }
+    });
+    const outcomesWithMappings = await Promise.all(
+      courseOutcomes.map(async (co) => {
+        const poMappings = await COPOMapping.find({ course_outcome: co._id });
+        return {
+          ...co.toObject(),
+          po_mappings: poMappings.map(m => ({
+            program_outcome_code: m.program_outcome_code,
+            level: m.level,
+            _id: m._id
+          }))
+        };
+      })
+    );
+
     res.status(200).json({
       success: true,
-      data: courseObj
+      data: { ...courseObj, courseOutcomes: outcomesWithMappings }
     });
 
   } catch (error) {

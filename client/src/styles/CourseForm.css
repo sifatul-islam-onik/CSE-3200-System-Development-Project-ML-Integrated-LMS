@@ -607,8 +607,23 @@ textarea:disabled {
   background: #ffebee;
 }
 
+.co-item.has-warning {
+  border-color: #ffa726;
+}
+
+.co-item.has-warning .co-header {
+  background: #fff8e1;
+}
+
 .error-indicator {
   color: #ef5350;
+  font-size: 1.2rem;
+  margin-left: auto;
+  margin-right: var(--spacing-xs);
+}
+
+.warning-indicator {
+  color: #ffa726;
   font-size: 1.2rem;
   margin-left: auto;
   margin-right: var(--spacing-xs);
@@ -626,6 +641,12 @@ textarea:disabled {
   margin: 4px 0;
   font-size: 0.85rem;
   color: #c62828;
+}
+
+.warning-message {
+  margin: 4px 0;
+  font-size: 0.85rem;
+  color: #856404;
 }
 
 .co-summary {

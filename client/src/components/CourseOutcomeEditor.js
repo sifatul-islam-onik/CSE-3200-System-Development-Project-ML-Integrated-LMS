@@ -45,24 +45,22 @@ const CourseOutcomeEditor = ({ courseOutcomes, onChange, onValidationChange }) =
     courseOutcomes.forEach((co, index) => {
       const coErrors = [];
 
-      // Check if description exists
+      // Check if description exists – this is the only hard requirement that blocks saving
       if (!co.description || co.description.trim() === '') {
         coErrors.push('Description is required');
         isValid = false;
       }
 
-      // Check if at least one PO mapping exists
+      // Check if at least one PO mapping exists (warning only – does not block save)
       const hasMappings = co.po_mappings && co.po_mappings.length > 0;
       if (!hasMappings) {
-        coErrors.push('At least one Program Outcome mapping is required');
-        isValid = false;
+        coErrors.push('At least one Program Outcome mapping is recommended');
       }
 
-      // Check if at least one taxonomy level is selected
+      // Check if at least one taxonomy level is selected (warning only – does not block save)
       const hasTaxonomy = co.taxonomy_levels && co.taxonomy_levels.length > 0;
       if (!hasTaxonomy) {
-        coErrors.push('At least one taxonomy level is required');
-        isValid = false;
+        coErrors.push('At least one taxonomy level is recommended');
       }
 
       if (coErrors.length > 0) {
@@ -72,7 +70,7 @@ const CourseOutcomeEditor = ({ courseOutcomes, onChange, onValidationChange }) =
 
     setValidationErrors(errors);
     
-    // Notify parent component about validation status
+    // Notify parent component about validation status (only description blocks saving)
     if (onValidationChange) {
       onValidationChange(isValid);
     }
@@ -103,11 +101,10 @@ const CourseOutcomeEditor = ({ courseOutcomes, onChange, onValidationChange }) =
 
   const updatePOMapping = (coIndex, poCode, level) => {
     const updated = [...courseOutcomes];
-    const co = updated[coIndex];
-    
-    if (!co.po_mappings) {
-      co.po_mappings = [];
-    }
+    // Create a new CO object to avoid mutating shared references (prevents hasFieldChanges bug)
+    const co = { ...updated[coIndex] };
+    updated[coIndex] = co;
+    co.po_mappings = [...(co.po_mappings || [])];
 
     const levelNum = parseInt(level);
 
@@ -119,12 +116,11 @@ const CourseOutcomeEditor = ({ courseOutcomes, onChange, onValidationChange }) =
       const existingIndex = co.po_mappings.findIndex(m => m.program_outcome_code === poCode);
       
       if (existingIndex >= 0) {
-        co.po_mappings[existingIndex].level = levelNum;
+        co.po_mappings = co.po_mappings.map((m, i) =>
+          i === existingIndex ? { ...m, level: levelNum } : m
+        );
       } else {
-        co.po_mappings.push({
-          program_outcome_code: poCode,
-          level: levelNum
-        });
+        co.po_mappings = [...co.po_mappings, { program_outcome_code: poCode, level: levelNum }];
       }
     }
 
@@ -139,25 +135,25 @@ const CourseOutcomeEditor = ({ courseOutcomes, onChange, onValidationChange }) =
 
   const toggleTaxonomyLevel = (coIndex, taxonomyCode) => {
     const updated = [...courseOutcomes];
-    const co = updated[coIndex];
-    
-    if (!co.taxonomy_levels) {
-      co.taxonomy_levels = [];
-    }
+    // Create a new CO object to avoid mutating shared references (prevents hasFieldChanges bug)
+    const co = { ...updated[coIndex] };
+    updated[coIndex] = co;
 
-    const index = co.taxonomy_levels.indexOf(taxonomyCode);
+    let levels = [...(co.taxonomy_levels || [])];
+    const index = levels.indexOf(taxonomyCode);
     const group = taxonomyCode.charAt(0); // Get first character (C, P, A, or S)
-    
+
     if (index >= 0) {
       // Remove if already present
-      co.taxonomy_levels.splice(index, 1);
+      levels = levels.filter((_, i) => i !== index);
     } else {
       // Remove any existing selection from the same group (at most one per group)
-      co.taxonomy_levels = co.taxonomy_levels.filter(level => level.charAt(0) !== group);
+      levels = levels.filter(level => level.charAt(0) !== group);
       // Add the new selection
-      co.taxonomy_levels.push(taxonomyCode);
+      levels = [...levels, taxonomyCode];
     }
 
+    co.taxonomy_levels = levels;
     onChange(updated);
   };
 
@@ -189,13 +185,18 @@ const CourseOutcomeEditor = ({ courseOutcomes, onChange, onValidationChange }) =
         <p className="empty-message">No course outcomes defined. Click "Add CO" to get started.</p>
       ) : (
         <div className="co-list">
-          {courseOutcomes.map((co, index) => (
-            <div key={index} className={`co-item ${expandedCO === index ? 'expanded' : ''} ${validationErrors[index] ? 'has-error' : ''}`}>
+          {courseOutcomes.map((co, index) => {
+            const coErrs = validationErrors[index];
+            // Determine if there are hard errors (blocks save) vs only soft warnings
+            const hasHardError = coErrs && coErrs.some(e => !e.includes('recommended'));
+            const hasWarning = coErrs && coErrs.length > 0 && !hasHardError;
+            return (
+            <div key={index} className={`co-item ${expandedCO === index ? 'expanded' : ''} ${hasHardError ? 'has-error' : ''} ${hasWarning ? 'has-warning' : ''}`}>
               <div className="co-header" onClick={() => setExpandedCO(expandedCO === index ? null : index)}>
                 <span className="co-number">{co.co_code}</span>
                 <span className="co-preview">{co.description || 'No description'}</span>
-                {validationErrors[index] && (
-                  <span className="error-indicator" title={validationErrors[index].join(', ')}>⚠</span>
+                {coErrs && (
+                  <span className={hasHardError ? 'error-indicator' : 'warning-indicator'} title={coErrs.join(', ')}>{hasHardError ? '✕' : '⚠'}</span>
                 )}
                 <button
                   type="button"
@@ -327,23 +328,27 @@ const CourseOutcomeEditor = ({ courseOutcomes, onChange, onValidationChange }) =
                   {validationErrors[index] && (
                     <div className="validation-errors">
                       {validationErrors[index].map((error, i) => (
-                        <p key={i} className="error-message">⚠ {error}</p>
+                        <p key={i} className={error.includes('recommended') ? 'warning-message' : 'error-message'}>{error.includes('recommended') ? '⚠' : '✕'} {error}</p>
                       ))}
                     </div>
                   )}
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {courseOutcomes.length > 0 && (
         <div className="co-summary">
           <p>Total Course Outcomes: <strong>{courseOutcomes.length}</strong></p>
-          {Object.keys(validationErrors).length > 0 && (
-            <p className="warning-text">⚠ Please fix {Object.keys(validationErrors).length} course outcome(s) before saving</p>
-          )}
+          {Object.keys(validationErrors).length > 0 && (() => {
+            const hardErrorCount = Object.values(validationErrors).filter(errs => errs.some(e => !e.includes('recommended'))).length;
+            return hardErrorCount > 0
+              ? <p className="warning-text">✕ Please fix {hardErrorCount} course outcome(s) with missing descriptions</p>
+              : <p className="warning-text" style={{color:'#856404'}}>⚠ Some course outcomes are missing PO mappings or taxonomy levels (recommended)</p>;
+          })()}
         </div>
       )}
     </div>
