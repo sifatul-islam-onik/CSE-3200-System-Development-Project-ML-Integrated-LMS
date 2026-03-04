@@ -580,6 +580,9 @@ const AttainmentView = () => {
         }
 
         // Build COCalc rows
+        // Use effectiveClos = combinedClos (theory+lab merged) when available so that
+        // theory COs (e.g. CO2, CO3) are included even when viewing a lab course.
+        const effectiveClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
         const calcRows = uniqueStudents.map(student => {
           const row = {
             rollNumber: student.rollNumber,
@@ -619,7 +622,7 @@ const AttainmentView = () => {
           );
 
           // Populate CO marks for Section A
-          clos.forEach(clo => {
+          effectiveClos.forEach(clo => {
             const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
 
             // Find student in sectionAObtainedRows for real-time calculation
@@ -703,7 +706,7 @@ const AttainmentView = () => {
           });
 
           // Populate CO marks for Section B
-          clos.forEach(clo => {
+          effectiveClos.forEach(clo => {
             const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
 
             // Find student in sectionBObtainedRows for real-time calculation
@@ -787,7 +790,7 @@ const AttainmentView = () => {
           });
 
           // Populate CO marks for CT
-          clos.forEach(clo => {
+          effectiveClos.forEach(clo => {
             const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
             if (studentCT) {
               row.ct.marksObtained[coNumber] = studentCT[`obtained_${coNumber}`] || 0;
@@ -799,7 +802,7 @@ const AttainmentView = () => {
           });
 
           // Populate CO marks for Assignment
-          clos.forEach(clo => {
+          effectiveClos.forEach(clo => {
             const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
             if (studentAssign) {
               row.assignment.marksObtained[coNumber] = studentAssign[`obtained_${coNumber}`] || 0;
@@ -818,7 +821,7 @@ const AttainmentView = () => {
           }
 
           // Calculate total marks (CT + Assign + Section A + Section B)
-          clos.forEach(clo => {
+          effectiveClos.forEach(clo => {
             const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
 
             let totalObtained = 0;
@@ -858,7 +861,7 @@ const AttainmentView = () => {
     };
 
     loadCOCalcData();
-  }, [selectedSheet, selectedCourse, clos, sheetNames, sectionAObtainedRows, sectionARows, sectionBObtainedRows, sectionBRows]);
+  }, [selectedSheet, selectedCourse, clos, combinedClos, sheetNames, sectionAObtainedRows, sectionARows, sectionBObtainedRows, sectionBRows]);
 
   // Initialize Obtained Marks table rows from student list when CT, Attn_Assign, SectionA or SectionB selected
   const initObtainedRows = useCallback(async (forSheet) => {
@@ -1685,6 +1688,9 @@ const AttainmentView = () => {
 
             if (savedRows && savedRows.length > 0) {
               setCtRows(() => {
+                // When loading theory partner data for a lab course, preserve all theory
+                // partner COs (e.g. CO2, CO3) — don't filter down to the lab's own clos.
+                if (courseIdToUse !== selectedCourse._id) return savedRows;
                 if (clos.length === 0) return savedRows;
                 const savedMap = {};
                 savedRows.forEach(r => { savedMap[r.coNumber] = r; });
@@ -1761,6 +1767,9 @@ const AttainmentView = () => {
 
             if (savedRows && savedRows.length > 0) {
               setAssignmentRows(() => {
+                // When loading theory partner data for a lab course, preserve all theory
+                // partner COs — don't filter down to the lab's own clos.
+                if (courseIdToUse !== selectedCourse._id) return savedRows;
                 if (clos.length === 0) return savedRows;
                 const savedMap = {};
                 savedRows.forEach(r => { savedMap[r.coNumber] = r; });
@@ -2072,6 +2081,9 @@ const AttainmentView = () => {
 
             if (savedSectionARows && savedSectionARows.length > 0) {
               setSectionARows(() => {
+                // When loading theory partner data for a lab course, preserve all theory
+                // partner COs (e.g. CO2, CO3) — don't filter down to the lab's own clos.
+                if (courseIdToUse !== selectedCourse._id) return savedSectionARows;
                 if (clos.length === 0) return savedSectionARows;
                 const savedMap = {};
                 savedSectionARows.forEach(r => { savedMap[r.coNumber] = r; });
@@ -2092,6 +2104,9 @@ const AttainmentView = () => {
             }
             if (savedSectionBRows && savedSectionBRows.length > 0) {
               setSectionBRows(() => {
+                // When loading theory partner data for a lab course, preserve all theory
+                // partner COs — don't filter down to the lab's own clos.
+                if (courseIdToUse !== selectedCourse._id) return savedSectionBRows;
                 if (clos.length === 0) return savedSectionBRows;
                 const savedMap = {};
                 savedSectionBRows.forEach(r => { savedMap[r.coNumber] = r; });
@@ -3191,12 +3206,15 @@ const AttainmentView = () => {
       sampleObtained: labActivityObtainedRows[0],
       sampleAllocated: labActivityRows[0],
     });
-    if (!labActivityObtainedRows.length || !clos.length) return [];
+    // Use combinedClos when available so that theory-only COs (e.g. CO2, CO3) appear
+    // with value 0 in the lab attainment table, allowing combined tables to show all COs.
+    const effectiveClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
+    if (!labActivityObtainedRows.length || !effectiveClos.length) return [];
     return labActivityObtainedRows
       .filter(student => student.rollNumber)
       .map(student => {
         const coValues = {};
-        clos.forEach(clo => {
+        effectiveClos.forEach(clo => {
           const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
           const ratio = getLabActivityCOAttainment(student, cn);
           console.log('[labCoAttainmentData] student', student.rollNumber, 'co', cn, 'ratio', ratio);
@@ -3205,7 +3223,7 @@ const AttainmentView = () => {
         return { rollNumber: student.rollNumber, coValues };
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [labActivityObtainedRows, labActivityRows, clos, useEqWtActivity, coMappedActivityMarks, activityTaken, labActivityManualWts]);
+  }, [labActivityObtainedRows, labActivityRows, clos, combinedClos, useEqWtActivity, coMappedActivityMarks, activityTaken, labActivityManualWts]);
 
   const columnTotals = () => {
     const fields = ['CT1_Q1', 'CT1_Q2', 'CT1_Q3', 'CT2_Q1', 'CT2_Q2', 'CT2_Q3', 'CT3_Q1', 'CT3_Q2', 'CT3_Q3'];
@@ -3335,12 +3353,14 @@ const AttainmentView = () => {
   // Placed after calculateAutoFactor to avoid temporal dead zone (const TDZ).
   // CT/Assignment states are preserved for COAttainment tab so factored helpers work correctly.
   const theoryCoAttainmentData = useMemo(() => {
-    if (!coCalcData.length || !clos.length) return [];
+    // Use combinedClos when available so CO2/CO3 (theory-only) are computed when viewing a lab course.
+    const effectiveClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
+    if (!coCalcData.length || !effectiveClos.length) return [];
     const factoredTotals = calculateFactoredCOTotals();
     const factoredAssignTotals = calculateFactoredAssignmentCOTotals();
     return coCalcData.map(studentRow => {
       const coValues = {};
-      clos.forEach(clo => {
+      effectiveClos.forEach(clo => {
         const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
         const totalObt = (studentRow.sectionA.marksObtained[cn] || 0)
           + (studentRow.sectionB.marksObtained[cn] || 0)
@@ -3355,18 +3375,20 @@ const AttainmentView = () => {
       return { rollNumber: studentRow.rollNumber, coValues };
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coCalcData, clos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary]);
+  }, [coCalcData, clos, combinedClos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary]);
 
   // CO Attainment – Combined (Theory+Lab): =IFERROR(BP5/BV5, 0)*100
   // BP5 = totalObt (theory + lab obtained), BV5 = totalDist (theory + lab distribution)
   // Mirrors the CombinedCOPOTable logic in COCalcSheet.js.
   const combinedCoAttainmentData = useMemo(() => {
-    if (!coCalcData.length || !clos.length) return [];
+    // Use combinedClos when available so CO2/CO3 (theory-only) are computed when viewing a lab course.
+    const effectiveClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
+    if (!coCalcData.length || !effectiveClos.length) return [];
     const factoredTotals = calculateFactoredCOTotals();
     const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
     return coCalcData.map(studentRow => {
       const coValues = {};
-      clos.forEach(clo => {
+      effectiveClos.forEach(clo => {
         const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
         // BP5: theory obtained + lab activity obtained (factored/weighted)
         const labStudent = labActivityObtainedRows.find(s =>
@@ -3400,17 +3422,19 @@ const AttainmentView = () => {
       return { rollNumber: studentRow.rollNumber, coValues };
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coCalcData, clos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary,
+  }, [coCalcData, clos, combinedClos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary,
     labActivityObtainedRows, labActivityRows, activityTaken, coMappedActivityMarks]);
 
   // CO Attainment – Unnormed (Theory+Lab): raw lab marks / raw lab distribution, no weighting
   const unnormedCoAttainmentData = useMemo(() => {
-    if (!coCalcData.length || !clos.length) return [];
+    // Use combinedClos when available so CO2/CO3 (theory-only) are computed when viewing a lab course.
+    const effectiveClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
+    if (!coCalcData.length || !effectiveClos.length) return [];
     const factoredTotals = calculateFactoredCOTotals();
     const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
     return coCalcData.map(studentRow => {
       const coValues = {};
-      clos.forEach(clo => {
+      effectiveClos.forEach(clo => {
         const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
         const labStudent = labActivityObtainedRows.find(s =>
           String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
@@ -3433,7 +3457,7 @@ const AttainmentView = () => {
       return { rollNumber: studentRow.rollNumber, coValues };
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coCalcData, clos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary,
+  }, [coCalcData, clos, combinedClos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary,
     labActivityObtainedRows, labActivityRows, activityTaken]);
 
   // CO Attainment – Equal Wt (Theory+Lab): forces equal weight across all lab activities regardless of manual-wt setting
@@ -3444,14 +3468,14 @@ const AttainmentView = () => {
   // H143:M143 = Wt table Theory row  (theoryBin[CO] / sumBin[CO])
   // H144:M144 = Wt table Lab row     (labBin[CO]   / sumBin[CO])
   const equalWtCoAttainmentData = useMemo(() => {
-    if (!clos.length) return [];
+    const effectiveClos = combinedClos.length > 0 ? combinedClos : clos;
+    if (!effectiveClos.length) return [];
     if (!theoryCoAttainmentData.length && !labCoAttainmentData.length) return [];
 
-    const coNumbers = clos.map(clo => (clo.cloNumber || '').toString().replace('CLO', 'CO'));
+    const coNumbers = effectiveClos.map(clo => (clo.cloNumber || '').toString().replace('CLO', 'CO'));
 
     // Use sourceType from combinedClos (Course Profile tag) when available,
     // otherwise fall back to data-presence check — keeps weights in sync with the summary table
-    const effectiveClos = combinedClos.length > 0 ? combinedClos : clos;
     const theoryWt = {};
     const labWt = {};
     coNumbers.forEach((cn, i) => {
