@@ -50,3 +50,20 @@ export const updateCLOField = async (cloNumber, field, value) => {
     throw error.response?.data || error.message;
   }
 };
+
+/**
+ * Persist CO-PO correlation change for a single CO (used by Course Profile inline edit)
+ */
+export const updateCOCorrelation = async (courseId, outcomeId, value) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.put(
+      `${API_URL}/course-outcomes/${courseId}/outcomes/${outcomeId}`,
+      { co_po_correlation: value },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};

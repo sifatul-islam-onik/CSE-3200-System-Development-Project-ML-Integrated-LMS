@@ -80,6 +80,7 @@ const CourseOutcomeEditor = ({ courseOutcomes, onChange, onValidationChange }) =
     const newCO = {
       co_code: `CO${courseOutcomes.length + 1}`,
       description: '',
+      co_po_correlation: '',
       po_mappings: [],
       taxonomy_levels: []
     };
@@ -229,6 +230,16 @@ const CourseOutcomeEditor = ({ courseOutcomes, onChange, onValidationChange }) =
                       onChange={(e) => updateCourseOutcome(index, 'description', e.target.value)}
                       placeholder="Describe what students will be able to do after completing this course..."
                       rows="3"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>CO-PO Correlation <span className="optional-label">(Optional)</span></label>
+                    <input
+                      type="text"
+                      value={co.co_po_correlation || ''}
+                      onChange={(e) => updateCourseOutcome(index, 'co_po_correlation', e.target.value)}
+                      placeholder="e.g., High, Medium, Low or a numerical value"
                     />
                   </div>
 

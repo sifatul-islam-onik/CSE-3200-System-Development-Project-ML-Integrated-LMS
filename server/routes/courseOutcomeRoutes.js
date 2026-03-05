@@ -17,7 +17,7 @@ router.get('/profile/:courseCode', getCourseProfileData);
 // Course outcome routes
 router.post('/:courseId/outcomes', authenticateUser, authorizeAdmin, createCourseOutcomes);
 router.get('/:courseId/outcomes', getCourseOutcomes);
-router.put('/:courseId/outcomes/:outcomeId', authenticateUser, authorizeAdmin, updateCourseOutcome);
+router.put('/:courseId/outcomes/:outcomeId', authenticateUser, updateCourseOutcome);
 router.delete('/:courseId/outcomes/:outcomeId', authenticateUser, authorizeAdmin, deleteCourseOutcome);
 router.delete('/:courseId/outcomes', authenticateUser, authorizeAdmin, deleteAllCourseOutcomes);
 

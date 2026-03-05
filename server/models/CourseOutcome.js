@@ -18,6 +18,11 @@ const courseOutcomeSchema = new mongoose.Schema({
     required: [true, 'Description is required'],
     trim: true
   },
+  co_po_correlation: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   taxonomy_levels: {
     type: [String],
     default: [],
