@@ -171,7 +171,7 @@ const SingleBarChart = ({ title, labels, values, color = '#2980b9', yLabel = 'Ac
 // Multi-series grouped bar chart (for PO Attainment with 3 series)
 const SERIES_COLORS = ['#2980b9', '#27ae60', '#e67e22'];
 
-const GroupedBarChart = ({ title, labels, series, yLabel = 'Achieved (%)' }) => {
+const GroupedBarChart = ({ title, labels, series, yLabel }) => {
   const n = labels.length;
   const k = series.length;
   if (n === 0 || k === 0) return null;
@@ -207,7 +207,7 @@ const GroupedBarChart = ({ title, labels, series, yLabel = 'Achieved (%)' }) => 
             );
           })}
           {/* Y axis label */}
-          <text transform={`rotate(-90)`} x={-PLOT_H / 2} y={-38} textAnchor="middle" fontSize={12} fill="#333">{yLabel}</text>
+          {yLabel && <text transform={`rotate(-90)`} x={-PLOT_H / 2} y={-38} textAnchor="middle" fontSize={12} fill="#333">{yLabel}</text>}
           {/* Axes */}
           <line x1={0} y1={0} x2={0} y2={PLOT_H} stroke="#333" />
           <line x1={0} y1={PLOT_H} x2={PLOT_W} y2={PLOT_H} stroke="#333" />
@@ -228,11 +228,6 @@ const GroupedBarChart = ({ title, labels, series, yLabel = 'Achieved (%)' }) => 
                         width={barW} height={barH}
                         fill={SERIES_COLORS[si]} rx={2}
                       />
-                      {val > 0 && (
-                        <text x={bx + barW / 2} y={PLOT_H - barH - 3} textAnchor="middle" fontSize={9} fill="#333">
-                          {val}
-                        </text>
-                      )}
                     </g>
                   );
                 })}
@@ -395,7 +390,36 @@ const ChartsSheet = ({
           { label: 'Unnorm Achieved(%)', values: poUnnormVals   },
           { label: 'Eq. Wt. Achieved(%)', values: poEqWtVals   },
         ]}
+      />
+      <GroupedBarChart
+        title={`CO Attainment of ${theoryCourseCode}+${labCourseCode}`}
+        labels={coNames}
+        series={[
+          { label: 'Achieved(%)',         values: coAchievedVals },
+          { label: 'Unnorm Achieved(%)',  values: coUnnormVals   },
+          { label: 'Eq. Wt. Achieved(%)', values: coEqWtVals    },
+        ]}
+      />
+      <SingleBarChart
+        title={`PO Attainment of ${theoryCourseCode}+${labCourseCode}`}
+        labels={poNames}
+        values={poAchievedVals}
+        color="#2980b9"
         yLabel="Achieved (%)"
+      />
+      <SingleBarChart
+        title={`PO Attainment of ${theoryCourseCode}+${labCourseCode} (Unnorm)`}
+        labels={poNames}
+        values={poUnnormVals}
+        color="#27ae60"
+        yLabel="Unnorm Achieved (%)"
+      />
+      <SingleBarChart
+        title={`PO Attainment of ${theoryCourseCode}+${labCourseCode} (Eq Wt)`}
+        labels={poNames}
+        values={poEqWtVals}
+        color="#e67e22"
+        yLabel="Eq. Wt. Achieved (%)"
       />
     </section>
   );
