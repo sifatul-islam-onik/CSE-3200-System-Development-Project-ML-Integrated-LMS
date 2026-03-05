@@ -198,6 +198,34 @@ export const getAssignmentData = async (courseId) => {
 };
 
 /**
+ * Parse Assignment Excel/CSV upload and return structured preview data
+ * @param {string} courseId - Course ID
+ * @param {File} file - Excel/CSV file
+ * @param {string} assignmentKey - e.g. 'Assgn1', 'Assgn2', 'Assgn3'
+ */
+export const parseAssignUpload = async (courseId, file, assignmentKey) => {
+  try {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('assignmentKey', assignmentKey);
+    const response = await axios.post(
+      `${API_URL}/attainment/assignment/${courseId}/parse-upload`,
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
  * Get term exam marks for attainment calculations
  * @param {string} courseId - Course ID
  * @param {string} section - Section (A or B) for theory courses
@@ -248,9 +276,27 @@ export const getLabActivityData = async (courseId) => {
     const token = localStorage.getItem('token');
     const response = await axios.get(
       `${API_URL}/attainment/labactivity/${courseId}`,
-      {
-        headers: { Authorization: `Bearer ${token}` }
-      }
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Parse a Lab Activity Excel/CSV file uploaded from the teacher dashboard
+ */
+export const parseLabUpload = async (courseId, file, activityKey) => {
+  try {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('activityKey', activityKey);
+    const response = await axios.post(
+      `${API_URL}/attainment/labactivity/${courseId}/parse-upload`,
+      formData,
+      { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } }
     );
     return response.data;
   } catch (error) {

@@ -28,7 +28,8 @@ const assignmentAttainmentSchema = new mongoose.Schema({
   assignmentSummary: {
     assignTaken: { type: Number, default: 3 },
     assignmentMarks30: { type: Number, default: 0 },
-    useEqWt: { type: Number, default: 0 }
+    useEqWt: { type: Number, default: 0 },
+    attendancePerformance: { type: Number, default: 0 }
   },
   attendanceMarks: {
     type: Number,
@@ -37,16 +38,16 @@ const assignmentAttainmentSchema = new mongoose.Schema({
   attnAssignObtainedRows: [{
     rollNumber: String,
     name: String,
-    attendance: { type: Number, default: 0 },
-    Assgn1_Q1: { type: Number, default: 0 },
-    Assgn1_Q2: { type: Number, default: 0 },
-    Assgn1_Q3: { type: Number, default: 0 },
-    Assgn2_Q1: { type: Number, default: 0 },
-    Assgn2_Q2: { type: Number, default: 0 },
-    Assgn2_Q3: { type: Number, default: 0 },
-    Assgn3_Q1: { type: Number, default: 0 },
-    Assgn3_Q2: { type: Number, default: 0 },
-    Assgn3_Q3: { type: Number, default: 0 }
+    attendance: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    Assgn1_Q1: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    Assgn1_Q2: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    Assgn1_Q3: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    Assgn2_Q1: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    Assgn2_Q2: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    Assgn2_Q3: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    Assgn3_Q1: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    Assgn3_Q2: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    Assgn3_Q3: { type: mongoose.Schema.Types.Mixed, default: 0 }
   }],
   updatedBy: {
     type: mongoose.Schema.Types.ObjectId,

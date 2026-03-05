@@ -195,19 +195,22 @@ exports.saveCTData = async (req, res) => {
     }
 
     // Update or create CT attainment data
+    const cleanedCtObtainedRows = (ctObtainedRows || []).map(({ _id, __v, ...rest }) => rest);
     const ctData = await CTAttainment.findOneAndUpdate(
       { course: courseId },
       {
-        course: courseId,
-        ctRows,
-        ctFactors,
-        ctManualWts,
-        ctEqWts,
-        ctSummary,
-        ctObtainedRows,
-        updatedBy: req.user._id
+        $set: {
+          course: courseId,
+          ctRows,
+          ctFactors,
+          ctManualWts,
+          ctEqWts,
+          ctSummary,
+          ctObtainedRows: cleanedCtObtainedRows,
+          updatedBy: req.user._id
+        }
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: false }
     );
 
     res.json({
@@ -332,7 +335,7 @@ exports.parseCTUpload = async (req, res) => {
     }
 
     const totalRows = worksheet.rowCount;
-    let manualWt = 0;
+    let manualWt = null;
     let q1Total = 0, q2Total = 0, q3Total = 0;
     let q1CO = null, q2CO = null, q3CO = null;
     let dataStartRow = -1;
@@ -357,33 +360,52 @@ exports.parseCTUpload = async (req, res) => {
       return null;
     };
 
+    // Column indices — determined dynamically from header row labels
+    let q1Col = -1, q2Col = -1, q3Col = -1;
+
     // Scan rows to find Manual Wt row and the header row with "Roll"
     for (let r = 1; r <= totalRows; r++) {
       const row = worksheet.getRow(r);
       const col1 = (row.getCell(1).value == null ? '' : row.getCell(1).value).toString().trim();
-      const col2 = row.getCell(2).value;
 
       if (col1.toLowerCase() === 'manual wt') {
-        manualWt = parseFloat(col2) || 0;
+        manualWt = parseFloat(row.getCell(2).value) || 0;
         continue;
       }
 
-      // The header row has "Roll" in col A and Q labels in cols 2-4
       if (col1.toLowerCase() === 'roll') {
-        q1Total = extractTotal(row.getCell(2).value);
-        q2Total = extractTotal(row.getCell(3).value);
-        q3Total = extractTotal(row.getCell(4).value);
-        q1CO = extractCO(row.getCell(2).value);
-        q2CO = extractCO(row.getCell(3).value);
-        q3CO = extractCO(row.getCell(4).value);
+        const maxC = Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20);
+        for (let c = 2; c <= maxC; c++) {
+          const cv = (row.getCell(c).value == null ? '' : row.getCell(c).value).toString().trim();
+          if (!cv) continue;
+          if (/^q\s*1\b/i.test(cv)) {
+            q1Col = c; q1Total = extractTotal(cv); q1CO = extractCO(cv);
+          } else if (/^q\s*2\b/i.test(cv)) {
+            q2Col = c; q2Total = extractTotal(cv); q2CO = extractCO(cv);
+          } else if (/^q\s*3\b/i.test(cv)) {
+            q3Col = c; q3Total = extractTotal(cv); q3CO = extractCO(cv);
+          }
+        }
         dataStartRow = r + 1;
         break;
       }
     }
 
     if (dataStartRow === -1) {
-      return res.status(400).json({ success: false, message: 'Could not find header row with "Roll" column in file' });
+      // No Roll header — Manual Wt only upload is valid
+      return res.json({
+        success: true,
+        data: { manualWt, q1Total, q2Total, q3Total, q1CO, q2CO, q3CO, hasQ1: false, hasQ2: false, hasQ3: false, rows: [] }
+      });
     }
+
+    const parseCTCellValue = (raw) => {
+      if (raw === null || raw === undefined) return null;
+      const str = raw.toString().trim();
+      if (str === '') return null;
+      if (str.toLowerCase() === 'a') return 'A';
+      return parseFloat(str) || 0;
+    };
 
     // Data rows - skip empty rows, stop only when we've hit 5 consecutive empty rows
     const rows = [];
@@ -399,26 +421,279 @@ exports.parseCTUpload = async (req, res) => {
       emptyStreak = 0;
       const rollStr = rawRoll.toString().trim();
       if (!rollStr || rollStr.toLowerCase() === 'roll') continue;
-      const parseCTCellValue = (raw) => {
-        if (raw === null || raw === undefined) return 0;
-        const str = raw.toString().trim();
-        if (str.toLowerCase() === 'a') return 'A';
-        return parseFloat(str) || 0;
-      };
       rows.push({
         rollNumber: rollStr,
-        q1: parseCTCellValue(dataRow.getCell(2).value),
-        q2: parseCTCellValue(dataRow.getCell(3).value),
-        q3: parseCTCellValue(dataRow.getCell(4).value),
+        q1: q1Col !== -1 ? parseCTCellValue(dataRow.getCell(q1Col).value) : null,
+        q2: q2Col !== -1 ? parseCTCellValue(dataRow.getCell(q2Col).value) : null,
+        q3: q3Col !== -1 ? parseCTCellValue(dataRow.getCell(q3Col).value) : null,
       });
     }
 
     return res.json({
       success: true,
-      data: { manualWt, q1Total, q2Total, q3Total, q1CO, q2CO, q3CO, rows }
+      data: { manualWt, q1Total, q2Total, q3Total, q1CO, q2CO, q3CO, hasQ1: q1Col !== -1, hasQ2: q2Col !== -1, hasQ3: q3Col !== -1, rows }
     });
   } catch (error) {
     console.error('Error parsing CT upload:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Parse an uploaded Lab Activity Excel/CSV file and return structured data
+ * POST /api/attainment/labactivity/:courseId/parse-upload
+ * File format:
+ *   Row 1: "Manual Wt" | <value>
+ *   Row 2: Roll | Attn. | Quiz | C. Viva | Q1(<total>)(<CO>) | Q2(...) | Q3(...)
+ *   Row 3+: data rows
+ */
+exports.parseLabUpload = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const { courseId } = req.params;
+    const course = await Course.findById(courseId).select('assignedTeachers').lean();
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+    if (req.user.role === 'teacher') {
+      const isAssigned = course.assignedTeachers.some(a => {
+        const tid = a.teacher?._id || a.teacher;
+        return tid.toString() === req.user._id.toString();
+      });
+      if (!isAssigned) return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const fileName = req.file.originalname.toLowerCase();
+    const isCSV = fileName.endsWith('.csv') || req.file.mimetype === 'text/csv' || req.file.mimetype === 'application/csv';
+    if (isCSV) {
+      const { Readable } = require('stream');
+      await workbook.csv.read(Readable.from(req.file.buffer.toString('utf-8')));
+    } else {
+      await workbook.xlsx.load(req.file.buffer);
+    }
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet) return res.status(400).json({ success: false, message: 'No worksheet found' });
+
+    const totalRows = worksheet.rowCount;
+    let manualWt = null;
+    let attnTotal = 0, quizTotal = 0, vivaTotal = 0;
+    let q1Total = 0, q2Total = 0, q3Total = 0;
+    let q1CO = null, q2CO = null, q3CO = null;
+    let dataStartRow = -1;
+
+    const extractTotal = (cv) => {
+      const s = (cv == null ? '' : cv).toString();
+      const m = s.match(/(\d+(?:\.\d+)?)\/\d+|(\d+(?:\.\d+)?)\)/);
+      const m2 = s.match(/\((\d+(?:\.\d+)?)\)/);
+      return m2 ? parseFloat(m2[1]) : 0;
+    };
+    const extractCO = (cv) => {
+      const s = (cv == null ? '' : cv).toString();
+      const matches = [...s.matchAll(/\(([^)]+)\)/g)];
+      if (matches.length >= 2) {
+        const co = matches[1][1].trim();
+        if (!co) return null;
+        return co.replace(/^CLO/i, 'CO');
+      }
+      return null;
+    };
+
+    // Column index map — determined dynamically from header row
+    let attnCol = -1, quizCol = -1, vivaCol = -1, otherCol = -1;
+    let q1Col = -1, q2Col = -1, q3Col = -1;
+
+    for (let r = 1; r <= totalRows; r++) {
+      const row = worksheet.getRow(r);
+      const col1 = (row.getCell(1).value == null ? '' : row.getCell(1).value).toString().trim();
+      if (col1.toLowerCase() === 'manual wt') { manualWt = parseFloat(row.getCell(2).value) || 0; continue; }
+      if (col1.toLowerCase() === 'roll') {
+        // Scan columns 2..N to find each heading dynamically
+        const maxC = Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20);
+        for (let c = 2; c <= maxC; c++) {
+          const cv = (row.getCell(c).value == null ? '' : row.getCell(c).value).toString().trim();
+          const cvL = cv.toLowerCase();
+          if (!cvL) continue;
+          if (cvL.startsWith('attn')) {
+            attnCol = c;
+          } else if (cvL.startsWith('quiz')) {
+            quizCol = c;
+          } else if (cvL.includes('viva')) {
+            vivaCol = c;
+          } else if (cvL.startsWith('other')) {
+            otherCol = c;
+          } else if (/^q\s*1\b/i.test(cv)) {
+            q1Col = c; q1Total = extractTotal(cv); q1CO = q1Total > 0 ? extractCO(cv) : null;
+          } else if (/^q\s*2\b/i.test(cv)) {
+            q2Col = c; q2Total = extractTotal(cv); q2CO = q2Total > 0 ? extractCO(cv) : null;
+          } else if (/^q\s*3\b/i.test(cv)) {
+            q3Col = c; q3Total = extractTotal(cv); q3CO = q3Total > 0 ? extractCO(cv) : null;
+          }
+        }
+        dataStartRow = r + 1;
+        break;
+      }
+    }
+    if (dataStartRow === -1) {
+      // No Roll header — Manual Wt only upload is valid
+      return res.json({ success: true, data: { manualWt, attnTotal, quizTotal, vivaTotal, q1Total, q2Total, q3Total, q1CO, q2CO, q3CO, hasAttn: false, hasQuiz: false, hasViva: false, hasOther: false, hasQ1: false, hasQ2: false, hasQ3: false, rows: [] } });
+    }
+    const hasAttn = attnCol !== -1;
+    const hasQuiz = quizCol !== -1;
+    const hasViva = vivaCol !== -1;
+    const hasOther = otherCol !== -1;
+
+    const parseVal = (raw) => {
+      if (raw === null || raw === undefined) return null;
+      const s = raw.toString().trim();
+      if (s === '') return null;
+      if (s.toLowerCase() === 'a') return 'A';
+      return parseFloat(s) || 0;
+    };
+    const rows = [];
+    let emptyStreak = 0;
+    for (let rn = dataStartRow; rn <= totalRows; rn++) {
+      const dr = worksheet.getRow(rn);
+      const rawRoll = dr.getCell(1).value;
+      if (rawRoll === null || rawRoll === undefined || rawRoll === '') {
+        if (++emptyStreak >= 5) break;
+        continue;
+      }
+      emptyStreak = 0;
+      const rollStr = rawRoll.toString().trim();
+      if (!rollStr || rollStr.toLowerCase() === 'roll') continue;
+      rows.push({
+        rollNumber: rollStr,
+        attn: hasAttn ? parseVal(dr.getCell(attnCol).value) : null,
+        quiz: hasQuiz ? parseVal(dr.getCell(quizCol).value) : null,
+        viva: hasViva ? parseVal(dr.getCell(vivaCol).value) : null,
+        q1: q1Col !== -1 ? parseVal(dr.getCell(q1Col).value) : null,
+        q2: q2Col !== -1 ? parseVal(dr.getCell(q2Col).value) : null,
+        q3: q3Col !== -1 ? parseVal(dr.getCell(q3Col).value) : null,
+        other: hasOther ? parseVal(dr.getCell(otherCol).value) : null,
+      });
+    }
+    return res.json({ success: true, data: { manualWt, attnTotal, quizTotal, vivaTotal, q1Total, q2Total, q3Total, q1CO, q2CO, q3CO, hasAttn, hasQuiz, hasViva, hasOther, hasQ1: q1Col !== -1, hasQ2: q2Col !== -1, hasQ3: q3Col !== -1, rows } });
+  } catch (error) {
+    console.error('Error parsing lab upload:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Parse Assignment Excel/CSV upload and return structured data
+ * POST /api/attainment/assignment/:courseId/parse-upload
+ * Expected format:
+ *   Row 1: "Manual Wt" | <value>
+ *   Row 2: Roll | [Attn. Perf.] | Q1(<total>)(<CO>) | Q2(...) | Q3(...)
+ *   Row 3+: data rows
+ */
+exports.parseAssignUpload = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const { courseId } = req.params;
+    const course = await Course.findById(courseId).select('assignedTeachers').lean();
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+    if (req.user.role === 'teacher') {
+      const isAssigned = course.assignedTeachers.some(a => {
+        const tid = a.teacher?._id || a.teacher;
+        return tid.toString() === req.user._id.toString();
+      });
+      if (!isAssigned) return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const fileName = req.file.originalname.toLowerCase();
+    const isCSV = fileName.endsWith('.csv') || req.file.mimetype === 'text/csv' || req.file.mimetype === 'application/csv';
+    if (isCSV) {
+      const { Readable } = require('stream');
+      await workbook.csv.read(Readable.from(req.file.buffer.toString('utf-8')));
+    } else {
+      await workbook.xlsx.load(req.file.buffer);
+    }
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet) return res.status(400).json({ success: false, message: 'No worksheet found' });
+
+    const totalRows = worksheet.rowCount;
+    let manualWt = null;
+    let q1Total = 0, q2Total = 0, q3Total = 0;
+    let q1CO = null, q2CO = null, q3CO = null;
+    let dataStartRow = -1;
+
+    const extractTotal = (cv) => {
+      const s = (cv == null ? '' : cv).toString();
+      const m2 = s.match(/\((\d+(?:\.\d+)?)\)/);
+      return m2 ? parseFloat(m2[1]) : 0;
+    };
+    const extractCO = (cv) => {
+      const s = (cv == null ? '' : cv).toString();
+      const matches = [...s.matchAll(/\(([^)]+)\)/g)];
+      if (matches.length >= 2) {
+        const co = matches[1][1].trim();
+        if (!co) return null;
+        return co.replace(/^CLO/i, 'CO');
+      }
+      return null;
+    };
+
+    let attnPerfCol = -1, q1Col = -1, q2Col = -1, q3Col = -1;
+    for (let r = 1; r <= totalRows; r++) {
+      const row = worksheet.getRow(r);
+      const col1 = (row.getCell(1).value == null ? '' : row.getCell(1).value).toString().trim();
+      if (col1.toLowerCase() === 'manual wt') { manualWt = parseFloat(row.getCell(2).value) || 0; continue; }
+      if (col1.toLowerCase() === 'roll') {
+        const maxC = Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20);
+        for (let c = 2; c <= maxC; c++) {
+          const cv = (row.getCell(c).value == null ? '' : row.getCell(c).value).toString().trim();
+          const cvL = cv.toLowerCase();
+          if (!cvL) continue;
+          if (cvL.startsWith('attn')) {
+            attnPerfCol = c;
+          } else if (/^q\s*1\b/i.test(cv)) {
+            q1Col = c; q1Total = extractTotal(cv); q1CO = q1Total > 0 ? extractCO(cv) : null;
+          } else if (/^q\s*2\b/i.test(cv)) {
+            q2Col = c; q2Total = extractTotal(cv); q2CO = q2Total > 0 ? extractCO(cv) : null;
+          } else if (/^q\s*3\b/i.test(cv)) {
+            q3Col = c; q3Total = extractTotal(cv); q3CO = q3Total > 0 ? extractCO(cv) : null;
+          }
+        }
+        dataStartRow = r + 1;
+        break;
+      }
+    }
+    if (dataStartRow === -1) {
+      // No Roll header — Manual Wt only upload is valid
+      return res.json({ success: true, data: { manualWt, q1Total, q2Total, q3Total, q1CO, q2CO, q3CO, hasAttnPerf: false, hasQ1: false, hasQ2: false, hasQ3: false, rows: [] } });
+    }
+    const hasAttnPerf = attnPerfCol !== -1;
+    const parseVal = (raw) => {
+      if (raw === null || raw === undefined) return null;
+      const s = raw.toString().trim();
+      if (s === '') return null;
+      if (s.toLowerCase() === 'a') return 'A';
+      return parseFloat(s) || 0;
+    };
+    const rows = [];
+    let emptyStreak = 0;
+    for (let rn = dataStartRow; rn <= totalRows; rn++) {
+      const dr = worksheet.getRow(rn);
+      const rawRoll = dr.getCell(1).value;
+      if (rawRoll === null || rawRoll === undefined || rawRoll === '') {
+        if (++emptyStreak >= 5) break;
+        continue;
+      }
+      emptyStreak = 0;
+      const rollStr = rawRoll.toString().trim();
+      if (!rollStr || rollStr.toLowerCase() === 'roll') continue;
+      rows.push({
+        rollNumber: rollStr,
+        attnPerf: hasAttnPerf ? parseVal(dr.getCell(attnPerfCol).value) : null,
+        q1: q1Col !== -1 ? parseVal(dr.getCell(q1Col).value) : null,
+        q2: q2Col !== -1 ? parseVal(dr.getCell(q2Col).value) : null,
+        q3: q3Col !== -1 ? parseVal(dr.getCell(q3Col).value) : null,
+      });
+    }
+    return res.json({ success: true, data: { manualWt, q1Total, q2Total, q3Total, q1CO, q2CO, q3CO, hasAttnPerf, hasQ1: q1Col !== -1, hasQ2: q2Col !== -1, hasQ3: q3Col !== -1, rows } });
+  } catch (error) {
+    console.error('Error parsing assignment upload:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -585,18 +860,21 @@ exports.saveAssignmentData = async (req, res) => {
     }
 
     // Update or create Assignment attainment data
+    const cleanedObtainedRows = (attnAssignObtainedRows || []).map(({ _id, __v, ...rest }) => rest);
     const assignmentData = await AssignmentAttainment.findOneAndUpdate(
       { course: courseId },
       {
-        course: courseId,
-        assignmentRows,
-        assignmentManualWts,
-        assignmentSummary,
-        attendanceMarks,
-        attnAssignObtainedRows,
-        updatedBy: req.user._id
+        $set: {
+          course: courseId,
+          assignmentRows,
+          assignmentManualWts,
+          assignmentSummary,
+          attendanceMarks,
+          attnAssignObtainedRows: cleanedObtainedRows,
+          updatedBy: req.user._id
+        }
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: false }
     );
 
     res.json({
@@ -722,26 +1000,29 @@ exports.saveLabActivityData = async (req, res) => {
     }
 
     // Update or create Lab Activity attainment data
+    const cleanedLabObtainedRows = (labActivityObtainedRows || []).map(({ _id, __v, ...rest }) => rest);
     const labActivityData = await LabActivityAttainment.findOneAndUpdate(
       { course: courseId },
       {
-        course: courseId,
-        labActivityRows,
-        labActivityFactors,
-        labActivityEqWts,
-        labActivityManualWts,
-        labAttendanceMarks,
-        labQuizMarks,
-        labVivaMarks,
-        activityTaken,
-        otherActivityRemaining,
-        otherActivityMeasured,
-        coMappedActivityMarks,
-        useEqWtActivity,
-        labActivityObtainedRows,
-        updatedBy: req.user._id
+        $set: {
+          course: courseId,
+          labActivityRows,
+          labActivityFactors,
+          labActivityEqWts,
+          labActivityManualWts,
+          labAttendanceMarks,
+          labQuizMarks,
+          labVivaMarks,
+          activityTaken,
+          otherActivityRemaining,
+          otherActivityMeasured,
+          coMappedActivityMarks,
+          useEqWtActivity,
+          labActivityObtainedRows: cleanedLabObtainedRows,
+          updatedBy: req.user._id
+        }
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: false }
     );
 
     console.log('[saveLabActivityData] Successfully saved data for courseId:', courseId);

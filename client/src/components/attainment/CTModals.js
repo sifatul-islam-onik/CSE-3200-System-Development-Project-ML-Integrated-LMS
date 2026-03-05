@@ -149,20 +149,6 @@ const CTModals = ({
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot>
-                      <tr>
-                        <td className="footer-label" style={{ fontWeight: 'bold' }}>Total</td>
-                        <td style={{ textAlign: 'center' }}></td>
-                        <td colSpan={getActiveAssignments().length * 3} style={{ textAlign: 'center' }}></td>
-                        <td style={{ textAlign: 'center', fontWeight: 'bold' }}>
-                          {formatNumber(assignmentRows.reduce((totalSum, row) =>
-                            totalSum + getActiveAssignmentFields().reduce((sum, field) => {
-                              const assignmentKey = field.replace(/(_Q[123])$/, '');
-                              return sum + (calculateAutoAssignmentFactor()[assignmentKey] || 0) * (row[field] || 0);
-                            }, 0), 0))}
-                        </td>
-                      </tr>
-                    </tfoot>
                   </>
                 ) : null}
               </table>
@@ -340,40 +326,6 @@ const CTModals = ({
                         </tr>
                       )}
                     </tbody>
-                    <tfoot>
-                      <tr>
-                        <td style={{ fontWeight: 'bold' }}>Total</td>
-                        {assignmentRows.map((coRow, coIdx) => {
-                          const coGrandTotal = attnAssignObtainedRows.reduce((sum, studentRow) => {
-                            return sum + getActiveAssignmentFields().reduce((coSum, field) => {
-                              const allocatedMarks = coRow[field] || 0;
-                              if (allocatedMarks === 0) return coSum;
-                              const assignmentKey = field.replace(/(_Q[123])$/, '');
-                              const factor = obtainedModalView === 0 ? 1 : (calculateAutoAssignmentFactor()[assignmentKey] || 0);
-                              return coSum + (factor * (studentRow[field] || 0));
-                            }, 0);
-                          }, 0);
-                          return (
-                            <td key={`total-co-${coIdx}`} style={{ textAlign: 'center', fontWeight: 'bold' }}>
-                              {formatNumber(coGrandTotal)}
-                            </td>
-                          );
-                        })}
-                        <td style={{ textAlign: 'center', fontWeight: 'bold' }}>
-                          {formatNumber(assignmentRows.reduce((grandTotal, coRow) => {
-                            return grandTotal + attnAssignObtainedRows.reduce((sum, studentRow) => {
-                              return sum + getActiveAssignmentFields().reduce((coSum, field) => {
-                                const allocatedMarks = coRow[field] || 0;
-                                if (allocatedMarks === 0) return coSum;
-                                const assignmentKey = field.replace(/(_Q[123])$/, '');
-                                const factor = obtainedModalView === 0 ? 1 : (calculateAutoAssignmentFactor()[assignmentKey] || 0);
-                                return coSum + (factor * (studentRow[field] || 0));
-                              }, 0);
-                            }, 0);
-                          }, 0))}
-                        </td>
-                      </tr>
-                    </tfoot>
                   </>
                 ) : null}
               </table>

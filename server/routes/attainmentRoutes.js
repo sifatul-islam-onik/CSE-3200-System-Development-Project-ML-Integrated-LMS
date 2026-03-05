@@ -71,6 +71,14 @@ router.get(
   attainmentController.getCTData
 );
 
+// Parse Assignment Excel/CSV upload (teacher only)
+router.post(
+  '/assignment/:courseId/parse-upload',
+  authorizeRoles('teacher', 'admin'),
+  ctUpload.single('file'),
+  attainmentController.parseAssignUpload
+);
+
 // Save Assignment/Attendance attainment data (teacher only)
 router.post(
   '/assignment/:courseId',
@@ -84,6 +92,14 @@ router.get(
   '/assignment/:courseId',
   cacheMiddleware(CACHE_DURATION.SHORT, (req) => `assignment_${req.params.courseId}`),
   attainmentController.getAssignmentData
+);
+
+// Parse Lab Activity Excel/CSV upload (teacher only)
+router.post(
+  '/labactivity/:courseId/parse-upload',
+  authorizeRoles('teacher', 'admin'),
+  ctUpload.single('file'),
+  attainmentController.parseLabUpload
 );
 
 // Save Lab Activity attainment data (teacher only)
