@@ -130,6 +130,34 @@ export const getCTData = async (courseId) => {
 };
 
 /**
+ * Parse a CT Excel/CSV file uploaded from the teacher dashboard
+ * @param {string} courseId - Course ID
+ * @param {File} file - The uploaded Excel/CSV file
+ * @param {string} ctKey - 'CT1', 'CT2', or 'CT3'
+ */
+export const parseCTUpload = async (courseId, file, ctKey) => {
+  try {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('ctKey', ctKey);
+    const response = await axios.post(
+      `${API_URL}/attainment/ct/${courseId}/parse-upload`,
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
  * Save Assignment/Attendance attainment data
  * @param {string} courseId - Course ID
  * @param {object} data - Assignment data to save

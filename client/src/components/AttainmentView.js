@@ -1387,7 +1387,8 @@ const AttainmentView = () => {
 
       const ctKey = field.replace(/(_Q[123])$/, '');
       const factor = calculateAutoFactor()[ctKey] || 0;
-      const studentMark = studentRow[field] || 0;
+      const rawMark = studentRow[field];
+      const studentMark = (rawMark === 'A' || rawMark === 'Absent') ? 0 : (parseFloat(rawMark) || 0);
       return sum + (factor * studentMark);
     }, 0);
   };
@@ -1715,7 +1716,7 @@ const AttainmentView = () => {
             if (savedEq) setCtEqWts(savedEq);
             if (savedSummary) setCtSummary(savedSummary);
             if (savedObtained && savedObtained.length > 0) {
-              setCtObtainedRows(savedObtained);
+              setCtObtainedRows(savedObtained.filter(r => r.rollNumber && r.rollNumber.toLowerCase() !== 'roll'));
             } else {
               // No saved obtained rows - allow initialization
               ctDataLoadedRef.current = false;
@@ -3576,10 +3577,11 @@ const AttainmentView = () => {
   };
 
   const computeObtainedTotal = (row) => {
+    const v = (val) => (val === 'A' || val === 'Absent' ? 0 : (parseFloat(val) || 0));
     return (
-      (row.CT1_Q1 || 0) + (row.CT1_Q2 || 0) + (row.CT1_Q3 || 0) +
-      (row.CT2_Q1 || 0) + (row.CT2_Q2 || 0) + (row.CT2_Q3 || 0) +
-      (row.CT3_Q1 || 0) + (row.CT3_Q2 || 0) + (row.CT3_Q3 || 0)
+      v(row.CT1_Q1) + v(row.CT1_Q2) + v(row.CT1_Q3) +
+      v(row.CT2_Q1) + v(row.CT2_Q2) + v(row.CT2_Q3) +
+      v(row.CT3_Q1) + v(row.CT3_Q2) + v(row.CT3_Q3)
     );
   };
 
@@ -3923,14 +3925,8 @@ const AttainmentView = () => {
               ctManualWts={ctManualWts}
               ctSummary={ctSummary}
               ctObtainedRows={ctObtainedRows}
-              saveStatus={saveStatus}
-              setCtSummary={setCtSummary}
               setShowGeneratedTableModal={setShowGeneratedTableModal}
               setShowObtainedGeneratedModal={setShowObtainedGeneratedModal}
-              handleManualSave={handleManualSave}
-              handleCTCellChange={handleCTCellChange}
-              handleObtainedCellChange={handleObtainedCellChange}
-              handleManualWtChange={handleManualWtChange}
               getActiveCTs={getActiveCTs}
               getActiveCTFields={getActiveCTFields}
               computeCOTotal={computeCOTotal}

@@ -1,9 +1,29 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const attainmentController = require('../controllers/attainmentController');
 const { authenticateUser } = require('../middlewares/authMiddleware');
 const { authorizeRoles } = require('../middlewares/roleMiddleware');
 const { cacheMiddleware, invalidateCacheMiddleware, CACHE_DURATION } = require('../middlewares/cacheMiddleware');
+
+const ctUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = file.originalname.toLowerCase();
+    const allowedMimes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv',
+      'application/csv',
+    ];
+    if (allowedMimes.includes(file.mimetype) || ext.endsWith('.xlsx') || ext.endsWith('.xls') || ext.endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only Excel and CSV files are allowed.'));
+    }
+  }
+});
 
 // Protect all routes with authentication
 router.use(authenticateUser);
@@ -26,6 +46,14 @@ router.put(
   '/batch-update',
   authorizeRoles('teacher', 'admin'),
   attainmentController.batchUpdateStudentPoValues
+);
+
+// Parse CT Excel/CSV upload and return structured data (teacher only)
+router.post(
+  '/ct/:courseId/parse-upload',
+  authorizeRoles('teacher', 'admin'),
+  ctUpload.single('file'),
+  attainmentController.parseCTUpload
 );
 
 // Save CT attainment data (teacher only)

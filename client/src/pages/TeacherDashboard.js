@@ -6,6 +6,7 @@ import { getUser, logout } from '../components/ProtectedRoute';
 import { getProfile } from '../services/authService';
 import { getMyProposals, createCourseProposal, deleteProposal } from '../services/courseProposalService';
 import { getAllCourses, getCourseStudents, updateCourse } from '../services/courseService';
+import { getCTData, saveCTData, parseCTUpload } from '../services/attainmentService';
 import CourseForm from '../components/CourseForm';
 import AttainmentView from '../components/AttainmentView';
 import CourseOBEView from '../components/CourseOBEView';
@@ -69,10 +70,15 @@ const TeacherDashboard = () => {
   const [courseStudents, setCourseStudents] = useState([]);
   const [showCTMarksModal, setShowCTMarksModal] = useState(false);
   const [ctMarksCourse, setCtMarksCourse] = useState(null);
-  const [ctMarksData, setCtMarksData] = useState([]);
-  const [ctMarksLoading, setCtMarksLoading] = useState(false);
-  const [ctCount, setCtCount] = useState(3);
-  const [ctTotalMarks, setCtTotalMarks] = useState([20, 20, 20]);
+  const [ctSettings, setCtSettings] = useState({ ctTaken: 3, coMappedMarks60: 0, useEqWt: 0 });
+  const [ctSettingsSaving, setCtSettingsSaving] = useState(false);
+  const [ctSettingsLoading, setCtSettingsLoading] = useState(false);
+  const [ctExistingData, setCtExistingData] = useState(null);
+  const [selectedCTUpload, setSelectedCTUpload] = useState('CT1');
+  const [ctUploadFile, setCtUploadFile] = useState(null);
+  const [ctUploadParsed, setCtUploadParsed] = useState(null);
+  const [ctUploadLoading, setCtUploadLoading] = useState(false);
+  const [ctUploadSaving, setCtUploadSaving] = useState(false);
   const [isSmallScreen, setIsSmallScreen] = useState(typeof window !== 'undefined' ? window.innerWidth < 640 : false);
   
   // Attendance & Assignment Marks state
@@ -84,26 +90,46 @@ const TeacherDashboard = () => {
   const [assignmentCount, setAssignmentCount] = useState(3);
   const [assignmentTotalMarks, setAssignmentTotalMarks] = useState([10, 10, 10]);
 
-  // When CT count changes, redistribute totals to sum 60 and resize marks arrays
   useEffect(() => {
-    const base = Math.floor(60 / ctCount);
-    const rem = 60 % ctCount;
-    const redistributed = Array.from({ length: ctCount }, (_, i) => base + (i < rem ? 1 : 0));
-    setCtTotalMarks(redistributed);
-
-    setCtMarksData((prev) => prev.map((s) => {
-      const newMarks = Array.from({ length: ctCount }, (_, i) => (Array.isArray(s.marks) ? s.marks[i] : undefined) ?? '');
-      return { ...s, marks: newMarks };
-    }));
-  }, [ctCount]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsSmallScreen(window.innerWidth < 640);
-    };
+    const handleResize = () => setIsSmallScreen(window.innerWidth < 640);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // When CT modal opens, load existing settings
+  useEffect(() => {    if (showCTMarksModal && ctMarksCourse) {
+      setCtSettingsLoading(true);
+      setCtUploadFile(null);
+      setCtUploadParsed(null);
+      getCTData(ctMarksCourse._id)
+        .then(resp => {
+          if (resp.success && resp.data) {
+            const data = resp.data;
+            // Sanitize: remove any stray "Roll" rows saved from previous bad uploads
+            if (Array.isArray(data.ctObtainedRows)) {
+              data.ctObtainedRows = data.ctObtainedRows.filter(r => r.rollNumber && r.rollNumber.toLowerCase() !== 'roll');
+            }
+            setCtExistingData(data);
+            const taken = data.ctSummary?.ctTaken || 3;
+            setCtSettings({
+              ctTaken: taken,
+              coMappedMarks60: data.ctSummary?.coMappedMarks60 || 0,
+              useEqWt: data.ctSummary?.useEqWt || 0,
+            });
+            setSelectedCTUpload(`CT${Math.min(taken, 1) || 1}`);
+          } else {
+            setCtExistingData(null);
+            setCtSettings({ ctTaken: 3, coMappedMarks60: 0, useEqWt: 0 });
+            setSelectedCTUpload('CT1');
+          }
+        })
+        .catch(err => {
+          console.error('Error loading CT data:', err);
+          setCtExistingData(null);
+        })
+        .finally(() => setCtSettingsLoading(false));
+    }
+  }, [showCTMarksModal, ctMarksCourse]);
 
   // When assignment count changes, redistribute totals and resize marks arrays
   useEffect(() => {
@@ -629,43 +655,9 @@ const TeacherDashboard = () => {
                                 </button>
                                 <button
                                   className="btn btn-sm btn-success"
-                                  onClick={async () => {
-                                    // Find teacher's section for this course
-                                    const assignment = course.assignedTeachers?.find(at => {
-                                      const teacherId = at.teacher?._id || at.teacher;
-                                      const userIdToMatch = user.userId || user._id;
-                                      return teacherId && teacherId.toString() === userIdToMatch;
-                                    });
-                                    const section = assignment?.section || null;
-                                    
-                                    // Fetch students
-                                    try {
-                                      setCtMarksLoading(true);
-                                      const response = await getCourseStudents(course._id, section);
-                                      if (response.success && response.data.length > 0) {
-                                        // Sort students by roll in ascending order
-                                        const sortedStudents = response.data.sort((a, b) => {
-                                          return (a.roll || '').localeCompare(b.roll || '', undefined, { numeric: true });
-                                        });
-                                        setCtMarksData(sortedStudents.map(student => ({
-                                          studentId: student._id,
-                                          roll: student.roll,
-                                          name: student.name,
-                                          marks: []
-                                        })));
-                                        setCtMarksCourse(course);
-                                        setShowCTMarksModal(true);
-                                      } else {
-                                        setError('No students enrolled in this course');
-                                        setTimeout(() => setError(''), 3000);
-                                      }
-                                    } catch (err) {
-                                      console.error('Error fetching students:', err);
-                                      setError('Failed to fetch students');
-                                      setTimeout(() => setError(''), 3000);
-                                    } finally {
-                                      setCtMarksLoading(false);
-                                    }
+                                  onClick={() => {
+                                    setCtMarksCourse(course);
+                                    setShowCTMarksModal(true);
                                   }}
                                 >
                                   <FontAwesomeIcon icon={faClipboardList} /> Enter CT Marks
@@ -1180,189 +1172,257 @@ const TeacherDashboard = () => {
       )}
 
       {/* CT Marks Entry Modal */}
-      {showCTMarksModal && ctMarksCourse && ctMarksData.length > 0 && (
+      {showCTMarksModal && ctMarksCourse && (
         <div className="modal-overlay" onClick={() => setShowCTMarksModal(false)}>
-          <div className="modal-content" style={{ width: '95vw', maxWidth: '900px', maxHeight: '90vh', borderRadius: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header" style={{ padding: '24px', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="modal-content" style={{ width: '95vw', maxWidth: '700px', maxHeight: '90vh', borderRadius: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ padding: '20px 24px', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h3 style={{ margin: 0 }}>Enter CT Marks - {ctMarksCourse.courseCode}</h3>
-              <button 
-                className="close-btn"
-                onClick={() => setShowCTMarksModal(false)}
-                disabled={ctMarksLoading}
-              >
+              <button className="close-btn" onClick={() => setShowCTMarksModal(false)}>
                 <FontAwesomeIcon icon={faTimes} />
               </button>
             </div>
-            <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', flex: '1 1 auto' }}>
-              {/* CT Total Marks Configuration */}
-              <div style={{
-                marginBottom: '20px',
-                padding: '16px',
-                backgroundColor: '#efe5ff',
-                border: '1px solid #ddd6fe',
-                borderRadius: '6px',
-              }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
-                  Set Total Marks for Each CT
-                </h4>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>Number of CTs</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={ctCount}
-                    onChange={(e) => {
-                      const n = parseInt(e.target.value) || 1;
-                      setCtCount(Math.max(1, Math.min(n, 10)));
-                    }}
-                    style={{ width: '80px', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
-                  />
-                  <span style={{ fontSize: '12px', color: '#6b7280' }}>Total must be 60</span>
-                </div>
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                  gap: '12px' 
-                }}>
-                  {Array.from({ length: ctCount }, (_, ctIndex) => (
-                    <div key={ctIndex}>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '6px', color: '#374151' }}>
-                        CT {ctIndex + 1} Total Marks
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={ctTotalMarks[ctIndex]}
-                        onChange={(e) => {
-                          let val = e.target.value ? parseInt(e.target.value) : 0;
-                          if (isNaN(val) || val < 0) val = 0;
-                          const newTotals = [...ctTotalMarks];
-                          const othersSum = newTotals.reduce((sum, m, i) => i === ctIndex ? sum : sum + (m || 0), 0);
-                          const maxForThis = Math.max(0, 60 - othersSum);
-                          newTotals[ctIndex] = Math.min(val, maxForThis);
-                          const totalNow = newTotals.reduce((s, m) => s + (m || 0), 0);
-                          const remainder = Math.max(0, 60 - totalNow);
-                          if (newTotals.length > 0) {
-                            const last = newTotals.length - 1;
-                            if (last !== ctIndex) {
-                              newTotals[last] = remainder;
-                            } else {
-                              newTotals[last] = Math.min(newTotals[last], maxForThis);
-                            }
-                          }
-                          setCtTotalMarks(newTotals);
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '4px',
-                          fontSize: '13px'
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
 
-              <div style={{ width: '100%', overflowX: 'auto' }}>
-                <table style={{
-                  width: '100%',
-                  minWidth: `${(isSmallScreen ? 200 : 320) + ctCount * 110}px`,
-                  borderCollapse: 'collapse',
-                  fontSize: '14px',
-                  tableLayout: 'fixed'
-                }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '2px solid #d1d5db' }}>
-                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, color: '#1f2937', position: 'sticky', left: 0, backgroundColor: '#f3f4f6', zIndex: 2, minWidth: '110px' }}>Roll</th>
-                    {!isSmallScreen && (
-                      <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, color: '#1f2937' }}>Name</th>
-                    )}
-                    {ctTotalMarks.map((total, i) => (
-                      <th key={i} style={{ padding: '12px', textAlign: 'center', fontWeight: 600, color: '#1f2937' }}>CT {i + 1} ({total})</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {ctMarksData.map((student, idx) => (
-                    <tr key={student.studentId} style={{
-                      borderBottom: '1px solid #e5e7eb',
-                      backgroundColor: idx % 2 === 0 ? '#fff' : '#f9fafb'
-                    }}>
-                      <td style={{ padding: '12px', color: '#1f2937', fontWeight: 500, position: 'sticky', left: 0, backgroundColor: '#fff', zIndex: 1 }}>
-                        {student.roll}
-                      </td>
-                      {!isSmallScreen && (
-                        <td style={{ padding: '12px', color: '#1f2937' }}>
-                          {student.name}
-                        </td>
-                      )}
-                      {Array.from({ length: ctCount }, (_, ctIndex) => (
-                        <td key={ctIndex} style={{ padding: '12px', textAlign: 'center' }}>
+            <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', flex: '1 1 auto' }}>
+              {ctSettingsLoading ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>Loading existing settings...</div>
+              ) : (
+                <>
+                  {/* Settings Section */}
+                  <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#efe5ff', border: '1px solid #ddd6fe', borderRadius: '8px' }}>
+                    <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 700, color: '#374151' }}>CT Settings</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '14px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>CT Taken (0–3)</label>
+                        <input
+                          type="number" min={0} max={3}
+                          value={ctSettings.ctTaken}
+                          onChange={e => setCtSettings(prev => ({ ...prev, ctTaken: Math.max(0, Math.min(3, parseInt(e.target.value) || 0)) }))}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>CO Mapped CT marks out of 60</label>
+                        <input
+                          type="number" min={0} max={60}
+                          value={ctSettings.coMappedMarks60}
+                          onChange={e => setCtSettings(prev => ({ ...prev, coMappedMarks60: Math.max(0, Math.min(60, parseFloat(e.target.value) || 0)) }))}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Use Eq. Wt for each CT (0/1)</label>
+                        <input
+                          type="number" min={0} max={1} step={1}
+                          value={ctSettings.useEqWt}
+                          onChange={e => setCtSettings(prev => ({ ...prev, useEqWt: Math.max(0, Math.min(1, parseInt(e.target.value) || 0)) }))}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-primary"
+                      disabled={ctSettingsSaving}
+                      onClick={async () => {
+                        setCtSettingsSaving(true);
+                        try {
+                          const existing = ctExistingData || {};
+                          const fullData = {
+                            ctRows: existing.ctRows || [],
+                            ctFactors: existing.ctFactors || {},
+                            ctManualWts: existing.ctManualWts || {},
+                            ctEqWts: existing.ctEqWts || {},
+                            ctSummary: ctSettings,
+                            ctObtainedRows: existing.ctObtainedRows || [],
+                          };
+                          await saveCTData(ctMarksCourse._id, fullData);
+                          setCtExistingData(prev => ({ ...(prev || {}), ...fullData }));
+                          setSuccessMessage('CT settings saved');
+                          setTimeout(() => setSuccessMessage(''), 3000);
+                        } catch (err) {
+                          console.error('Error saving CT settings:', err);
+                          setError('Failed to save CT settings');
+                          setTimeout(() => setError(''), 3000);
+                        } finally {
+                          setCtSettingsSaving(false);
+                        }
+                      }}
+                      style={{ fontSize: '13px', padding: '8px 20px' }}
+                    >
+                      {ctSettingsSaving ? 'Saving...' : 'Save Settings'}
+                    </button>
+                  </div>
+
+                  {/* CT Upload Section */}
+                  {ctSettings.ctTaken > 0 && (
+                    <div style={{ padding: '16px', border: '1px solid #d1fae5', backgroundColor: '#f0fdf4', borderRadius: '8px' }}>
+                      <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 700, color: '#374151' }}>Upload CT Marks</h4>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Select CT</label>
+                          <select
+                            value={selectedCTUpload}
+                            onChange={e => { setSelectedCTUpload(e.target.value); setCtUploadParsed(null); setCtUploadFile(null); }}
+                            style={{ padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', minWidth: '100px' }}
+                          >
+                            {Array.from({ length: ctSettings.ctTaken }, (_, i) => (
+                              <option key={i} value={`CT${i + 1}`}>CT{i + 1}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Upload Excel / CSV</label>
                           <input
-                            type="number"
-                            min="0"
-                            max={ctTotalMarks[ctIndex]}
-                            placeholder="0"
-                            value={(student.marks && student.marks[ctIndex]) ?? ''}
-                            onChange={(e) => {
-                              let value = e.target.value ? parseInt(e.target.value) : '';
-                              // Validate against max marks
-                              if (value && value > ctTotalMarks[ctIndex]) {
-                                value = ctTotalMarks[ctIndex];
-                              }
-                              const newData = [...ctMarksData];
-                              const marks = Array.from({ length: ctCount }, (_, i) => (newData[idx].marks && newData[idx].marks[i]) ?? '');
-                              marks[ctIndex] = value;
-                              newData[idx].marks = marks;
-                              setCtMarksData(newData);
-                            }}
-                            style={{
-                              width: '100%',
-                              maxWidth: '70px',
-                              padding: '6px 8px',
-                              border: '1px solid #d1d5db',
-                              borderRadius: '4px',
-                              textAlign: 'center',
-                              fontSize: '13px'
-                            }}
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            onChange={e => { setCtUploadFile(e.target.files[0] || null); setCtUploadParsed(null); }}
+                            style={{ fontSize: '13px' }}
                           />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-                </table>
-              </div>
+                        </div>
+                        <div style={{ alignSelf: 'flex-end' }}>
+                          <button
+                            className="btn btn-success"
+                            disabled={!ctUploadFile || ctUploadLoading}
+                            onClick={async () => {
+                              if (!ctUploadFile) return;
+                              setCtUploadLoading(true);
+                              try {
+                                const result = await parseCTUpload(ctMarksCourse._id, ctUploadFile, selectedCTUpload);
+                                if (result.success) {
+                                  setCtUploadParsed(result.data);
+                                } else {
+                                  setError(result.message || 'Failed to parse file');
+                                  setTimeout(() => setError(''), 3000);
+                                }
+                              } catch (err) {
+                                console.error('Error parsing CT file:', err);
+                                setError(typeof err === 'string' ? err : 'Failed to parse file');
+                                setTimeout(() => setError(''), 3000);
+                              } finally {
+                                setCtUploadLoading(false);
+                              }
+                            }}
+                            style={{ fontSize: '13px', padding: '8px 16px', whiteSpace: 'nowrap' }}
+                          >
+                            {ctUploadLoading ? 'Parsing...' : 'Parse File'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* File format hint */}
+                      <div style={{ marginBottom: '12px', padding: '10px', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', color: '#6b7280' }}>
+                        <strong>Expected file format:</strong><br />
+                        Row 1: <code>Manual Wt</code> | &lt;value&gt;<br />
+                        Row 2 (header): <code>Roll</code> | <code>Q1(&lt;total&gt;)</code> | <code>Q2(&lt;total&gt;)</code> | <code>Q3(&lt;total&gt;)</code><br />
+                        Row 3+: roll number | Q1 marks | Q2 marks | Q3 marks
+                      </div>
+
+                      {/* Parsed preview */}
+                      {ctUploadParsed && (
+                        <div>
+                          <div style={{ marginBottom: '10px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>
+                              Preview: {selectedCTUpload} — Manual Wt: <strong>{ctUploadParsed.manualWt}</strong> — {ctUploadParsed.rows.length} student(s)
+                            </span>
+                          </div>
+                          <div style={{ overflowX: 'auto', maxHeight: '260px', overflowY: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                              <thead>
+                                <tr style={{ backgroundColor: '#f3f4f6', position: 'sticky', top: 0 }}>
+                                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, border: '1px solid #e5e7eb' }}>Roll</th>
+                                  <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q1 ({ctUploadParsed.q1Total})</th>
+                                  <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q2 ({ctUploadParsed.q2Total})</th>
+                                  <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q3 ({ctUploadParsed.q3Total})</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {ctUploadParsed.rows.map((row, i) => (
+                                  <tr key={i} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
+                                    <td style={{ padding: '7px 12px', border: '1px solid #e5e7eb' }}>{row.rollNumber}</td>
+                                    {['q1', 'q2', 'q3'].map(q => {
+                                      const isAbsent = row[q] === 'A' || row[q] === 'Absent';
+                                      return (
+                                        <td key={q} style={{ padding: '7px 12px', textAlign: 'center', border: '1px solid #e5e7eb', color: isAbsent ? '#e74c3c' : undefined, fontStyle: isAbsent ? 'italic' : undefined }}>
+                                          {isAbsent ? 'Absent' : row[q]}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
-            <div className="modal-footer" style={{ padding: '16px 20px', display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'flex-end', width: '100%', boxSizing: 'border-box', backgroundColor: '#fff', borderTop: '1px solid #e5e7eb' }}>
-              <button
-                className="btn btn-outline"
-                onClick={() => setShowCTMarksModal(false)}
-                disabled={ctMarksLoading}
-                style={{ flex: '0 0 auto', width: '120px', whiteSpace: 'nowrap' }}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  // Save CT marks logic here
-                  setShowCTMarksModal(false);
-                  setSuccessMessage('CT Marks saved successfully');
-                  setTimeout(() => setSuccessMessage(''), 3000);
-                }}
-                disabled={ctMarksLoading}
-                style={{ flex: '0 0 auto', width: '120px', whiteSpace: 'nowrap' }}
-              >
-                Save CT Marks
+
+            <div className="modal-footer" style={{ padding: '14px 20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', backgroundColor: '#fff', borderTop: '1px solid #e5e7eb' }}>
+              {ctUploadParsed && (
+                <button
+                  className="btn btn-primary"
+                  disabled={ctUploadSaving}
+                  onClick={async () => {
+                    setCtUploadSaving(true);
+                    try {
+                      const existing = ctExistingData || {};
+                      const ctKey = selectedCTUpload;
+                      const newManualWts = { ...(existing.ctManualWts || {}), [ctKey]: ctUploadParsed.manualWt };
+                      const q1Field = `${ctKey}_Q1`;
+                      const q2Field = `${ctKey}_Q2`;
+                      const q3Field = `${ctKey}_Q3`;
+                      const parsedMap = {};
+                      ctUploadParsed.rows.forEach(parsed => {
+                        if (parsed.rollNumber && parsed.rollNumber.toLowerCase() !== 'roll') {
+                          parsedMap[parsed.rollNumber] = parsed;
+                        }
+                      });
+                      const existingObtained = (Array.isArray(existing.ctObtainedRows) ? existing.ctObtainedRows : [])
+                        .filter(r => r.rollNumber && r.rollNumber.toLowerCase() !== 'roll')
+                        .map(r => {
+                          const match = parsedMap[r.rollNumber];
+                          if (match) {
+                            return { ...r, [q1Field]: match.q1, [q2Field]: match.q2, [q3Field]: match.q3 };
+                          }
+                          return r;
+                        });
+                      const fullData = {
+                        ctRows: existing.ctRows || [],
+                        ctFactors: existing.ctFactors || {},
+                        ctManualWts: newManualWts,
+                        ctEqWts: existing.ctEqWts || {},
+                        ctSummary: existing.ctSummary || ctSettings,
+                        ctObtainedRows: existingObtained,
+                      };
+                      await saveCTData(ctMarksCourse._id, fullData);
+                      setCtExistingData(prev => ({ ...(prev || {}), ...fullData }));
+                      setSuccessMessage(`${ctKey} marks saved successfully`);
+                      setTimeout(() => setSuccessMessage(''), 3000);
+                      setCtUploadParsed(null);
+                      setCtUploadFile(null);
+                    } catch (err) {
+                      console.error('Error saving CT upload:', err);
+                      setError('Failed to save CT data');
+                      setTimeout(() => setError(''), 3000);
+                    } finally {
+                      setCtUploadSaving(false);
+                    }
+                  }}
+                  style={{ fontSize: '13px', padding: '8px 20px' }}
+                >
+                  {ctUploadSaving ? 'Saving...' : `Save ${selectedCTUpload} Data`}
+                </button>
+              )}
+              <button className="btn btn-outline" onClick={() => setShowCTMarksModal(false)} style={{ width: '100px' }}>
+                Close
               </button>
             </div>
           </div>
         </div>
       )}
+
 
       {/* Attendance & Assignment Marks Modal */}
       {showAttendanceModal && attendanceCourse && attendanceData.length > 0 && (

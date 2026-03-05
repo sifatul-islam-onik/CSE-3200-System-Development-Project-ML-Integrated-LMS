@@ -233,30 +233,41 @@ const CTModals = ({
                             {studentRow.rollNumber || '-'}
                           </td>
                           {ctRows.map((coRow, coIdx) => {
-                            const coTotal = getActiveCTFields().reduce((sum, field) => {
-                              const allocatedMarks = coRow[field] || 0;
-                              if (allocatedMarks === 0) return sum;
+                            const coActiveFields = getActiveCTFields().filter(f => (coRow[f] || 0) !== 0);
+                            const coAllAbsent = coActiveFields.length > 0 && coActiveFields.every(f => { const v = studentRow[f]; return v === 'A' || v === 'Absent'; });
+                            const coTotal = coActiveFields.reduce((sum, field) => {
                               const ctKey = field.replace(/(_Q[123])$/, '');
                               const factor = obtainedModalView === 0 ? 1 : (calculateAutoFactor()[ctKey] || 0);
-                              return sum + (factor * (studentRow[field] || 0));
+                              const rawMark = studentRow[field];
+                              const mark = (rawMark === 'A' || rawMark === 'Absent') ? 0 : (parseFloat(rawMark) || 0);
+                              return sum + (factor * mark);
                             }, 0);
                             return (
-                              <td key={`co-${coIdx}-student-${studentIdx}`} style={{ textAlign: 'center' }}>
-                                {formatNumber(coTotal)}
+                              <td key={`co-${coIdx}-student-${studentIdx}`} style={{ textAlign: 'center', color: coAllAbsent ? '#e74c3c' : undefined, fontStyle: coAllAbsent ? 'italic' : undefined }}>
+                                {coAllAbsent ? 'Absent' : formatNumber(coTotal)}
                               </td>
                             );
                           })}
-                          <td style={{ textAlign: 'center', fontWeight: 'bold' }}>
-                            {formatNumber(ctRows.reduce((total, coRow) => {
+                          {(() => {
+                            const allActiveFields = getActiveCTFields().filter(f => ctRows.some(coRow => (coRow[f] || 0) !== 0));
+                            const rowAllAbsent = allActiveFields.length > 0 && allActiveFields.every(f => { const v = studentRow[f]; return v === 'A' || v === 'Absent'; });
+                            const rowTotal = ctRows.reduce((total, coRow) => {
                               return total + getActiveCTFields().reduce((sum, field) => {
                                 const allocatedMarks = coRow[field] || 0;
                                 if (allocatedMarks === 0) return sum;
                                 const ctKey = field.replace(/(_Q[123])$/, '');
                                 const factor = obtainedModalView === 0 ? 1 : (calculateAutoFactor()[ctKey] || 0);
-                                return sum + (factor * (studentRow[field] || 0));
+                                const rawMark = studentRow[field];
+                                const mark = (rawMark === 'A' || rawMark === 'Absent') ? 0 : (parseFloat(rawMark) || 0);
+                                return sum + (factor * mark);
                               }, 0);
-                            }, 0))}
-                          </td>
+                            }, 0);
+                            return (
+                              <td style={{ textAlign: 'center', fontWeight: 'bold', color: rowAllAbsent ? '#e74c3c' : undefined, fontStyle: rowAllAbsent ? 'italic' : undefined }}>
+                                {rowAllAbsent ? 'Absent' : formatNumber(rowTotal)}
+                              </td>
+                            );
+                          })()}
                         </tr>
                       ))}
                       {ctObtainedRows.length === 0 && (
@@ -267,40 +278,7 @@ const CTModals = ({
                         </tr>
                       )}
                     </tbody>
-                    <tfoot>
-                      <tr>
-                        <td style={{ fontWeight: 'bold' }}>Total</td>
-                        {ctRows.map((coRow, coIdx) => {
-                          const coGrandTotal = ctObtainedRows.reduce((sum, studentRow) => {
-                            return sum + getActiveCTFields().reduce((coSum, field) => {
-                              const allocatedMarks = coRow[field] || 0;
-                              if (allocatedMarks === 0) return coSum;
-                              const ctKey = field.replace(/(_Q[123])$/, '');
-                              const factor = obtainedModalView === 0 ? 1 : (calculateAutoFactor()[ctKey] || 0);
-                              return coSum + (factor * (studentRow[field] || 0));
-                            }, 0);
-                          }, 0);
-                          return (
-                            <td key={`total-co-${coIdx}`} style={{ textAlign: 'center', fontWeight: 'bold' }}>
-                              {formatNumber(coGrandTotal)}
-                            </td>
-                          );
-                        })}
-                        <td style={{ textAlign: 'center', fontWeight: 'bold' }}>
-                          {formatNumber(ctRows.reduce((grandTotal, coRow) => {
-                            return grandTotal + ctObtainedRows.reduce((sum, studentRow) => {
-                              return sum + getActiveCTFields().reduce((coSum, field) => {
-                                const allocatedMarks = coRow[field] || 0;
-                                if (allocatedMarks === 0) return coSum;
-                                const ctKey = field.replace(/(_Q[123])$/, '');
-                                const factor = obtainedModalView === 0 ? 1 : (calculateAutoFactor()[ctKey] || 0);
-                                return coSum + (factor * (studentRow[field] || 0));
-                              }, 0);
-                            }, 0);
-                          }, 0))}
-                        </td>
-                      </tr>
-                    </tfoot>
+                  
                   </>
                 ) : selectedSheet === 'Attn_Assign' ? (
                   <>
