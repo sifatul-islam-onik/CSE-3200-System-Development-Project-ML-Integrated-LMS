@@ -5,8 +5,8 @@ import { faBook, faPlus, faHourglass, faCheckCircle, faTimesCircle, faEye, faTra
 import { getUser, logout } from '../components/ProtectedRoute';
 import { getProfile } from '../services/authService';
 import { getMyProposals, createCourseProposal, deleteProposal } from '../services/courseProposalService';
-import { getAllCourses, getCourseStudents, updateCourse } from '../services/courseService';
-import { getCTData, saveCTData, parseCTUpload } from '../services/attainmentService';
+import { getAllCourses, getCourseStudents } from '../services/courseService';
+import { getCTData, saveCTData, parseCTUpload, getLabActivityData, saveLabActivityData, parseLabUpload, getAssignmentData, saveAssignmentData, parseAssignUpload } from '../services/attainmentService';
 import CourseForm from '../components/CourseForm';
 import AttainmentView from '../components/AttainmentView';
 import CourseOBEView from '../components/CourseOBEView';
@@ -80,15 +80,32 @@ const TeacherDashboard = () => {
   const [ctUploadLoading, setCtUploadLoading] = useState(false);
   const [ctUploadSaving, setCtUploadSaving] = useState(false);
   const [isSmallScreen, setIsSmallScreen] = useState(typeof window !== 'undefined' ? window.innerWidth < 640 : false);
+
+  // Lab Marks state
+  const [showLabMarksModal, setShowLabMarksModal] = useState(false);
+  const [labMarksCourse, setLabMarksCourse] = useState(null);
+  const [labSettings, setLabSettings] = useState({ activityTaken: 1, otherActivityRemaining: 0, otherActivityMeasured: 0, coMappedActivityMarks: 0, useEqWtActivity: 0, attnMarks: 0, quizMarks: 0, vivaMarks: 0 });
+  const [labSettingsSaving, setLabSettingsSaving] = useState(false);
+  const [labSettingsLoading, setLabSettingsLoading] = useState(false);
+  const [labExistingData, setLabExistingData] = useState(null);
+  const [selectedActivityUpload, setSelectedActivityUpload] = useState('Activity1');
+  const [labUploadFile, setLabUploadFile] = useState(null);
+  const [labUploadParsed, setLabUploadParsed] = useState(null);
+  const [labUploadLoading, setLabUploadLoading] = useState(false);
+  const [labUploadSaving, setLabUploadSaving] = useState(false);
   
   // Attendance & Assignment Marks state
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [attendanceCourse, setAttendanceCourse] = useState(null);
-  const [attendanceData, setAttendanceData] = useState([]);
-  const [attendanceLoading, setAttendanceLoading] = useState(false);
-  const [attendanceTotalMarks, setAttendanceTotalMarks] = useState(10);
-  const [assignmentCount, setAssignmentCount] = useState(3);
-  const [assignmentTotalMarks, setAssignmentTotalMarks] = useState([10, 10, 10]);
+  const [assignSettings, setAssignSettings] = useState({ assignTaken: 3, assignmentMarks30: 30, useEqWt: 0, attendancePerformance: 0 });
+  const [assignSettingsSaving, setAssignSettingsSaving] = useState(false);
+  const [assignSettingsLoading, setAssignSettingsLoading] = useState(false);
+  const [selectedAssignUpload, setSelectedAssignUpload] = useState('Assgn1');
+  const [assignUploadFile, setAssignUploadFile] = useState(null);
+  const [assignUploadParsed, setAssignUploadParsed] = useState(null);
+  const [assignUploadLoading, setAssignUploadLoading] = useState(false);
+  const [assignUploadSaving, setAssignUploadSaving] = useState(false);
+  const [assignExistingData, setAssignExistingData] = useState(null);
 
   useEffect(() => {
     const handleResize = () => setIsSmallScreen(window.innerWidth < 640);
@@ -131,16 +148,69 @@ const TeacherDashboard = () => {
     }
   }, [showCTMarksModal, ctMarksCourse]);
 
-  // When assignment count changes, redistribute totals and resize marks arrays
+  // When Lab modal opens, load existing lab data
   useEffect(() => {
-    const newTotals = Array.from({ length: assignmentCount }, () => 10);
-    setAssignmentTotalMarks(newTotals);
+    if (showLabMarksModal && labMarksCourse) {
+      setLabSettingsLoading(true);
+      setLabUploadFile(null);
+      setLabUploadParsed(null);
+      getLabActivityData(labMarksCourse._id)
+        .then(resp => {
+          if (resp.success && resp.data) {
+            const data = resp.data;
+            setLabExistingData(data);
+            const taken = data.activityTaken || 1;
+            setLabSettings({
+              activityTaken: taken,
+              otherActivityRemaining: data.otherActivityRemaining || 0,
+              otherActivityMeasured: data.otherActivityMeasured || 0,
+              coMappedActivityMarks: data.coMappedActivityMarks || 0,
+              useEqWtActivity: data.useEqWtActivity || 0,
+              attnMarks: data.labAttendanceMarks || 0,
+              quizMarks: data.labQuizMarks || 0,
+              vivaMarks: data.labVivaMarks || 0,
+            });
+            setSelectedActivityUpload(`Activity${taken >= 1 ? 1 : 1}`);
+          } else {
+            setLabExistingData(null);
+            setLabSettings({ activityTaken: 1, otherActivityRemaining: 0, otherActivityMeasured: 0, coMappedActivityMarks: 0, useEqWtActivity: 0, attnMarks: 0, quizMarks: 0, vivaMarks: 0 });
+            setSelectedActivityUpload('Activity1');
+          }
+        })
+        .catch(err => { console.error('Error loading lab data:', err); setLabExistingData(null); })
+        .finally(() => setLabSettingsLoading(false));
+    }
+  }, [showLabMarksModal, labMarksCourse]);
 
-    setAttendanceData((prev) => prev.map((s) => {
-      const newMarks = Array.from({ length: assignmentCount }, (_, i) => (Array.isArray(s.assignments) ? s.assignments[i] : undefined) ?? '');
-      return { ...s, assignments: newMarks };
-    }));
-  }, [assignmentCount]);
+  // When Attendance & Assignments modal opens, load existing data
+  useEffect(() => {
+    if (showAttendanceModal && attendanceCourse) {
+      setAssignSettingsLoading(true);
+      setAssignUploadFile(null);
+      setAssignUploadParsed(null);
+      getAssignmentData(attendanceCourse._id)
+        .then(resp => {
+          if (resp.success && resp.data) {
+            const data = resp.data;
+            setAssignExistingData(data);
+            const taken = data.assignmentSummary?.assignTaken || 3;
+            setAssignSettings({
+              assignTaken: taken,
+              assignmentMarks30: data.assignmentSummary?.assignmentMarks30 || 30,
+              useEqWt: data.assignmentSummary?.useEqWt || 0,
+              attendancePerformance: data.assignmentSummary?.attendancePerformance || 0,
+            });
+            setSelectedAssignUpload('Assgn1');
+          } else {
+            setAssignExistingData(null);
+            setAssignSettings({ assignTaken: 3, assignmentMarks30: 30, useEqWt: 0, attendancePerformance: 0 });
+            setSelectedAssignUpload('Assgn1');
+          }
+        })
+        .catch(err => { console.error('Error loading assignment data:', err); setAssignExistingData(null); })
+        .finally(() => setAssignSettingsLoading(false));
+    }
+  }, [showAttendanceModal, attendanceCourse]);
 
   // Navigate to a course group (drill-down)
   const navigateToGroup = (groupKey) => {
@@ -672,51 +742,25 @@ const TeacherDashboard = () => {
                                 </button>
                                 <button
                                   className="btn btn-sm btn-info"
-                                  onClick={async () => {
-                                    // Find teacher's section for this course
-                                    const assignment = course.assignedTeachers?.find(at => {
-                                      const teacherId = at.teacher?._id || at.teacher;
-                                      const userIdToMatch = user.userId || user._id;
-                                      return teacherId && teacherId.toString() === userIdToMatch;
-                                    });
-                                    const section = assignment?.section || null;
-                                    
-                                    // Fetch students
-                                    try {
-                                      setAttendanceLoading(true);
-                                      const response = await getCourseStudents(course._id, section);
-                                      if (response.success && response.data.length > 0) {
-                                        // Sort students by roll in ascending order
-                                        const sortedStudents = response.data.sort((a, b) => {
-                                          return (a.roll || '').localeCompare(b.roll || '', undefined, { numeric: true });
-                                        });
-                                        setAttendanceData(sortedStudents.map(student => ({
-                                          studentId: student._id,
-                                          roll: student.roll,
-                                          name: student.name,
-                                          attendance: '',
-                                          assignments: []
-                                        })));
-                                        setAttendanceCourse(course);
-                                        // Set attendance total marks from course
-                                        setAttendanceTotalMarks(course.attendanceMarks || 10);
-                                        setShowAttendanceModal(true);
-                                      } else {
-                                        setError('No students enrolled in this course');
-                                        setTimeout(() => setError(''), 3000);
-                                      }
-                                    } catch (err) {
-                                      console.error('Error fetching students:', err);
-                                      setError('Failed to fetch students');
-                                      setTimeout(() => setError(''), 3000);
-                                    } finally {
-                                      setAttendanceLoading(false);
-                                    }
+                                  onClick={() => {
+                                    setAttendanceCourse(course);
+                                    setShowAttendanceModal(true);
                                   }}
                                 >
                                   <FontAwesomeIcon icon={faClipboardList} /> Attendance & Assignments
                                 </button>
                                 </>}
+                                {!isTheoryCourse && (
+                                  <button
+                                    className="btn btn-sm btn-warning"
+                                    onClick={() => {
+                                      setLabMarksCourse(course);
+                                      setShowLabMarksModal(true);
+                                    }}
+                                  >
+                                    <FontAwesomeIcon icon={faClipboardList} /> Enter Lab Marks
+                                  </button>
+                                )}
                                 <button
                                   className="btn btn-sm btn-primary"
                                   onClick={() => openEditProposal(course)}
@@ -1333,7 +1377,7 @@ const TeacherDashboard = () => {
                         <div>
                           <div style={{ marginBottom: '10px' }}>
                             <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>
-                              Preview: {selectedCTUpload} — Manual Wt: <strong>{ctUploadParsed.manualWt}</strong> — {ctUploadParsed.rows.length} student(s)
+                              Preview: {selectedCTUpload} — Manual Wt: <strong>{ctUploadParsed.manualWt !== null ? ctUploadParsed.manualWt : '(unchanged)'}</strong> — {ctUploadParsed.rows.length} student(s)
                             </span>
                           </div>
                           <div style={{ overflowX: 'auto', maxHeight: '260px', overflowY: 'auto' }}>
@@ -1381,7 +1425,7 @@ const TeacherDashboard = () => {
                     try {
                       const existing = ctExistingData || {};
                       const ctKey = selectedCTUpload;
-                      const newManualWts = { ...(existing.ctManualWts || {}), [ctKey]: ctUploadParsed.manualWt };
+                      const newManualWts = { ...(existing.ctManualWts || {}), ...(ctUploadParsed.manualWt !== null ? { [ctKey]: ctUploadParsed.manualWt } : {}) };
                       const q1Field = `${ctKey}_Q1`;
                       const q2Field = `${ctKey}_Q2`;
                       const q3Field = `${ctKey}_Q3`;
@@ -1396,44 +1440,51 @@ const TeacherDashboard = () => {
                         .map(r => {
                           const match = parsedMap[r.rollNumber];
                           if (match) {
-                            return { ...r, [q1Field]: match.q1, [q2Field]: match.q2, [q3Field]: match.q3 };
+                            return {
+                              ...r,
+                              [q1Field]: match.q1 !== null ? match.q1 : (r[q1Field] ?? 0),
+                              [q2Field]: match.q2 !== null ? match.q2 : (r[q2Field] ?? 0),
+                              [q3Field]: match.q3 !== null ? match.q3 : (r[q3Field] ?? 0),
+                            };
                           }
                           return r;
                         });
                       // Build updated ctRows from CO mapping in upload headers
-                      // A Q with (0) and no CO label is inactive — explicitly zero it out
+                      // A Q column absent from upload leaves existing allocation untouched
                       const coSet = new Set((existing.ctRows || []).map(r => r.coNumber).filter(Boolean));
-                      if (ctUploadParsed.q1CO) coSet.add(ctUploadParsed.q1CO);
-                      if (ctUploadParsed.q2CO) coSet.add(ctUploadParsed.q2CO);
-                      if (ctUploadParsed.q3CO) coSet.add(ctUploadParsed.q3CO);
+                      if (ctUploadParsed.hasQ1 && ctUploadParsed.q1CO) coSet.add(ctUploadParsed.q1CO);
+                      if (ctUploadParsed.hasQ2 && ctUploadParsed.q2CO) coSet.add(ctUploadParsed.q2CO);
+                      if (ctUploadParsed.hasQ3 && ctUploadParsed.q3CO) coSet.add(ctUploadParsed.q3CO);
                       const updatedCtRows = [...coSet].map(coNumber => {
                         const existingRow = (existing.ctRows || []).find(r => r.coNumber === coNumber) || { coNumber };
                         const newRow = { ...existingRow };
-                        // q has CO label → allocate marks; q has no CO but total=0 → zero out; q has no CO and nonzero → keep existing
-                        if (ctUploadParsed.q1CO != null) {
+                        if (ctUploadParsed.hasQ1 && ctUploadParsed.q1CO != null) {
                           newRow[q1Field] = ctUploadParsed.q1CO === coNumber ? ctUploadParsed.q1Total : 0;
-                        } else if (ctUploadParsed.q1Total === 0) {
-                          newRow[q1Field] = 0;
                         }
-                        if (ctUploadParsed.q2CO != null) {
+                        if (ctUploadParsed.hasQ2 && ctUploadParsed.q2CO != null) {
                           newRow[q2Field] = ctUploadParsed.q2CO === coNumber ? ctUploadParsed.q2Total : 0;
-                        } else if (ctUploadParsed.q2Total === 0) {
-                          newRow[q2Field] = 0;
                         }
-                        if (ctUploadParsed.q3CO != null) {
+                        if (ctUploadParsed.hasQ3 && ctUploadParsed.q3CO != null) {
                           newRow[q3Field] = ctUploadParsed.q3CO === coNumber ? ctUploadParsed.q3Total : 0;
-                        } else if (ctUploadParsed.q3Total === 0) {
-                          newRow[q3Field] = 0;
                         }
                         return newRow;
                       });
+                      const existingRollSet = new Set(existingObtained.map(r => r.rollNumber));
+                      const newStudentsCT = ctUploadParsed.rows
+                        .filter(p => p.rollNumber && p.rollNumber.toLowerCase() !== 'roll' && !existingRollSet.has(p.rollNumber))
+                        .map(p => ({
+                          rollNumber: p.rollNumber,
+                          [q1Field]: p.q1 ?? 0,
+                          [q2Field]: p.q2 ?? 0,
+                          [q3Field]: p.q3 ?? 0,
+                        }));
                       const fullData = {
                         ctRows: updatedCtRows,
                         ctFactors: existing.ctFactors || {},
                         ctManualWts: newManualWts,
                         ctEqWts: existing.ctEqWts || {},
                         ctSummary: existing.ctSummary || ctSettings,
-                        ctObtainedRows: existingObtained,
+                        ctObtainedRows: [...existingObtained, ...newStudentsCT],
                       };
                       await saveCTData(ctMarksCourse._id, fullData);
                       setCtExistingData(prev => ({ ...(prev || {}), ...fullData }));
@@ -1463,237 +1514,706 @@ const TeacherDashboard = () => {
       )}
 
 
-      {/* Attendance & Assignment Marks Modal */}
-      {showAttendanceModal && attendanceCourse && attendanceData.length > 0 && (
-        <div className="modal-overlay" onClick={() => setShowAttendanceModal(false)}>
-          <div className="modal-content" style={{ width: '95vw', maxWidth: '900px', maxHeight: '90vh', borderRadius: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header" style={{ padding: '24px', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ margin: 0 }}>Attendance & Assignments - {attendanceCourse.courseCode}</h3>
-              <button 
-                className="close-btn"
-                onClick={() => setShowAttendanceModal(false)}
-                disabled={attendanceLoading}
-              >
+      {/* Lab Marks Modal */}
+      {showLabMarksModal && labMarksCourse && (
+        <div className="modal-overlay" onClick={() => setShowLabMarksModal(false)}>
+          <div className="modal-content" style={{ width: '95vw', maxWidth: '720px', maxHeight: '90vh', borderRadius: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ padding: '20px 24px', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ margin: 0 }}>Enter Lab Marks - {labMarksCourse.courseCode}</h3>
+              <button className="close-btn" onClick={() => setShowLabMarksModal(false)}>
                 <FontAwesomeIcon icon={faTimes} />
               </button>
             </div>
+
             <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', flex: '1 1 auto' }}>
-              {/* Attendance Configuration */}
-              <div style={{
-                marginBottom: '20px',
-                padding: '16px',
-                backgroundColor: '#fef3c7',
-                border: '1px solid #fde68a',
-                borderRadius: '6px',
-              }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
-                  Set Attendance Total Marks
-                </h4>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>Attendance Total Marks</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={attendanceTotalMarks}
-                    onChange={(e) => {
-                      let val = e.target.value ? parseInt(e.target.value) : 0;
-                      if (isNaN(val) || val < 0) val = 0;
-                      setAttendanceTotalMarks(val);
-                    }}
-                    style={{ width: '100px', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
-                  />
-                </div>
-              </div>
-
-              {/* Assignment Configuration */}
-              <div style={{
-                marginBottom: '20px',
-                padding: '16px',
-                backgroundColor: '#e0f2fe',
-                border: '1px solid #bae6fd',
-                borderRadius: '6px',
-              }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
-                  Set Assignment Marks
-                </h4>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>Number of Assignments</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={assignmentCount}
-                    onChange={(e) => {
-                      const n = parseInt(e.target.value) || 1;
-                      setAssignmentCount(Math.max(1, Math.min(n, 10)));
-                    }}
-                    style={{ width: '80px', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
-                  />
-                </div>
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                  gap: '12px' 
-                }}>
-                  {Array.from({ length: assignmentCount }, (_, assignIndex) => (
-                    <div key={assignIndex}>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '6px', color: '#374151' }}>
-                        Assignment {assignIndex + 1} Full Marks
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={assignmentTotalMarks[assignIndex]}
-                        onChange={(e) => {
-                          let val = e.target.value ? parseInt(e.target.value) : 0;
-                          if (isNaN(val) || val < 0) val = 0;
-                          const newTotals = [...assignmentTotalMarks];
-                          newTotals[assignIndex] = val;
-                          setAssignmentTotalMarks(newTotals);
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '4px',
-                          fontSize: '13px'
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ width: '100%', overflowX: 'auto' }}>
-                <table style={{
-                  width: '100%',
-                  minWidth: `${(isSmallScreen ? 200 : 320) + 110 + assignmentCount * 110}px`,
-                  borderCollapse: 'collapse',
-                  fontSize: '14px',
-                  tableLayout: 'fixed'
-                }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '2px solid #d1d5db' }}>
-                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, color: '#1f2937', position: 'sticky', left: 0, backgroundColor: '#f3f4f6', zIndex: 2, minWidth: '110px' }}>Roll</th>
-                    {!isSmallScreen && (
-                      <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, color: '#1f2937' }}>Name</th>
-                    )}
-                    <th style={{ padding: '12px', textAlign: 'center', fontWeight: 600, color: '#1f2937' }}>Attendance ({attendanceTotalMarks})</th>
-                    {assignmentTotalMarks.map((total, i) => (
-                      <th key={i} style={{ padding: '12px', textAlign: 'center', fontWeight: 600, color: '#1f2937' }}>Assign {i + 1} ({total})</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {attendanceData.map((student, idx) => (
-                    <tr key={student.studentId} style={{
-                      borderBottom: '1px solid #e5e7eb',
-                      backgroundColor: idx % 2 === 0 ? '#fff' : '#f9fafb'
-                    }}>
-                      <td style={{ padding: '12px', color: '#1f2937', fontWeight: 500, position: 'sticky', left: 0, backgroundColor: idx % 2 === 0 ? '#fff' : '#f9fafb', zIndex: 1 }}>
-                        {student.roll}
-                      </td>
-                      {!isSmallScreen && (
-                        <td style={{ padding: '12px', color: '#1f2937' }}>
-                          {student.name}
-                        </td>
-                      )}
-                      <td style={{ padding: '12px', textAlign: 'center' }}>
+              {labSettingsLoading ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>Loading existing lab data...</div>
+              ) : (
+                <>
+                  {/* Lab Settings Section */}
+                  <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#efe5ff', border: '1px solid #ddd6fe', borderRadius: '8px' }}>
+                    <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 700, color: '#374151' }}>Lab Activity Settings</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '14px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Activity Taken (1–5)</label>
                         <input
-                          type="number"
-                          min="0"
-                          max={attendanceTotalMarks}
-                          placeholder="0"
-                          value={student.attendance ?? ''}
-                          onChange={(e) => {
-                            let value = e.target.value ? parseInt(e.target.value) : '';
-                            if (value && value > attendanceTotalMarks) {
-                              value = attendanceTotalMarks;
-                            }
-                            const newData = [...attendanceData];
-                            newData[idx].attendance = value;
-                            setAttendanceData(newData);
+                          type="number" min={1} max={5}
+                          value={labSettings.activityTaken}
+                          onChange={e => {
+                            const v = Math.max(1, Math.min(5, parseInt(e.target.value) || 1));
+                            setLabSettings(prev => ({ ...prev, activityTaken: v }));
+                            setSelectedActivityUpload(`Activity1`);
                           }}
-                          style={{
-                            width: '100%',
-                            maxWidth: '70px',
-                            padding: '6px 8px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '4px',
-                            textAlign: 'center',
-                            fontSize: '13px'
-                          }}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
                         />
-                      </td>
-                      {Array.from({ length: assignmentCount }, (_, assignIndex) => (
-                        <td key={assignIndex} style={{ padding: '12px', textAlign: 'center' }}>
-                          <input
-                            type="number"
-                            min="0"
-                            max={assignmentTotalMarks[assignIndex]}
-                            placeholder="0"
-                            value={(student.assignments && student.assignments[assignIndex]) ?? ''}
-                            onChange={(e) => {
-                              let value = e.target.value ? parseInt(e.target.value) : '';
-                              if (value && value > assignmentTotalMarks[assignIndex]) {
-                                value = assignmentTotalMarks[assignIndex];
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Other Activity Remaining Marks /50</label>
+                        <input
+                          type="number" min={0} max={50}
+                          value={labSettings.otherActivityRemaining}
+                          onChange={e => setLabSettings(prev => ({ ...prev, otherActivityRemaining: Math.max(0, Math.min(50, parseFloat(e.target.value) || 0)) }))}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Other Activity Measured In</label>
+                        <input
+                          type="number" min={0} max={50}
+                          value={labSettings.otherActivityMeasured}
+                          onChange={e => setLabSettings(prev => ({ ...prev, otherActivityMeasured: Math.max(0, Math.min(50, parseFloat(e.target.value) || 0)) }))}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>CO Mapped Activity Marks out of 50</label>
+                        <input
+                          type="number" min={0} max={50}
+                          value={labSettings.coMappedActivityMarks}
+                          onChange={e => setLabSettings(prev => ({ ...prev, coMappedActivityMarks: Math.max(0, Math.min(50, parseFloat(e.target.value) || 0)) }))}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Use Eq. Wt for each Activity (0/1)</label>
+                        <input
+                          type="number" min={0} max={1} step={1}
+                          value={labSettings.useEqWtActivity}
+                          onChange={e => setLabSettings(prev => ({ ...prev, useEqWtActivity: Math.max(0, Math.min(1, parseInt(e.target.value) || 0)) }))}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Attn. Marks (0–50)</label>
+                        <input
+                          type="number" min={0} max={50}
+                          value={labSettings.attnMarks}
+                          onChange={e => setLabSettings(prev => ({ ...prev, attnMarks: Math.max(0, Math.min(50, parseFloat(e.target.value) || 0)) }))}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Quiz Marks (0–50)</label>
+                        <input
+                          type="number" min={0} max={50}
+                          value={labSettings.quizMarks}
+                          onChange={e => setLabSettings(prev => ({ ...prev, quizMarks: Math.max(0, Math.min(50, parseFloat(e.target.value) || 0)) }))}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>C. Viva Marks (0–50)</label>
+                        <input
+                          type="number" min={0} max={50}
+                          value={labSettings.vivaMarks}
+                          onChange={e => setLabSettings(prev => ({ ...prev, vivaMarks: Math.max(0, Math.min(50, parseFloat(e.target.value) || 0)) }))}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-primary"
+                      disabled={labSettingsSaving}
+                      onClick={async () => {
+                        setLabSettingsSaving(true);
+                        try {
+                          const existing = labExistingData || {};
+                          const fullData = {
+                            labActivityRows: existing.labActivityRows || [],
+                            labActivityFactors: existing.labActivityFactors || {},
+                            labActivityEqWts: existing.labActivityEqWts || {},
+                            labActivityManualWts: existing.labActivityManualWts || {},
+                            labAttendanceMarks: labSettings.attnMarks,
+                            labQuizMarks: labSettings.quizMarks,
+                            labVivaMarks: labSettings.vivaMarks,
+                            activityTaken: labSettings.activityTaken,
+                            otherActivityRemaining: labSettings.otherActivityRemaining,
+                            otherActivityMeasured: labSettings.otherActivityMeasured,
+                            coMappedActivityMarks: labSettings.coMappedActivityMarks,
+                            useEqWtActivity: labSettings.useEqWtActivity,
+                            labActivityObtainedRows: existing.labActivityObtainedRows || [],
+                          };
+                          await saveLabActivityData(labMarksCourse._id, fullData);
+                          setLabExistingData(prev => ({ ...(prev || {}), ...fullData }));
+                          setSuccessMessage('Lab settings saved');
+                          setTimeout(() => setSuccessMessage(''), 3000);
+                        } catch (err) {
+                          console.error('Error saving lab settings:', err);
+                          setError('Failed to save lab settings');
+                          setTimeout(() => setError(''), 3000);
+                        } finally {
+                          setLabSettingsSaving(false);
+                        }
+                      }}
+                      style={{ fontSize: '13px', padding: '8px 20px' }}
+                    >
+                      {labSettingsSaving ? 'Saving...' : 'Save Settings'}
+                    </button>
+                  </div>
+
+                  {/* Lab Activity Upload Section */}
+                  <div style={{ padding: '16px', border: '1px solid #d1fae5', backgroundColor: '#f0fdf4', borderRadius: '8px' }}>
+                    <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 700, color: '#374151' }}>Upload Activity Marks</h4>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Select Activity</label>
+                        <select
+                          value={selectedActivityUpload}
+                          onChange={e => { setSelectedActivityUpload(e.target.value); setLabUploadParsed(null); setLabUploadFile(null); }}
+                          style={{ padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', minWidth: '120px' }}
+                        >
+                          {Array.from({ length: labSettings.activityTaken }, (_, i) => (
+                            <option key={i} value={`Activity${i + 1}`}>Activity{i + 1}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={{ flex: 1, minWidth: '200px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Upload Excel / CSV</label>
+                        <input
+                          type="file"
+                          accept=".xlsx,.xls,.csv"
+                          onChange={e => { setLabUploadFile(e.target.files[0] || null); setLabUploadParsed(null); }}
+                          style={{ fontSize: '13px' }}
+                        />
+                      </div>
+                      <div style={{ alignSelf: 'flex-end' }}>
+                        <button
+                          className="btn btn-success"
+                          disabled={!labUploadFile || labUploadLoading}
+                          onClick={async () => {
+                            if (!labUploadFile) return;
+                            setLabUploadLoading(true);
+                            try {
+                              const result = await parseLabUpload(labMarksCourse._id, labUploadFile, selectedActivityUpload);
+                              if (result.success) {
+                                setLabUploadParsed(result.data);
+                              } else {
+                                setError(result.message || 'Failed to parse file');
+                                setTimeout(() => setError(''), 3000);
                               }
-                              const newData = [...attendanceData];
-                              const assignments = Array.from({ length: assignmentCount }, (_, i) => (newData[idx].assignments && newData[idx].assignments[i]) ?? '');
-                              assignments[assignIndex] = value;
-                              newData[idx].assignments = assignments;
-                              setAttendanceData(newData);
-                            }}
-                            style={{
-                              width: '100%',
-                              maxWidth: '70px',
-                              padding: '6px 8px',
-                              border: '1px solid #d1d5db',
-                              borderRadius: '4px',
-                              textAlign: 'center',
-                              fontSize: '13px'
-                            }}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-                </table>
-              </div>
+                            } catch (err) {
+                              console.error('Error parsing lab file:', err);
+                              setError(typeof err === 'string' ? err : 'Failed to parse file');
+                              setTimeout(() => setError(''), 3000);
+                            } finally {
+                              setLabUploadLoading(false);
+                            }
+                          }}
+                          style={{ fontSize: '13px', padding: '8px 16px', whiteSpace: 'nowrap' }}
+                        >
+                          {labUploadLoading ? 'Parsing...' : 'Parse File'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* File format hint */}
+                    <div style={{ marginBottom: '12px', padding: '10px', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', color: '#6b7280' }}>
+                      <strong>Expected file format:</strong><br />
+                      Row 1: <code>Manual Wt</code> | &lt;value&gt;<br />
+                      Row 2 (header): <code>Roll</code> | <em>[optional]</em> <code>Attn.</code> | <code>Quiz</code> | <code>C. Viva</code> | <code>Q1(&lt;total&gt;)(&lt;CO&gt;)</code> | <code>Q2(&lt;total&gt;)(&lt;CO&gt;)</code> | <code>Q3(&lt;total&gt;)(&lt;CO&gt;)</code> | <em>[optional]</em> <code>Other</code><br />
+                      Row 3+: roll | attn (optional) | quiz (optional) | viva (optional) | Q1 | Q2 | Q3 marks | other measured (optional)
+                    </div>
+
+                    {/* Parsed preview */}
+                    {labUploadParsed && (
+                      <div>
+                        <div style={{ marginBottom: '10px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>
+                            Preview: {selectedActivityUpload} — Manual Wt: <strong>{labUploadParsed.manualWt !== null ? labUploadParsed.manualWt : '(unchanged)'}</strong> — {labUploadParsed.rows.length} student(s)
+                          </span>
+                        </div>
+                        <div style={{ overflowX: 'auto', maxHeight: '260px', overflowY: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                            <thead>
+                              <tr style={{ backgroundColor: '#f3f4f6', position: 'sticky', top: 0 }}>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, border: '1px solid #e5e7eb' }}>Roll</th>
+                                {labUploadParsed.hasAttn && <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Attn.</th>}
+                                {labUploadParsed.hasQuiz && <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Quiz</th>}
+                                {labUploadParsed.hasViva && <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>C. Viva</th>}
+                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q1({labUploadParsed.q1Total}){labUploadParsed.q1CO ? `(${labUploadParsed.q1CO})` : ''}</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q2({labUploadParsed.q2Total}){labUploadParsed.q2CO ? `(${labUploadParsed.q2CO})` : ''}</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q3({labUploadParsed.q3Total}){labUploadParsed.q3CO ? `(${labUploadParsed.q3CO})` : ''}</th>
+                                {labUploadParsed.hasOther && <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Other</th>}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {labUploadParsed.rows.map((row, i) => (
+                                <tr key={i} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
+                                  <td style={{ padding: '7px 12px', border: '1px solid #e5e7eb' }}>{row.rollNumber}</td>
+                                  {[
+                                    ...(labUploadParsed.hasAttn ? ['attn'] : []),
+                                    ...(labUploadParsed.hasQuiz ? ['quiz'] : []),
+                                    ...(labUploadParsed.hasViva ? ['viva'] : []),
+                                    'q1', 'q2', 'q3',
+                                    ...(labUploadParsed.hasOther ? ['other'] : []),
+                                  ].map(f => {
+                                    const isAbsent = row[f] === 'A' || row[f] === 'Absent';
+                                    return (
+                                      <td key={f} style={{ padding: '7px 12px', textAlign: 'center', border: '1px solid #e5e7eb', color: isAbsent ? '#e74c3c' : undefined, fontStyle: isAbsent ? 'italic' : undefined }}>
+                                        {isAbsent ? 'Absent' : row[f]}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
-            <div className="modal-footer" style={{ padding: '16px 20px', display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'flex-end', width: '100%', boxSizing: 'border-box', backgroundColor: '#fff', borderTop: '1px solid #e5e7eb' }}>
-              <button
-                className="btn btn-outline"
-                onClick={() => setShowAttendanceModal(false)}
-                disabled={attendanceLoading}
-                style={{ flex: '0 0 auto', width: '120px', whiteSpace: 'nowrap' }}
-              >
-                Cancel
+
+            <div className="modal-footer" style={{ padding: '14px 20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', backgroundColor: '#fff', borderTop: '1px solid #e5e7eb' }}>
+              {labUploadParsed && (
+                <button
+                  className="btn btn-primary"
+                  disabled={labUploadSaving}
+                  onClick={async () => {
+                    setLabUploadSaving(true);
+                    try {
+                      const existing = labExistingData || {};
+                      const actKey = selectedActivityUpload;
+                      const newManualWts = { ...(existing.labActivityManualWts || {}), ...(labUploadParsed.manualWt !== null ? { [actKey.charAt(0).toLowerCase() + actKey.slice(1)]: labUploadParsed.manualWt } : {}) };
+                      const q1Field = `${actKey}_Q1`;
+                      const q2Field = `${actKey}_Q2`;
+                      const q3Field = `${actKey}_Q3`;
+
+                      const parsedMap = {};
+                      labUploadParsed.rows.forEach(parsed => {
+                        if (parsed.rollNumber && parsed.rollNumber.toLowerCase() !== 'roll') {
+                          parsedMap[parsed.rollNumber] = parsed;
+                        }
+                      });
+
+                      // Update only existing obtained rows
+                      const existingObtained = (Array.isArray(existing.labActivityObtainedRows) ? existing.labActivityObtainedRows : [])
+                        .filter(r => r.rollNumber && r.rollNumber.toLowerCase() !== 'roll')
+                        .map(r => {
+                          const match = parsedMap[r.rollNumber];
+                          if (match) {
+                            return {
+                              ...r,
+                              attn: match.attn !== null ? match.attn : (r.attn ?? 0),
+                              quiz: match.quiz !== null ? match.quiz : (r.quiz ?? 0),
+                              viva: match.viva !== null ? match.viva : (r.viva ?? 0),
+                              [q1Field]: match.q1 !== null ? match.q1 : (r[q1Field] ?? 0),
+                              [q2Field]: match.q2 !== null ? match.q2 : (r[q2Field] ?? 0),
+                              [q3Field]: match.q3 !== null ? match.q3 : (r[q3Field] ?? 0),
+                              ...(labUploadParsed.hasOther && match.other !== null ? { otherMeasured: match.other } : {}),
+                            };
+                          }
+                          return r;
+                        });
+
+                      // Update labActivityRows CO mapping
+                      const coSet = new Set((existing.labActivityRows || []).map(r => r.coNumber).filter(Boolean));
+                      if (labUploadParsed.hasQ1 && labUploadParsed.q1CO) coSet.add(labUploadParsed.q1CO);
+                      if (labUploadParsed.hasQ2 && labUploadParsed.q2CO) coSet.add(labUploadParsed.q2CO);
+                      if (labUploadParsed.hasQ3 && labUploadParsed.q3CO) coSet.add(labUploadParsed.q3CO);
+
+                      const updatedLabRows = [...coSet].map(coNumber => {
+                        const existingRow = (existing.labActivityRows || []).find(r => r.coNumber === coNumber) || { coNumber };
+                        const newRow = { ...existingRow };
+                        if (labUploadParsed.hasQ1 && labUploadParsed.q1CO != null) {
+                          newRow[q1Field] = labUploadParsed.q1CO === coNumber ? labUploadParsed.q1Total : 0;
+                        }
+                        if (labUploadParsed.hasQ2 && labUploadParsed.q2CO != null) {
+                          newRow[q2Field] = labUploadParsed.q2CO === coNumber ? labUploadParsed.q2Total : 0;
+                        }
+                        if (labUploadParsed.hasQ3 && labUploadParsed.q3CO != null) {
+                          newRow[q3Field] = labUploadParsed.q3CO === coNumber ? labUploadParsed.q3Total : 0;
+                        }
+                        return newRow;
+                      });
+
+                      const existingRollSet = new Set(existingObtained.map(r => r.rollNumber));
+                      const newStudentsLab = labUploadParsed.rows
+                        .filter(p => p.rollNumber && p.rollNumber.toLowerCase() !== 'roll' && !existingRollSet.has(p.rollNumber))
+                        .map(p => ({
+                          rollNumber: p.rollNumber,
+                          attn: p.attn ?? 0,
+                          quiz: p.quiz ?? 0,
+                          viva: p.viva ?? 0,
+                          [q1Field]: p.q1 ?? 0,
+                          [q2Field]: p.q2 ?? 0,
+                          [q3Field]: p.q3 ?? 0,
+                          ...(labUploadParsed.hasOther && p.other !== null ? { otherMeasured: p.other } : {}),
+                        }));
+                      const fullData = {
+                        labActivityRows: updatedLabRows,
+                        labActivityFactors: existing.labActivityFactors || {},
+                        labActivityManualWts: newManualWts,
+                        labActivityEqWts: existing.labActivityEqWts || {},
+                        labAttendanceMarks: labSettings.attnMarks,
+                        labQuizMarks: labSettings.quizMarks,
+                        labVivaMarks: labSettings.vivaMarks,
+                        activityTaken: labSettings.activityTaken,
+                        otherActivityRemaining: labSettings.otherActivityRemaining,
+                        otherActivityMeasured: labSettings.otherActivityMeasured,
+                        coMappedActivityMarks: labSettings.coMappedActivityMarks,
+                        useEqWtActivity: labSettings.useEqWtActivity,
+                        labActivityObtainedRows: [...existingObtained, ...newStudentsLab],
+                      };
+
+                      await saveLabActivityData(labMarksCourse._id, fullData);
+                      setLabExistingData(prev => ({ ...(prev || {}), ...fullData }));
+                      setSuccessMessage(`${actKey} marks saved successfully`);
+                      setTimeout(() => setSuccessMessage(''), 3000);
+                      setLabUploadParsed(null);
+                      setLabUploadFile(null);
+                    } catch (err) {
+                      console.error('Error saving lab upload:', err);
+                      setError('Failed to save lab data');
+                      setTimeout(() => setError(''), 3000);
+                    } finally {
+                      setLabUploadSaving(false);
+                    }
+                  }}
+                  style={{ fontSize: '13px', padding: '8px 20px' }}
+                >
+                  {labUploadSaving ? 'Saving...' : `Save ${selectedActivityUpload} Data`}
+                </button>
+              )}
+              <button className="btn btn-outline" onClick={() => setShowLabMarksModal(false)} style={{ width: '100px' }}>
+                Close
               </button>
-              <button
-                className="btn btn-primary"
-                onClick={async () => {
-                  try {
-                    setAttendanceLoading(true);
-                    // Save attendance total marks to course
-                    await updateCourse(attendanceCourse._id, { 
-                      attendanceMarks: attendanceTotalMarks 
-                    });
-                    setShowAttendanceModal(false);
-                    setSuccessMessage('Attendance & Assignment Marks saved successfully');
-                    setTimeout(() => setSuccessMessage(''), 3000);
-                  } catch (err) {
-                    setError(err.error || 'Failed to save marks');
-                    setTimeout(() => setError(''), 3000);
-                  } finally {
-                    setAttendanceLoading(false);
-                  }
-                }}
-                disabled={attendanceLoading}
-                style={{ flex: '0 0 auto', width: '120px', whiteSpace: 'nowrap' }}
-              >
-                Save Marks
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Attendance & Assignment Marks Modal */}
+      {showAttendanceModal && attendanceCourse && (
+        <div className="modal-overlay" onClick={() => setShowAttendanceModal(false)}>
+          <div className="modal-content" style={{ width: '95vw', maxWidth: '720px', maxHeight: '90vh', borderRadius: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ padding: '20px 24px', position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ margin: 0 }}>Attendance & Assignments - {attendanceCourse.courseCode}</h3>
+              <button className="close-btn" onClick={() => setShowAttendanceModal(false)}>
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', flex: '1 1 auto' }}>
+              {assignSettingsLoading ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>Loading existing assignment data...</div>
+              ) : (
+                <>
+                  {/* Assignment Settings Section */}
+                  <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#fef3c7', border: '1px solid #fde68a', borderRadius: '8px' }}>
+                    <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 700, color: '#374151' }}>Assignment &amp; Attendance Settings</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '14px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Assign. Taken (1–3)</label>
+                        <input
+                          type="number" min={1} max={3}
+                          value={assignSettings.assignTaken}
+                          onChange={e => {
+                            const v = Math.max(1, Math.min(3, parseInt(e.target.value) || 1));
+                            setAssignSettings(prev => ({ ...prev, assignTaken: v }));
+                            setSelectedAssignUpload('Assgn1');
+                          }}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Assignment Marks out of 30</label>
+                        <input
+                          type="number" min={0} max={30}
+                          value={assignSettings.assignmentMarks30}
+                          onChange={e => setAssignSettings(prev => ({ ...prev, assignmentMarks30: Math.max(0, Math.min(30, parseFloat(e.target.value) || 0)) }))}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Use Eq. Wt (0/1)</label>
+                        <input
+                          type="number" min={0} max={1} step={1}
+                          value={assignSettings.useEqWt}
+                          onChange={e => setAssignSettings(prev => ({ ...prev, useEqWt: Math.max(0, Math.min(1, parseInt(e.target.value) || 0)) }))}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Attendance Performance (0–30)</label>
+                        <input
+                          type="number" min={0} max={30}
+                          value={assignSettings.attendancePerformance}
+                          onChange={e => setAssignSettings(prev => ({ ...prev, attendancePerformance: Math.max(0, Math.min(30, parseFloat(e.target.value) || 0)) }))}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-primary"
+                      disabled={assignSettingsSaving}
+                      onClick={async () => {
+                        setAssignSettingsSaving(true);
+                        try {
+                          const existing = assignExistingData || {};
+                          const fullData = {
+                            assignmentRows: existing.assignmentRows || [],
+                            assignmentManualWts: existing.assignmentManualWts || {},
+                            assignmentSummary: {
+                              assignTaken: assignSettings.assignTaken,
+                              assignmentMarks30: assignSettings.assignmentMarks30,
+                              useEqWt: assignSettings.useEqWt,
+                              attendancePerformance: assignSettings.attendancePerformance,
+                            },
+                            attendanceMarks: existing.attendanceMarks || 0,
+                            attnAssignObtainedRows: existing.attnAssignObtainedRows || [],
+                          };
+                          await saveAssignmentData(attendanceCourse._id, fullData);
+                          setAssignExistingData(prev => ({ ...(prev || {}), ...fullData }));
+                          setSuccessMessage('Assignment settings saved');
+                          setTimeout(() => setSuccessMessage(''), 3000);
+                        } catch (err) {
+                          console.error('Error saving assignment settings:', err);
+                          setError('Failed to save assignment settings');
+                          setTimeout(() => setError(''), 3000);
+                        } finally {
+                          setAssignSettingsSaving(false);
+                        }
+                      }}
+                      style={{ fontSize: '13px', padding: '8px 20px' }}
+                    >
+                      {assignSettingsSaving ? 'Saving...' : 'Save Settings'}
+                    </button>
+                  </div>
+
+                  {/* Assignment Upload Section */}
+                  <div style={{ padding: '16px', border: '1px solid #d1fae5', backgroundColor: '#f0fdf4', borderRadius: '8px' }}>
+                    <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 700, color: '#374151' }}>Upload Assignment Marks</h4>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Select Assignment</label>
+                        <select
+                          value={selectedAssignUpload}
+                          onChange={e => { setSelectedAssignUpload(e.target.value); setAssignUploadParsed(null); setAssignUploadFile(null); }}
+                          style={{ padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', minWidth: '120px' }}
+                        >
+                          {Array.from({ length: assignSettings.assignTaken }, (_, i) => (
+                            <option key={i} value={`Assgn${i + 1}`}>Assgn{i + 1}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={{ flex: 1, minWidth: '200px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Upload Excel / CSV</label>
+                        <input
+                          type="file"
+                          accept=".xlsx,.xls,.csv"
+                          onChange={e => { setAssignUploadFile(e.target.files[0] || null); setAssignUploadParsed(null); }}
+                          style={{ fontSize: '13px' }}
+                        />
+                      </div>
+                      <div style={{ alignSelf: 'flex-end' }}>
+                        <button
+                          className="btn btn-success"
+                          disabled={!assignUploadFile || assignUploadLoading}
+                          onClick={async () => {
+                            if (!assignUploadFile) return;
+                            setAssignUploadLoading(true);
+                            try {
+                              const result = await parseAssignUpload(attendanceCourse._id, assignUploadFile, selectedAssignUpload);
+                              if (result.success) {
+                                setAssignUploadParsed(result.data);
+                              } else {
+                                setError(result.message || 'Failed to parse file');
+                                setTimeout(() => setError(''), 3000);
+                              }
+                            } catch (err) {
+                              console.error('Error parsing assignment file:', err);
+                              setError(typeof err === 'string' ? err : 'Failed to parse file');
+                              setTimeout(() => setError(''), 3000);
+                            } finally {
+                              setAssignUploadLoading(false);
+                            }
+                          }}
+                          style={{ fontSize: '13px', padding: '8px 16px', whiteSpace: 'nowrap' }}
+                        >
+                          {assignUploadLoading ? 'Parsing...' : 'Parse File'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* File format hint */}
+                    <div style={{ marginBottom: '12px', padding: '10px', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', color: '#6b7280' }}>
+                      <strong>Expected file format:</strong><br />
+                      Row 1: <code>Manual Wt</code> | &lt;value&gt;<br />
+                      Row 2 (header): <code>Roll</code> | <em>[optional]</em> <code>Attn. Perf.</code> | <code>Q1(&lt;total&gt;)(&lt;CO&gt;)</code> | <code>Q2(&lt;total&gt;)(&lt;CO&gt;)</code> | <code>Q3(&lt;total&gt;)(&lt;CO&gt;)</code><br />
+                      Row 3+: roll | attn perf (optional) | Q1 | Q2 | Q3 marks
+                    </div>
+
+                    {/* Parsed preview */}
+                    {assignUploadParsed && (
+                      <div>
+                        <div style={{ marginBottom: '10px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>
+                            Preview: {selectedAssignUpload} — Manual Wt: <strong>{assignUploadParsed.manualWt !== null ? assignUploadParsed.manualWt : '(unchanged)'}</strong> — {assignUploadParsed.rows.length} student(s)
+                          </span>
+                        </div>
+                        <div style={{ overflowX: 'auto', maxHeight: '260px', overflowY: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                            <thead>
+                              <tr style={{ backgroundColor: '#f3f4f6', position: 'sticky', top: 0 }}>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, border: '1px solid #e5e7eb' }}>Roll</th>
+                                {assignUploadParsed.hasAttnPerf && <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Attn. Perf.</th>}
+                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q1({assignUploadParsed.q1Total}){assignUploadParsed.q1CO ? `(${assignUploadParsed.q1CO})` : ''}</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q2({assignUploadParsed.q2Total}){assignUploadParsed.q2CO ? `(${assignUploadParsed.q2CO})` : ''}</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q3({assignUploadParsed.q3Total}){assignUploadParsed.q3CO ? `(${assignUploadParsed.q3CO})` : ''}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {assignUploadParsed.rows.map((row, i) => (
+                                <tr key={i} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
+                                  <td style={{ padding: '7px 12px', border: '1px solid #e5e7eb' }}>{row.rollNumber}</td>
+                                  {[
+                                    ...(assignUploadParsed.hasAttnPerf ? ['attnPerf'] : []),
+                                    'q1', 'q2', 'q3',
+                                  ].map(f => {
+                                    const isAbsent = row[f] === 'A' || row[f] === 'Absent';
+                                    return (
+                                      <td key={f} style={{ padding: '7px 12px', textAlign: 'center', border: '1px solid #e5e7eb', color: isAbsent ? '#e74c3c' : undefined, fontStyle: isAbsent ? 'italic' : undefined }}>
+                                        {isAbsent ? 'Absent' : row[f]}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="modal-footer" style={{ padding: '14px 20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', backgroundColor: '#fff', borderTop: '1px solid #e5e7eb' }}>
+              {assignUploadParsed && (
+                <button
+                  className="btn btn-primary"
+                  disabled={assignUploadSaving}
+                  onClick={async () => {
+                    setAssignUploadSaving(true);
+                    try {
+                      const existing = assignExistingData || {};
+                      const assgnKey = selectedAssignUpload; // e.g. 'Assgn1'
+                      const q1Field = `${assgnKey}_Q1`;
+                      const q2Field = `${assgnKey}_Q2`;
+                      const q3Field = `${assgnKey}_Q3`;
+
+                      const parsedMap = {};
+                      assignUploadParsed.rows.forEach(p => {
+                        if (p.rollNumber && p.rollNumber.toLowerCase() !== 'roll') {
+                          parsedMap[p.rollNumber] = p;
+                        }
+                      });
+
+                      // Merge parsed rows into existing obtained rows (or create from parsed if none exist)
+                      const existingObtained = (Array.isArray(existing.attnAssignObtainedRows) ? existing.attnAssignObtainedRows : [])
+                        .filter(r => r.rollNumber && r.rollNumber.toLowerCase() !== 'roll');
+
+                      let updatedObtained;
+                      if (existingObtained.length > 0) {
+                        updatedObtained = existingObtained.map(r => {
+                          const match = parsedMap[r.rollNumber];
+                          if (match) {
+                            return {
+                              ...r,
+                              ...(assignUploadParsed.hasAttnPerf && match.attnPerf !== null ? { attendance: match.attnPerf } : {}),
+                              [q1Field]: match.q1 !== null ? match.q1 : (r[q1Field] ?? 0),
+                              [q2Field]: match.q2 !== null ? match.q2 : (r[q2Field] ?? 0),
+                              [q3Field]: match.q3 !== null ? match.q3 : (r[q3Field] ?? 0),
+                            };
+                          }
+                          return r;
+                        });
+                        const existingRollSet = new Set(existingObtained.map(r => r.rollNumber));
+                        const newStudentsAssign = assignUploadParsed.rows
+                          .filter(p => p.rollNumber && p.rollNumber.toLowerCase() !== 'roll' && !existingRollSet.has(p.rollNumber))
+                          .map(p => ({
+                            rollNumber: p.rollNumber,
+                            attendance: assignUploadParsed.hasAttnPerf ? (p.attnPerf ?? 0) : 0,
+                            [q1Field]: p.q1 ?? 0,
+                            [q2Field]: p.q2 ?? 0,
+                            [q3Field]: p.q3 ?? 0,
+                          }));
+                        updatedObtained = [...updatedObtained, ...newStudentsAssign];
+                      } else {
+                        updatedObtained = assignUploadParsed.rows
+                          .filter(p => p.rollNumber && p.rollNumber.toLowerCase() !== 'roll')
+                          .map(p => ({
+                            rollNumber: p.rollNumber,
+                            attendance: assignUploadParsed.hasAttnPerf ? (p.attnPerf ?? 0) : 0,
+                            [q1Field]: p.q1 ?? 0,
+                            [q2Field]: p.q2 ?? 0,
+                            [q3Field]: p.q3 ?? 0,
+                          }));
+                      }
+
+                      // Update assignmentManualWts for this assignment
+                      const newManualWts = { ...(existing.assignmentManualWts || {}), ...(assignUploadParsed.manualWt !== null ? { [assgnKey]: assignUploadParsed.manualWt } : {}) };
+
+                      // Update assignmentRows CO mapping
+                      const coSet = new Set((existing.assignmentRows || []).map(r => r.coNumber).filter(Boolean));
+                      if (assignUploadParsed.hasQ1 && assignUploadParsed.q1CO) coSet.add(assignUploadParsed.q1CO);
+                      if (assignUploadParsed.hasQ2 && assignUploadParsed.q2CO) coSet.add(assignUploadParsed.q2CO);
+                      if (assignUploadParsed.hasQ3 && assignUploadParsed.q3CO) coSet.add(assignUploadParsed.q3CO);
+
+                      const updatedAssignmentRows = [...coSet].map(coNumber => {
+                        const existingRow = (existing.assignmentRows || []).find(r => r.coNumber === coNumber) || { coNumber };
+                        const newRow = { ...existingRow };
+                        if (assignUploadParsed.hasQ1 && assignUploadParsed.q1CO != null) {
+                          newRow[q1Field] = assignUploadParsed.q1CO === coNumber ? assignUploadParsed.q1Total : 0;
+                        }
+                        if (assignUploadParsed.hasQ2 && assignUploadParsed.q2CO != null) {
+                          newRow[q2Field] = assignUploadParsed.q2CO === coNumber ? assignUploadParsed.q2Total : 0;
+                        }
+                        if (assignUploadParsed.hasQ3 && assignUploadParsed.q3CO != null) {
+                          newRow[q3Field] = assignUploadParsed.q3CO === coNumber ? assignUploadParsed.q3Total : 0;
+                        }
+                        return newRow;
+                      });
+
+                      const fullData = {
+                        assignmentRows: updatedAssignmentRows,
+                        assignmentManualWts: newManualWts,
+                        assignmentSummary: {
+                          assignTaken: assignSettings.assignTaken,
+                          assignmentMarks30: assignSettings.assignmentMarks30,
+                          useEqWt: assignSettings.useEqWt,
+                          attendancePerformance: assignSettings.attendancePerformance,
+                        },
+                        attendanceMarks: existing.attendanceMarks || 0,
+                        attnAssignObtainedRows: updatedObtained,
+                      };
+
+                      await saveAssignmentData(attendanceCourse._id, fullData);
+                      setAssignExistingData(prev => ({ ...(prev || {}), ...fullData }));
+                      setSuccessMessage(`${assgnKey} marks saved successfully`);
+                      setTimeout(() => setSuccessMessage(''), 3000);
+                      setAssignUploadParsed(null);
+                      setAssignUploadFile(null);
+                    } catch (err) {
+                      console.error('Error saving assignment upload:', err);
+                      const errMsg = err && (err.error || err.message || (typeof err === 'string' ? err : null));
+                      setError(errMsg || 'Failed to save assignment data');
+                      setTimeout(() => setError(''), 5000);
+                    } finally {
+                      setAssignUploadSaving(false);
+                    }
+                  }}
+                  style={{ fontSize: '13px', padding: '8px 20px' }}
+                >
+                  {assignUploadSaving ? 'Saving...' : `Save ${selectedAssignUpload} Data`}
+                </button>
+              )}
+              <button className="btn btn-outline" onClick={() => setShowAttendanceModal(false)} style={{ width: '100px' }}>
+                Close
               </button>
             </div>
           </div>

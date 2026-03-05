@@ -8,26 +8,13 @@ const LabActivitySheet = ({
   labQuizMarks,
   labVivaMarks,
   labActivityManualWts,
-  labActivitySaveStatus,
   activityTaken,
   otherActivityRemaining,
   otherActivityMeasured,
   coMappedActivityMarks,
   useEqWtActivity,
-  setLabAttendanceMarks,
-  setLabQuizMarks,
-  setLabVivaMarks,
-  setActivityTaken,
-  setOtherActivityRemaining,
-  setOtherActivityMeasured,
-  setCoMappedActivityMarks,
-  setUseEqWtActivity,
-  setLabActivityObtainedRows,
   setShowLabActivityGeneratedModal,
   setShowLabActivityObtainedModal,
-  handleManualSaveLabActivity,
-  handleLabActivityCellChange,
-  handleLabActivityManualWtChange,
   labActivityActivityTotals,
   computeLabActivityMeasuredTotal,
   computeLabActivityCOTotal,
@@ -38,20 +25,6 @@ const LabActivitySheet = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
         <h2 style={{ margin: 0 }}>Allocated Marks for Lab activity</h2>
         <div className="action-buttons-container">
-          {labActivitySaveStatus && (
-            <div className={`save-status-badge ${labActivitySaveStatus}`}>
-              {labActivitySaveStatus === 'saving' && '💾 Saving...'}
-              {labActivitySaveStatus === 'saved' && '✓ Saved'}
-              {labActivitySaveStatus === 'error' && '✗ Error saving'}
-            </div>
-          )}
-          <button
-            onClick={handleManualSaveLabActivity}
-            disabled={labActivitySaveStatus === 'saving'}
-            className="btn-professional btn-save"
-          >
-            {labActivitySaveStatus === 'saving' ? 'Saving...' : 'Save Table'}
-          </button>
           <button
             onClick={() => setShowLabActivityGeneratedModal(true)}
             className="btn-professional btn-primary"
@@ -87,21 +60,9 @@ const LabActivitySheet = ({
                   <th rowSpan="2">Measured Total</th>
                 </tr>
                 <tr>
-                  <th>
-                    <input type="number" min="0" value={labAttendanceMarks}
-                      onChange={(e) => setLabAttendanceMarks(Number(e.target.value))}
-                      style={{ width: '50px' }} />
-                  </th>
-                  <th>
-                    <input type="number" min="0" value={labQuizMarks}
-                      onChange={(e) => setLabQuizMarks(Number(e.target.value))}
-                      style={{ width: '50px' }} />
-                  </th>
-                  <th>
-                    <input type="number" min="0" value={labVivaMarks}
-                      onChange={(e) => setLabVivaMarks(Number(e.target.value))}
-                      style={{ width: '50px' }} />
-                  </th>
+                  <th>{labAttendanceMarks || 0}</th>
+                  <th>{labQuizMarks || 0}</th>
+                  <th>{labVivaMarks || 0}</th>
                   {Array.from({ length: activityTaken || 5 }, (_, i) => (
                     <React.Fragment key={`q-headers-${i + 1}`}>
                       <th>Q1</th>
@@ -121,22 +82,10 @@ const LabActivitySheet = ({
                     {Array.from({ length: activityTaken || 5 }, (_, activityIndex) => {
                       const activityNum = activityIndex + 1;
                       return (
-                        <React.Fragment key={`activity-inputs-${activityNum}`}>
-                          <td>
-                            <input type="number" min="0" value={row[`Activity${activityNum}_Q1`]}
-                              onChange={(e) => handleLabActivityCellChange(idx, `Activity${activityNum}_Q1`, e.target.value)}
-                              style={{ width: '60px' }} />
-                          </td>
-                          <td>
-                            <input type="number" min="0" value={row[`Activity${activityNum}_Q2`]}
-                              onChange={(e) => handleLabActivityCellChange(idx, `Activity${activityNum}_Q2`, e.target.value)}
-                              style={{ width: '60px' }} />
-                          </td>
-                          <td>
-                            <input type="number" min="0" value={row[`Activity${activityNum}_Q3`]}
-                              onChange={(e) => handleLabActivityCellChange(idx, `Activity${activityNum}_Q3`, e.target.value)}
-                              style={{ width: '60px' }} />
-                          </td>
+                        <React.Fragment key={`activity-vals-${activityNum}`}>
+                          <td style={{ textAlign: 'center' }}>{row[`Activity${activityNum}_Q1`] || 0}</td>
+                          <td style={{ textAlign: 'center' }}>{row[`Activity${activityNum}_Q2`] || 0}</td>
+                          <td style={{ textAlign: 'center' }}>{row[`Activity${activityNum}_Q3`] || 0}</td>
                         </React.Fragment>
                       );
                     })}
@@ -275,11 +224,8 @@ const LabActivitySheet = ({
                     const activityNum = activityIndex + 1;
                     const activityKey = `activity${activityNum}`;
                     return (
-                      <td key={`manualwt-${activityKey}`} colSpan="3">
-                        <input type="number" min="0"
-                          value={labActivityManualWts[activityKey] || 0}
-                          onChange={(e) => handleLabActivityManualWtChange(activityKey, e.target.value)}
-                          style={{ width: '80px' }} />
+                      <td key={`manualwt-${activityKey}`} colSpan="3" style={{ textAlign: 'center', fontWeight: 'bold' }}>
+                        {labActivityManualWts[activityKey] || 0}
                       </td>
                     );
                   })}
@@ -313,57 +259,17 @@ const LabActivitySheet = ({
             </table>
           </div>
 
-          {/* Summary Config Table */}
+          {/* Summary Config Table — read-only */}
           <div className="table-wrapper" style={{ marginTop: '20px' }}>
             <table className="ct-table">
               <tbody>
-                <tr>
-                  <td>Activity Taken</td>
-                  <td><input type="number" min="0" value={activityTaken}
-                    onChange={(e) => setActivityTaken(Number(e.target.value))}
-                    style={{ width: '80px' }} /></td>
-                </tr>
-                <tr>
-                  <td>Other Activity remaining marks /50</td>
-                  <td><input type="number" min="0" value={otherActivityRemaining}
-                    onChange={(e) => setOtherActivityRemaining(Number(e.target.value))}
-                    style={{ width: '80px' }} /></td>
-                </tr>
-                <tr>
-                  <td>Other Activity Measured in</td>
-                  <td><input type="number" min="0" value={otherActivityMeasured}
-                    onChange={(e) => setOtherActivityMeasured(Number(e.target.value))}
-                    style={{ width: '80px' }} /></td>
-                </tr>
-                <tr>
-                  <td>CO Mapped Activity Marks out of 50</td>
-                  <td><input type="number" min="0" value={coMappedActivityMarks}
-                    onChange={(e) => setCoMappedActivityMarks(Number(e.target.value))}
-                    style={{ width: '80px' }} /></td>
-                </tr>
-                <tr>
-                  <td>Use Eq. Wt for each activity</td>
-                  <td><input type="number" min="0" value={useEqWtActivity}
-                    onChange={(e) => setUseEqWtActivity(Number(e.target.value))}
-                    style={{ width: '80px' }} /></td>
-                </tr>
+                <tr><td>Activity Taken</td><td style={{ fontWeight: 600 }}>{activityTaken || 0}</td></tr>
+                <tr><td>Other Activity remaining marks /50</td><td style={{ fontWeight: 600 }}>{otherActivityRemaining || 0}</td></tr>
+                <tr><td>Other Activity Measured in</td><td style={{ fontWeight: 600 }}>{otherActivityMeasured || 0}</td></tr>
+                <tr><td>CO Mapped Activity Marks out of 50</td><td style={{ fontWeight: 600 }}>{coMappedActivityMarks || 0}</td></tr>
+                <tr><td>Use Eq. Wt for each activity</td><td style={{ fontWeight: 600 }}>{useEqWtActivity || 0}</td></tr>
               </tbody>
             </table>
-          </div>
-
-          {/* Summary Save Button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '15px', gap: '15px' }}>
-            {labActivitySaveStatus && (
-              <div className={`save-status-badge ${labActivitySaveStatus}`}>
-                {labActivitySaveStatus === 'saving' && '💾 Saving...'}
-                {labActivitySaveStatus === 'saved' && '✓ Saved'}
-                {labActivitySaveStatus === 'error' && '✗ Error saving'}
-              </div>
-            )}
-            <button onClick={handleManualSaveLabActivity} disabled={labActivitySaveStatus === 'saving'}
-              className="btn-professional btn-save">
-              {labActivitySaveStatus === 'saving' ? 'Saving...' : 'Save Table'}
-            </button>
           </div>
 
           {/* Obtained Marks Section */}
@@ -371,17 +277,6 @@ const LabActivitySheet = ({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '15px' }}>
               <h3>Obtained Marks</h3>
               <div className="action-buttons-container">
-                {labActivitySaveStatus && (
-                  <div className={`save-status-badge ${labActivitySaveStatus}`}>
-                    {labActivitySaveStatus === 'saving' && '💾 Saving...'}
-                    {labActivitySaveStatus === 'saved' && '✓ Saved'}
-                    {labActivitySaveStatus === 'error' && '✗ Error saving'}
-                  </div>
-                )}
-                <button onClick={handleManualSaveLabActivity} disabled={labActivitySaveStatus === 'saving'}
-                  className="btn-professional btn-save">
-                  {labActivitySaveStatus === 'saving' ? 'Saving...' : 'Save Table'}
-                </button>
                 <button onClick={() => setShowLabActivityObtainedModal(true)} className="btn-professional btn-primary">
                   Generated Tables
                 </button>
@@ -427,56 +322,26 @@ const LabActivitySheet = ({
                   {labActivityObtainedRows.length > 0 ? labActivityObtainedRows.map((row, idx) => (
                     <tr key={`lab-${row.rollNumber}-${idx}`}>
                       <td>{row.rollNumber || '-'}</td>
-                      <td>
-                        <input type="number" min="0" value={row.attn || 0}
-                          onChange={e => {
-                            const updatedRows = [...labActivityObtainedRows];
-                            updatedRows[idx] = { ...row, attn: Number(e.target.value) };
-                            setLabActivityObtainedRows(updatedRows);
-                          }} style={{ width: '80px' }} />
-                      </td>
-                      <td>
-                        <input type="number" min="0" value={row.quiz || 0}
-                          onChange={e => {
-                            const updatedRows = [...labActivityObtainedRows];
-                            updatedRows[idx] = { ...row, quiz: Number(e.target.value) };
-                            setLabActivityObtainedRows(updatedRows);
-                          }} style={{ width: '80px' }} />
-                      </td>
-                      <td>
-                        <input type="number" min="0" value={row.viva || 0}
-                          onChange={e => {
-                            const updatedRows = [...labActivityObtainedRows];
-                            updatedRows[idx] = { ...row, viva: Number(e.target.value) };
-                            setLabActivityObtainedRows(updatedRows);
-                          }} style={{ width: '80px' }} />
-                      </td>
+                      <td style={{ textAlign: 'center' }}>{row.attn != null && row.attn !== '' ? row.attn : 0}</td>
+                      <td style={{ textAlign: 'center' }}>{row.quiz != null && row.quiz !== '' ? row.quiz : 0}</td>
+                      <td style={{ textAlign: 'center' }}>{row.viva != null && row.viva !== '' ? row.viva : 0}</td>
                       {Array.from({ length: activityTaken || 5 }, (_, activityIndex) => {
                         const activityNum = activityIndex + 1;
                         return (
                           <React.Fragment key={`activity-${activityNum}`}>
-                            {['Q1','Q2','Q3'].map(q => (
-                              <td key={q}>
-                                <input type="number" min="0"
-                                  value={row[`Activity${activityNum}_${q}`] || 0}
-                                  onChange={e => {
-                                    const updatedRows = [...labActivityObtainedRows];
-                                    updatedRows[idx] = { ...row, [`Activity${activityNum}_${q}`]: Number(e.target.value) };
-                                    setLabActivityObtainedRows(updatedRows);
-                                  }} style={{ width: '80px' }} />
-                              </td>
-                            ))}
+                            {['Q1', 'Q2', 'Q3'].map(q => {
+                              const val = row[`Activity${activityNum}_${q}`];
+                              const isAbsent = val === 'A' || val === 'Absent';
+                              return (
+                                <td key={q} style={{ textAlign: 'center', color: isAbsent ? '#e74c3c' : undefined, fontStyle: isAbsent ? 'italic' : undefined }}>
+                                  {isAbsent ? 'Absent' : (val != null ? val : 0)}
+                                </td>
+                              );
+                            })}
                           </React.Fragment>
                         );
                       })}
-                      <td>
-                        <input type="number" min="0" value={row.otherMeasured || 0}
-                          onChange={e => {
-                            const updatedRows = [...labActivityObtainedRows];
-                            updatedRows[idx] = { ...row, otherMeasured: Number(e.target.value) };
-                            setLabActivityObtainedRows(updatedRows);
-                          }} style={{ width: '80px' }} />
-                      </td>
+                      <td style={{ textAlign: 'center' }}>{row.otherMeasured || 0}</td>
                       <td style={{ textAlign: 'center', fontWeight: 'bold' }}>
                         {(() => {
                           const totals = labActivityActivityTotals();

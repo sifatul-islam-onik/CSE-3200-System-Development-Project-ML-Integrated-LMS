@@ -2309,12 +2309,11 @@ const AttainmentView = () => {
   };
 
   const assignmentSums = () => {
-    let assgn1 = 0, assgn2 = 0, assgn3 = 0;
-    assignmentRows.forEach(r => {
-      assgn1 += (r.Assgn1_Q1 || 0) + (r.Assgn1_Q2 || 0) + (r.Assgn1_Q3 || 0);
-      assgn2 += (r.Assgn2_Q1 || 0) + (r.Assgn2_Q2 || 0) + (r.Assgn2_Q3 || 0);
-      assgn3 += (r.Assgn3_Q1 || 0) + (r.Assgn3_Q2 || 0) + (r.Assgn3_Q3 || 0);
-    });
+    // Each Q column maps to exactly one CO (all others are 0), so use max across rows
+    const maxQ = (field) => Math.max(0, ...assignmentRows.map(r => r[field] || 0));
+    const assgn1 = maxQ('Assgn1_Q1') + maxQ('Assgn1_Q2') + maxQ('Assgn1_Q3');
+    const assgn2 = maxQ('Assgn2_Q1') + maxQ('Assgn2_Q2') + maxQ('Assgn2_Q3');
+    const assgn3 = maxQ('Assgn3_Q1') + maxQ('Assgn3_Q2') + maxQ('Assgn3_Q3');
     return { assgn1, assgn2, assgn3 };
   };
 
@@ -3100,16 +3099,26 @@ const AttainmentView = () => {
   // Helper function to calculate total marks for a student (sum of all CO attainments)
   const getLabActivityStudentTotalMarks = (studentRow) => {
     try {
-      // Sum of Attn, Quiz, C. Viva, Other, and CO wise mapped marks
       let total = 0;
 
-      // Add Attn, Quiz, Viva, and Other
-      total += parseFloat(studentRow.attn || 0);
-      total += parseFloat(studentRow.quiz || 0);
-      total += parseFloat(studentRow.viva || 0);
-      total += parseFloat(studentRow.other || 0);
+      // Add Attn, Quiz, Viva — use parseFloat(x)||0 so 'A' (absent) → NaN → 0
+      total += parseFloat(studentRow.attn) || 0;
+      total += parseFloat(studentRow.quiz) || 0;
+      total += parseFloat(studentRow.viva) || 0;
 
-      // Add all CO mapped marks (2nd CO wise obtained marks column)
+      // Add factored Other: compute from otherMeasured (stored by TeacherDashboard upload),
+      // falling back to the pre-computed 'other' field (stored by old AttainmentView save).
+      const rawOther = parseFloat(studentRow.otherMeasured) || 0;
+      if (rawOther > 0 && (otherActivityRemaining || 0) > 0) {
+        const totals = labActivityActivityTotals();
+        let measuredTotal = (labAttendanceMarks || 0) + (labQuizMarks || 0) + (labVivaMarks || 0);
+        for (let i = 1; i <= (activityTaken || 5); i++) measuredTotal += totals[`activity${i}`] || 0;
+        total += measuredTotal > 0 ? rawOther * ((otherActivityRemaining || 0) / measuredTotal) : 0;
+      } else {
+        total += parseFloat(studentRow.other) || 0;
+      }
+
+      // Add all CO mapped marks (factored activity marks for each CO)
       labActivityRows.forEach(coRow => {
         total += getLabActivityStudentCOMappedMarks(studentRow, coRow.coNumber);
       });
@@ -3134,26 +3143,20 @@ const AttainmentView = () => {
     return 'F';
   };
 
-  // Helper function to get grade color
+  // Helper function to get grade color (green → yellow-green → yellow → orange → red)
   const getGradeColor = (grade) => {
     switch (grade) {
-      case 'A+':
-      case 'A':
-      case 'A-':
-        return '#27ae60'; // Green
-      case 'B+':
-      case 'B':
-      case 'B-':
-        return '#3498db'; // Blue
-      case 'C+':
-      case 'C':
-        return '#138d75'; // Orange
-      case 'D':
-        return '#e67e22'; // Dark Orange
-      case 'F':
-        return '#e74c3c'; // Red
-      default:
-        return '#2c3e50'; // Default dark
+      case 'A+': return '#006400'; // dark green
+      case 'A':  return '#228b22'; // forest green
+      case 'A-': return '#32cd32'; // lime green
+      case 'B+': return '#9acd32'; // yellow-green
+      case 'B':  return '#ffd700'; // gold
+      case 'B-': return '#ffa500'; // orange
+      case 'C+': return '#ff6600'; // dark orange
+      case 'C':  return '#ff3300'; // red-orange
+      case 'D':  return '#cc0000'; // dark red
+      case 'F':  return '#e00000'; // danger red
+      default:   return '#2c3e50';
     }
   };
 
@@ -4017,16 +4020,8 @@ const AttainmentView = () => {
               assignmentRows={assignmentRows}
               attnAssignObtainedRows={attnAssignObtainedRows}
               attendanceMarks={attendanceMarks}
-              setAttendanceMarks={setAttendanceMarks}
               assignmentManualWts={assignmentManualWts}
-              setAssignmentManualWts={setAssignmentManualWts}
               assignmentSummary={assignmentSummary}
-              setAssignmentSummary={setAssignmentSummary}
-              saveStatus={saveStatus}
-              setAttnAssignObtainedRows={setAttnAssignObtainedRows}
-              handleManualSaveAssignment={handleManualSaveAssignment}
-              handleAssignmentCellChange={handleAssignmentCellChange}
-              handleAssignmentManualWtChange={handleAssignmentManualWtChange}
               setShowGeneratedTableModal={setShowGeneratedTableModal}
               setShowObtainedGeneratedModal={setShowObtainedGeneratedModal}
               getActiveAssignments={getActiveAssignments}
