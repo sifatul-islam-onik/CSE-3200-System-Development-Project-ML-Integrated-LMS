@@ -6,16 +6,9 @@ const CTSheet = ({
   ctManualWts,
   ctSummary,
   ctObtainedRows,
-  saveStatus,
   // Setters
-  setCtSummary,
   setShowGeneratedTableModal,
   setShowObtainedGeneratedModal,
-  // Handlers
-  handleManualSave,
-  handleCTCellChange,
-  handleObtainedCellChange,
-  handleManualWtChange,
   // Computed helpers (functions)
   getActiveCTs,
   getActiveCTFields,
@@ -34,20 +27,6 @@ const CTSheet = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
         <h2 style={{ margin: 0 }}>CO mapping of Class Test Marks</h2>
         <div className="action-buttons-container">
-          {saveStatus && (
-            <div className={`save-status-badge ${saveStatus}`}>
-              {saveStatus === 'saving' && '💾 Saving...'}
-              {saveStatus === 'saved' && '✓ Saved'}
-              {saveStatus === 'error' && '✗ Error saving'}
-            </div>
-          )}
-          <button
-            onClick={handleManualSave}
-            disabled={saveStatus === 'saving'}
-            className="btn-professional btn-save"
-          >
-            {saveStatus === 'saving' ? 'Saving...' : 'Save Table'}
-          </button>
           <button
             onClick={() => setShowGeneratedTableModal(true)}
             className="btn-professional btn-primary"
@@ -81,14 +60,8 @@ const CTSheet = ({
               <tr key={row.coNumber || idx}>
                 <td className="co-label">{row.coNumber || '-'}</td>
                 {getActiveCTFields().map(field => (
-                  <td key={field}>
-                    <input
-                      type="number"
-                      min="0"
-                      value={row[field]}
-                      onChange={(e) => handleCTCellChange(idx, field, e.target.value)}
-                      style={{ width: '80px' }}
-                    />
+                  <td key={field} style={{ textAlign: 'center' }}>
+                    {row[field] ?? 0}
                   </td>
                 ))}
                 <td className="co-total">{computeCOTotal(row)}</td>
@@ -139,14 +112,8 @@ const CTSheet = ({
             <tr>
               <td className="footer-label">Manual Wt</td>
               {getActiveCTs().map(ct => (
-                <td key={ct} colSpan={3}>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={ctManualWts[ct] ?? 0}
-                    onChange={(e) => handleManualWtChange(ct, e.target.value)}
-                    style={{ width: '80px' }}
-                  />
+                <td key={ct} colSpan={3} style={{ textAlign: 'center' }}>
+                  {formatNumber(ctManualWts[ct] ?? 0)}
                 </td>
               ))}
               <td><strong>{formatNumber(sumManualWtTotal())}</strong></td>
@@ -184,60 +151,24 @@ const CTSheet = ({
         </table>
       </div>
 
-      {/* CT summary table */}
+      {/* CT summary table (read-only) */}
       <div className="table-wrapper" style={{ marginTop: '20px' }}>
         <table className="ct-table">
           <tbody>
             <tr>
               <td style={{ backgroundColor: '#f8f9fa', fontWeight: 600 }}>CTs Taken</td>
-              <td>
-                <input
-                  type="number" min={0} max={3} style={{ width: '80px' }}
-                  value={ctSummary.ctTaken}
-                  onChange={e => setCtSummary(prev => ({ ...prev, ctTaken: Math.max(0, Math.min(3, Number(e.target.value) || 0)) }))}
-                />
-              </td>
+              <td style={{ paddingLeft: '12px' }}>{ctSummary.ctTaken ?? 0}</td>
             </tr>
             <tr>
               <td style={{ backgroundColor: '#f8f9fa', fontWeight: 600 }}>CT Marks out of 60</td>
-              <td>
-                <input
-                  type="number" min={0} max={60} style={{ width: '80px' }}
-                  value={ctSummary.coMappedMarks60}
-                  onChange={e => setCtSummary(prev => ({ ...prev, coMappedMarks60: Math.max(0, Math.min(60, Number(e.target.value) || 0)) }))}
-                />
-              </td>
+              <td style={{ paddingLeft: '12px' }}>{ctSummary.coMappedMarks60 ?? 0}</td>
             </tr>
             <tr>
               <td style={{ backgroundColor: '#f8f9fa', fontWeight: 600 }}>Use Eq. Wt</td>
-              <td>
-                <input
-                  type="number" step="0.01" style={{ width: '80px' }}
-                  value={ctSummary.useEqWt}
-                  onChange={e => setCtSummary(prev => ({ ...prev, useEqWt: Number(e.target.value) || 0 }))}
-                />
-              </td>
+              <td style={{ paddingLeft: '12px' }}>{ctSummary.useEqWt ?? 0}</td>
             </tr>
           </tbody>
         </table>
-      </div>
-
-      {/* Save Summary Button */}
-      <div className="action-buttons-container" style={{ marginTop: '10px', justifyContent: 'flex-end' }}>
-        {saveStatus && (
-          <div className={`save-status-badge ${saveStatus}`}>
-            {saveStatus === 'saving' && '💾 Saving...'}
-            {saveStatus === 'saved' && '✓ Saved'}
-            {saveStatus === 'error' && '✗ Error saving'}
-          </div>
-        )}
-        <button
-          onClick={handleManualSave}
-          disabled={saveStatus === 'saving'}
-          className="btn-professional btn-save"
-        >
-          {saveStatus === 'saving' ? 'Saving...' : 'Save Summary'}
-        </button>
       </div>
 
       {/* Obtained Marks for Class Tests */}
@@ -249,20 +180,6 @@ const CTSheet = ({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
               <h3 style={{ margin: 0 }}>Obtained Marks for Class Tests</h3>
               <div className="action-buttons-container">
-                {saveStatus && (
-                  <div className={`save-status-badge ${saveStatus}`}>
-                    {saveStatus === 'saving' && '💾 Saving...'}
-                    {saveStatus === 'saved' && '✓ Saved'}
-                    {saveStatus === 'error' && '✗ Error saving'}
-                  </div>
-                )}
-                <button
-                  onClick={handleManualSave}
-                  disabled={saveStatus === 'saving'}
-                  className="btn-professional btn-save"
-                >
-                  {saveStatus === 'saving' ? 'Saving...' : 'Save Table'}
-                </button>
                 <button
                   onClick={() => setShowObtainedGeneratedModal(true)}
                   className="btn-professional btn-primary"
@@ -297,17 +214,19 @@ const CTSheet = ({
                     <tr key={`ct-${row.rollNumber}-${idx}`}>
                       <td className="roll-cell" title={row.name || row.rollNumber}>{row.rollNumber || '-'}</td>
                       {getActiveCTFields().map(field => (
-                        <td key={`obt_${field}_${idx}`}>
-                          <input
-                            type="number"
-                            min="0"
-                            value={row[field]}
-                            onChange={(e) => handleObtainedCellChange(idx, field, e.target.value)}
-                            style={{ width: '80px' }}
-                          />
+                        <td key={`obt_${field}_${idx}`} style={{ textAlign: 'center', color: row[field] === 'A' ? '#e74c3c' : undefined, fontStyle: row[field] === 'A' ? 'italic' : undefined }}>
+                          {row[field] === 'A' ? 'Absent' : (row[field] ?? 0)}
                         </td>
                       ))}
-                      <td className="row-total">{computeObtainedTotal(row)}</td>
+                      {(() => {
+                        const activeFields = getActiveCTFields();
+                        const allAbsent = activeFields.length > 0 && activeFields.every(f => row[f] === 'A' || row[f] === 'Absent');
+                        return (
+                          <td className="row-total" style={{ color: allAbsent ? '#e74c3c' : undefined, fontStyle: allAbsent ? 'italic' : undefined }}>
+                            {allAbsent ? 'Absent' : computeObtainedTotal(row)}
+                          </td>
+                        );
+                      })()}
                     </tr>
                   ))}
                   {ctObtainedRows.length === 0 && (

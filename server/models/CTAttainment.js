@@ -43,15 +43,15 @@ const ctAttainmentSchema = new mongoose.Schema({
   ctObtainedRows: [{
     rollNumber: String,
     name: String,
-    CT1_Q1: { type: Number, default: 0 },
-    CT1_Q2: { type: Number, default: 0 },
-    CT1_Q3: { type: Number, default: 0 },
-    CT2_Q1: { type: Number, default: 0 },
-    CT2_Q2: { type: Number, default: 0 },
-    CT2_Q3: { type: Number, default: 0 },
-    CT3_Q1: { type: Number, default: 0 },
-    CT3_Q2: { type: Number, default: 0 },
-    CT3_Q3: { type: Number, default: 0 }
+    CT1_Q1: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    CT1_Q2: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    CT1_Q3: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    CT2_Q1: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    CT2_Q2: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    CT2_Q3: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    CT3_Q1: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    CT3_Q2: { type: mongoose.Schema.Types.Mixed, default: 0 },
+    CT3_Q3: { type: mongoose.Schema.Types.Mixed, default: 0 }
   }],
   updatedBy: {
     type: mongoose.Schema.Types.ObjectId,

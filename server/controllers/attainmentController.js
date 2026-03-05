@@ -282,6 +282,130 @@ exports.getCTData = async (req, res) => {
 };
 
 /**
+ * Parse an uploaded CT Excel/CSV file and return structured data
+ * POST /api/attainment/ct/:courseId/parse-upload
+ * Accepts multipart file upload. File format:
+ *   Row 1: "Manual Wt" | <value>
+ *   Row 2: "Roll" | "Q1(<total>)" | "Q2(<total>)" | "Q3(<total>)"
+ *   Row 3+: rollNumber | q1Val | q2Val | q3Val
+ */
+exports.parseCTUpload = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    const { courseId } = req.params;
+
+    const course = await Course.findById(courseId).select('assignedTeachers').lean();
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    if (req.user.role === 'teacher') {
+      const isAssigned = course.assignedTeachers.some(assignment => {
+        const teacherId = assignment.teacher?._id || assignment.teacher;
+        return teacherId.toString() === req.user._id.toString();
+      });
+      if (!isAssigned) {
+        return res.status(403).json({ success: false, message: 'Access denied.' });
+      }
+    }
+
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+
+    const fileName = req.file.originalname.toLowerCase();
+    const isCSV = fileName.endsWith('.csv') || req.file.mimetype === 'text/csv' || req.file.mimetype === 'application/csv';
+
+    if (isCSV) {
+      const { Readable } = require('stream');
+      const stream = Readable.from(req.file.buffer.toString('utf-8'));
+      await workbook.csv.read(stream);
+    } else {
+      await workbook.xlsx.load(req.file.buffer);
+    }
+
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet) {
+      return res.status(400).json({ success: false, message: 'No worksheet found in file' });
+    }
+
+    const totalRows = worksheet.rowCount;
+    let manualWt = 0;
+    let q1Total = 0, q2Total = 0, q3Total = 0;
+    let dataStartRow = -1;
+
+    const extractTotal = (cellValue) => {
+      const str = (cellValue == null ? '' : cellValue).toString();
+      const match = str.match(/\((\d+(?:\.\d+)?)\)/);
+      return match ? parseFloat(match[1]) : 0;
+    };
+
+    // Scan rows to find Manual Wt row and the header row with "Roll"
+    for (let r = 1; r <= totalRows; r++) {
+      const row = worksheet.getRow(r);
+      const col1 = (row.getCell(1).value == null ? '' : row.getCell(1).value).toString().trim();
+      const col2 = row.getCell(2).value;
+
+      if (col1.toLowerCase() === 'manual wt') {
+        manualWt = parseFloat(col2) || 0;
+        continue;
+      }
+
+      // The header row has "Roll" in col A and Q labels (possibly with totals) in cols 2-4
+      if (col1.toLowerCase() === 'roll') {
+        q1Total = extractTotal(row.getCell(2).value);
+        q2Total = extractTotal(row.getCell(3).value);
+        q3Total = extractTotal(row.getCell(4).value);
+        dataStartRow = r + 1;
+        break;
+      }
+    }
+
+    if (dataStartRow === -1) {
+      return res.status(400).json({ success: false, message: 'Could not find header row with "Roll" column in file' });
+    }
+
+    // Data rows - skip empty rows, stop only when we've hit 5 consecutive empty rows
+    const rows = [];
+    let emptyStreak = 0;
+    for (let rowNum = dataStartRow; rowNum <= totalRows; rowNum++) {
+      const dataRow = worksheet.getRow(rowNum);
+      const rawRoll = dataRow.getCell(1).value;
+      if (rawRoll === null || rawRoll === undefined || rawRoll === '') {
+        emptyStreak++;
+        if (emptyStreak >= 5) break;
+        continue;
+      }
+      emptyStreak = 0;
+      const rollStr = rawRoll.toString().trim();
+      if (!rollStr || rollStr.toLowerCase() === 'roll') continue;
+      const parseCTCellValue = (raw) => {
+        if (raw === null || raw === undefined) return 0;
+        const str = raw.toString().trim();
+        if (str.toLowerCase() === 'a') return 'A';
+        return parseFloat(str) || 0;
+      };
+      rows.push({
+        rollNumber: rollStr,
+        q1: parseCTCellValue(dataRow.getCell(2).value),
+        q2: parseCTCellValue(dataRow.getCell(3).value),
+        q3: parseCTCellValue(dataRow.getCell(4).value),
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: { manualWt, q1Total, q2Total, q3Total, rows }
+    });
+  } catch (error) {
+    console.error('Error parsing CT upload:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
  * Get term exam marks for attainment calculations
  * GET /api/attainment/term/:courseId
  */
