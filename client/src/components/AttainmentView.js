@@ -30,7 +30,7 @@ import {
   saveSectionAData,
   getSectionAData,
 } from '../services/attainmentService';
-import { getCourseProfile, getCombinedCourseProfile } from '../services/courseProfileService';
+import { getCourseProfile, getCombinedCourseProfile, updateCOCorrelation } from '../services/courseProfileService';
 import { getCourseStudents } from '../services/courseService';
 import { getAllCourses } from '../services/courseService';
 import { getAllProgramOutcomes } from '../services/programOutcomeService';
@@ -3710,8 +3710,11 @@ const AttainmentView = () => {
     if (!editingCLOCell) return;
     try {
       setSaving(true);
-      // TODO: Save CLO-PLO correlation to database
-      // For now, just update local state
+      // Find the CLO to get its _id and the course _id
+      const clo = clos.find(c => c.cloNumber === editingCLOCell.cloNumber);
+      if (clo && clo._id && selectedCourse && selectedCourse._id && editingCLOCell.field === 'cloPloCorrelation') {
+        await updateCOCorrelation(selectedCourse._id, clo._id, editingCLOCell.value);
+      }
       const updatedClos = clos.map(clo =>
         clo.cloNumber === editingCLOCell.cloNumber
           ? { ...clo, cloPloCorrelation: editingCLOCell.value }

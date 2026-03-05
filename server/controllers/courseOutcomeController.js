@@ -176,18 +176,26 @@ exports.getCourseOutcomes = async (req, res) => {
 
 // @desc    Update a course outcome
 // @route   PUT /api/courses/:courseId/outcomes/:outcomeId
-// @access  Admin only
+// @access  Admin only (or teacher updating co_po_correlation only)
 exports.updateCourseOutcome = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    const { courseId, outcomeId } = req.params;
+    const { co_code, description, co_po_correlation } = req.body;
+
+    // Teachers may only update co_po_correlation
+    const isTeacher = req.user.role === 'teacher';
+    if (isTeacher && (co_code !== undefined || description !== undefined)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Teachers can only update CO-PO correlation.'
+      });
+    }
+    if (!isTeacher && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Admin privileges required.'
       });
     }
-
-    const { courseId, outcomeId } = req.params;
-    const { co_code, description } = req.body;
 
     const outcome = await CourseOutcome.findOne({
       _id: outcomeId,
@@ -219,6 +227,7 @@ exports.updateCourseOutcome = async (req, res) => {
 
     if (co_code) outcome.co_code = co_code;
     if (description) outcome.description = description;
+    if (co_po_correlation !== undefined) outcome.co_po_correlation = co_po_correlation;
 
     await outcome.save();
 
@@ -459,11 +468,13 @@ exports.getCourseProfileData = async (req, res) => {
         .sort((a, b) => a - b);
 
       return {
+        _id: co._id,
+        co_code: co.co_code,
         cloNumber: co.co_code.replace('CO', 'CLO'),
         description: co.description,
         bloomLevels,
         ploAssessed: mappedPos.join(', '),
-        cloPloCorrelation: '', // Initially blank, editable
+        cloPloCorrelation: co.co_po_correlation || '',
         sourceType: co._sourceType || currentCourseType // 'theory', 'lab', or 'both'
       };
     });

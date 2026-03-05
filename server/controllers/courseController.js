@@ -355,6 +355,7 @@ exports.createCourse = async (req, res) => {
             course: course._id,
             co_code: coData.co_code,
             description: coData.description,
+            co_po_correlation: coData.co_po_correlation || '',
             taxonomy_levels: coData.taxonomy_levels || []
           }], { session });
 
@@ -548,6 +549,7 @@ exports.getAllCourses = async (req, res) => {
             const poMappings = await COPOMapping.find({ course_outcome: co._id });
             return {
               ...co.toObject(),
+              co_po_correlation: co.co_po_correlation || '',
               po_mappings: poMappings.map(m => ({
                 program_outcome_code: m.program_outcome_code,
                 level: m.level,
@@ -634,6 +636,7 @@ exports.getCourse = async (req, res) => {
         const poMappings = await COPOMapping.find({ course_outcome: co._id });
         return {
           ...co.toObject(),
+          co_po_correlation: co.co_po_correlation || '',
           po_mappings: poMappings.map(m => ({
             program_outcome_code: m.program_outcome_code,
             level: m.level,
@@ -1020,6 +1023,7 @@ exports.updateCourse = async (req, res) => {
                 }
                 targetCO.co_code = newCode;
                 targetCO.description = coData.description;
+                targetCO.co_po_correlation = coData.co_po_correlation || '';
                 targetCO.taxonomy_levels = coData.taxonomy_levels || [];
                 targetCO.is_deleted = false;
                 await targetCO.save({ session });
@@ -1049,6 +1053,7 @@ exports.updateCourse = async (req, res) => {
               if (targetCO) {
                 // Active CO exists – update in place
                 targetCO.description = coData.description;
+                targetCO.co_po_correlation = coData.co_po_correlation || '';
                 targetCO.taxonomy_levels = coData.taxonomy_levels || [];
                 await targetCO.save({ session });
                 coStats.updated++;
@@ -1058,6 +1063,7 @@ exports.updateCourse = async (req, res) => {
                   course: course._id,
                   co_code: coCodeNorm,
                   description: coData.description,
+                  co_po_correlation: coData.co_po_correlation || '',
                   taxonomy_levels: coData.taxonomy_levels || []
                 }], { session });
                 targetCO = newCO;
