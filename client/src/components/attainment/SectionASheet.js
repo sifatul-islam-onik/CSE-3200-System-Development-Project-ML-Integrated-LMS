@@ -4,9 +4,6 @@ const SectionASheet = ({
   clos,
   sectionARows,
   sectionAObtainedRows,
-  sectionASaveStatus,
-  handleManualSaveSectionA,
-  handleSectionACellChange,
   computeSectionAObtainedTotal,
   sectionAQuestionTotals,
   setShowSectionAGeneratedModal,
@@ -19,27 +16,7 @@ const SectionASheet = ({
           Allocated marks for Section-A in final question
         </h2>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <button
-            onClick={handleManualSaveSectionA}
-            disabled={sectionASaveStatus === 'saving'}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: sectionASaveStatus === 'saving' ? '#95a5a6' : '#27ae60',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: sectionASaveStatus === 'saving' ? 'not-allowed' : 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            {sectionASaveStatus === 'saving' ? 'Saving...' : 'Save Table'}
-          </button>
-          {sectionASaveStatus === 'saved' && (
-            <span style={{ color: '#27ae60', fontSize: '14px', fontWeight: 'bold' }}>✓ Saved</span>
-          )}
-          {sectionASaveStatus === 'error' && (
-            <span style={{ color: '#e74c3c', fontSize: '14px', fontWeight: 'bold' }}>✗ Error</span>
-          )}
+          <span style={{ fontSize: '13px', color: '#7f8c8d', fontStyle: 'italic' }}>Edit via "Marks Distribution" in Enter Term Marks</span>
           <button
             onClick={() => setShowSectionAGeneratedModal(true)}
             style={{
@@ -85,33 +62,17 @@ const SectionASheet = ({
                 {sectionARows.map((row, idx) => (
                   <tr key={row.coNumber || idx}>
                     <td className="co-label">{row.coNumber || '-'}</td>
-                    {['Q1a','Q1b','Q1c','Q1d'].map((f, fi) => (
-                      <td key={f}>
-                        <input type="number" min="0" value={row[f]}
-                          onChange={(e) => handleSectionACellChange(idx, f, e.target.value)}
-                          style={{ width: '80px' }} />
-                      </td>
+                    {['Q1a','Q1b','Q1c','Q1d'].map((f) => (
+                      <td key={f} style={{ textAlign: 'center' }}>{row[f] || 0}</td>
                     ))}
                     {['Q2a','Q2b','Q2c','Q2d'].map((f, fi) => (
-                      <td key={f} style={fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}}>
-                        <input type="number" min="0" value={row[f]}
-                          onChange={(e) => handleSectionACellChange(idx, f, e.target.value)}
-                          style={{ width: '80px' }} />
-                      </td>
+                      <td key={f} style={{ ...(fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}), textAlign: 'center' }}>{row[f] || 0}</td>
                     ))}
                     {['Q3a','Q3b','Q3c','Q3d'].map((f, fi) => (
-                      <td key={f} style={fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}}>
-                        <input type="number" min="0" value={row[f]}
-                          onChange={(e) => handleSectionACellChange(idx, f, e.target.value)}
-                          style={{ width: '80px' }} />
-                      </td>
+                      <td key={f} style={{ ...(fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}), textAlign: 'center' }}>{row[f] || 0}</td>
                     ))}
                     {['Q4a','Q4b','Q4c','Q4d'].map((f, fi) => (
-                      <td key={f} style={fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}}>
-                        <input type="number" min="0" value={row[f]}
-                          onChange={(e) => handleSectionACellChange(idx, f, e.target.value)}
-                          style={{ width: '80px' }} />
-                      </td>
+                      <td key={f} style={{ ...(fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}), textAlign: 'center' }}>{row[f] || 0}</td>
                     ))}
                   </tr>
                 ))}
