@@ -607,6 +607,13 @@ const TeacherDashboard = () => {
                                 </div>
                               </div>
                               <div className="course-item-actions">
+                                {(() => {
+                                  const courseCode = (course.courseCode || '').toLowerCase();
+                                  const lastDigitMatch = courseCode.match(/(\d)(?:\s*)$/);
+                                  const lastDigitNum = lastDigitMatch ? parseInt(lastDigitMatch[1]) : NaN;
+                                  const isTheoryCourse = !isNaN(lastDigitNum) && lastDigitNum % 2 === 1;
+                                  return (
+                                <>
                                 <button
                                   className="btn btn-sm btn-secondary"
                                   onClick={() => {
@@ -618,6 +625,7 @@ const TeacherDashboard = () => {
                                 >
                                   <FontAwesomeIcon icon={faEye} /> View
                                 </button>
+                                {isTheoryCourse && <>
                                 <button
                                   className="btn btn-sm btn-success"
                                   onClick={async () => {
@@ -708,12 +716,16 @@ const TeacherDashboard = () => {
                                 >
                                   <FontAwesomeIcon icon={faClipboardList} /> Attendance & Assignments
                                 </button>
+                                </>}
                                 <button
                                   className="btn btn-sm btn-primary"
                                   onClick={() => openEditProposal(course)}
                                 >
                                   <FontAwesomeIcon icon={faEdit} /> Propose Edit
                                 </button>
+                                </>
+                                  );
+                                })()}
                               </div>
                             </div>
                             );
@@ -1329,9 +1341,9 @@ const TeacherDashboard = () => {
                               <thead>
                                 <tr style={{ backgroundColor: '#f3f4f6', position: 'sticky', top: 0 }}>
                                   <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, border: '1px solid #e5e7eb' }}>Roll</th>
-                                  <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q1 ({ctUploadParsed.q1Total})</th>
-                                  <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q2 ({ctUploadParsed.q2Total})</th>
-                                  <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q3 ({ctUploadParsed.q3Total})</th>
+                                  <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q1({ctUploadParsed.q1Total}){ctUploadParsed.q1CO ? `(${ctUploadParsed.q1CO})` : ''}</th>
+                                  <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q2({ctUploadParsed.q2Total}){ctUploadParsed.q2CO ? `(${ctUploadParsed.q2CO})` : ''}</th>
+                                  <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q3({ctUploadParsed.q3Total}){ctUploadParsed.q3CO ? `(${ctUploadParsed.q3CO})` : ''}</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -1388,8 +1400,35 @@ const TeacherDashboard = () => {
                           }
                           return r;
                         });
+                      // Build updated ctRows from CO mapping in upload headers
+                      // A Q with (0) and no CO label is inactive — explicitly zero it out
+                      const coSet = new Set((existing.ctRows || []).map(r => r.coNumber).filter(Boolean));
+                      if (ctUploadParsed.q1CO) coSet.add(ctUploadParsed.q1CO);
+                      if (ctUploadParsed.q2CO) coSet.add(ctUploadParsed.q2CO);
+                      if (ctUploadParsed.q3CO) coSet.add(ctUploadParsed.q3CO);
+                      const updatedCtRows = [...coSet].map(coNumber => {
+                        const existingRow = (existing.ctRows || []).find(r => r.coNumber === coNumber) || { coNumber };
+                        const newRow = { ...existingRow };
+                        // q has CO label → allocate marks; q has no CO but total=0 → zero out; q has no CO and nonzero → keep existing
+                        if (ctUploadParsed.q1CO != null) {
+                          newRow[q1Field] = ctUploadParsed.q1CO === coNumber ? ctUploadParsed.q1Total : 0;
+                        } else if (ctUploadParsed.q1Total === 0) {
+                          newRow[q1Field] = 0;
+                        }
+                        if (ctUploadParsed.q2CO != null) {
+                          newRow[q2Field] = ctUploadParsed.q2CO === coNumber ? ctUploadParsed.q2Total : 0;
+                        } else if (ctUploadParsed.q2Total === 0) {
+                          newRow[q2Field] = 0;
+                        }
+                        if (ctUploadParsed.q3CO != null) {
+                          newRow[q3Field] = ctUploadParsed.q3CO === coNumber ? ctUploadParsed.q3Total : 0;
+                        } else if (ctUploadParsed.q3Total === 0) {
+                          newRow[q3Field] = 0;
+                        }
+                        return newRow;
+                      });
                       const fullData = {
-                        ctRows: existing.ctRows || [],
+                        ctRows: updatedCtRows,
                         ctFactors: existing.ctFactors || {},
                         ctManualWts: newManualWts,
                         ctEqWts: existing.ctEqWts || {},

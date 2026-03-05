@@ -334,12 +334,27 @@ exports.parseCTUpload = async (req, res) => {
     const totalRows = worksheet.rowCount;
     let manualWt = 0;
     let q1Total = 0, q2Total = 0, q3Total = 0;
+    let q1CO = null, q2CO = null, q3CO = null;
     let dataStartRow = -1;
 
     const extractTotal = (cellValue) => {
       const str = (cellValue == null ? '' : cellValue).toString();
       const match = str.match(/\((\d+(?:\.\d+)?)\)/);
       return match ? parseFloat(match[1]) : 0;
+    };
+
+    // Extract CO label from format like "Q1(5)(CO1)" or "Q1(5)(CLO1)" → "CO1"
+    const extractCO = (cellValue) => {
+      const str = (cellValue == null ? '' : cellValue).toString();
+      const matches = [...str.matchAll(/\(([^)]+)\)/g)];
+      // Second parenthetical group holds the CO/CLO label
+      if (matches.length >= 2) {
+        const co = matches[1][1].trim();
+        if (!co) return null;
+        // Normalize CLO → CO so it matches coNumber keys in ctRows
+        return co.replace(/^CLO/i, 'CO');
+      }
+      return null;
     };
 
     // Scan rows to find Manual Wt row and the header row with "Roll"
@@ -353,11 +368,14 @@ exports.parseCTUpload = async (req, res) => {
         continue;
       }
 
-      // The header row has "Roll" in col A and Q labels (possibly with totals) in cols 2-4
+      // The header row has "Roll" in col A and Q labels in cols 2-4
       if (col1.toLowerCase() === 'roll') {
         q1Total = extractTotal(row.getCell(2).value);
         q2Total = extractTotal(row.getCell(3).value);
         q3Total = extractTotal(row.getCell(4).value);
+        q1CO = extractCO(row.getCell(2).value);
+        q2CO = extractCO(row.getCell(3).value);
+        q3CO = extractCO(row.getCell(4).value);
         dataStartRow = r + 1;
         break;
       }
@@ -397,7 +415,7 @@ exports.parseCTUpload = async (req, res) => {
 
     return res.json({
       success: true,
-      data: { manualWt, q1Total, q2Total, q3Total, rows }
+      data: { manualWt, q1Total, q2Total, q3Total, q1CO, q2CO, q3CO, rows }
     });
   } catch (error) {
     console.error('Error parsing CT upload:', error);
