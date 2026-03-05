@@ -3950,9 +3950,6 @@ const AttainmentView = () => {
               clos={clos}
               sectionARows={sectionARows}
               sectionAObtainedRows={sectionAObtainedRows}
-              sectionASaveStatus={sectionASaveStatus}
-              handleManualSaveSectionA={handleManualSaveSectionA}
-              handleSectionACellChange={handleSectionACellChange}
               computeSectionAObtainedTotal={computeSectionAObtainedTotal}
               sectionAQuestionTotals={sectionAQuestionTotals}
               setShowSectionAGeneratedModal={setShowSectionAGeneratedModal}
@@ -3966,9 +3963,6 @@ const AttainmentView = () => {
               clos={clos}
               sectionBRows={sectionBRows}
               sectionBObtainedRows={sectionBObtainedRows}
-              sectionBSaveStatus={sectionBSaveStatus}
-              handleManualSaveSectionB={handleManualSaveSectionB}
-              handleSectionBCellChange={handleSectionBCellChange}
               computeSectionBObtainedTotal={computeSectionBObtainedTotal}
               sectionBQuestionTotals={sectionBQuestionTotals}
               setShowSectionBGeneratedModal={setShowSectionBGeneratedModal}

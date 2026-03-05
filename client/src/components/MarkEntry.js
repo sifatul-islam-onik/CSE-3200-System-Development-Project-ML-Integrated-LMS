@@ -3,6 +3,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faCamera, faUpload, faChevronLeft, faChevronRight, faCheck, faSpinner, faClock, faHourglassHalf, faCircleXmark } from '@fortawesome/free-solid-svg-icons';
 import { getTermExamMarks, saveTermExamMarks } from '../services/termExamMarksService';
 import { submitOCRJob, getOCRJobStatus, getQueueStatus } from '../services/ocrJobService';
+import { getSectionAData, saveSectionAData } from '../services/attainmentService';
+import { getCourseProfile } from '../services/courseProfileService';
 import '../styles/MarkEntry.css';
 
 const MarkEntry = ({ course, students, section, onClose }) => {
@@ -43,6 +45,13 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   const [isLoadingData, setIsLoadingData] = useState(true); // Loading state for initial data
   const [activeJobCount, setActiveJobCount] = useState(0); // Track number of active jobs for efficient polling
   const [queueStatus, setQueueStatus] = useState(null); // Queue status from Redis
+
+  // Marks Distribution state
+  const [showMarksDistribution, setShowMarksDistribution] = useState(false);
+  const [distSectionARows, setDistSectionARows] = useState([]);
+  const [distSectionBRows, setDistSectionBRows] = useState([]);
+  const [distSaveStatus, setDistSaveStatus] = useState('idle'); // idle | saving | saved | error
+  const [distLoading, setDistLoading] = useState(false);
   
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null); // Separate ref for mobile camera input
@@ -786,21 +795,153 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     }
   };
 
+  // ── Marks Distribution helpers ──────────────────────────────────────────────
+  // Load saved section A/B allocation rows on mount
+  useEffect(() => {
+    const loadDist = async () => {
+      setDistLoading(true);
+      try {
+        const [sectionResp, profileResp] = await Promise.all([
+          getSectionAData(course._id),
+          getCourseProfile(course.courseCode)
+        ]);
+        const clos = (profileResp?.success && profileResp.data) ? profileResp.data : [];
+        const initRow = (coNumber) => ({
+          coNumber,
+          Q1a: 0, Q1b: 0, Q1c: 0, Q1d: 0,
+          Q2a: 0, Q2b: 0, Q2c: 0, Q2d: 0,
+          Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
+          Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
+        });
+        let aRows = [], bRows = [];
+        if (sectionResp?.success && sectionResp.data) {
+          const saved = sectionResp.data;
+          const aMap = {}, bMap = {};
+          (saved.sectionARows || []).forEach(r => { aMap[r.coNumber] = r; });
+          (saved.sectionBRows || []).forEach(r => { bMap[r.coNumber] = r; });
+          aRows = clos.length > 0
+            ? clos.map(clo => { const co = (clo.cloNumber || '').toString().replace('CLO', 'CO'); return aMap[co] || initRow(co); })
+            : (saved.sectionARows || []);
+          bRows = clos.length > 0
+            ? clos.map(clo => { const co = (clo.cloNumber || '').toString().replace('CLO', 'CO'); return bMap[co] || initRow(co); })
+            : (saved.sectionBRows || []);
+        } else {
+          aRows = clos.map(clo => initRow((clo.cloNumber || '').toString().replace('CLO', 'CO')));
+          bRows = clos.map(clo => initRow((clo.cloNumber || '').toString().replace('CLO', 'CO')));
+        }
+        setDistSectionARows(aRows);
+        setDistSectionBRows(bRows);
+      } catch (err) {
+        console.error('Failed to load marks distribution:', err);
+      } finally {
+        setDistLoading(false);
+      }
+    };
+    loadDist();
+  }, [course._id, course.courseCode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const computeDistQuestionTotals = (rows) => {
+    const letters = ['a', 'b', 'c', 'd'];
+    return ['Q1', 'Q2', 'Q3', 'Q4'].map(q =>
+      letters.reduce((s, l) => s + rows.reduce((rs, row) => rs + (parseFloat(row[`${q}${l}`]) || 0), 0), 0)
+    );
+  };
+
+  const handleDistCellChange = (section, idx, field, value) => {
+    const num = parseFloat(value) || 0;
+    if (section === 'A') {
+      setDistSectionARows(prev => { const u = [...prev]; u[idx] = { ...u[idx], [field]: num }; return u; });
+    } else {
+      setDistSectionBRows(prev => { const u = [...prev]; u[idx] = { ...u[idx], [field]: num }; return u; });
+    }
+  };
+
+  const handleSaveDistribution = async () => {
+    setDistSaveStatus('saving');
+    try {
+      await saveSectionAData(course._id, {
+        sectionARows: distSectionARows,
+        sectionBRows: distSectionBRows,
+        sectionAObtainedRows: [],
+        sectionBObtainedRows: [],
+      });
+      setDistSaveStatus('saved');
+      setTimeout(() => setDistSaveStatus('idle'), 2500);
+    } catch (err) {
+      console.error('Failed to save marks distribution:', err);
+      setDistSaveStatus('error');
+      setTimeout(() => setDistSaveStatus('idle'), 3000);
+    }
+  };
+
+  const distATotals = computeDistQuestionTotals(distSectionARows);
+  const distBTotals = computeDistQuestionTotals(distSectionBRows);
+  const isDistributionValid = (normalizedSection === 'A' ? distATotals : distBTotals).every(t => t === 35);
+  // ───────────────────────────────────────────────────────────────────────────
+
   return (
     <div className="modal-overlay">
       <div className="modal-content mark-entry-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <div>
-            <h3>{course.courseCode} - Term Exam Marks Entry</h3>
-            <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#6b7280' }}>
-              {normalizedSection ? `Section ${normalizedSection}` : ''} • Student {currentStudentIndex + 1} of {students.length}
-            </p>
-          </div>
-          <button className="close-btn" onClick={onClose}>
-            <FontAwesomeIcon icon={faTimes} />
-          </button>
+          {showMarksDistribution ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button
+                    onClick={() => setShowMarksDistribution(false)}
+                    style={{ padding: '6px 12px', backgroundColor: '#6b7280', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+                  >
+                    ← Back
+                  </button>
+                  <div>
+                    <h3>{course.courseCode} - Marks Distribution</h3>
+                    <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#6b7280' }}>
+                      Section {normalizedSection} — set each question total to <strong>35</strong> before entering marks
+                    </p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  {distSaveStatus === 'saved' && <span style={{ color: '#27ae60', fontWeight: 'bold' }}>✓ Saved</span>}
+                  {distSaveStatus === 'error' && <span style={{ color: '#e74c3c', fontWeight: 'bold' }}>✗ Error saving</span>}
+                  <button
+                    onClick={handleSaveDistribution}
+                    disabled={distSaveStatus === 'saving'}
+                    style={{ padding: '8px 16px', backgroundColor: distSaveStatus === 'saving' ? '#95a5a6' : '#2563eb', color: 'white', border: 'none', borderRadius: '6px', cursor: distSaveStatus === 'saving' ? 'not-allowed' : 'pointer', fontWeight: '600' }}
+                  >
+                    {distSaveStatus === 'saving' ? 'Saving...' : 'Save Distribution'}
+                  </button>
+                  <button className="close-btn" onClick={onClose}>
+                    <FontAwesomeIcon icon={faTimes} />
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div>
+                  <h3>{course.courseCode} - Term Exam Marks Entry</h3>
+                  <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#6b7280' }}>
+                    {normalizedSection ? `Section ${normalizedSection}` : ''} • Student {currentStudentIndex + 1} of {students.length}
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  onClick={() => setShowMarksDistribution(true)}
+                  style={{ padding: '6px 12px', backgroundColor: isDistributionValid ? '#27ae60' : '#e67e22', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', flexShrink: 0 }}
+                >
+                  {isDistributionValid ? '✓ Set Marks Distribution' : '⚠ Set Marks Distribution'}
+                </button>
+                <button className="close-btn" onClick={onClose}>
+                  <FontAwesomeIcon icon={faTimes} />
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
+        {!showMarksDistribution && (
         <div className="modal-body mark-entry-body">
           {/* Loading State */}
           {isLoadingData && (
@@ -1105,8 +1246,16 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           {/* Marks Entry Form */}
           {(capturedImage || showCamera === false) && (
             <div className="marks-form-section">
+              {!isDistributionValid && (
+                <div style={{
+                  background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px',
+                  padding: '12px 16px', marginBottom: '12px', fontSize: '14px', color: '#92400e'
+                }}>
+                  ⚠️ <strong>Marks Distribution not set.</strong> Click &ldquo;Marks Distribution&rdquo; above and set each question total to <strong>35</strong> before entering marks.
+                </div>
+              )}
               <h4>Enter Marks - Section {normalizedSection} (Q{normalizedSection === 'A' ? '1-4' : '5-8'})</h4>
-              <div className="marks-table-container">
+              <div className="marks-table-container" style={{ opacity: isDistributionValid ? 1 : 0.4, pointerEvents: isDistributionValid ? 'auto' : 'none' }}>
                 <table className="marks-table">
                   <thead>
                     <tr>
@@ -1148,8 +1297,10 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           )}
           </div> {/* End of main content wrapper */}
         </div>
+        )} {/* end !showMarksDistribution body */}
 
         {/* Footer with Navigation */}
+        {!showMarksDistribution && (
         <div className="modal-footer mark-entry-footer">
           <div>
             <button 
@@ -1191,6 +1342,78 @@ const MarkEntry = ({ course, students, section, onClose }) => {
             </button>
           </div>
         </div>
+        )} {/* end !showMarksDistribution footer */}
+        {showMarksDistribution && (
+          <div className="modal-body mark-entry-body" style={{ overflowY: 'auto' }}>
+          {distLoading ? (
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <FontAwesomeIcon icon={faSpinner} spin size="2x" style={{ color: '#2563eb' }} />
+              <p style={{ color: '#6b7280', marginTop: '8px' }}>Loading...</p>
+            </div>
+          ) : (
+            [{ label: 'Section A', qLabels: ['Q1','Q2','Q3','Q4'], rows: distSectionARows, sec: 'A', totals: distATotals },
+             { label: 'Section B', qLabels: ['Q5','Q6','Q7','Q8'], rows: distSectionBRows, sec: 'B', totals: distBTotals }]
+            .filter(({ sec }) => sec === normalizedSection)
+            .map(({ label, qLabels, rows, sec, totals }) => (
+              <div key={sec} style={{ marginBottom: '32px' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                    <thead>
+                      <tr style={{ background: '#1e3a5f', color: 'white' }}>
+                        <th rowSpan="2" style={{ padding: '12px 16px', border: '1px solid #334' }}>CO</th>
+                        {qLabels.map((q, qi) => (
+                          <th key={q} colSpan="4" style={{ padding: '12px 16px', border: '1px solid #334', borderLeft: qi > 0 ? '3px solid #aaa' : undefined }}>{q}</th>
+                        ))}
+                      </tr>
+                      <tr style={{ background: '#2b4c7e', color: 'white' }}>
+                        {qLabels.map((q, qi) => (
+                          ['a','b','c','d'].map((l, li) => (
+                            <th key={`${q}${l}`} style={{ padding: '10px 12px', border: '1px solid #334', borderLeft: li === 0 && qi > 0 ? '3px solid #aaa' : undefined }}>{l}</th>
+                          ))
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row, idx) => (
+                        <tr key={row.coNumber || idx} style={{ background: idx % 2 === 0 ? '#f8fafc' : 'white' }}>
+                          <td style={{ padding: '10px 16px', fontWeight: '600', border: '1px solid #ddd', whiteSpace: 'nowrap' }}>{row.coNumber}</td>
+                          {['Q1','Q2','Q3','Q4'].map((q, qi) => (
+                            ['a','b','c','d'].map((l, li) => (
+                              <td key={`${q}${l}`} style={{ padding: '6px', border: '1px solid #ddd', borderLeft: li === 0 && qi > 0 ? '3px solid #aaa' : undefined }}>
+                                <input
+                                  type="number" min="0"
+                                  value={row[`${q}${l}`] || 0}
+                                  onChange={e => handleDistCellChange(sec, idx, `${q}${l}`, e.target.value)}
+                                  style={{ width: '70px', textAlign: 'center', border: '1px solid #ccc', borderRadius: '4px', padding: '6px 4px', fontSize: 'inherit' }}
+                                />
+                              </td>
+                            ))
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ background: '#f0f4f8', fontWeight: 'bold' }}>
+                        <td style={{ padding: '10px 16px', border: '1px solid #ddd' }}>Total</td>
+                        {totals.map((t, qi) => (
+                          <td key={qi} colSpan="4" style={{
+                            padding: '10px 16px', border: '1px solid #ddd',
+                            borderLeft: qi > 0 ? '3px solid #aaa' : undefined,
+                            textAlign: 'center',
+                            color: t === 35 ? '#27ae60' : '#e74c3c'
+                          }}>
+                            {t} {t === 35 ? '✓' : '≠ 35'}
+                          </td>
+                        ))}
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            ))
+          )}
+          </div>
+        )}
       </div>
     </div>
   );

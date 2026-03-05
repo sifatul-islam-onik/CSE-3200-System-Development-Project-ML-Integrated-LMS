@@ -4,9 +4,6 @@ const SectionBSheet = ({
   clos,
   sectionBRows,
   sectionBObtainedRows,
-  sectionBSaveStatus,
-  handleManualSaveSectionB,
-  handleSectionBCellChange,
   computeSectionBObtainedTotal,
   sectionBQuestionTotals,
   setShowSectionBGeneratedModal,
@@ -19,27 +16,7 @@ const SectionBSheet = ({
           Allocated marks for Section-B in final question
         </h2>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <button
-            onClick={handleManualSaveSectionB}
-            disabled={sectionBSaveStatus === 'saving'}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: sectionBSaveStatus === 'saving' ? '#95a5a6' : '#27ae60',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: sectionBSaveStatus === 'saving' ? 'not-allowed' : 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            {sectionBSaveStatus === 'saving' ? 'Saving...' : 'Save Table'}
-          </button>
-          {sectionBSaveStatus === 'saved' && (
-            <span style={{ color: '#27ae60', fontSize: '14px', fontWeight: 'bold' }}>✓ Saved</span>
-          )}
-          {sectionBSaveStatus === 'error' && (
-            <span style={{ color: '#e74c3c', fontSize: '14px', fontWeight: 'bold' }}>✗ Error</span>
-          )}
+          <span style={{ fontSize: '13px', color: '#7f8c8d', fontStyle: 'italic' }}>Edit via "Marks Distribution" in Enter Term Marks</span>
           <button
             onClick={() => setShowSectionBGeneratedModal(true)}
             style={{
@@ -86,32 +63,16 @@ const SectionBSheet = ({
                   <tr key={row.coNumber || idx}>
                     <td className="co-label">{row.coNumber || '-'}</td>
                     {['Q1a','Q1b','Q1c','Q1d'].map((f) => (
-                      <td key={f}>
-                        <input type="number" min="0" value={row[f]}
-                          onChange={(e) => handleSectionBCellChange(idx, f, e.target.value)}
-                          style={{ width: '80px' }} />
-                      </td>
+                      <td key={f} style={{ textAlign: 'center' }}>{row[f] || 0}</td>
                     ))}
                     {['Q2a','Q2b','Q2c','Q2d'].map((f, fi) => (
-                      <td key={f} style={fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}}>
-                        <input type="number" min="0" value={row[f]}
-                          onChange={(e) => handleSectionBCellChange(idx, f, e.target.value)}
-                          style={{ width: '80px' }} />
-                      </td>
+                      <td key={f} style={{ ...(fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}), textAlign: 'center' }}>{row[f] || 0}</td>
                     ))}
                     {['Q3a','Q3b','Q3c','Q3d'].map((f, fi) => (
-                      <td key={f} style={fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}}>
-                        <input type="number" min="0" value={row[f]}
-                          onChange={(e) => handleSectionBCellChange(idx, f, e.target.value)}
-                          style={{ width: '80px' }} />
-                      </td>
+                      <td key={f} style={{ ...(fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}), textAlign: 'center' }}>{row[f] || 0}</td>
                     ))}
                     {['Q4a','Q4b','Q4c','Q4d'].map((f, fi) => (
-                      <td key={f} style={fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}}>
-                        <input type="number" min="0" value={row[f]}
-                          onChange={(e) => handleSectionBCellChange(idx, f, e.target.value)}
-                          style={{ width: '80px' }} />
-                      </td>
+                      <td key={f} style={{ ...(fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}), textAlign: 'center' }}>{row[f] || 0}</td>
                     ))}
                   </tr>
                 ))}
