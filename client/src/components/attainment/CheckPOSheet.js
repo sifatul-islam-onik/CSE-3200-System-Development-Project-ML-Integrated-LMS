@@ -1,4 +1,5 @@
 import React from 'react';
+import { SheetLoader } from './LoadingSpinner';
 
 // ── helpers (mirrors POCalcSheet / POCalcMaxSheet logic) ──────────────────────
 
@@ -66,8 +67,8 @@ const computePoCalcMaxTheory = (coAttainmentData, clos, programOutcomes) => {
 const PO_THRESHOLD = 0.55;
 
 const CheckPOSheet = ({ selectedCourse, clos, programOutcomes, poCalcStudents, theoryCoAttainmentData }) => {
-  if (!programOutcomes || programOutcomes.length === 0) return <p>Loading Program Outcomes...</p>;
-  if (!poCalcStudents || poCalcStudents.length === 0) return <p>Loading Students...</p>;
+  if (!programOutcomes || programOutcomes.length === 0) return <SheetLoader label="Loading Program Outcomes…" />;
+  if (!poCalcStudents || poCalcStudents.length === 0) return <SheetLoader label="Loading Students…" />;
 
   const courseCode = selectedCourse?.courseCode || '';
   const lastDigit = parseInt(courseCode.charAt(courseCode.length - 1));

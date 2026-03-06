@@ -1,4 +1,5 @@
 import React from 'react';
+import { SkeletonTable } from './LoadingSpinner';
 
 // ── Summary tables: CO measured & Wt ─────────────────────────────────────────
 const COSummaryTables = ({ clos, theoryCoAttainmentData, labCoAttainmentData }) => {
@@ -103,11 +104,9 @@ const COSummaryTables = ({ clos, theoryCoAttainmentData, labCoAttainmentData }) 
 const AttainmentTable = ({ clos, coAttainmentData, formatNumber, keyPrefix, title, showAchievementAvg = false }) => (
   <section className="co-attainment-section" style={{ marginTop: '30px' }}>
     <h2>{title}</h2>
-    {clos.length === 0 && (
-      <p style={{ padding: '20px', color: '#7f8c8d' }}>Loading course outcomes...</p>
-    )}
+    {clos.length === 0 && <SkeletonTable rows={6} cols={5} />}
     {clos.length > 0 && coAttainmentData.length === 0 && (
-      <p style={{ padding: '20px', color: '#7f8c8d' }}>No student data available.</p>
+      <SkeletonTable rows={6} cols={Math.min(clos.length * 3 + 1, 13)} />
     )}
     {clos.length > 0 && coAttainmentData.length > 0 && (
       <div className="table-wrapper">

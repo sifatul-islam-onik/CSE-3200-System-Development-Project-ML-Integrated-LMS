@@ -1,4 +1,5 @@
 ﻿import React from 'react';
+import { SheetLoader } from './LoadingSpinner';
 
 // â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -265,8 +266,8 @@ const ChartsSheet = ({
   // Effective combined CO list (all COs across theory + lab)
   const effectiveClos = combinedClos?.length > 0 ? combinedClos : (clos || []);
 
-  if (!effectiveClos.length) return <p>Loading Course Outcomes...</p>;
-  if (!programOutcomes || programOutcomes.length === 0) return <p>Loading Program Outcomes...</p>;
+  if (!effectiveClos.length) return <SheetLoader label="Loading Course Outcomes…" />;
+  if (!programOutcomes || programOutcomes.length === 0) return <SheetLoader label="Loading Program Outcomes…" />;
 
   const coNames = effectiveClos.map(clo => (clo.cloNumber || '').toString().replace('CLO', 'CO'));
   const poNames = programOutcomes.map((po, idx) => po.poCode || `PO${idx + 1}`);

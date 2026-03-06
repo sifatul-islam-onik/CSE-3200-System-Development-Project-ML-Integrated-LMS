@@ -320,20 +320,12 @@ exports.createCourse = async (req, res) => {
     if (yearLevel !== undefined) courseData.yearLevel = yearLevel;
     if (prerequisites) courseData.prerequisites = prerequisites;
 
-    console.log('=== CREATE COURSE DEBUG ===');
-    console.log('courseOutcomes:', courseOutcomes);
-    console.log('courseOutcomes type:', typeof courseOutcomes);
-    console.log('courseOutcomes is array:', Array.isArray(courseOutcomes));
-    console.log('courseOutcomes length:', courseOutcomes ? courseOutcomes.length : 'N/A');
-
     // Use transaction if OBE data is provided
     if (courseOutcomes && Array.isArray(courseOutcomes) && courseOutcomes.length > 0) {
-      console.log('=== CREATING COURSE WITH TRANSACTION ===');
       const session = await mongoose.startSession();
       session.startTransaction();
 
       try {
-        console.log('=== Creating course document ===');
         // Step 1: Create course
         const [course] = await Course.create([courseData], { session });
 
@@ -343,14 +335,9 @@ exports.createCourse = async (req, res) => {
         for (const coData of courseOutcomes) {
           const coCodeNorm = (coData.co_code || '').toUpperCase();
           if (seenCOCodes.has(coCodeNorm)) {
-            console.log(`=== Skipping duplicate CO in request: ${coData.co_code} ===`);
             continue;
           }
           seenCOCodes.add(coCodeNorm);
-          console.log(`=== Creating CO: ${coData.co_code} ===`);
-          console.log('CO Data:', JSON.stringify(coData, null, 2));
-          console.log('Taxonomy levels being saved:', coData.taxonomy_levels);
-          
           const [courseOutcome] = await CourseOutcome.create([{
             course: course._id,
             co_code: coData.co_code,
@@ -364,7 +351,6 @@ exports.createCourse = async (req, res) => {
             po_mappings: coData.po_mappings || []
           });
         }
-        console.log('=== Created COs:', createdCOs.length);
 
         // Step 3: Create CO-PO mappings
         let totalMappings = 0;
@@ -380,13 +366,10 @@ exports.createCourse = async (req, res) => {
             totalMappings += mappingsToCreate.length;
           }
         }
-        console.log('=== Created PO mappings:', totalMappings);
 
         // Commit transaction
-        console.log('=== Committing transaction...');
         await session.commitTransaction();
         session.endSession();
-        console.log('=== Transaction committed successfully!');
 
         // Populate creator details
         await course.populate('createdBy', 'name email');
@@ -925,15 +908,8 @@ exports.updateCourse = async (req, res) => {
       }
     }
 
-    console.log('=== UPDATE COURSE DEBUG ===');
-    console.log('courseOutcomes:', courseOutcomes);
-    console.log('courseOutcomes type:', typeof courseOutcomes);
-    console.log('courseOutcomes is array:', Array.isArray(courseOutcomes));
-    console.log('courseOutcomes length:', courseOutcomes ? courseOutcomes.length : 'N/A');
-
     // Use transaction if OBE data is being updated
     if ((courseOutcomes && courseOutcomes.length > 0) || (deletedCOIds && deletedCOIds.length > 0)) {
-      console.log('=== ENTERING TRANSACTION MODE ===');
       const session = await mongoose.startSession();
       session.startTransaction();
 
@@ -1198,9 +1174,6 @@ exports.updateCourse = async (req, res) => {
 // @access  Admin only
 exports.deleteCourse = async (req, res) => {
   try {
-    console.log('=== DELETE COURSE DEBUG ===');
-    console.log('Course ID:', req.params.id);
-    
     const course = await Course.findById(req.params.id);
 
     if (!course) {
@@ -1210,30 +1183,20 @@ exports.deleteCourse = async (req, res) => {
       });
     }
 
-    console.log('Found course:', course.courseCode);
-
     // First, find all course outcomes for this course
     const courseOutcomes = await CourseOutcome.find({ course: course._id });
     const coIds = courseOutcomes.map(co => co._id);
     
-    console.log('Found course outcomes:', courseOutcomes.length);
-    console.log('CO IDs:', coIds);
-
     // Delete all CO-PO mappings for these course outcomes
     if (coIds.length > 0) {
-      const deleteResult = await COPOMapping.deleteMany({ course_outcome: { $in: coIds } });
-      console.log(`Deleted ${deleteResult.deletedCount} CO-PO mappings for ${coIds.length} course outcomes`);
-    } else {
-      console.log('No course outcomes found, skipping CO-PO mapping deletion');
+      await COPOMapping.deleteMany({ course_outcome: { $in: coIds } });
     }
 
     // Delete all course outcomes
-    const coDeleteResult = await CourseOutcome.deleteMany({ course: course._id });
-    console.log(`Deleted ${coDeleteResult.deletedCount} course outcomes`);
+    await CourseOutcome.deleteMany({ course: course._id });
 
     // Finally, delete the course
     await Course.findByIdAndDelete(req.params.id);
-    console.log(`Deleted course: ${course.courseCode}`);
 
     res.status(200).json({
       success: true,
