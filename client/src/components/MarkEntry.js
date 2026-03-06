@@ -8,12 +8,8 @@ import { getCourseProfile } from '../services/courseProfileService';
 import '../styles/MarkEntry.css';
 
 const MarkEntry = ({ course, students, section, onClose }) => {
-  // Debug: Log the section value to console
-  console.log('MarkEntry - Section prop received:', section, 'Type:', typeof section);
-  
   // Normalize section to uppercase and trim whitespace, default to 'A' if null/undefined
   const normalizedSection = section ? section.toString().trim().toUpperCase() : 'A';
-  console.log('MarkEntry - Normalized section:', normalizedSection);
   
   // Warn if section is null - this means teacher assignment may not have section set
   if (!section) {
@@ -106,7 +102,6 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         try {
           const response = await getOCRJobStatus(job.jobId);
           if (response.success && response.data) {
-            console.log('Job status response:', response.data);
             updates.push(response.data);
           }
         } catch (error) {
@@ -116,7 +111,6 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       
       // Only update state if there are actual changes
       if (updates.length > 0) {
-        console.log('Polling updates received:', updates.length, 'jobs');
         
         let hasChanges = false;
         
@@ -150,7 +144,6 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                 
                 // Immediately cache completed jobs to studentData
                 if (updatedJob.status === 'completed' && updatedJob.marks) {
-                  console.log('Immediately caching marks for student:', studentId);
                   setStudentData(prevData => ({
                     ...prevData,
                     [studentId]: {
@@ -161,7 +154,6 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                   
                   // Update marks if this is the current student
                   if (studentId === currentStudentIdRef.current) {
-                    console.log('Auto-filling marks for current student:', studentId);
                     setMarks(updatedJob.marks);
                   }
                 }
@@ -360,12 +352,10 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       video.srcObject = stream;
       
       const handleCanPlay = () => {
-        console.log('Video can play');
         setVideoReady(true);
       };
 
       const handleLoadedMetadata = () => {
-        console.log('Video metadata loaded');
         // Give it a moment to ensure video is actually ready
         setTimeout(() => {
           setVideoReady(true);
@@ -597,8 +587,6 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           createdAt: new Date()
         };
         
-        console.log('Job created and stored with studentId:', studentId);
-        
         setOcrJobs(prev => {
           const updated = new Map(prev);
           updated.set(studentId, newJob);
@@ -717,7 +705,6 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         }
       }));
       
-      console.log('✅ Marks saved successfully for', currentStudent.name, currentStudent.roll);
     } catch (error) {
       console.error('Error saving marks:', error);
       alert('Failed to save marks: ' + error.message);
@@ -740,9 +727,6 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           // Don't save blob URLs to database as they expire
           imageUrl: capturedImage && !capturedImage.startsWith('blob:') && capturedImage !== 'skipped' ? capturedImage : null
         });
-        
-        console.log(`✅ Auto-saved marks for ${currentStudent.name} (${currentStudent.roll})`);
-        console.log('Saved marks:', marks);
         
         // Update in-memory cache (without blob URLs)
         setStudentData(prev => ({

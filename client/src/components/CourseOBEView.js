@@ -236,7 +236,6 @@ const CourseOBEView = ({ course: courseProp, onClose, viewingSemester = null }) 
               </thead>
               <tbody>
                 {course.courseOutcomes.map((co, idx) => {
-                  console.log('CO Data:', co); // Debug log
                   return (
                     <tr key={idx}>
                       <td className="co-number-cell">{co.co_code || `CO${idx + 1}`}</td>

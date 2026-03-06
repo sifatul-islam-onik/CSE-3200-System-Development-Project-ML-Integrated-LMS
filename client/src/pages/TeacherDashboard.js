@@ -624,22 +624,12 @@ const TeacherDashboard = () => {
                         <div className="tree-content">
                           {sortedTypeCourses.map((course) => {
                             // Find teacher's section for this course
-                            console.log('[TeacherDashboard] Checking course:', course.courseCode);
-                            console.log('[TeacherDashboard] User ID:', user?.userId, 'User _id:', user?._id);
-                            console.log('[TeacherDashboard] Assigned teachers:', course.assignedTeachers);
-                            
                             const assignment = course.assignedTeachers?.find(at => {
                               const teacherId = at.teacher?._id || at.teacher;
                               const userIdToMatch = user.userId || user._id;
-                              console.log('[TeacherDashboard] Comparing:', {
-                                teacherId: teacherId?.toString(),
-                                userId: userIdToMatch,
-                                matches: teacherId?.toString() === userIdToMatch
-                              });
                               return teacherId && teacherId.toString() === userIdToMatch;
                             });
                             const teacherSection = assignment?.section || null;
-                            console.log('[TeacherDashboard] Found assignment:', assignment, 'Section:', teacherSection);
                             
                             return (
                             <div key={course._id} className="course-item">

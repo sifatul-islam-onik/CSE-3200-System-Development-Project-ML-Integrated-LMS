@@ -1757,16 +1757,9 @@ const AttainmentView = () => {
             if (labCourse) courseIdToUse = labCourse._id;
           }
         }
-        console.log('[loadLabActivityData] sheet:', selectedSheet, 'courseId:', courseIdToUse);
-
+        
         try {
           const response = await getLabActivityData(courseIdToUse);
-          console.log('[loadLabActivityData] response success:', response.success, 'hasData:', !!response.data,
-            'savedRows:', response.data?.labActivityRows?.length,
-            'savedObtained:', response.data?.labActivityObtainedRows?.length,
-            'activityTaken:', response.data?.activityTaken,
-            'useEqWt:', response.data?.useEqWtActivity,
-            'coMapped:', response.data?.coMappedActivityMarks);
           if (response.success && response.data) {
             const {
               labActivityRows: savedRows,
@@ -3119,17 +3112,6 @@ const AttainmentView = () => {
   // CO Attainment (Lab) – AK32*100, where AK32 = getLabActivityCOAttainment (a 0-1 ratio).
   // Placed after labActivityActivityTotals to avoid TDZ (all transitively called consts must be above).
   const labCoAttainmentData = useMemo(() => {
-    console.log('[labCoAttainmentData] recomputing', {
-      obtainedRows: labActivityObtainedRows.length,
-      allocatedRows: labActivityRows.length,
-      clos: clos.length,
-      useEqWtActivity,
-      coMappedActivityMarks,
-      activityTaken,
-      labActivityManualWts,
-      sampleObtained: labActivityObtainedRows[0],
-      sampleAllocated: labActivityRows[0],
-    });
     // Use combinedClos when available so that theory-only COs (e.g. CO2, CO3) appear
     // with value 0 in the lab attainment table, allowing combined tables to show all COs.
     const effectiveClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
@@ -3141,7 +3123,6 @@ const AttainmentView = () => {
         effectiveClos.forEach(clo => {
           const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
           const ratio = getLabActivityCOAttainment(student, cn);
-          console.log('[labCoAttainmentData] student', student.rollNumber, 'co', cn, 'ratio', ratio);
           coValues[cn] = ratio != null ? parseFloat((ratio * 100).toFixed(4)) : 0;
         });
         return { rollNumber: student.rollNumber, coValues };
