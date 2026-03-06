@@ -14,16 +14,7 @@ const getAuthHeader = () => {
 
 // Save or update term exam marks for a student
 export const saveTermExamMarks = async (marksData) => {
-  console.log('[termExamMarksService] Saving marks data:', marksData);
-  console.log('[termExamMarksService] Marks structure:', JSON.stringify(marksData.marks, null, 2));
-  console.log('[termExamMarksService] Section:', marksData.section);
-  console.log('[termExamMarksService] Student ID:', marksData.studentId);
-  console.log('[termExamMarksService] Course ID:', marksData.courseId);
-  
   const response = await axios.post(`${API_URL}/term-exam-marks`, marksData, getAuthHeader());
-  
-  console.log('[termExamMarksService] Response:', response.data);
-  
   return response.data;
 };
 

@@ -21,7 +21,6 @@ const CourseProfileView = () => {
       setLoading(true);
       setError(null);
       const response = await getCourseProfile();
-      console.log('Course Profile Response:', response);
       setClos(response.data || []);
     } catch (err) {
       console.error('Course Profile Error:', err);

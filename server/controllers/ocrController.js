@@ -49,7 +49,6 @@ exports.submitOCRJob = async (req, res) => {
         // DO NOT use named jobs - use default unnamed queue
         // This ensures true FIFO behavior
       );
-      
       // IMMEDIATELY update job store BEFORE job can be picked up by worker
       // This prevents race condition where worker tries to access incomplete job data
       ocrJobStore.updateJob(ocrJob.jobId, {

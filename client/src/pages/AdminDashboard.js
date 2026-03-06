@@ -685,8 +685,6 @@ const AdminDashboard = () => {
   const handleCreateCourse = async (courseData) => {
     setCourseFormLoading(true);
     setCourseFormError('');
-    console.log('=== Submitting Course Data ===');
-    console.log(JSON.stringify(courseData, null, 2));
     try {
       await createCourse(courseData);
       setSuccessMessage('Course created successfully');
@@ -719,8 +717,6 @@ const AdminDashboard = () => {
   const handleUpdateCourse = async (courseData) => {
     setCourseFormLoading(true);
     setCourseFormError('');
-    console.log('=== Updating Course Data ===');
-    console.log(JSON.stringify(courseData, null, 2));
     try {
       await updateCourse(editingCourse._id, courseData);
       setSuccessMessage('Course updated successfully');
@@ -741,20 +737,12 @@ const AdminDashboard = () => {
       const responseData = err.response?.data;
       let errorMsg = responseData?.message || 'Failed to update course';
       
-      console.log('Building error message...');
-      console.log('Base message:', errorMsg);
-      console.log('Has error field?', !!responseData?.error);
-      console.log('Has details field?', !!responseData?.details);
-      console.log('Has errors array?', !!responseData?.errors);
-      
       if (responseData?.error && typeof responseData.error === 'string') {
         errorMsg += `: ${responseData.error}`;
-        console.log('Added error:', responseData.error);
       }
       
       if (responseData?.details && Array.isArray(responseData.details) && responseData.details.length > 0) {
         errorMsg += ` - ${responseData.details.join('; ')}`;
-        console.log('Added details:', responseData.details);
       }
       
       // Handle express-validator errors array
@@ -762,11 +750,9 @@ const AdminDashboard = () => {
         const validationErrors = responseData.errors.map(e => `${e.path || e.param}: ${e.msg}`).join('; ');
         if (!errorMsg.includes(validationErrors)) {
           errorMsg += ` - ${validationErrors}`;
-          console.log('Added validation errors:', validationErrors);
         }
       }
       
-      console.log('Final error message:', errorMsg);
       setCourseFormError(errorMsg);
     } finally {
       setCourseFormLoading(false);
@@ -824,29 +810,16 @@ const AdminDashboard = () => {
     setAssignmentError('');
     setAssignmentSuccess('');
     
-    console.log('Assigning teacher:', {
-      courseId: selectedCourseForAssignment._id,
-      teacherId,
-      section
-    });
-    
     try {
       const response = await assignTeacherToCourse(selectedCourseForAssignment._id, teacherId, section);
-      console.log('Teacher assignment response:', response);
-      console.log('assignedTeachers from response:', JSON.stringify(response.data?.assignedTeachers, null, 2));
       setAssignmentSuccess('Teacher assigned successfully');
       
       // Update the selected course with the new assignment data
       if (response.data?.assignedTeachers) {
-        console.log('Updating selectedCourseForAssignment state with:', JSON.stringify(response.data.assignedTeachers, null, 2));
-        setSelectedCourseForAssignment(prev => {
-          const updated = {
-            ...prev,
-            assignedTeachers: response.data.assignedTeachers
-          };
-          console.log('New selectedCourseForAssignment:', JSON.stringify(updated.assignedTeachers, null, 2));
-          return updated;
-        });
+        setSelectedCourseForAssignment(prev => ({
+          ...prev,
+          assignedTeachers: response.data.assignedTeachers
+        }));
       }
       
       // Clear the section selection for this teacher
@@ -1014,29 +987,15 @@ const AdminDashboard = () => {
 
     try {
       const normalizedBatch = String(batchInput).replace(/\D/g, '').padStart(2, '0');
-      console.log('Assigning batch:', { batch: normalizedBatch, deptCode: deptCodeInput, courseId: selectedCourseForBatch._id });
       
       // Check if this is a group assignment
       if (selectedCourseForBatch._isGroupAssignment && selectedCourseForBatch._groupCourses) {
-        console.log('[handleAssignBatch] GROUP assignment:', {
-          groupName: selectedCourseForBatch._groupName,
-          groupYear: selectedCourseForBatch._groupYear,
-          groupTerm: selectedCourseForBatch._groupTerm,
-          groupSemester: selectedCourseForBatch._groupSemester,
-          courseCount: selectedCourseForBatch._groupCourses.length
-        });
         
         // Assign batch to all courses in the group
         const promises = selectedCourseForBatch._groupCourses.map(course => {
           const y = Number.isInteger(course.yearLevel) ? course.yearLevel : selectedCourseForBatch._groupYear;
           const t = Number.isInteger(course.term) ? course.term : selectedCourseForBatch._groupTerm;
           const s = Number.isInteger(course.semester) ? course.semester : selectedCourseForBatch._groupSemester;
-          
-          console.log('[handleAssignBatch] assigning course:', {
-            courseId: course._id,
-            courseCode: course.courseCode,
-            values: { y, s, t }
-          });
           
           return assignBatchToCourse(
             course._id,
@@ -1081,7 +1040,6 @@ const AdminDashboard = () => {
           selectedCourseForBatch.semester,
           selectedCourseForBatch.term
         );
-        console.log('Batch assignment response:', response);
         setBatchAssignmentSuccess('Batch assigned successfully');
         
         // Update local state
@@ -3125,12 +3083,6 @@ const AdminDashboard = () => {
                     {selectedCourseForAssignment.assignedTeachers.map((assignment, idx) => {
                       const teacher = assignment.teacher || assignment;
                       const section = assignment.section;
-                      console.log(`Rendering teacher ${idx}:`, { 
-                        assignment: JSON.stringify(assignment), 
-                        teacher: teacher?.name, 
-                        section: section,
-                        sectionType: typeof section
-                      });
                       return (
                         <div 
                           key={`${teacher._id}-${section || idx}`}

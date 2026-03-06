@@ -1,6 +1,7 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
-const API_TARGET = process.env.REACT_APP_API_URL || process.env.API_TARGET || 'http://localhost:5000';
+const _rawApiTarget = process.env.REACT_APP_API_URL || process.env.API_TARGET || 'http://localhost:5000';
+const API_TARGET = _rawApiTarget.replace(/\/api\/?$/, '');
 const ML_API_TARGET = process.env.REACT_APP_ML_API_TARGET || process.env.ML_API_TARGET || 'http://localhost:8000';
 
 module.exports = function(app) {
