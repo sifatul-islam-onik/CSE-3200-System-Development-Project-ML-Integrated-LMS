@@ -643,6 +643,43 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     // Note: studentData cache update moved to handleNext/handleSave to reduce re-renders
   }, []);
 
+  // Handle keyboard navigation between mark input cells
+  const handleMarkKeyDown = useCallback((e, row, question) => {
+    const ROWS = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+    const COLS_A = ['1', '2', '3', '4'];
+    const COLS_B = ['5', '6', '7', '8'];
+    const cols = normalizedSection === 'A' ? COLS_A : COLS_B;
+
+    let targetRow = row;
+    let targetCol = question;
+
+    if (e.key === 'ArrowDown') {
+      const nextRowIdx = ROWS.indexOf(row) + 1;
+      if (nextRowIdx >= ROWS.length) return;
+      targetRow = ROWS[nextRowIdx];
+    } else if (e.key === 'ArrowUp') {
+      const prevRowIdx = ROWS.indexOf(row) - 1;
+      if (prevRowIdx < 0) return;
+      targetRow = ROWS[prevRowIdx];
+    } else if (e.key === 'ArrowRight') {
+      const nextColIdx = cols.indexOf(question) + 1;
+      if (nextColIdx >= cols.length) return;
+      targetCol = cols[nextColIdx];
+    } else if (e.key === 'ArrowLeft') {
+      const prevColIdx = cols.indexOf(question) - 1;
+      if (prevColIdx < 0) return;
+      targetCol = cols[prevColIdx];
+    } else {
+      return;
+    }
+
+    e.preventDefault();
+    const target = document.querySelector(
+      `.marks-table [data-row="${targetRow}"][data-col="${targetCol}"]`
+    );
+    if (target) target.focus();
+  }, [normalizedSection]);
+
   // Calculate total marks (memoized to prevent recalculation on every render)
   const totalMarks = useMemo(() => {
     let total = 0;
@@ -1277,6 +1314,9 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                               inputMode="decimal"
                               value={marks[row][question]}
                               onChange={(e) => handleMarkChange(row, question, e.target.value)}
+                              onKeyDown={(e) => handleMarkKeyDown(e, row, question)}
+                              data-row={row}
+                              data-col={question}
                               placeholder="0"
                               className="mark-input"
                             />
