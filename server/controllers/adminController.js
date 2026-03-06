@@ -694,8 +694,6 @@ exports.exportTeacherCredentials = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Department is required' });
     }
 
-    console.log('Exporting credentials for department:', department);
-
     // Get all teachers in the department, matching either the department field
     // or the email subdomain (format: name@DEPT.kuet.ac.bd)
     const deptRegex = new RegExp(`@${department}\\.kuet\\.ac\\.bd$`, 'i');
@@ -711,19 +709,6 @@ exports.exportTeacherCredentials = async (req, res) => {
     .select('name email department +initialPassword')
     .lean();
 
-    console.log(`Found ${teachers.length} teachers for department: ${department}`);
-    
-    // Log first teacher to debug initialPassword field
-    if (teachers.length > 0) {
-      console.log('Sample teacher data:', {
-        name: teachers[0].name,
-        email: teachers[0].email,
-        department: teachers[0].department,
-        hasInitialPassword: !!teachers[0].initialPassword,
-        initialPasswordValue: teachers[0].initialPassword ? '[SET]' : '[NOT SET]'
-      });
-    }
-
     // If no teachers found, return an error as JSON
     if (teachers.length === 0) {
       return res.status(404).json({
@@ -738,10 +723,6 @@ exports.exportTeacherCredentials = async (req, res) => {
     // Count how many teachers have initialPassword set
     const withPassword = teachers.filter(t => t.initialPassword).length;
     const withoutPassword = teachers.length - withPassword;
-    
-    if (withoutPassword > 0) {
-      console.log(`Warning: ${withoutPassword} of ${teachers.length} teachers don't have current passwords recorded`);
-    }
     
     // Prepare data with current passwords (initialPassword is updated when users change passwords)
     const exportData = teachers.map(t => ({
@@ -1328,7 +1309,6 @@ exports.updateUserProfile = async (req, res) => {
 // @access  Admin only
 exports.assignBatchToCourse = async (req, res) => {
   try {
-    console.log('[assignBatchToCourse] payload:', req.params, req.body);
     // Verify admin role
     if (req.user.role !== 'admin') {
       return res.status(403).json({
@@ -1382,14 +1362,6 @@ exports.assignBatchToCourse = async (req, res) => {
     const reqSemesterNum = (reqSemester !== undefined && reqSemester !== null) ? parseInt(reqSemester, 10) : undefined;
     const reqTermNum = (reqTerm !== undefined && reqTerm !== null) ? parseInt(reqTerm, 10) : undefined;
 
-    console.log('[assignBatchToCourse] course before:', { 
-      courseCode: course.courseCode,
-      yearLevel: course.yearLevel, 
-      semester: course.semester, 
-      term: course.term 
-    });
-    console.log('[assignBatchToCourse] request values:', { reqYearLevelNum, reqSemesterNum, reqTermNum });
-
     let y = course.yearLevel;
     let s = course.semester;
     let t = course.term;
@@ -1405,15 +1377,12 @@ exports.assignBatchToCourse = async (req, res) => {
       course.semester = s;
       course.term = t;
       needsSave = true;
-      
-      console.log('[assignBatchToCourse] SET from request:', { yearLevel: y, semester: s, term: t });
     }
     // Fallback 1: course has term and year but not semester
     else if (Number.isInteger(y) && Number.isInteger(t) && !Number.isInteger(s)) {
       s = ((y - 1) * 2) + t;
       course.semester = s;
       needsSave = true;
-      console.log('[assignBatchToCourse] DERIVED semester from course year/term:', { yearLevel: y, semester: s, term: t });
     }
     // Fallback 2: course has semester but not year/term
     else if (!Number.isInteger(y) && Number.isInteger(s)) {
@@ -1422,7 +1391,6 @@ exports.assignBatchToCourse = async (req, res) => {
       course.yearLevel = y;
       course.term = t;
       needsSave = true;
-      console.log('[assignBatchToCourse] DERIVED year/term from semester:', { yearLevel: y, semester: s, term: t });
     }
 
     if (needsSave) {
@@ -1442,8 +1410,6 @@ exports.assignBatchToCourse = async (req, res) => {
         message: `Cannot assign batch: course ${course.courseCode} is missing year/semester. Request must include yearLevel and (semester or term).`
       });
     }
-
-    console.log('[assignBatchToCourse] FINAL values:', { yearLevel: y, semester: s, term: t });
 
     // Check if this batch+dept combination is already assigned
     const alreadyAssigned = course.assignedBatches.some(
@@ -1468,7 +1434,6 @@ exports.assignBatchToCourse = async (req, res) => {
       'assignedBatches.batch': batch,
       'assignedBatches.deptCode': deptCode
     }).select('yearLevel semester courseCode');
-    console.log('[assignBatchToCourse] existingForBatch:', existingForBatch.map(c => ({ courseCode: c.courseCode, yearLevel: c.yearLevel, semester: c.semester })));
 
     const conflictingSemester = existingForBatch.find(c =>
       Number.isInteger(c.yearLevel) && Number.isInteger(c.semester) && (c.yearLevel !== y || c.semester !== s)
@@ -1484,7 +1449,6 @@ exports.assignBatchToCourse = async (req, res) => {
     // 2) Ensure no other batch (same department) is assigned to this semester (year-sem)
     const coursesInSem = await Course.find({ yearLevel: y, semester: s, 'assignedBatches.deptCode': deptCode })
       .select('assignedBatches courseCode');
-    console.log('[assignBatchToCourse] coursesInSem:', coursesInSem.map(c => ({ courseCode: c.courseCode, batches: c.assignedBatches })));
 
     const otherBatchInSem = coursesInSem.some(c =>
       (c.assignedBatches || []).some(ab => ab.deptCode === deptCode && ab.batch !== batch)

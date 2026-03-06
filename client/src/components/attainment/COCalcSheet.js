@@ -1,4 +1,5 @@
 import React from 'react';
+import { SheetLoader } from './LoadingSpinner';
 
 // ─── Grade helpers ────────────────────────────────────────────────────────────
 const getLetterGrade = (total) => {
@@ -61,7 +62,7 @@ const computeStudentTheoryTotal = (studentRow, clos, attnAssignObtainedRows, get
 const SectionABTable = ({ clos, coCalcData, formatNumber }) => (
   <section className="co-calc-section" style={{ marginTop: '30px' }}>
     <h2>CO Calculation - Section A &amp; B Marks</h2>
-    {clos.length === 0 && <p style={{ padding: '20px', color: '#7f8c8d' }}>Loading course outcomes...</p>}
+    {clos.length === 0 && <SheetLoader label="Loading course outcomes…" />}
     {clos.length > 0 && coCalcData.length === 0 && <p style={{ padding: '20px', color: '#7f8c8d' }}>No student data available.</p>}
     {clos.length > 0 && coCalcData.length > 0 && (
       <div className="table-wrapper">
@@ -118,7 +119,7 @@ const SectionABTable = ({ clos, coCalcData, formatNumber }) => (
 const TheoryCOPOTable = ({ clos, coCalcData, attnAssignObtainedRows, attendanceMarks, calculateFactoredCOTotals, calculateFactoredAssignmentCOTotals, getStudentCTFactoredMarks, getStudentAssignmentFactoredMarks, formatNumber }) => (
   <section className="co-po-percentage-section" style={{ marginTop: '30px' }}>
     <h2>CO-PO percentage (Theory: CT+Assign+A+B)</h2>
-    {clos.length === 0 && <p style={{ padding: '20px', color: '#7f8c8d' }}>Loading course outcomes...</p>}
+    {clos.length === 0 && <SheetLoader label="Loading course outcomes…" />}
     {clos.length > 0 && coCalcData.length === 0 && <p style={{ padding: '20px', color: '#7f8c8d' }}>No student data available.</p>}
     {clos.length > 0 && coCalcData.length > 0 && (
       <div className="table-wrapper">
@@ -296,7 +297,7 @@ const CTAssignmentTableV1 = ({ clos, coCalcData, ctRows, assignmentRows, getActi
 const CTAssignmentTableV2 = ({ clos, coCalcData, attnAssignObtainedRows, calculateFactoredCOTotals, calculateFactoredAssignmentCOTotals, getStudentCTFactoredMarks, getStudentAssignmentFactoredMarks, formatNumber }) => (
   <section className="ct-assignment-section" style={{ marginTop: '30px' }}>
     <h2>CT and Assignment Marks</h2>
-    {clos.length === 0 && <p style={{ padding: '20px', color: '#7f8c8d' }}>Loading course outcomes...</p>}
+    {clos.length === 0 && <SheetLoader label="Loading course outcomes…" />}
     {clos.length > 0 && coCalcData.length > 0 && (
       <div className="table-wrapper">
         <table className="ct-assignment-table">
@@ -372,7 +373,7 @@ const CombinedCOPOTable = ({
 }) => (
   <section className="co-po-combined-percentage-section" style={{ marginTop: '30px' }}>
     <h2>{tableTitle || 'CO - PO percentage (theory + Lab)'}</h2>
-    {clos.length === 0 && <p style={{ padding: '20px', color: '#7f8c8d' }}>Loading course outcomes...</p>}
+    {clos.length === 0 && <SheetLoader label="Loading course outcomes…" />}
     {clos.length > 0 && coCalcData.length === 0 && <p style={{ padding: '20px', color: '#7f8c8d' }}>No student data available.</p>}
     {clos.length > 0 && coCalcData.length > 0 && (
       <div className="table-wrapper">
@@ -495,7 +496,7 @@ const COAttainmentCombinedTable = ({
 }) => (
   <section className="co-attainment-combined-section" style={{ marginTop: '30px' }}>
     <h2>{useUnweightedLab ? 'CO attainment (theory+Lab) unnorm' : 'CO attainment (theory+Lab)'}</h2>
-    {clos.length === 0 && <p style={{ padding: '20px', color: '#7f8c8d' }}>Loading course outcomes...</p>}
+    {clos.length === 0 && <SheetLoader label="Loading course outcomes…" />}
     {clos.length > 0 && coCalcData.length === 0 && <p style={{ padding: '20px', color: '#7f8c8d' }}>No student data available.</p>}
     {clos.length > 0 && coCalcData.length > 0 && (
       <div className="table-wrapper">

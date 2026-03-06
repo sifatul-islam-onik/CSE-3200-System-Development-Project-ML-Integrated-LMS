@@ -156,7 +156,7 @@ exports.getCourseOutcomes = async (req, res) => {
         }
       } catch (err) {
         // If related course doesn't exist, just return current course COs
-        console.log('Related course not found, returning current course COs only');
+
       }
     }
 
@@ -413,7 +413,7 @@ exports.getCourseProfileData = async (req, res) => {
             );
           }
         } catch (err) {
-          console.log('Related course not found, returning current course COs only');
+          // Related course not found, returning current course COs only
         }
       }
     }

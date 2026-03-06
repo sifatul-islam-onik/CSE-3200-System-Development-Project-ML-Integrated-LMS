@@ -801,17 +801,6 @@ exports.getTermExamMarks = async (req, res) => {
       };
     });
 
-    console.log('[getTermExamMarks] Returning', formattedMarks.length, 'records');
-    if (formattedMarks.length > 0) {
-      console.log('[getTermExamMarks] Sample record:', {
-        rollNumber: formattedMarks[0].rollNumber,
-        marksKeys: Object.keys(formattedMarks[0].marks || {}),
-        sampleMarks: JSON.stringify(formattedMarks[0].marks, null, 2),
-        aKeys: formattedMarks[0].marks?.a ? Object.keys(formattedMarks[0].marks.a) : 'N/A',
-        aValue1: formattedMarks[0].marks?.a?.['1']
-      });
-    }
-
     res.json({
       success: true,
       count: formattedMarks.length,
@@ -955,10 +944,6 @@ exports.getAssignmentData = async (req, res) => {
 exports.saveLabActivityData = async (req, res) => {
   try {
     const { courseId } = req.params;
-    console.log('[saveLabActivityData] Received request for courseId:', courseId);
-    console.log('[saveLabActivityData] Request body keys:', Object.keys(req.body));
-    console.log('[saveLabActivityData] labActivityObtainedRows count:', req.body.labActivityObtainedRows?.length);
-    
     const {
       labActivityRows,
       labActivityFactors,
@@ -1025,8 +1010,6 @@ exports.saveLabActivityData = async (req, res) => {
       { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: false }
     );
 
-    console.log('[saveLabActivityData] Successfully saved data for courseId:', courseId);
-
     res.json({
       success: true,
       message: 'Lab Activity data saved successfully',
@@ -1048,7 +1031,6 @@ exports.saveLabActivityData = async (req, res) => {
 exports.getLabActivityData = async (req, res) => {
   try {
     const { courseId } = req.params;
-    console.log('[getLabActivityData] Fetching data for courseId:', courseId);
 
     // Parallel course check and lab activity data fetch for better performance
     const [course, labActivityData] = await Promise.all([
@@ -1057,7 +1039,6 @@ exports.getLabActivityData = async (req, res) => {
     ]);
 
     if (!course) {
-      console.log('[getLabActivityData] Course not found:', courseId);
       return res.status(404).json({
         success: false,
         message: 'Course not found'
@@ -1072,7 +1053,6 @@ exports.getLabActivityData = async (req, res) => {
       });
 
       if (!isAssigned) {
-        console.log('[getLabActivityData] Access denied for teacher:', req.user._id);
         return res.status(403).json({
           success: false,
           message: 'Access denied. You are not assigned to this course.'
@@ -1082,16 +1062,11 @@ exports.getLabActivityData = async (req, res) => {
 
     // Return data if found, otherwise return empty structure
     if (!labActivityData) {
-      console.log('[getLabActivityData] No data found for courseId:', courseId);
       return res.json({
         success: true,
         data: null
       });
     }
-
-    console.log('[getLabActivityData] Found data for courseId:', courseId);
-    console.log('[getLabActivityData] labActivityObtainedRows count:', labActivityData.labActivityObtainedRows?.length);
-    console.log('[getLabActivityData] First obtained row:', labActivityData.labActivityObtainedRows?.[0]);
 
     res.json({
       success: true,
@@ -1114,11 +1089,6 @@ exports.saveSectionAData = async (req, res) => {
   try {
     const { courseId } = req.params;
     const { sectionARows, sectionAObtainedRows, sectionBRows, sectionBObtainedRows } = req.body;
-
-    console.log('[saveSectionAData] Received request for courseId:', courseId);
-    console.log('[saveSectionAData] Request body keys:', Object.keys(req.body));
-    console.log('[saveSectionAData] Section A rows:', sectionARows?.length);
-    console.log('[saveSectionAData] Section B rows:', sectionBRows?.length);
 
     // Verify course exists and user has access
     const course = await Course.findById(courseId);
@@ -1157,8 +1127,6 @@ exports.saveSectionAData = async (req, res) => {
       },
       { upsert: true, new: true }
     );
-
-    console.log('[saveSectionAData] Successfully saved data for courseId:', courseId);
 
     res.json({
       success: true,

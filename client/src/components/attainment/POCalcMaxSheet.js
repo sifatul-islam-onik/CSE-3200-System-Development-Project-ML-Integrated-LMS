@@ -1,4 +1,5 @@
 import React from 'react';
+import { SheetLoader } from './LoadingSpinner';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const parseMappedPOs = (ploAssessed) => {
@@ -180,10 +181,10 @@ const POCalcMaxSheet = ({ selectedCourse, clos, programOutcomes, poCalcStudents,
   const isLabCourse = lastDigit % 2 === 0;
 
   if (!programOutcomes || programOutcomes.length === 0) {
-    return <p>Loading Program Outcomes...</p>;
+    return <SheetLoader label="Loading Program Outcomes…" />;
   }
   if (!poCalcStudents || poCalcStudents.length === 0) {
-    return <p>Loading Students...</p>;
+    return <SheetLoader label="Loading Students…" />;
   }
 
   // Compute Theory-only PO values:

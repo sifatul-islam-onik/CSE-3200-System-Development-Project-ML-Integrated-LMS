@@ -34,7 +34,7 @@ import { getCourseProfile, getCombinedCourseProfile, updateCOCorrelation } from 
 import { getCourseStudents } from '../services/courseService';
 import { getAllCourses } from '../services/courseService';
 import { getAllProgramOutcomes } from '../services/programOutcomeService';
-import { loadStudentsOptimized, loadAttainmentDatasets } from '../services/dataLoader';
+
 import logger from '../utils/logger';
 import '../styles/AttainmentView.css';
 
@@ -85,6 +85,12 @@ const AttainmentView = () => {
   const previousCourseIdForAssignmentRef = useRef(null);
   const previousCourseIdForLabActivityRef = useRef(null);
   const previousCourseIdForSectionARef = useRef(null);
+  // Per-course student fetch cache — deduplicates concurrent getCourseStudents calls across effects
+  const studentsFetchCacheRef = useRef({});
+  // API data cache for loadCOCalcData — lets section-row re-runs skip redundant network calls
+  const coCalcApiCacheRef = useRef(null); // { courseId, uniqueStudents, ctData, assignData }
+  // Tracks which sheet was active on the previous loadCOCalcData run (used to detect cache staleness)
+  const prevCoCalcSheetRef = useRef(null);
 
   // Assignment & Attendance states
   const [assignmentRows, setAssignmentRows] = useState([]);
@@ -175,34 +181,36 @@ const AttainmentView = () => {
     loadSheetNames();
   }, []);
 
-  // Load course profile function - memoized for better performance
+  // Load course profile function - fetch own + combined COs in parallel
   const loadCourseProfile = useCallback(async () => {
     if (!selectedCourse) return;
-    try {
-      // Own-course COs only (for Course Profile tab)
-      const ownResponse = await getCourseProfile(selectedCourse.courseCode);
-      if (ownResponse.success && ownResponse.data) {
-        setClos(ownResponse.data);
-      } else {
-        setClos([]);
-      }
-    } catch (err) {
-      logger.error('Failed to load course profile (own):', err);
+    const [ownResult, combinedResult] = await Promise.allSettled([
+      getCourseProfile(selectedCourse.courseCode),
+      getCombinedCourseProfile(selectedCourse.courseCode),
+    ]);
+    if (ownResult.status === 'fulfilled' && ownResult.value?.success && ownResult.value?.data) {
+      setClos(ownResult.value.data);
+    } else {
+      if (ownResult.status === 'rejected') logger.error('Failed to load course profile (own):', ownResult.reason);
       setClos([]);
     }
-    try {
-      // Combined theory+lab COs (for COAttainment, COCalc, COPOMap, Charts)
-      const combinedResponse = await getCombinedCourseProfile(selectedCourse.courseCode);
-      if (combinedResponse.success && combinedResponse.data) {
-        setCombinedClos(combinedResponse.data);
-      } else {
-        setCombinedClos([]);
-      }
-    } catch (err) {
-      logger.error('Failed to load combined course profile:', err);
+    if (combinedResult.status === 'fulfilled' && combinedResult.value?.success && combinedResult.value?.data) {
+      setCombinedClos(combinedResult.value.data);
+    } else {
+      if (combinedResult.status === 'rejected') logger.error('Failed to load combined course profile:', combinedResult.reason);
       setCombinedClos([]);
     }
   }, [selectedCourse]);
+
+  // Stable helper — returns (or creates) a cached Promise for getCourseStudents so concurrent effects
+  // share a single in-flight request per course ID rather than each firing their own.
+  const fetchCourseStudentsCached = useCallback((courseId) => {
+    if (!studentsFetchCacheRef.current[courseId]) {
+      studentsFetchCacheRef.current[courseId] =
+        getCourseStudents(courseId).catch(() => ({ success: false, data: [] }));
+    }
+    return studentsFetchCacheRef.current[courseId];
+  }, []);
 
   // Memoize sheets that require CLOs to avoid repeated string checks
   const cloDependentSheets = useMemo(() =>
@@ -412,172 +420,81 @@ const AttainmentView = () => {
     }
   }, [selectedSheet, clos]);
 
-  // Initialize CO Attainment data when COAttainment sheet is selected - OPTIMIZED
+  // Clear per-course fetch caches when the selected course changes so effect re-runs
+  // on a different course always get fresh data.
   useEffect(() => {
-    const calculateCOAttainment = async () => {
-      if (selectedSheet === 'COAttainment' && selectedCourse && clos.length > 0) {
-
-        // Use optimized parallel loader
-        const uniqueStudents = await loadStudentsOptimized(selectedCourse, sheetNames);
-
-
-        if (uniqueStudents.length === 0) {
-          setCoAttainmentData([]);
-          return;
-        }
-
-        // Load all required datasets in parallel
-        const datasets = await loadAttainmentDatasets(selectedCourse, ['ct', 'assignment', 'termExam']);
-
-        // Extract CT obtained marks
-        const ctData = datasets.ct?.ctObtainedRows || [];
-
-        // Calculate CO attainment for each student
-        const attainmentRows = uniqueStudents.map(student => {
-          const row = {
-            rollNumber: student.rollNumber,
-            coValues: {}
-          };
-
-          // Find student's obtained marks from CT data
-          const studentCTData = ctData.find(s =>
-            String(s.rollNumber || '').trim().toLowerCase() ===
-            String(student.rollNumber || '').trim().toLowerCase()
-          );
-
-          // For each CO, calculate attainment percentage
-          clos.forEach(clo => {
-            const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-            let totalObtained = 0;
-            let totalAllocated = 0;
-
-            // Calculate from CT data if available
-            if (studentCTData && studentCTData.coMarks) {
-              const coMarks = studentCTData.coMarks[coNumber];
-              if (coMarks) {
-                totalObtained += coMarks.obtained || 0;
-                totalAllocated += coMarks.allocated || 0;
-              }
-            }
-
-            // Calculate percentage
-            const percentage = totalAllocated > 0
-              ? (totalObtained / totalAllocated) * 100
-              : 0;
-
-            row.coValues[coNumber] = Math.round(percentage * 100) / 100;
-          });
-
-          return row;
-        });
-
-        setCoAttainmentData(attainmentRows);
-      } else {
-        setCoAttainmentData([]);
-      }
-    };
-
-    calculateCOAttainment();
-  }, [selectedSheet, selectedCourse, clos, sheetNames]);
+    studentsFetchCacheRef.current = {};
+    coCalcApiCacheRef.current = null;
+  }, [selectedCourse]);
 
   // Initialize COCalc data when COCalc or COCalc_LabUnnorm sheet is selected
   useEffect(() => {
     const loadCOCalcData = async () => {
       if ((selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax' || selectedSheet === 'POCalc' || selectedSheet === 'CheckPO' || selectedSheet === 'Charts') && selectedCourse && clos.length > 0) {
 
-        // Get students list
-        let allStudents = [];
-
-        if (selectedCourse._id) {
-          try {
-            const resp = await getCourseStudents(selectedCourse._id);
-            if (resp.success && Array.isArray(resp.data) && resp.data.length > 0) {
-              allStudents = resp.data.map(s => ({
-                rollNumber: s.roll || s.rollNumber
-              }));
-            }
-          } catch (err) {
-          }
+        // Invalidate the API data cache when returning from outside the CO-calc sheet group
+        // (e.g. user edited CT/Assignment marks on another tab and came back).
+        const calcSheetGroup = new Set(['COCalc', 'COCalc_LabUnnorm', 'COAttainment', 'POCalcMax', 'POCalc', 'CheckPO', 'Charts']);
+        if (!calcSheetGroup.has(prevCoCalcSheetRef.current)) {
+          coCalcApiCacheRef.current = null;
         }
+        prevCoCalcSheetRef.current = selectedSheet;
 
-        // Fallback: try Section sheets
-        if (allStudents.length === 0 && sheetNames.includes('Section A')) {
-          try {
-            const sectAData = await getAttainmentData('Section A');
-            if (sectAData.success && Array.isArray(sectAData.data)) {
-              allStudents = sectAData.data.map(s => ({ rollNumber: s.rollNumber }));
-            }
-          } catch (err) {
-          }
-        }
+        const cacheKey = selectedCourse._id;
+        let uniqueStudents, ctData, assignData;
 
-        // Deduplicate students
-        const uniqueStudents = [];
-        const seenRolls = new Set();
-        allStudents.forEach(student => {
-          const rollLower = String(student.rollNumber || '').trim().toLowerCase();
-          if (rollLower && !seenRolls.has(rollLower)) {
-            seenRolls.add(rollLower);
-            uniqueStudents.push(student);
-          }
-        });
-
-        // Get CT and Assignment data
-        let ctData = [];
-        let assignData = [];
-
-        if (sheetNames.includes('CT')) {
-          try {
-            const ctResp = await getCTData(selectedCourse._id);
-            if (ctResp.success && Array.isArray(ctResp.data)) {
-              ctData = ctResp.data;
-            }
-          } catch (err) {
-          }
-        }
-
-        // Fetch term exam marks for this course
-        let termMarksData = [];
-        try {
+        if (coCalcApiCacheRef.current?.courseId === cacheKey) {
+          // Re-run triggered by a section-row state update — reuse previously fetched API data
+          ({ uniqueStudents, ctData, assignData } = coCalcApiCacheRef.current);
+        } else {
+          // First run for this course (or cache invalidated) — parallel-fetch all required data
           setTermExamLoading(true);
-
-          const termResp = await getTermExamMarks(selectedCourse._id, selectedCourse.section);
-
-          if (termResp.success && Array.isArray(termResp.data)) {
-            setTermExamMarks(termResp.data);
-            termMarksData = termResp.data;
-          } else {
-            setTermExamMarks([]);
-          }
-        } catch (err) {
-          console.error('Error loading term exam marks:', err);
-          setTermExamMarks([]);
-        } finally {
-          setTermExamLoading(false);
-        }
-
-        // Transform term exam marks into sectionA and sectionB format
-        // Term marks structure: { marks: { a: {1,2,3,4,5,6,7,8}, b: {...}, ... } }
-        // Questions 1-4 are Section A, Questions 5-8 are Section B
-        // But we need format: { rollNumber, obtained_CO1, allocated_CO1, obtained_CO2, allocated_CO2, ... }
-
-        // For now, use the existing sectionA/B data fetch
-        // TODO: Calculate CO-wise marks from term exam marks based on question-CO mapping
-        if (termMarksData.length > 0 && !sheetNames.includes('Section A') && !sheetNames.includes('Section B')) {
-          // If we have term marks but no Section A/B sheets, we need to process term marks
-          // This requires knowing which questions map to which COs
-          // For now, just note that term marks are available
-          // The actual CO mapping would need to come from course profile or CO definitions
-        }
-
-        if (sheetNames.includes('Attn_Assign')) {
+          let studentsResp, ctResp, termResp, assignResp, sectAFallbackResp;
           try {
-            const assignResp = await getAttainmentData('Attn_Assign');
-            if (assignResp.success && Array.isArray(assignResp.data)) {
-              assignData = assignResp.data;
-            }
-          } catch (err) {
+            [studentsResp, ctResp, termResp, assignResp, sectAFallbackResp] = await Promise.all([
+              fetchCourseStudentsCached(cacheKey),
+              sheetNames.includes('CT')
+                ? getCTData(cacheKey).catch(() => ({ success: false }))
+                : Promise.resolve({ success: false }),
+              getTermExamMarks(cacheKey, selectedCourse.section)
+                .catch(() => ({ success: false, data: [] })),
+              sheetNames.includes('Attn_Assign')
+                ? getAttainmentData('Attn_Assign').catch(() => ({ success: false }))
+                : Promise.resolve({ success: false }),
+              sheetNames.includes('Section A')
+                ? getAttainmentData('Section A').catch(() => ({ success: false }))
+                : Promise.resolve({ success: false }),
+            ]);
+          } finally {
+            setTermExamLoading(false);
           }
+
+          // Build student list (with Section A sheet as fallback)
+          let allStudents = [];
+          if (studentsResp.success && Array.isArray(studentsResp.data) && studentsResp.data.length > 0) {
+            allStudents = studentsResp.data.map(s => ({ rollNumber: s.roll || s.rollNumber }));
+          } else if (sectAFallbackResp?.success && Array.isArray(sectAFallbackResp.data)) {
+            allStudents = sectAFallbackResp.data.map(s => ({ rollNumber: s.rollNumber }));
+          }
+
+          // Deduplicate students
+          const seenRolls = new Set();
+          uniqueStudents = [];
+          allStudents.forEach(student => {
+            const rollLower = String(student.rollNumber || '').trim().toLowerCase();
+            if (rollLower && !seenRolls.has(rollLower)) {
+              seenRolls.add(rollLower);
+              uniqueStudents.push(student);
+            }
+          });
+
+          ctData = (ctResp?.success && Array.isArray(ctResp.data)) ? ctResp.data : [];
+          assignData = (assignResp?.success && Array.isArray(assignResp.data)) ? assignResp.data : [];
+          const termData = (termResp?.success && Array.isArray(termResp.data)) ? termResp.data : [];
+          setTermExamMarks(termData.length ? termData : []);
+
+          // Cache so re-runs from section-row updates on the same tab skip the API calls
+          coCalcApiCacheRef.current = { courseId: cacheKey, uniqueStudents, ctData, assignData };
         }
 
         // Build COCalc rows
@@ -886,14 +803,12 @@ const AttainmentView = () => {
     let allStudents = [];
     if (selectedCourse && selectedCourse._id) {
       try {
-        const resp = await getCourseStudents(selectedCourse._id);
+        const resp = await fetchCourseStudentsCached(selectedCourse._id);
         if (resp.success && Array.isArray(resp.data) && resp.data.length > 0) {
           allStudents = resp.data.map(s => ({ rollNumber: s.roll || s.rollNumber, name: s.name }));
-        } else {
         }
       } catch (error) {
       }
-    } else {
     }
     if (allStudents.length === 0) {
       const sectionSheets = (sheetNames || []).filter(name => /^Section/i.test(name));
@@ -1119,7 +1034,7 @@ const AttainmentView = () => {
         setLabActivityObtainedRows([]);
       }
     }
-  }, [selectedCourse, sheetNames, attainmentData, termExamMarks]);
+  }, [selectedCourse, sheetNames, attainmentData, termExamMarks, fetchCourseStudentsCached]);
 
   // Effect to trigger initialization when sheet changes
   useEffect(() => {
@@ -1982,7 +1897,7 @@ const AttainmentView = () => {
               // Get all enrolled students and merge with saved data
               let allStudents = [];
               try {
-                const resp = await getCourseStudents(selectedCourse._id);
+                const resp = await fetchCourseStudentsCached(selectedCourse._id);
                 if (resp.success && Array.isArray(resp.data) && resp.data.length > 0) {
                   allStudents = resp.data.map(s => ({
                     rollNumber: s.roll || s.rollNumber,
@@ -2135,7 +2050,7 @@ const AttainmentView = () => {
             // Get all enrolled students and merge with saved obtained rows data
             let allStudents = [];
             try {
-              const resp = await getCourseStudents(selectedCourse._id);
+              const resp = await fetchCourseStudentsCached(selectedCourse._id);
               if (resp.success && Array.isArray(resp.data) && resp.data.length > 0) {
                 allStudents = resp.data.map(s => ({
                   rollNumber: s.roll || s.rollNumber,
@@ -4150,9 +4065,7 @@ const AttainmentView = () => {
                 formatNumber={formatNumber}
               />
             ) : (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#7f8c8d', fontSize: '15px' }}>
-                Calculating CO Attainment…
-              </div>
+              <SheetLoader label="Calculating CO Attainment…" />
             )
           )}
 
@@ -4259,8 +4172,3 @@ const AttainmentView = () => {
 };
 
 export default AttainmentView;
-
-
-
-
-

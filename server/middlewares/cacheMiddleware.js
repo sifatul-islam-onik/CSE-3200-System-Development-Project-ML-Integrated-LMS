@@ -46,7 +46,6 @@ const cacheMiddleware = (duration = CACHE_DURATION.MEDIUM, keyGenerator) => {
     // Check if cached response exists and is still valid
     const cachedResponse = cache.get(key);
     if (cachedResponse && Date.now() < cachedResponse.expiry) {
-      console.log(`Cache HIT: ${key}`);
       return res.json(cachedResponse.data);
     }
 
@@ -61,7 +60,6 @@ const cacheMiddleware = (duration = CACHE_DURATION.MEDIUM, keyGenerator) => {
           data,
           expiry: Date.now() + duration
         });
-        console.log(`Cache SET: ${key} (expires in ${duration / 1000}s)`);
       }
       return originalJson(data);
     };
@@ -82,7 +80,6 @@ const invalidateCacheMiddleware = (keyPattern) => {
     res.json = (data) => {
       if (data && data.success !== false) {
         clearCache(keyPattern(req));
-        console.log(`Cache INVALIDATED: ${keyPattern(req)}`);
       }
       return originalJson(data);
     };
@@ -132,9 +129,6 @@ const cleanupExpiredCache = () => {
     }
   }
 
-  if (cleaned > 0) {
-    console.log(`Cache cleanup: removed ${cleaned} expired entries`);
-  }
 };
 
 // Run cleanup every 10 minutes

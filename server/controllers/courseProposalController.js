@@ -232,14 +232,10 @@ exports.getProposalById = async (req, res) => {
 // @route   PUT /api/course-proposals/:id/approve
 // @access  Admin only
 exports.approveProposal = async (req, res) => {
-  console.log('=== Approve Proposal Started ===');
-  console.log('Proposal ID:', req.params.id);
-  console.log('Review Comments:', req.body.reviewComments);
   try {
     const { reviewComments } = req.body;
 
     const proposal = await CourseProposal.findById(req.params.id);
-    console.log('Proposal found:', proposal ? 'YES' : 'NO');
 
     if (!proposal) {
       return res.status(404).json({
@@ -307,15 +303,12 @@ exports.approveProposal = async (req, res) => {
     }
 
     try {
-      console.log('Proposal Type:', proposal.proposalType);
       if (proposal.proposalType === 'CREATE') {
-        console.log('Creating new course...');
         // Create new course
         const courseData = {
           ...normalizeCourseData(proposal.proposedData),
           createdBy: proposal.proposedBy
         };
-        console.log('Normalized course data:', JSON.stringify(courseData, null, 2));
 
         // Extract courseOutcomes if present
         const courseOutcomes = courseData.courseOutcomes;
