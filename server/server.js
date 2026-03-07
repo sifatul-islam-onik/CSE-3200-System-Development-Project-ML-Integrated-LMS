@@ -117,6 +117,7 @@ const attainmentRoutes = require('./routes/attainmentRoutes');
 const courseProfileRoutes = require('./routes/courseProfileRoutes');
 const ocrRoutes = require('./routes/ocrRoutes');
 const workerRoutes = require('./routes/workerRoutes');
+const resultRoutes = require('./routes/resultRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
@@ -132,6 +133,7 @@ app.use('/api/attainment', attainmentRoutes);
 app.use('/api/course-profile', courseProfileRoutes);
 app.use('/api/ocr', ocrRoutes);
 app.use('/api/workers', workerRoutes);
+app.use('/api/results', resultRoutes);
 
 // Error handlers
 process.on('unhandledRejection', (err) => {
