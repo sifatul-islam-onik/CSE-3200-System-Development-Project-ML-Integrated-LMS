@@ -1,4 +1,6 @@
-﻿import React from 'react';
+﻿import React, { useRef } from 'react';
+import ExcelJS from 'exceljs/dist/exceljs.min.js';
+import { saveAs } from 'file-saver';
 import { SheetLoader } from './LoadingSpinner';
 
 // â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -266,6 +268,9 @@ const ChartsSheet = ({
   // Effective combined CO list (all COs across theory + lab)
   const effectiveClos = combinedClos?.length > 0 ? combinedClos : (clos || []);
 
+  // Must be called before any early returns (Rules of Hooks)
+  const sectionRef = useRef(null);
+
   if (!effectiveClos.length) return <SheetLoader label="Loading Course Outcomes…" />;
   if (!programOutcomes || programOutcomes.length === 0) return <SheetLoader label="Loading Program Outcomes…" />;
 
@@ -309,8 +314,90 @@ const ChartsSheet = ({
   const labelStyle = { textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8', whiteSpace: 'nowrap' };
   const cellStyle  = { textAlign: 'center' };
 
+  // Convert an inline SVG element to a PNG data URL via Canvas
+  const svgToPng = (svgEl) => new Promise((resolve, reject) => {
+    const w = parseInt(svgEl.getAttribute('width')) || 700;
+    const h = parseInt(svgEl.getAttribute('height')) || 300;
+    const clone = svgEl.cloneNode(true);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    const blob = new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      resolve({ dataUrl: canvas.toDataURL('image/png'), w, h });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('svg load failed')); };
+    img.src = url;
+  });
+
+  const handleExportToExcel = async () => {
+    const safeVal = v => (v === '-' || v == null) ? '-' : (isFinite(Number(v)) ? Number(v) : '-');
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Charts');
+    let rowCount = 0;
+    const addRow = (values) => { ws.addRow(values); rowCount++; };
+    const styleLastHeader = (colCount) => {
+      const row = ws.getRow(rowCount);
+      for (let c = 1; c <= colCount; c++) {
+        const cell = row.getCell(c);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2980B9' } };
+        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+        cell.alignment = { horizontal: 'center' };
+      }
+    };
+
+    // CO Attainment table
+    addRow([`CO Attainment of ${theoryCourseCode}+${labCourseCode}`]);
+    ws.getRow(rowCount).font = { bold: true, size: 13 };
+    addRow(['Metric', ...coNames]); styleLastHeader(coNames.length + 1);
+    coRows.forEach(row => addRow([row.label, ...row.vals.map(safeVal)]));
+    addRow([]);
+
+    // PO Attainment table
+    addRow([`PO Attainment of ${theoryCourseCode}+${labCourseCode}`]);
+    ws.getRow(rowCount).font = { bold: true, size: 13 };
+    addRow(['Metric', ...poNames]); styleLastHeader(poNames.length + 1);
+    poRows.forEach(row => addRow([row.label, ...row.vals.map(safeVal)]));
+    addRow([]); addRow([]);
+
+    // Capture each SVG chart and embed as an image
+    if (sectionRef.current) {
+      const svgEls = Array.from(sectionRef.current.querySelectorAll('svg'));
+      for (const svgEl of svgEls) {
+        try {
+          const { dataUrl, w, h } = await svgToPng(svgEl);
+          const imgId = wb.addImage({ base64: dataUrl.split(',')[1], extension: 'png' });
+          ws.addImage(imgId, { tl: { col: 0, row: rowCount }, ext: { width: w, height: h } });
+          const rowsSpanned = Math.ceil(h / 18) + 2;
+          for (let i = 0; i < rowsSpanned; i++) addRow([]);
+        } catch (e) {
+          console.warn('Chart capture failed:', e);
+          addRow([]);
+        }
+      }
+    }
+
+    const buffer = await wb.xlsx.writeBuffer();
+    saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `Charts_${courseCode}.xlsx`);
+  };
+
   return (
-    <section className="charts-section">
+    <section className="charts-section" ref={sectionRef}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+        <button
+          onClick={handleExportToExcel}
+          style={{ backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 18px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
+        >
+          Export to Excel
+        </button>
+      </div>
       <h3>Charts</h3>
 
       {/* CO Attainment Table */}

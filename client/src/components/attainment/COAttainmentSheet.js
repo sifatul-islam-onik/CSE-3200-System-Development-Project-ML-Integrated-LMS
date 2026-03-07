@@ -1,4 +1,5 @@
 import React from 'react';
+import * as XLSX from 'xlsx';
 import { SkeletonTable } from './LoadingSpinner';
 
 // ── Summary tables: CO measured & Wt ─────────────────────────────────────────
@@ -242,13 +243,88 @@ const COAttainmentSheet = ({ selectedCourse, clos, ownClos, coAttainmentData, th
   const lastDigit = parseInt(courseCode.replace(/\s/g, '').slice(-1));
   const isTheoryCourse = !isNaN(lastDigit) && lastDigit % 2 === 1;
   const isLabCourse    = !isNaN(lastDigit) && lastDigit % 2 === 0;
-
-  // Theory/Lab tables use own-course COs only (matching how theoryCoAttainmentData/labCoAttainmentData are computed).
-  // Combined/Unnormed/EqualWt tables use all combined COs.
   const separatedClos = (ownClos && ownClos.length > 0) ? ownClos : clos;
+
+  const handleExportToExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    const buildSheet = (closList, data) => {
+      if (!data || !data.length || !closList.length) return null;
+      const coNumbers = closList.map(clo => (clo.cloNumber || '').toString().replace('CLO', 'CO'));
+      const header = [
+        'Roll',
+        ...coNumbers.map(cn => `${cn} (%)`),
+        ...coNumbers.map(cn => `${cn} (>=55?)`),
+        ...coNumbers.map(cn => `${cn} (Binary)`),
+      ];
+      const dataRows = data.map(studentRow => [
+        studentRow.rollNumber,
+        ...coNumbers.map(cn => parseFloat(formatNumber(studentRow.coValues[cn] || 0)) || 0),
+        ...coNumbers.map(cn => (studentRow.coValues[cn] || 0) >= 55 ? 'Y' : 'N'),
+        ...coNumbers.map(cn => (studentRow.coValues[cn] || 0) >= 55 ? 1 : 0),
+      ]);
+      const avgRow = [
+        'Average',
+        ...coNumbers.map(cn => {
+          const total = data.reduce((sum, r) => sum + (r.coValues[cn] || 0), 0);
+          return parseFloat(formatNumber(data.length > 0 ? total / data.length : 0)) || 0;
+        }),
+        ...coNumbers.map(cn => {
+          const hasNoData = data.some(r => r.coValues?.[cn] == null);
+          return hasNoData ? '--' : data.filter(r => (r.coValues?.[cn] || 0) >= 55).length;
+        }),
+        ...coNumbers.map(() => ''),
+      ];
+      const achievedRow = [
+        'Achieved(%)',
+        ...coNumbers.map(() => ''),
+        ...coNumbers.map(cn => {
+          const hasNoData = data.some(r => r.coValues?.[cn] == null);
+          if (hasNoData) return '--';
+          const yCount = data.filter(r => (r.coValues?.[cn] || 0) >= 55).length;
+          return parseFloat((yCount / data.length * 100).toFixed(2));
+        }),
+        ...coNumbers.map(() => ''),
+      ];
+      return [header, ...dataRows, avgRow, achievedRow];
+    };
+
+    const effectiveTheory   = theoryCoAttainmentData?.length   > 0 ? theoryCoAttainmentData   : coAttainmentData;
+    const effectiveLab      = labCoAttainmentData?.length      > 0 ? labCoAttainmentData      : coAttainmentData;
+    const effectiveCombined = combinedCoAttainmentData?.length > 0 ? combinedCoAttainmentData : coAttainmentData;
+    const effectiveUnnormed = unnormedCoAttainmentData?.length > 0 ? unnormedCoAttainmentData : coAttainmentData;
+    const effectiveEqualWt  = equalWtCoAttainmentData?.length  > 0 ? equalWtCoAttainmentData  : coAttainmentData;
+
+    if (isTheoryCourse) {
+      const d = buildSheet(separatedClos, effectiveTheory);
+      if (d) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d), 'Theory Courses');
+    }
+    if (isLabCourse) {
+      const d = buildSheet(separatedClos, effectiveLab);
+      if (d) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d), 'Lab Courses');
+    }
+    const d2 = buildSheet(clos, effectiveCombined);
+    if (d2) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d2), 'Combined (Theory+Lab)');
+    const d3 = buildSheet(clos, effectiveUnnormed);
+    if (d3) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d3), 'Unnormed (Theory+Lab)');
+    const d4 = buildSheet(clos, effectiveEqualWt);
+    if (d4) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d4), 'Equal Wt (Theory+Lab)');
+
+    if (wb.SheetNames.length === 0) return;
+    XLSX.writeFile(wb, `CO_Attainment_${courseCode || 'export'}.xlsx`);
+  };
 
   return (
     <>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+        <button
+          onClick={handleExportToExcel}
+          style={{ padding: '8px 18px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
+          title="Export all CO Attainment tables to Excel"
+        >
+          ⬇ Export Excel
+        </button>
+      </div>
       <COSummaryTables
         clos={clos}
         theoryCoAttainmentData={theoryCoAttainmentData}

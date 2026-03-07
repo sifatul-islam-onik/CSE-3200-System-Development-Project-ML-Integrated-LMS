@@ -1,4 +1,5 @@
 import React from 'react';
+import * as XLSX from 'xlsx';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -181,8 +182,36 @@ const POCalcSheet = ({ selectedCourse, clos, programOutcomes, poCalcStudents, th
   // COCalc!col = CO Attainment (Theory+Lab) %, COPOMap!col = Normalized Combined CO-PO Mapping
   const combinedPORows = computePOValuesNormalizedCombined(combinedCoAttainmentData, combinedCOPOMatrix, programOutcomes);
 
+  const handleExportToExcel = () => {
+    const safeNum = v => { const n = Number(v); return isFinite(n) ? n : 0; };
+    const wb = XLSX.utils.book_new();
+    const poNames = programOutcomes.map((po, idx) => po.poCode || `PO${idx + 1}`);
+
+    const buildSheet = (computedRows) => {
+      const header = ['Roll', ...poNames];
+      const dataRows = computedRows.map(row => [row.rollNumber, ...row.poValues.map(safeNum)]);
+      return XLSX.utils.aoa_to_sheet([header, ...dataRows]);
+    };
+
+    if (isTheoryCourse && theoryPORows.length > 0)
+      XLSX.utils.book_append_sheet(wb, buildSheet(theoryPORows), 'Theory only');
+    if (combinedPORows.length > 0)
+      XLSX.utils.book_append_sheet(wb, buildSheet(combinedPORows), 'Theory+Lab');
+
+    if (wb.SheetNames.length === 0) return;
+    XLSX.writeFile(wb, `POCalc_${courseCode}.xlsx`);
+  };
+
   return (
     <section className="po-calc-section">
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+        <button
+          onClick={handleExportToExcel}
+          style={{ backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 18px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
+        >
+          Export to Excel
+        </button>
+      </div>
       <h3>PO Calculation</h3>
       {isTheoryCourse && (
         <POTableComputed

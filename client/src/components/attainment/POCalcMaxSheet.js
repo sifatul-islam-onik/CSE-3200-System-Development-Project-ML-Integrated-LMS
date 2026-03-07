@@ -1,4 +1,5 @@
 import React from 'react';
+import * as XLSX from 'xlsx';
 import { SheetLoader } from './LoadingSpinner';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -204,9 +205,53 @@ const POCalcMaxSheet = ({ selectedCourse, clos, programOutcomes, poCalcStudents,
 
   // Theory+Lab(Eq Wt): same formula with equalWtCoAttainmentData and combinedCOPOMatrix
   const equalWtPORows = computePOValuesCombined(equalWtCoAttainmentData, combinedCOPOMatrix, programOutcomes);
+  const handleExportToExcel = () => {
+    const safeNum = v => { const n = Number(v); return isFinite(n) ? n : 0; };
+    const wb = XLSX.utils.book_new();
+    const poNames = programOutcomes.map((po, idx) => po.poCode || `PO${idx + 1}`);
 
+    const buildSheet = (computedRows, withYCount = false) => {
+      const header = ['Roll', ...poNames];
+      const dataRows = computedRows.map(row => [row.rollNumber, ...row.poValues.map(safeNum)]);
+      const aoa = [header, ...dataRows];
+      if (withYCount && computedRows.length > 0) {
+        const totalStudents = computedRows.length;
+        const yCountRow = ['Y count', ...programOutcomes.map((_, pIdx) => {
+          const zeroCount = computedRows.filter(r => r.poValues[pIdx] === 0).length;
+          return zeroCount >= totalStudents ? '--' : computedRows.filter(r => r.poValues[pIdx] === 1).length;
+        })];
+        const achievedRow = ['Achieved(%)', ...programOutcomes.map((_, pIdx) => {
+          const zeroCount = computedRows.filter(r => r.poValues[pIdx] === 0).length;
+          const yCount = zeroCount >= totalStudents ? null : computedRows.filter(r => r.poValues[pIdx] === 1).length;
+          return yCount == null ? '--' : parseFloat((yCount / totalStudents * 100).toFixed(2));
+        })];
+        aoa.push(yCountRow, achievedRow);
+      }
+      return XLSX.utils.aoa_to_sheet(aoa);
+    };
+
+    if (isTheoryCourse && theoryPORows.length > 0)
+      XLSX.utils.book_append_sheet(wb, buildSheet(theoryPORows), 'Theory only');
+    if (combinedPORows.length > 0)
+      XLSX.utils.book_append_sheet(wb, buildSheet(combinedPORows, true), 'Theory+Lab');
+    if (unnormedPORows.length > 0)
+      XLSX.utils.book_append_sheet(wb, buildSheet(unnormedPORows, true), 'Theory+Lab(unnorm)');
+    if (equalWtPORows.length > 0)
+      XLSX.utils.book_append_sheet(wb, buildSheet(equalWtPORows, true), 'Theory+Lab(Eq Wt)');
+
+    if (wb.SheetNames.length === 0) return;
+    XLSX.writeFile(wb, `POCalcMax_${courseCode}.xlsx`);
+  };
   return (
     <section className="po-calc-max-section">
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+        <button
+          onClick={handleExportToExcel}
+          style={{ backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 18px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
+        >
+          Export to Excel
+        </button>
+      </div>
       <h3>PO Calculation Max</h3>
       {isTheoryCourse && (
         <POTableComputed
