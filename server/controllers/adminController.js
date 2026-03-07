@@ -1567,6 +1567,31 @@ exports.unassignBatchFromCourse = async (req, res) => {
 
     await course.save();
 
+    // Clear all student-specific obtained rows for this course now that the
+    // batch has been unassigned, so old student data does not carry over if
+    // the course is later assigned to a different batch.
+    // CO allocation rows (ctRows, sectionARows, etc.) are course-structure
+    // data and are intentionally preserved.
+    await Promise.all([
+      CTAttainment.updateOne(
+        { course: courseId },
+        { $set: { ctObtainedRows: [] } }
+      ),
+      AssignmentAttainment.updateOne(
+        { course: courseId },
+        { $set: { attnAssignObtainedRows: [] } }
+      ),
+      TermExamAttainment.updateOne(
+        { course: courseId },
+        { $set: { sectionAObtainedRows: [], sectionBObtainedRows: [] } }
+      ),
+      LabActivityAttainment.updateOne(
+        { course: courseId },
+        { $set: { labActivityObtainedRows: [] } }
+      ),
+      TermExamMarks.deleteMany({ course: courseId }),
+    ]);
+
     // Populate and return updated course
     const updatedCourse = await Course.findById(courseId)
       .populate('assignedTeachers.teacher', 'name email designation');
