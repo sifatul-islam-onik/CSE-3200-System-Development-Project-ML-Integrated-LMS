@@ -2836,7 +2836,7 @@ const AdminDashboard = () => {
             <div className="section-header">
               <div className="header-content">
                 <h2>Result Management</h2>
-                <p>Compute, preview, and publish student term results</p>
+                <p>Compute, preview, and publish student term results. You can also look up published results for any past batch by entering its batch number, department, year, and term below.</p>
               </div>
             </div>
             <div className="section-body">
@@ -2890,6 +2890,32 @@ const AdminDashboard = () => {
 
               {/* Action buttons */}
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '24px' }}>
+                <button
+                  className="btn btn-secondary"
+                  disabled={resultsLoading || !resultBatch || !resultDeptCode}
+                  onClick={async () => {
+                    setResultsLoading(true);
+                    setResultsMsg('');
+                    try {
+                      const fetched = await getBatchResults({ batch: resultBatch, deptCode: resultDeptCode, yearLevel: resultYearLevel, term: resultTerm });
+                      setBatchResults(fetched.results || []);
+                      if (!fetched.results?.length) {
+                        setResultsMsg('No saved results found for this batch/term.');
+                        setResultsMsgType('error');
+                      } else {
+                        setResultsMsg(`Loaded ${fetched.results.length} result(s).`);
+                        setResultsMsgType('success');
+                      }
+                    } catch (err) {
+                      setResultsMsg(err.response?.data?.message || 'Failed to load results.');
+                      setResultsMsgType('error');
+                    } finally {
+                      setResultsLoading(false);
+                    }
+                  }}
+                >
+                  {resultsLoading ? 'Loading…' : 'View Results'}
+                </button>
                 <button
                   className="btn btn-primary"
                   disabled={resultsLoading || !resultBatch || !resultDeptCode}
