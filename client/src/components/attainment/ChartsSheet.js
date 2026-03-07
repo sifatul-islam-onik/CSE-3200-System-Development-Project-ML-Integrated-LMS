@@ -467,6 +467,7 @@ const ChartsSheet = ({
       let isFirstPage = true;
 
       for (const block of blocks) {
+        if (block.dataset.pdfSkip) continue;
         const canvas = await html2canvas(block, {
           scale: 2,
           useCORS: true,
@@ -538,31 +539,9 @@ const ChartsSheet = ({
         </table>
       </div>
 
-      {/* PO Attainment Table */}
-      <div className="table-container" style={{ marginTop: '30px', overflowX: 'auto' }}>
-        <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>
-          PO Attainment of {theoryCourseCode}+{labCourseCode}
-        </h4>
-        <table className="co-po-map-table">
-          <thead>
-            <tr>
-              <th style={thStyle}>Metric</th>
-              {programOutcomes.map((po, idx) => (
-                <th key={idx} style={thStyle}>{po.poCode || `PO${idx + 1}`}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {poRows.map(row => (
-              <tr key={row.label}>
-                <td style={labelStyle}>{row.label}</td>
-                {row.vals.map((v, idx) => <td key={idx} style={cellStyle}>{v}</td>)}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
 
+      {/* CO Charts - all on one page */}
+      <div>
       {/* â”€â”€ Charts â”€â”€ */}
       {/* Charts grid — CO charts, 2 columns on wide screens */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '0 24px' }}>
@@ -598,6 +577,32 @@ const ChartsSheet = ({
         ]}
         wide
       />
+      </div>
+      {/* PO Attainment Table */}
+      <div data-pdf-skip="true" className="table-container" style={{ marginTop: '30px', overflowX: 'auto' }}>
+        <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>
+          PO Attainment of {theoryCourseCode}+{labCourseCode}
+        </h4>
+        <table className="co-po-map-table">
+          <thead>
+            <tr>
+              <th style={thStyle}>Metric</th>
+              {programOutcomes.map((po, idx) => (
+                <th key={idx} style={thStyle}>{po.poCode || `PO${idx + 1}`}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {poRows.map(row => (
+              <tr key={row.label}>
+                <td style={labelStyle}>{row.label}</td>
+                {row.vals.map((v, idx) => <td key={idx} style={cellStyle}>{v}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       {/* PO charts — one per row */}
       <SingleBarChart
         title={`PO Attainment \u2014 ${theoryCourseCode}+${labCourseCode}`}
