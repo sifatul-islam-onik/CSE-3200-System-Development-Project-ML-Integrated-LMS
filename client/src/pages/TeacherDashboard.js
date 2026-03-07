@@ -79,6 +79,7 @@ const TeacherDashboard = () => {
   const [ctUploadParsed, setCtUploadParsed] = useState(null);
   const [ctUploadLoading, setCtUploadLoading] = useState(false);
   const [ctUploadSaving, setCtUploadSaving] = useState(false);
+  const [ctFileInputKey, setCtFileInputKey] = useState(0);
   const [isSmallScreen, setIsSmallScreen] = useState(typeof window !== 'undefined' ? window.innerWidth < 640 : false);
 
   // Lab Marks state
@@ -93,6 +94,7 @@ const TeacherDashboard = () => {
   const [labUploadParsed, setLabUploadParsed] = useState(null);
   const [labUploadLoading, setLabUploadLoading] = useState(false);
   const [labUploadSaving, setLabUploadSaving] = useState(false);
+  const [labFileInputKey, setLabFileInputKey] = useState(0);
   
   // Attendance & Assignment Marks state
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
@@ -105,6 +107,7 @@ const TeacherDashboard = () => {
   const [assignUploadParsed, setAssignUploadParsed] = useState(null);
   const [assignUploadLoading, setAssignUploadLoading] = useState(false);
   const [assignUploadSaving, setAssignUploadSaving] = useState(false);
+  const [assignFileInputKey, setAssignFileInputKey] = useState(0);
   const [assignExistingData, setAssignExistingData] = useState(null);
 
   useEffect(() => {
@@ -1307,7 +1310,7 @@ const TeacherDashboard = () => {
                           <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Select CT</label>
                           <select
                             value={selectedCTUpload}
-                            onChange={e => { setSelectedCTUpload(e.target.value); setCtUploadParsed(null); setCtUploadFile(null); }}
+                            onChange={e => { setSelectedCTUpload(e.target.value); setCtUploadParsed(null); setCtUploadFile(null); setCtFileInputKey(k => k + 1); }}
                             style={{ padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', minWidth: '100px' }}
                           >
                             {Array.from({ length: ctSettings.ctTaken }, (_, i) => (
@@ -1318,6 +1321,7 @@ const TeacherDashboard = () => {
                         <div style={{ flex: 1, minWidth: '200px' }}>
                           <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Upload Excel / CSV</label>
                           <input
+                            key={ctFileInputKey}
                             type="file"
                             accept=".xlsx,.xls,.csv"
                             onChange={e => { setCtUploadFile(e.target.files[0] || null); setCtUploadParsed(null); }}
@@ -1439,12 +1443,8 @@ const TeacherDashboard = () => {
                           }
                           return r;
                         });
-                      // Build updated ctRows from CO mapping in upload headers
-                      // A Q column absent from upload leaves existing allocation untouched
+                      // Build updated ctRows — only update existing CO rows, never add new ones
                       const coSet = new Set((existing.ctRows || []).map(r => r.coNumber).filter(Boolean));
-                      if (ctUploadParsed.hasQ1 && ctUploadParsed.q1CO) coSet.add(ctUploadParsed.q1CO);
-                      if (ctUploadParsed.hasQ2 && ctUploadParsed.q2CO) coSet.add(ctUploadParsed.q2CO);
-                      if (ctUploadParsed.hasQ3 && ctUploadParsed.q3CO) coSet.add(ctUploadParsed.q3CO);
                       const updatedCtRows = [...coSet].map(coNumber => {
                         const existingRow = (existing.ctRows || []).find(r => r.coNumber === coNumber) || { coNumber };
                         const newRow = { ...existingRow };
@@ -1459,22 +1459,13 @@ const TeacherDashboard = () => {
                         }
                         return newRow;
                       });
-                      const existingRollSet = new Set(existingObtained.map(r => r.rollNumber));
-                      const newStudentsCT = ctUploadParsed.rows
-                        .filter(p => p.rollNumber && p.rollNumber.toLowerCase() !== 'roll' && !existingRollSet.has(p.rollNumber))
-                        .map(p => ({
-                          rollNumber: p.rollNumber,
-                          [q1Field]: p.q1 ?? 0,
-                          [q2Field]: p.q2 ?? 0,
-                          [q3Field]: p.q3 ?? 0,
-                        }));
                       const fullData = {
                         ctRows: updatedCtRows,
                         ctFactors: existing.ctFactors || {},
                         ctManualWts: newManualWts,
                         ctEqWts: existing.ctEqWts || {},
                         ctSummary: existing.ctSummary || ctSettings,
-                        ctObtainedRows: [...existingObtained, ...newStudentsCT],
+                        ctObtainedRows: existingObtained,
                       };
                       await saveCTData(ctMarksCourse._id, fullData);
                       setCtExistingData(prev => ({ ...(prev || {}), ...fullData }));
@@ -1482,8 +1473,7 @@ const TeacherDashboard = () => {
                       setTimeout(() => setSuccessMessage(''), 3000);
                       setCtUploadParsed(null);
                       setCtUploadFile(null);
-                    } catch (err) {
-                      console.error('Error saving CT upload:', err);
+                      setCtFileInputKey(k => k + 1);
                       setError('Failed to save CT data');
                       setTimeout(() => setError(''), 3000);
                     } finally {
@@ -1660,6 +1650,7 @@ const TeacherDashboard = () => {
                       <div style={{ flex: 1, minWidth: '200px' }}>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Upload Excel / CSV</label>
                         <input
+                          key={labFileInputKey}
                           type="file"
                           accept=".xlsx,.xls,.csv"
                           onChange={e => { setLabUploadFile(e.target.files[0] || null); setLabUploadParsed(null); }}
@@ -1798,11 +1789,8 @@ const TeacherDashboard = () => {
                           return r;
                         });
 
-                      // Update labActivityRows CO mapping
+                      // Update labActivityRows CO mapping — only update existing CO rows, never add new ones
                       const coSet = new Set((existing.labActivityRows || []).map(r => r.coNumber).filter(Boolean));
-                      if (labUploadParsed.hasQ1 && labUploadParsed.q1CO) coSet.add(labUploadParsed.q1CO);
-                      if (labUploadParsed.hasQ2 && labUploadParsed.q2CO) coSet.add(labUploadParsed.q2CO);
-                      if (labUploadParsed.hasQ3 && labUploadParsed.q3CO) coSet.add(labUploadParsed.q3CO);
 
                       const updatedLabRows = [...coSet].map(coNumber => {
                         const existingRow = (existing.labActivityRows || []).find(r => r.coNumber === coNumber) || { coNumber };
@@ -1819,19 +1807,6 @@ const TeacherDashboard = () => {
                         return newRow;
                       });
 
-                      const existingRollSet = new Set(existingObtained.map(r => r.rollNumber));
-                      const newStudentsLab = labUploadParsed.rows
-                        .filter(p => p.rollNumber && p.rollNumber.toLowerCase() !== 'roll' && !existingRollSet.has(p.rollNumber))
-                        .map(p => ({
-                          rollNumber: p.rollNumber,
-                          attn: p.attn ?? 0,
-                          quiz: p.quiz ?? 0,
-                          viva: p.viva ?? 0,
-                          [q1Field]: p.q1 ?? 0,
-                          [q2Field]: p.q2 ?? 0,
-                          [q3Field]: p.q3 ?? 0,
-                          ...(labUploadParsed.hasOther && p.other !== null ? { otherMeasured: p.other } : {}),
-                        }));
                       const fullData = {
                         labActivityRows: updatedLabRows,
                         labActivityFactors: existing.labActivityFactors || {},
@@ -1845,7 +1820,7 @@ const TeacherDashboard = () => {
                         otherActivityMeasured: labSettings.otherActivityMeasured,
                         coMappedActivityMarks: labSettings.coMappedActivityMarks,
                         useEqWtActivity: labSettings.useEqWtActivity,
-                        labActivityObtainedRows: [...existingObtained, ...newStudentsLab],
+                        labActivityObtainedRows: existingObtained,
                       };
 
                       await saveLabActivityData(labMarksCourse._id, fullData);
@@ -1854,8 +1829,7 @@ const TeacherDashboard = () => {
                       setTimeout(() => setSuccessMessage(''), 3000);
                       setLabUploadParsed(null);
                       setLabUploadFile(null);
-                    } catch (err) {
-                      console.error('Error saving lab upload:', err);
+                      setLabFileInputKey(k => k + 1);
                       setError('Failed to save lab data');
                       setTimeout(() => setError(''), 3000);
                     } finally {
@@ -1981,7 +1955,7 @@ const TeacherDashboard = () => {
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Select Assignment</label>
                         <select
                           value={selectedAssignUpload}
-                          onChange={e => { setSelectedAssignUpload(e.target.value); setAssignUploadParsed(null); setAssignUploadFile(null); }}
+                          onChange={e => { setSelectedAssignUpload(e.target.value); setAssignUploadParsed(null); setAssignUploadFile(null); setAssignFileInputKey(k => k + 1); }}
                           style={{ padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', minWidth: '120px' }}
                         >
                           {Array.from({ length: assignSettings.assignTaken }, (_, i) => (
@@ -1992,6 +1966,7 @@ const TeacherDashboard = () => {
                       <div style={{ flex: 1, minWidth: '200px' }}>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Upload Excel / CSV</label>
                         <input
+                          key={assignFileInputKey}
                           type="file"
                           accept=".xlsx,.xls,.csv"
                           onChange={e => { setAssignUploadFile(e.target.files[0] || null); setAssignUploadParsed(null); }}
@@ -2122,37 +2097,15 @@ const TeacherDashboard = () => {
                           }
                           return r;
                         });
-                        const existingRollSet = new Set(existingObtained.map(r => r.rollNumber));
-                        const newStudentsAssign = assignUploadParsed.rows
-                          .filter(p => p.rollNumber && p.rollNumber.toLowerCase() !== 'roll' && !existingRollSet.has(p.rollNumber))
-                          .map(p => ({
-                            rollNumber: p.rollNumber,
-                            attendance: assignUploadParsed.hasAttnPerf ? (p.attnPerf ?? 0) : 0,
-                            [q1Field]: p.q1 ?? 0,
-                            [q2Field]: p.q2 ?? 0,
-                            [q3Field]: p.q3 ?? 0,
-                          }));
-                        updatedObtained = [...updatedObtained, ...newStudentsAssign];
                       } else {
-                        updatedObtained = assignUploadParsed.rows
-                          .filter(p => p.rollNumber && p.rollNumber.toLowerCase() !== 'roll')
-                          .map(p => ({
-                            rollNumber: p.rollNumber,
-                            attendance: assignUploadParsed.hasAttnPerf ? (p.attnPerf ?? 0) : 0,
-                            [q1Field]: p.q1 ?? 0,
-                            [q2Field]: p.q2 ?? 0,
-                            [q3Field]: p.q3 ?? 0,
-                          }));
+                        updatedObtained = existingObtained;
                       }
 
                       // Update assignmentManualWts for this assignment
                       const newManualWts = { ...(existing.assignmentManualWts || {}), ...(assignUploadParsed.manualWt !== null ? { [assgnKey]: assignUploadParsed.manualWt } : {}) };
 
-                      // Update assignmentRows CO mapping
+                      // Update assignmentRows CO mapping — only update existing CO rows, never add new ones
                       const coSet = new Set((existing.assignmentRows || []).map(r => r.coNumber).filter(Boolean));
-                      if (assignUploadParsed.hasQ1 && assignUploadParsed.q1CO) coSet.add(assignUploadParsed.q1CO);
-                      if (assignUploadParsed.hasQ2 && assignUploadParsed.q2CO) coSet.add(assignUploadParsed.q2CO);
-                      if (assignUploadParsed.hasQ3 && assignUploadParsed.q3CO) coSet.add(assignUploadParsed.q3CO);
 
                       const updatedAssignmentRows = [...coSet].map(coNumber => {
                         const existingRow = (existing.assignmentRows || []).find(r => r.coNumber === coNumber) || { coNumber };
@@ -2188,6 +2141,7 @@ const TeacherDashboard = () => {
                       setTimeout(() => setSuccessMessage(''), 3000);
                       setAssignUploadParsed(null);
                       setAssignUploadFile(null);
+                      setAssignFileInputKey(k => k + 1);
                     } catch (err) {
                       console.error('Error saving assignment upload:', err);
                       const errMsg = err && (err.error || err.message || (typeof err === 'string' ? err : null));
