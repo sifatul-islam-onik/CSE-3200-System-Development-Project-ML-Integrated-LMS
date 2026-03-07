@@ -1,4 +1,5 @@
 import React from 'react';
+import * as XLSX from 'xlsx';
 import { SheetLoader } from './LoadingSpinner';
 
 // ─── Grade helpers ────────────────────────────────────────────────────────────
@@ -604,6 +605,197 @@ const COCalcSheet = ({
   // Theory-only tables (Section A&B, CO-PO Theory, CT/Assignment) use only the own-course COs.
   const effectiveCombinedClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
 
+  const handleExportToExcel = () => {
+    // Ensure any value written to a cell is a finite number (never NaN/Infinity/undefined)
+    const safeNum = v => { const n = Number(v); return isFinite(n) ? n : 0; };
+
+    const wb = XLSX.utils.book_new();
+    const coNames = clos.map(clo => (clo.cloNumber || '').toString().replace('CLO', 'CO'));
+    const combinedCoNames = effectiveCombinedClos.map(clo => (clo.cloNumber || '').toString().replace('CLO', 'CO'));
+
+    // ── Sheet 1: Section A & B Marks ──────────────────────────────────────────
+    if (isTheoryCourse && coCalcData.length > 0) {
+      const s1Header = [
+        'Roll',
+        ...coNames.map(cn => `SA Obt - ${cn}`),
+        ...coNames.map(cn => `SA Dist - ${cn}`),
+        ...coNames.map(cn => `SB Obt - ${cn}`),
+        ...coNames.map(cn => `SB Dist - ${cn}`),
+      ];
+      const s1Rows = coCalcData.map(row => [
+        row.rollNumber,
+        ...coNames.map(cn => safeNum(row.sectionA.marksObtained[cn])),
+        ...coNames.map(cn => safeNum(row.sectionA.marksDistribution[cn])),
+        ...coNames.map(cn => safeNum(row.sectionB.marksObtained[cn])),
+        ...coNames.map(cn => safeNum(row.sectionB.marksDistribution[cn])),
+      ]);
+      const ws1 = XLSX.utils.aoa_to_sheet([s1Header, ...s1Rows]);
+      XLSX.utils.book_append_sheet(wb, ws1, 'Section A & B Marks');
+    }
+
+    // ── Sheet 2: CO-PO % Theory ────────────────────────────────────────────────
+    if (isTheoryCourse && coCalcData.length > 0) {
+      const factoredTotals = calculateFactoredCOTotals();
+      const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
+      const s2Header = [
+        'Roll',
+        ...coNames.map(cn => `Obt - ${cn}`),
+        ...coNames.map(cn => `Dist - ${cn}`),
+        ...coNames.map(cn => `Attain% - ${cn}`),
+        'Total',
+        'Ltr Grade',
+      ];
+      const s2Rows = coCalcData.map(row => {
+        const total = safeNum(computeStudentTheoryTotal(row, clos, attnAssignObtainedRows, getStudentCTFactoredMarks, getStudentAssignmentFactoredMarks));
+        const obtValues = coNames.map(cn =>
+          safeNum(row.sectionA.marksObtained[cn])
+          + safeNum(row.sectionB.marksObtained[cn])
+          + safeNum(getStudentCTFactoredMarks(row.rollNumber, cn))
+          + safeNum(getStudentAssignmentFactoredMarks(row.rollNumber, cn))
+        );
+        const distValues = coNames.map(cn =>
+          safeNum(row.sectionA.marksDistribution[cn])
+          + safeNum(row.sectionB.marksDistribution[cn])
+          + safeNum(factoredTotals[cn])
+          + safeNum(factoredAssignmentTotals[cn])
+        );
+        const attainValues = coNames.map((cn, i) => {
+          const dist = distValues[i];
+          return dist > 0 ? parseFloat(((obtValues[i] / dist) * 100).toFixed(4)) : 0;
+        });
+        return [row.rollNumber, ...obtValues, ...distValues, ...attainValues, total, getLetterGrade(total)];
+      });
+      const ws2 = XLSX.utils.aoa_to_sheet([s2Header, ...s2Rows]);
+      XLSX.utils.book_append_sheet(wb, ws2, 'Theory CO-PO %');
+    }
+
+    // ── Sheet 3: CT and Assignment Marks ──────────────────────────────────────
+    if (isTheoryCourse && coCalcData.length > 0) {
+      const isV2 = selectedSheet === 'COCalc_LabUnnorm';
+      const s3Header = [
+        'Roll',
+        ...coNames.map(cn => `CT - ${cn}`),
+        ...coNames.map(cn => `Assign - ${cn}`),
+        ...(isV2 ? ['Attn'] : []),
+      ];
+      const s3Rows = coCalcData.map(row => {
+        const ctValues = coNames.map(cn => safeNum(getStudentCTFactoredMarks(row.rollNumber, cn)));
+        const assignValues = coNames.map(cn => safeNum(getStudentAssignmentFactoredMarks(row.rollNumber, cn)));
+        if (isV2) {
+          const attnStudent = attnAssignObtainedRows.find(s =>
+            String(s.rollNumber || '').trim().toLowerCase() === String(row.rollNumber || '').trim().toLowerCase()
+          );
+          return [row.rollNumber, ...ctValues, ...assignValues, safeNum(attnStudent ? attnStudent.attendance : 0)];
+        }
+        return [row.rollNumber, ...ctValues, ...assignValues];
+      });
+      const ws3 = XLSX.utils.aoa_to_sheet([s3Header, ...s3Rows]);
+      XLSX.utils.book_append_sheet(wb, ws3, 'CT & Assignment Marks');
+    }
+
+    // ── Sheet 4: CO-PO % (theory + Lab) ───────────────────────────────────────
+    if (coCalcData.length > 0) {
+      const useUnweightedLab = selectedSheet === 'COCalc_LabUnnorm';
+      const factoredTotals = calculateFactoredCOTotals();
+      const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
+      const s4Header = [
+        'Roll',
+        ...combinedCoNames.map(cn => `Obt - ${cn}`),
+        ...combinedCoNames.map(cn => `Dist - ${cn}`),
+      ];
+      const s4Rows = coCalcData.map(row => {
+        const labActivityStudent = labActivityObtainedRows.find(s =>
+          String(s.rollNumber || '').trim().toLowerCase() === String(row.rollNumber || '').trim().toLowerCase()
+        );
+        const obtValues = combinedCoNames.map(cn => {
+          const theoryObt = safeNum(row.sectionA.marksObtained[cn])
+            + safeNum(row.sectionB.marksObtained[cn])
+            + safeNum(getStudentCTFactoredMarks(row.rollNumber, cn))
+            + safeNum(getStudentAssignmentFactoredMarks(row.rollNumber, cn));
+          const labMarks = safeNum(useUnweightedLab
+            ? getLabActivityStudentCOMarks(labActivityStudent, cn)
+            : getLabActivityStudentCOMappedMarks(labActivityStudent, cn));
+          return theoryObt + labMarks;
+        });
+        const distValues = combinedCoNames.map(cn => {
+          const theoryDist = safeNum(row.sectionA.marksDistribution[cn])
+            + safeNum(row.sectionB.marksDistribution[cn])
+            + safeNum(factoredTotals[cn])
+            + safeNum(factoredAssignmentTotals[cn]);
+          const labActivityRow = labActivityRows.find(r => r.coNumber === cn);
+          let labCoTotal = 0;
+          if (labActivityRow) {
+            if (useUnweightedLab) {
+              labCoTotal = safeNum(computeLabActivityCOTotal(labActivityRow));
+            } else if (activityTaken > 0) {
+              const eqWt = (coMappedActivityMarks || 0) / (activityTaken || 1);
+              for (let i = 0; i < activityTaken; i++) {
+                const n = i + 1;
+                if ((labActivityRow[`Activity${n}_Q1`] || 0) !== 0) labCoTotal += eqWt;
+                if ((labActivityRow[`Activity${n}_Q2`] || 0) !== 0) labCoTotal += eqWt;
+                if ((labActivityRow[`Activity${n}_Q3`] || 0) !== 0) labCoTotal += eqWt;
+              }
+            }
+          }
+          return theoryDist + labCoTotal;
+        });
+        return [row.rollNumber, ...obtValues, ...distValues];
+      });
+      const ws4 = XLSX.utils.aoa_to_sheet([s4Header, ...s4Rows]);
+      XLSX.utils.book_append_sheet(wb, ws4, 'CO-PO % (Theory+Lab)');
+    }
+
+    // ── Sheet 5: CO Attainment (theory + Lab) ─────────────────────────────────
+    if (coCalcData.length > 0) {
+      const useUnweightedLab = selectedSheet === 'COCalc_LabUnnorm';
+      const factoredTotals = calculateFactoredCOTotals();
+      const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
+      const s5Header = ['Roll', ...combinedCoNames.map(cn => `CO Attain% - ${cn}`)];
+      const s5Rows = coCalcData.map(row => {
+        const labActivityStudent = labActivityObtainedRows.find(s =>
+          String(s.rollNumber || '').trim().toLowerCase() === String(row.rollNumber || '').trim().toLowerCase()
+        );
+        const pctValues = combinedCoNames.map(cn => {
+          const labObt = safeNum(useUnweightedLab
+            ? getLabActivityStudentCOMarks(labActivityStudent, cn)
+            : getLabActivityStudentCOMappedMarks(labActivityStudent, cn));
+          const theoryObt = safeNum(row.sectionA.marksObtained[cn])
+            + safeNum(row.sectionB.marksObtained[cn])
+            + safeNum(getStudentCTFactoredMarks(row.rollNumber, cn))
+            + safeNum(getStudentAssignmentFactoredMarks(row.rollNumber, cn));
+          const totalObt = theoryObt + labObt;
+          const theoryDist = safeNum(row.sectionA.marksDistribution[cn])
+            + safeNum(row.sectionB.marksDistribution[cn])
+            + safeNum(factoredTotals[cn])
+            + safeNum(factoredAssignmentTotals[cn]);
+          const labActivityRow = labActivityRows.find(r => r.coNumber === cn);
+          let labCoTotal = 0;
+          if (labActivityRow) {
+            if (useUnweightedLab) {
+              labCoTotal = safeNum(computeLabActivityCOTotal(labActivityRow));
+            } else if (activityTaken > 0) {
+              const eqWt = (coMappedActivityMarks || 0) / (activityTaken || 1);
+              for (let i = 0; i < activityTaken; i++) {
+                const n = i + 1;
+                if ((labActivityRow[`Activity${n}_Q1`] || 0) !== 0) labCoTotal += eqWt;
+                if ((labActivityRow[`Activity${n}_Q2`] || 0) !== 0) labCoTotal += eqWt;
+                if ((labActivityRow[`Activity${n}_Q3`] || 0) !== 0) labCoTotal += eqWt;
+              }
+            }
+          }
+          const totalDist = theoryDist + labCoTotal;
+          return totalDist > 0 ? parseFloat(((totalObt / totalDist) * 100).toFixed(4)) : 0;
+        });
+        return [row.rollNumber, ...pctValues];
+      });
+      const ws5 = XLSX.utils.aoa_to_sheet([s5Header, ...s5Rows]);
+      XLSX.utils.book_append_sheet(wb, ws5, 'CO Attainment (Theory+Lab)');
+    }
+
+    const suffix = selectedSheet === 'COCalc_LabUnnorm' ? '_Unnorm' : '';
+    XLSX.writeFile(wb, `COCalc_${courseCode}${suffix}.xlsx`);
+  };
+
   const commonProps = {
     clos: effectiveCombinedClos, coCalcData, labActivityRows, labActivityObtainedRows,
     activityTaken, coMappedActivityMarks,
@@ -617,6 +809,14 @@ const COCalcSheet = ({
   if (selectedSheet === 'COCalc') {
     return (
       <>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+          <button
+            onClick={handleExportToExcel}
+            style={{ backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 18px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
+          >
+            Export to Excel
+          </button>
+        </div>
         {isTheoryCourse && (
           <>
             <SectionABTable clos={clos} coCalcData={coCalcData} formatNumber={formatNumber} />
@@ -648,6 +848,14 @@ const COCalcSheet = ({
   if (selectedSheet === 'COCalc_LabUnnorm') {
     return (
       <>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+          <button
+            onClick={handleExportToExcel}
+            style={{ backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 18px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
+          >
+            Export to Excel
+          </button>
+        </div>
         {isTheoryCourse && (
           <>
             <SectionABTable clos={clos} coCalcData={coCalcData} formatNumber={formatNumber} />

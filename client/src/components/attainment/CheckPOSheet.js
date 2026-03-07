@@ -1,4 +1,5 @@
 import React from 'react';
+import * as XLSX from 'xlsx';
 import { SheetLoader } from './LoadingSpinner';
 
 // ── helpers (mirrors POCalcSheet / POCalcMaxSheet logic) ──────────────────────
@@ -92,8 +93,30 @@ const CheckPOSheet = ({ selectedCourse, clos, programOutcomes, poCalcStudents, t
 
   const noData = !theoryCoAttainmentData?.length || !safeClos.length;
 
+  const handleExportToExcel = () => {
+    if (!isTheoryCourse || noData) return;
+    const wb = XLSX.utils.book_new();
+    const poNames = programOutcomes.map((po, idx) => po.poCode || `PO${idx + 1}`);
+    const header = ['Roll', ...poNames];
+    const dataRows = poCalcStudents.map(student => [
+      student.rollNumber,
+      ...programOutcomes.map((_, pIdx) => getCheck(student.rollNumber, pIdx)),
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([header, ...dataRows]);
+    XLSX.utils.book_append_sheet(wb, ws, 'Check PO');
+    XLSX.writeFile(wb, `CheckPO_${courseCode}.xlsx`);
+  };
+
   return (
     <section className="check-po-section">
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+        <button
+          onClick={handleExportToExcel}
+          style={{ backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 18px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
+        >
+          Export to Excel
+        </button>
+      </div>
       <h3>Check PO</h3>
       {!isTheoryCourse && (
         <p style={{ padding: '20px', color: '#7f8c8d' }}>
