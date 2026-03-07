@@ -3,6 +3,11 @@ const { sendApprovalEmail } = require('../utils/emailService');
 const XLSX = require('xlsx');
 const crypto = require('crypto');
 const { bulkImportTeachers } = require('../utils/bulkTeacherImport');
+const CTAttainment = require('../models/CTAttainment');
+const AssignmentAttainment = require('../models/AssignmentAttainment');
+const TermExamAttainment = require('../models/TermExamAttainment');
+const LabActivityAttainment = require('../models/LabActivityAttainment');
+const TermExamMarks = require('../models/TermExamMarks');
 
 // Helper function to generate random password
 const generateRandomPassword = () => {
@@ -1459,6 +1464,37 @@ exports.assignBatchToCourse = async (req, res) => {
         success: false,
         message: `Semester ${y}-${s} for department ${deptCode} is already assigned to a different batch. A semester can be taught to only one batch at a time.`
       });
+    }
+
+    // If the batch is changing, clear all student-specific obtained rows so old
+    // student data does not bleed into the new batch's attainment/result views.
+    // CO allocation rows (ctRows, sectionARows, etc.) are course-structure data
+    // and are intentionally preserved.
+    const oldAssignment = (course.assignedBatches || [])[0];
+    const isBatchChange =
+      oldAssignment &&
+      (oldAssignment.batch !== batch || oldAssignment.deptCode !== deptCode);
+
+    if (isBatchChange) {
+      await Promise.all([
+        CTAttainment.updateOne(
+          { course: courseId },
+          { $set: { ctObtainedRows: [] } }
+        ),
+        AssignmentAttainment.updateOne(
+          { course: courseId },
+          { $set: { attnAssignObtainedRows: [] } }
+        ),
+        TermExamAttainment.updateOne(
+          { course: courseId },
+          { $set: { sectionAObtainedRows: [], sectionBObtainedRows: [] } }
+        ),
+        LabActivityAttainment.updateOne(
+          { course: courseId },
+          { $set: { labActivityObtainedRows: [] } }
+        ),
+        TermExamMarks.deleteMany({ course: courseId }),
+      ]);
     }
 
     // Replace any existing assignment: a course can be assigned to only one batch
