@@ -1,4 +1,5 @@
 import React from 'react';
+import * as XLSX from 'xlsx';
 
 const CTModals = ({
   selectedSheet,
@@ -27,6 +28,133 @@ const CTModals = ({
   calculateAssignmentCOTotalsNoAttendance,
   calculateFactoredAssignmentCOTotals,
 }) => {
+  const handleExportToExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    if (selectedSheet === 'CT') {
+      const autoFactor = calculateAutoFactor();
+      const activeCTFields = getActiveCTFields();
+
+      const buildSheetData = (isFactored) => {
+        const coTotals = isFactored ? calculateFactoredCOTotals() : calculateCOTotals();
+
+        const headerRow = ['Roll'];
+        ctRows.forEach(row => {
+          const total = coTotals[row.coNumber || ''] || 0;
+          headerRow.push(`${row.coNumber} (${formatNumber(total)})`);
+        });
+        headerRow.push('Total');
+
+        const dataRows = ctObtainedRows.map(studentRow => {
+          const dataRow = [studentRow.rollNumber || '-'];
+
+          ctRows.forEach(coRow => {
+            const coActiveFields = activeCTFields.filter(f => (coRow[f] || 0) !== 0);
+            const coAllAbsent = coActiveFields.length > 0 &&
+              coActiveFields.every(f => { const v = studentRow[f]; return v === 'A' || v === 'Absent'; });
+            if (coAllAbsent) {
+              dataRow.push('Absent');
+            } else {
+              const coTotal = coActiveFields.reduce((sum, field) => {
+                const ctKey = field.replace(/(_Q[123])$/, '');
+                const factor = isFactored ? (autoFactor[ctKey] || 0) : 1;
+                const rawMark = studentRow[field];
+                const mark = (rawMark === 'A' || rawMark === 'Absent') ? 0 : (parseFloat(rawMark) || 0);
+                return sum + (factor * mark);
+              }, 0);
+              dataRow.push(parseFloat(formatNumber(coTotal)) || 0);
+            }
+          });
+
+          const allActiveFields = activeCTFields.filter(f => ctRows.some(coRow => (coRow[f] || 0) !== 0));
+          const rowAllAbsent = allActiveFields.length > 0 &&
+            allActiveFields.every(f => { const v = studentRow[f]; return v === 'A' || v === 'Absent'; });
+          if (rowAllAbsent) {
+            dataRow.push('Absent');
+          } else {
+            const rowTotal = ctRows.reduce((total, coRow) =>
+              total + activeCTFields.reduce((sum, field) => {
+                const allocated = coRow[field] || 0;
+                if (allocated === 0) return sum;
+                const ctKey = field.replace(/(_Q[123])$/, '');
+                const factor = isFactored ? (autoFactor[ctKey] || 0) : 1;
+                const rawMark = studentRow[field];
+                const mark = (rawMark === 'A' || rawMark === 'Absent') ? 0 : (parseFloat(rawMark) || 0);
+                return sum + (factor * mark);
+              }, 0)
+            , 0);
+            dataRow.push(parseFloat(formatNumber(rowTotal)) || 0);
+          }
+
+          return dataRow;
+        });
+
+        return [headerRow, ...dataRows];
+      };
+
+      const ws1 = XLSX.utils.aoa_to_sheet(buildSheetData(false));
+      XLSX.utils.book_append_sheet(wb, ws1, 'CO-wise Marks (Original)');
+
+      const ws2 = XLSX.utils.aoa_to_sheet(buildSheetData(true));
+      XLSX.utils.book_append_sheet(wb, ws2, 'CO-wise Marks (Factored)');
+
+      XLSX.writeFile(wb, 'CT_CO_wise_Marks.xlsx');
+
+    } else if (selectedSheet === 'Attn_Assign') {
+      const autoAssignFactor = calculateAutoAssignmentFactor();
+      const activeAssignFields = getActiveAssignmentFields();
+
+      const buildSheetData = (isFactored) => {
+        const coTotals = isFactored ? calculateFactoredAssignmentCOTotals() : calculateAssignmentCOTotalsNoAttendance();
+
+        const headerRow = ['Roll'];
+        assignmentRows.forEach(row => {
+          const total = coTotals[row.coNumber || ''] || 0;
+          headerRow.push(`${row.coNumber} (${formatNumber(total)})`);
+        });
+        headerRow.push('Total');
+
+        const dataRows = attnAssignObtainedRows.map(studentRow => {
+          const dataRow = [studentRow.rollNumber || '-'];
+
+          assignmentRows.forEach(coRow => {
+            const coTotal = activeAssignFields.reduce((sum, field) => {
+              const allocated = coRow[field] || 0;
+              if (allocated === 0) return sum;
+              const assignmentKey = field.replace(/(_Q[123])$/, '');
+              const factor = isFactored ? (autoAssignFactor[assignmentKey] || 0) : 1;
+              return sum + (factor * (studentRow[field] || 0));
+            }, 0);
+            dataRow.push(parseFloat(formatNumber(coTotal)) || 0);
+          });
+
+          const rowTotal = assignmentRows.reduce((total, coRow) =>
+            total + activeAssignFields.reduce((sum, field) => {
+              const allocated = coRow[field] || 0;
+              if (allocated === 0) return sum;
+              const assignmentKey = field.replace(/(_Q[123])$/, '');
+              const factor = isFactored ? (autoAssignFactor[assignmentKey] || 0) : 1;
+              return sum + (factor * (studentRow[field] || 0));
+            }, 0)
+          , 0);
+          dataRow.push(parseFloat(formatNumber(rowTotal)) || 0);
+
+          return dataRow;
+        });
+
+        return [headerRow, ...dataRows];
+      };
+
+      const ws1 = XLSX.utils.aoa_to_sheet(buildSheetData(false));
+      XLSX.utils.book_append_sheet(wb, ws1, 'CO-wise Marks (Original)');
+
+      const ws2 = XLSX.utils.aoa_to_sheet(buildSheetData(true));
+      XLSX.utils.book_append_sheet(wb, ws2, 'CO-wise Marks (Factored)');
+
+      XLSX.writeFile(wb, 'Attn_Assign_CO_wise_Marks.xlsx');
+    }
+  };
+
   return (
     <>
       {/* Generated Table Modal (CT & Attn_Assign) */}
@@ -185,10 +313,21 @@ const CTModals = ({
                   Next →
                 </button>
               </div>
-              <button onClick={() => { setShowObtainedGeneratedModal(false); setObtainedModalView(0); }}
-                style={{ padding: '4px 8px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
-                ✕
-              </button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {(selectedSheet === 'CT' || selectedSheet === 'Attn_Assign') && (
+                  <button
+                    onClick={handleExportToExcel}
+                    style={{ padding: '6px 14px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+                    title="Export both Original and Factored tables to Excel"
+                  >
+                    ⬇ Export Excel
+                  </button>
+                )}
+                <button onClick={() => { setShowObtainedGeneratedModal(false); setObtainedModalView(0); }}
+                  style={{ padding: '4px 8px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                  ✕
+                </button>
+              </div>
             </div>
 
             <div className="table-wrapper">

@@ -1,4 +1,5 @@
 import React from 'react';
+import * as XLSX from 'xlsx';
 
 const COMBINATIONS = ['q123','q124','q134','q234','q12','q13','q14','q23','q24','q34','q1','q2','q3','q4','none'];
 
@@ -35,6 +36,37 @@ const SectionAModals = ({
   const closeBtnStyle = {
     padding: '4px 8px', backgroundColor: '#e74c3c', color: 'white',
     border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px'
+  };
+
+  const handleExportToExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Obtained Marks for Section-A
+    const fields = ['Q1a','Q1b','Q1c','Q1d','Q2a','Q2b','Q2c','Q2d','Q3a','Q3b','Q3c','Q3d','Q4a','Q4b','Q4c','Q4d'];
+    const header1 = ['Roll','1(a)','1(b)','1(c)','1(d)','2(a)','2(b)','2(c)','2(d)','3(a)','3(b)','3(c)','3(d)','4(a)','4(b)','4(c)','4(d)','Total'];
+    const data1 = sectionAObtainedRows.map(row => {
+      const total = fields.reduce((sum, f) => sum + (parseFloat(row[f]) || 0), 0);
+      return [row.rollNumber || '-', ...fields.map(f => parseFloat(row[f]) || 0), total];
+    });
+    const ws1 = XLSX.utils.aoa_to_sheet([header1, ...data1]);
+    XLSX.utils.book_append_sheet(wb, ws1, 'Obtained Marks - Section A');
+
+    // Sheet 2: Student Analysis
+    const coHeaders = sectionARows.map(r => r.coNumber);
+    const header2 = ['Roll', ...coHeaders, 'Q 1', 'Q 2', 'Q 3', 'Q 4', 'Zero Count', 'Ans Combination', ...coHeaders.map(c => `${c} (Dist)`), 'Total'];
+    const data2 = sectionAObtainedRows.map(studentRow => {
+      const coTotals = sectionARows.map(coRow => parseFloat(formatNumber(getStudentCOTotal(studentRow, coRow.coNumber))) || 0);
+      const qTotals = [1,2,3,4].map(q => parseFloat(formatNumber(getStudentQuestionTotal(studentRow, q))) || 0);
+      const zeroCnt = getStudentZeroCount(studentRow);
+      const ansComb = getStudentAnswerCombination(studentRow);
+      const coDists = sectionARows.map(coRow => parseFloat(formatNumber(getStudentCODistribution(studentRow, coRow.coNumber))) || 0);
+      const total = parseFloat(formatNumber(coDists.reduce((s, v) => s + v, 0))) || 0;
+      return [studentRow.rollNumber || '-', ...coTotals, ...qTotals, zeroCnt, ansComb, ...coDists, total];
+    });
+    const ws2 = XLSX.utils.aoa_to_sheet([header2, ...data2]);
+    XLSX.utils.book_append_sheet(wb, ws2, 'Student Analysis');
+
+    XLSX.writeFile(wb, 'SectionA_Marks.xlsx');
   };
 
   return (
@@ -138,7 +170,16 @@ const SectionAModals = ({
           <div style={modalBoxStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3>Generated Table - Student Analysis</h3>
-              <button onClick={() => setShowSectionAObtainedModal(false)} style={closeBtnStyle}>✕</button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  onClick={handleExportToExcel}
+                  style={{ padding: '6px 14px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+                  title="Export Obtained Marks and Student Analysis to Excel"
+                >
+                  ⬇ Export Excel
+                </button>
+                <button onClick={() => setShowSectionAObtainedModal(false)} style={closeBtnStyle}>✕</button>
+              </div>
             </div>
             <div className="table-wrapper">
               <table className="section-a-table">
