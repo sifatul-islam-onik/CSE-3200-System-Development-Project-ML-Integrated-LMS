@@ -32,13 +32,13 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
 
   const headerRow = (
     <tr>
-      <th style={{ backgroundColor: '#2980b9', color: 'white' }}>CO/PO</th>
+      <th style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>CO/PO</th>
       {programOutcomes.map((po, idx) => (
-        <th key={idx} style={{ backgroundColor: '#2980b9', color: 'white' }}>
+        <th key={idx} style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>
           {po.poCode || `PO${idx + 1}`}
         </th>
       ))}
-      <th style={{ backgroundColor: '#2980b9', color: 'white' }}>Total</th>
+      <th style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>Total</th>
     </tr>
   );
 
@@ -47,8 +47,8 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
       <h3>CO-PO Mapping Table</h3>
 
       {/* ── Raw mapping ───────────────────────────────────────────────────── */}
-      <div className="table-container">
-        <table className="co-po-map-table">
+      <div style={{ overflowX: 'auto' }}>
+        <table className="co-po-map-table" style={{ minWidth: 'max-content', borderCollapse: 'separate', borderSpacing: 0, overflow: 'visible' }}>
           <thead>{headerRow}</thead>
           <tbody>
             {clos.map((clo, coIdx) => {
@@ -56,7 +56,7 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
               const mappedPOs = parseMappedPOs(clo.ploAssessed || '');
               return (
                 <tr key={coIdx}>
-                  <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8' }}>{cn}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8', position: 'sticky', left: 0, zIndex: 1 }}>{cn}</td>
                   {programOutcomes.map((_, poIdx) => {
                     const isMapped = mappedPOs.has(poIdx + 1);
                     return (
@@ -77,7 +77,7 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
             })}
             {/* Column totals row */}
             <tr>
-              <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8' }}>Total</td>
+              <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8', position: 'sticky', left: 0, zIndex: 1 }}>Total</td>
               {columnTotals.map((ct, poIdx) => (
                 <td key={poIdx} style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd' }}>{ct}</td>
               ))}
@@ -88,14 +88,15 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
       </div>
 
       {/* ── Normalized mapping ────────────────────────────────────────────── */}
-      <div className="table-container" style={{ marginTop: '30px' }}>
+      <div style={{ marginTop: '30px' }}>
         <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>Normalized CO-PO Mapping (Contribution per PO)</h4>
-        <table className="co-po-map-table">
+        <div style={{ overflowX: 'auto' }}>
+        <table className="co-po-map-table" style={{ minWidth: 'max-content', borderCollapse: 'separate', borderSpacing: 0, overflow: 'visible' }}>
           <thead>
             <tr>
-              <th style={{ backgroundColor: '#2980b9', color: 'white' }}>CO/PO</th>
+              <th style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>CO/PO</th>
               {programOutcomes.map((po, idx) => (
-                <th key={idx} style={{ backgroundColor: '#2980b9', color: 'white' }}>{po.poCode || `PO${idx + 1}`}</th>
+                <th key={idx} style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>{po.poCode || `PO${idx + 1}`}</th>
               ))}
             </tr>
           </thead>
@@ -105,7 +106,7 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
               const mappedPOs = parseMappedPOs(clo.ploAssessed || '');
               return (
                 <tr key={coIdx}>
-                  <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8' }}>{cn}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8', position: 'sticky', left: 0, zIndex: 1 }}>{cn}</td>
                   {programOutcomes.map((_, poIdx) => {
                     const isMapped = mappedPOs.has(poIdx + 1);
                     const ct = columnTotals[poIdx];
@@ -125,7 +126,7 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
             })}
             {/* Column totals row */}
             <tr>
-              <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8' }}>Total</td>
+              <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8', position: 'sticky', left: 0, zIndex: 1 }}>Total</td>
               {columnTotals.map((ct, poIdx) => (
                 <td key={poIdx} style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd' }}>
                   {ct > 0 ? parseFloat((1).toFixed(4)) : '-'}
@@ -134,24 +135,26 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* ── Combined Theory+Lab mapping (only when paired course exists) ───── */}
       {combinedCOPOMatrix && matchingCourseCode && (
         <>
           {/* Raw combined */}
-          <div className="table-container" style={{ marginTop: '30px' }}>
+          <div style={{ marginTop: '30px' }}>
             <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>
               Combined CO-PO Mapping ({selectedCourse.courseCode} + {matchingCourseCode})
             </h4>
-            <table className="co-po-map-table">
+            <div style={{ overflowX: 'auto' }}>
+            <table className="co-po-map-table" style={{ minWidth: 'max-content', borderCollapse: 'separate', borderSpacing: 0, overflow: 'visible' }}>
               <thead>{headerRow}</thead>
               <tbody>
                 {Object.keys(combinedCOPOMatrix).sort().map((cn, coIdx) => {
                   const mappedPOs = combinedCOPOMatrix[cn];
                   return (
                     <tr key={coIdx}>
-                      <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8' }}>{cn}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8', position: 'sticky', left: 0, zIndex: 1 }}>{cn}</td>
                       {programOutcomes.map((_, poIdx) => {
                         const isMapped = mappedPOs.includes(poIdx + 1);
                         return (
@@ -169,7 +172,7 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
                   );
                 })}
                 <tr>
-                  <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8' }}>Total</td>
+                  <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8', position: 'sticky', left: 0, zIndex: 1 }}>Total</td>
                   {programOutcomes.map((_, poIdx) => {
                     const ct = Object.keys(combinedCOPOMatrix).reduce((sum, cn) =>
                       sum + (combinedCOPOMatrix[cn].includes(poIdx + 1) ? 1 : 0), 0);
@@ -179,19 +182,21 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
                 </tr>
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Normalized combined */}
-          <div className="table-container" style={{ marginTop: '30px' }}>
+          <div style={{ marginTop: '30px' }}>
             <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>
               Normalized Combined CO-PO Mapping ({selectedCourse.courseCode} + {matchingCourseCode})
             </h4>
-            <table className="co-po-map-table">
+            <div style={{ overflowX: 'auto' }}>
+            <table className="co-po-map-table" style={{ minWidth: 'max-content', borderCollapse: 'separate', borderSpacing: 0, overflow: 'visible' }}>
               <thead>
                 <tr>
-                  <th style={{ backgroundColor: '#2980b9', color: 'white' }}>CO/PO</th>
+                  <th style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>CO/PO</th>
                   {programOutcomes.map((po, idx) => (
-                    <th key={idx} style={{ backgroundColor: '#2980b9', color: 'white' }}>{po.poCode || `PO${idx + 1}`}</th>
+                    <th key={idx} style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>{po.poCode || `PO${idx + 1}`}</th>
                   ))}
                 </tr>
               </thead>
@@ -207,7 +212,7 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
                         const mappedPOs = combinedCOPOMatrix[cn];
                         return (
                           <tr key={coIdx}>
-                            <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8' }}>{cn}</td>
+                            <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8', position: 'sticky', left: 0, zIndex: 1 }}>{cn}</td>
                             {programOutcomes.map((_, poIdx) => {
                               const isMapped = mappedPOs.includes(poIdx + 1);
                               const ct = combinedColumnTotals[poIdx];
@@ -226,7 +231,7 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
                         );
                       })}
                       <tr>
-                        <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8' }}>Total</td>
+                        <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8', position: 'sticky', left: 0, zIndex: 1 }}>Total</td>
                         {combinedColumnTotals.map((ct, poIdx) => (
                           <td key={poIdx} style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#fff3cd' }}>
                             {ct > 0 ? parseFloat((1).toFixed(4)) : '-'}
@@ -238,6 +243,7 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
                 })()}
               </tbody>
             </table>
+            </div>
           </div>
         </>
       )}

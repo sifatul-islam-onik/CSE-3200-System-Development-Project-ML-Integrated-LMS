@@ -127,13 +127,14 @@ const CheckPOSheet = ({ selectedCourse, clos, programOutcomes, poCalcStudents, t
         <p style={{ padding: '20px', color: '#7f8c8d' }}>No attainment data available.</p>
       )}
       {isTheoryCourse && !noData && (
-        <div className="table-container" style={{ marginTop: '20px' }}>
-          <table className="co-po-map-table">
+        <div style={{ marginTop: '20px' }}>
+          <div style={{ overflowX: 'auto' }}>
+          <table className="co-po-map-table" style={{ minWidth: 'max-content', borderCollapse: 'separate', borderSpacing: 0, overflow: 'visible' }}>
             <thead>
               <tr>
-                <th style={{ backgroundColor: '#2980b9', color: 'white' }}>Roll</th>
+                <th style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>Roll</th>
                 {programOutcomes.map((po, idx) => (
-                  <th key={idx} style={{ backgroundColor: '#2980b9', color: 'white' }}>
+                  <th key={idx} style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>
                     {po.poCode || `PO${idx + 1}`}
                   </th>
                 ))}
@@ -142,7 +143,7 @@ const CheckPOSheet = ({ selectedCourse, clos, programOutcomes, poCalcStudents, t
             <tbody>
               {poCalcStudents.map((student, sIdx) => (
                 <tr key={sIdx}>
-                  <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8' }}>
+                  <td style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8', position: 'sticky', left: 0, zIndex: 1 }}>
                     {student.rollNumber}
                   </td>
                   {programOutcomes.map((_, pIdx) => {
@@ -162,6 +163,7 @@ const CheckPOSheet = ({ selectedCourse, clos, programOutcomes, poCalcStudents, t
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </section>

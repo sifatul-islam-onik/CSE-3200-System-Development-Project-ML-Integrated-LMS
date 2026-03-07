@@ -17,7 +17,7 @@ const TermExamAttainment = require('../models/TermExamAttainment');
 const getTeacherCourses = async (teacherId) => {
   const courses = await Course.find({
     'assignedTeachers.teacher': teacherId
-  }).select('courseCode courseTitle assignedTeachers assignedBatches').lean();
+  }).select('courseCode courseTitle assignedTeachers assignedBatches yearLevel semester').lean();
   
   return courses.map(course => {
     const assignment = course.assignedTeachers.find(
@@ -28,7 +28,9 @@ const getTeacherCourses = async (teacherId) => {
       courseCode: course.courseCode,
       courseTitle: course.courseTitle,
       section: assignment?.section || null,
-      assignedBatches: Array.isArray(course.assignedBatches) ? course.assignedBatches : []
+      assignedBatches: Array.isArray(course.assignedBatches) ? course.assignedBatches : [],
+      yearLevel: course.yearLevel,
+      semester: course.semester
     };
   });
 };

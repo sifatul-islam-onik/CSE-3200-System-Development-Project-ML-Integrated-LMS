@@ -675,11 +675,12 @@ section {
 
 .co-attainment-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   min-width: 1000px;
   border: 1px solid #ddd;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .co-attainment-table th,
@@ -700,12 +701,21 @@ section {
   background-color: #2980b9;
 }
 
+.co-attainment-table thead tr:first-child th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 12;
+}
+
 .co-attainment-table .roll-cell {
   background-color: #ecf0f1;
   font-weight: 600;
   color: #2c3e50;
   text-align: left;
   padding-left: 12px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
 }
 
 .co-attainment-table .footer-label {
@@ -714,6 +724,9 @@ section {
   color: #2c3e50;
   text-align: left;
   padding-left: 12px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
 }
 
 .co-attainment-table tfoot td {
@@ -740,11 +753,12 @@ section {
 
 .co-calc-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   min-width: 1000px;
   border: 1px solid #ddd;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .co-calc-table th,
@@ -781,6 +795,9 @@ section {
   color: #2c3e50;
   text-align: left;
   padding-left: 12px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
 }
 
 .co-calc-table tbody td {
@@ -814,11 +831,12 @@ section {
 
 .co-po-percentage-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   min-width: 900px;
   border: 1px solid #ddd;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .co-po-percentage-table th,
@@ -862,6 +880,9 @@ section {
   color: #2c3e50;
   text-align: left;
   padding-left: 12px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
 }
 
 .co-po-percentage-table tbody td {
@@ -895,11 +916,12 @@ section {
 
 .ct-assignment-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   min-width: 1200px;
   border: 1px solid #ddd;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .ct-assignment-table th,
@@ -943,6 +965,9 @@ section {
   color: #2c3e50;
   text-align: left;
   padding-left: 12px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
 }
 
 .ct-assignment-table tbody td {
@@ -1251,6 +1276,7 @@ section {
 .co-summary-tables-container {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 12px;
   width: 100%;
@@ -1259,7 +1285,7 @@ section {
 }
 
 .co-summary-table-wrap {
-  flex: 1 1 0;
+  flex: 1 1 300px;
   min-width: 0;
   overflow-x: auto;
   background: #fff;
