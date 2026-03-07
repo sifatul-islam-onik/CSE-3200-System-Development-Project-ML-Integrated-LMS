@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faHourglass, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faHourglass, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye, faExclamationTriangle, faGraduationCap } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
 import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, setDepartmentHead, removeDepartmentHead, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers, updateUserProfile, assignBatchToCourse, unassignBatchFromCourse, getAssignedBatches, getStudentBatches } from '../services/adminService';
 import { createCourse, getAllCourses, getCourse, updateCourse, deleteCourse } from '../services/courseService';
 import { getAllProposals, getProposalById, approveProposal, rejectProposal } from '../services/courseProposalService';
+import { computeResults, publishResults, unpublishResults, getBatchResults } from '../services/resultService';
 import CourseForm from '../components/CourseForm';
 import CourseOBEView from '../components/CourseOBEView';
 import '../styles/Dashboard.css';
@@ -18,6 +19,15 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [activeSection, setActiveSection] = useState('pending');
+  // Results section state
+  const [resultBatch, setResultBatch] = useState('');
+  const [resultDeptCode, setResultDeptCode] = useState('');
+  const [resultYearLevel, setResultYearLevel] = useState('1');
+  const [resultTerm, setResultTerm] = useState('1');
+  const [batchResults, setBatchResults] = useState([]);
+  const [resultsLoading, setResultsLoading] = useState(false);
+  const [resultsMsg, setResultsMsg] = useState('');
+  const [resultsMsgType, setResultsMsgType] = useState('success');
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 1024);
   const [pendingUsers, setPendingUsers] = useState([]);
   const [users, setUsers] = useState([]);
@@ -2820,6 +2830,180 @@ const AdminDashboard = () => {
           </div>
         );
 
+      case 'results':
+        return (
+          <div className="section-container">
+            <div className="section-header">
+              <div className="header-content">
+                <h2>Result Management</h2>
+                <p>Compute, preview, and publish student term results</p>
+              </div>
+            </div>
+            <div className="section-body">
+              {resultsMsg && (
+                <div className={`alert alert-${resultsMsgType}`} style={{ marginBottom: '16px' }}>
+                  {resultsMsg}
+                </div>
+              )}
+
+              {/* Filter controls */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '20px', alignItems: 'flex-end' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600 }}>Batch (e.g. 21)</label>
+                  <input
+                    className="form-input"
+                    style={{ width: '100px' }}
+                    value={resultBatch}
+                    onChange={e => setResultBatch(e.target.value.trim())}
+                    placeholder="21"
+                    maxLength={2}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600 }}>Dept Code (e.g. 07)</label>
+                  <input
+                    className="form-input"
+                    style={{ width: '110px' }}
+                    value={resultDeptCode}
+                    onChange={e => setResultDeptCode(e.target.value.trim())}
+                    placeholder="07"
+                    maxLength={2}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600 }}>Year Level</label>
+                  <select className="form-input" style={{ width: '100px' }} value={resultYearLevel} onChange={e => setResultYearLevel(e.target.value)}>
+                    <option value="1">Year 1</option>
+                    <option value="2">Year 2</option>
+                    <option value="3">Year 3</option>
+                    <option value="4">Year 4</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600 }}>Term</label>
+                  <select className="form-input" style={{ width: '90px' }} value={resultTerm} onChange={e => setResultTerm(e.target.value)}>
+                    <option value="1">Term 1</option>
+                    <option value="2">Term 2</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '24px' }}>
+                <button
+                  className="btn btn-primary"
+                  disabled={resultsLoading || !resultBatch || !resultDeptCode}
+                  onClick={async () => {
+                    setResultsLoading(true);
+                    setResultsMsg('');
+                    try {
+                      const data = await computeResults({
+                        batch: resultBatch,
+                        deptCode: resultDeptCode,
+                        yearLevel: Number(resultYearLevel),
+                        term: Number(resultTerm),
+                      });
+                      setResultsMsg(`✔ ${data.message}`);
+                      setResultsMsgType('success');
+                      const fetched = await getBatchResults({ batch: resultBatch, deptCode: resultDeptCode, yearLevel: resultYearLevel, term: resultTerm });
+                      setBatchResults(fetched.results || []);
+                    } catch (err) {
+                      setResultsMsg(err.response?.data?.message || 'Failed to compute results.');
+                      setResultsMsgType('error');
+                    } finally {
+                      setResultsLoading(false);
+                    }
+                  }}
+                >
+                  {resultsLoading ? 'Computing…' : 'Compute / Refresh'}
+                </button>
+
+                <button
+                  className="btn btn-success"
+                  disabled={resultsLoading || !batchResults.length}
+                  onClick={async () => {
+                    setResultsLoading(true);
+                    setResultsMsg('');
+                    try {
+                      const data = await publishResults({ batch: resultBatch, deptCode: resultDeptCode, yearLevel: Number(resultYearLevel), term: Number(resultTerm) });
+                      setResultsMsg(`✔ ${data.message}`);
+                      setResultsMsgType('success');
+                      const fetched = await getBatchResults({ batch: resultBatch, deptCode: resultDeptCode, yearLevel: resultYearLevel, term: resultTerm });
+                      setBatchResults(fetched.results || []);
+                    } catch (err) {
+                      setResultsMsg(err.response?.data?.message || 'Failed to publish results.');
+                      setResultsMsgType('error');
+                    } finally {
+                      setResultsLoading(false);
+                    }
+                  }}
+                >
+                  Publish Results
+                </button>
+
+                <button
+                  className="btn btn-secondary"
+                  disabled={resultsLoading || !batchResults.length}
+                  onClick={async () => {
+                    setResultsLoading(true);
+                    setResultsMsg('');
+                    try {
+                      const data = await unpublishResults({ batch: resultBatch, deptCode: resultDeptCode, yearLevel: Number(resultYearLevel), term: Number(resultTerm) });
+                      setResultsMsg(`✔ ${data.message}`);
+                      setResultsMsgType('success');
+                      const fetched = await getBatchResults({ batch: resultBatch, deptCode: resultDeptCode, yearLevel: resultYearLevel, term: resultTerm });
+                      setBatchResults(fetched.results || []);
+                    } catch (err) {
+                      setResultsMsg(err.response?.data?.message || 'Failed to unpublish results.');
+                      setResultsMsgType('error');
+                    } finally {
+                      setResultsLoading(false);
+                    }
+                  }}
+                >
+                  Unpublish Results
+                </button>
+              </div>
+
+              {/* Results preview table */}
+              {batchResults.length > 0 && (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ padding: '8px 10px', textAlign: 'left' }}>Roll</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'left' }}>Name</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>Credit Taken</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>Credit Completed</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>Term GPA</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>CGPA</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {batchResults.map((r, i) => (
+                        <tr key={r._id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                          <td style={{ padding: '7px 10px' }}>{r.studentRoll}</td>
+                          <td style={{ padding: '7px 10px' }}>{r.studentName}</td>
+                          <td style={{ padding: '7px 10px', textAlign: 'center' }}>{r.creditTaken}</td>
+                          <td style={{ padding: '7px 10px', textAlign: 'center' }}>{r.creditCompleted}</td>
+                          <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>{r.termGPA?.toFixed(2)}</td>
+                          <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>{r.cgpa?.toFixed(2)}</td>
+                          <td style={{ padding: '7px 10px', textAlign: 'center' }}>
+                            <span style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 700, background: r.isPublished ? '#dcfce7' : '#fef9c3', color: r.isPublished ? '#166534' : '#92400e' }}>
+                              {r.isPublished ? 'Published' : 'Draft'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -2901,6 +3085,14 @@ const AdminDashboard = () => {
           >
             <span className="nav-icon"><FontAwesomeIcon icon={faUsers} /></span>
             {sidebarOpen && <span className="nav-label">All Users</span>}
+          </button>
+
+          <button
+            className={`nav-item ${activeSection === 'results' ? 'active' : ''}`}
+            onClick={() => handleSectionChange('results')}
+          >
+            <span className="nav-icon"><FontAwesomeIcon icon={faGraduationCap} /></span>
+            {sidebarOpen && <span className="nav-label">Results</span>}
           </button>
         </nav>
 

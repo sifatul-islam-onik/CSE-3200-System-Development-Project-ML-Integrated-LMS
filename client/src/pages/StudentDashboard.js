@@ -5,6 +5,7 @@ import { faBook, faSignOutAlt, faClipboardList, faGraduationCap, faCalendarAlt, 
 import { getUser, logout } from '../components/ProtectedRoute';
 import { getAllCourses } from '../services/courseService';
 import CourseOBEView from '../components/CourseOBEView';
+import ResultView from '../components/ResultView';
 import '../styles/Dashboard.css';
 import '../styles/AdminDashboard.css';
 import '../styles/Profile.css';
@@ -332,15 +333,11 @@ const StudentDashboard = () => {
             <div className="section-header">
               <div className="header-content">
                 <h2>Grades</h2>
-                <p>Track your performance</p>
+                <p>Term-wise result summary</p>
               </div>
             </div>
             <div className="section-body">
-              <div className="empty-state">
-                <div className="empty-icon">🏆</div>
-                <h3>No grade records yet</h3>
-                <p>Once available, your grades will appear here.</p>
-              </div>
+              <ResultView />
             </div>
           </div>
         );
