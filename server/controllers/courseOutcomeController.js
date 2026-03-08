@@ -2,6 +2,22 @@ const CourseOutcome = require('../models/CourseOutcome');
 const Course = require('../models/Course');
 const { validationResult } = require('express-validator');
 
+/**
+ * Returns the paired theory/lab course code, or null if no valid pair exists
+ * (pair must differ only in the last digit by ±1 AND share the same first-two
+ * digits of the numeric portion to guarantee they belong to the same semester).
+ */
+function getPairCourseCode(courseCode) {
+  const lastDigit = parseInt(courseCode.slice(-1));
+  if (isNaN(lastDigit)) return null;
+  const baseCode = courseCode.slice(0, -1);
+  const pairLastDigit = lastDigit % 2 === 1 ? lastDigit + 1 : lastDigit - 1;
+  const pairCode = baseCode + pairLastDigit;
+  const firstTwo = (code) => (code.match(/\d+/)?.[0] || '').slice(0, 2);
+  if (firstTwo(courseCode) !== firstTwo(pairCode)) return null;
+  return pairCode;
+}
+
 // @desc    Create course outcomes for a course
 // @route   POST /api/courses/:courseId/outcomes
 // @access  Admin only
@@ -42,6 +58,21 @@ exports.createCourseOutcomes = async (req, res) => {
       });
     }
 
+    // Pre-load pair course outcomes for content-consistency check
+    let pairCourseOutcomes = [];
+    let pairCourseCode = null;
+    const pairCode = getPairCourseCode(course.courseCode);
+    if (pairCode) {
+      const pairCourse = await Course.findOne({ courseCode: pairCode });
+      if (pairCourse) {
+        pairCourseCode = pairCode;
+        pairCourseOutcomes = await CourseOutcome.find({
+          course: pairCourse._id,
+          is_deleted: { $ne: true }
+        });
+      }
+    }
+
     // Create course outcomes
     const createdOutcomes = [];
     for (const outcome of outcomes) {
@@ -65,6 +96,19 @@ exports.createCourseOutcomes = async (req, res) => {
           success: false,
           message: `Duplicate CO code: ${co_code}`
         });
+      }
+
+      // Check content consistency with the paired course
+      if (pairCourseOutcomes.length > 0) {
+        const pairMatch = pairCourseOutcomes.find(
+          p => p.co_code === co_code.toUpperCase()
+        );
+        if (pairMatch && pairMatch.description.trim() !== description.trim()) {
+          return res.status(400).json({
+            success: false,
+            message: `CO ${co_code.toUpperCase()} already exists in the paired course ${pairCourseCode} with different description. Both paired courses must have identical content for matching CO codes.`
+          });
+        }
       }
 
       const courseOutcome = await CourseOutcome.create({
@@ -226,6 +270,31 @@ exports.updateCourseOutcome = async (req, res) => {
     }
 
     if (co_code) outcome.co_code = co_code;
+
+    // Check content consistency with paired course when description changes
+    const newDescription = description !== undefined ? description : outcome.description;
+    if (description !== undefined && description.trim() !== outcome.description.trim()) {
+      const fullCourse = await Course.findById(courseId);
+      const pairCode = fullCourse ? getPairCourseCode(fullCourse.courseCode) : null;
+      if (pairCode) {
+        const pairCourse = await Course.findOne({ courseCode: pairCode });
+        if (pairCourse) {
+          const effectiveCoCode = co_code ? co_code.toUpperCase() : outcome.co_code;
+          const pairMatch = await CourseOutcome.findOne({
+            course: pairCourse._id,
+            co_code: effectiveCoCode,
+            is_deleted: { $ne: true }
+          });
+          if (pairMatch && pairMatch.description.trim() !== description.trim()) {
+            return res.status(400).json({
+              success: false,
+              message: `CO ${effectiveCoCode} already exists in the paired course ${pairCode} with different description. Both paired courses must have identical content for matching CO codes.`
+            });
+          }
+        }
+      }
+    }
+
     if (description) outcome.description = description;
     if (co_po_correlation !== undefined) outcome.co_po_correlation = co_po_correlation;
 

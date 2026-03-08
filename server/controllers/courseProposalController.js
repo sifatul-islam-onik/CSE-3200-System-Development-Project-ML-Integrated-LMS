@@ -555,9 +555,11 @@ exports.rejectProposal = async (req, res) => {
   }
 };
 
-// @desc    Delete proposal (only pending proposals by owner)
+// @desc    Delete proposal
+//         - Admin: can delete any responded (APPROVED/REJECTED) proposal
+//         - Teacher: can delete their own proposals of any status
 // @route   DELETE /api/course-proposals/:id
-// @access  Teacher (own pending proposals)
+// @access  Teacher (own) / Admin (responded only)
 exports.deleteProposal = async (req, res) => {
   try {
     const proposal = await CourseProposal.findById(req.params.id);
@@ -569,20 +571,26 @@ exports.deleteProposal = async (req, res) => {
       });
     }
 
-    // Only owner can delete
-    if (proposal.proposedBy.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
-    }
+    const isAdmin = req.user.role === 'admin';
+    const isOwner = proposal.proposedBy.toString() === req.user._id.toString();
+    const isResponded = ['APPROVED', 'REJECTED'].includes(proposal.status);
 
-    // Only pending proposals can be deleted
-    if (proposal.status !== 'PENDING') {
-      return res.status(400).json({
-        success: false,
-        message: 'Only pending proposals can be deleted'
-      });
+    if (isAdmin) {
+      // Admin can only delete responded proposals (not pending ones which are awaiting review)
+      if (!isResponded) {
+        return res.status(400).json({
+          success: false,
+          message: 'Admin can only delete proposals that have already been responded to (approved or rejected)'
+        });
+      }
+    } else {
+      // Teachers can only delete their own proposals
+      if (!isOwner) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
     }
 
     await proposal.deleteOne();

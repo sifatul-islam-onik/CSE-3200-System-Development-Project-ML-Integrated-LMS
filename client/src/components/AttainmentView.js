@@ -166,6 +166,8 @@ const AttainmentView = () => {
   // Reset whenever any feed-state changes; show tables only after 400ms of no updates.
   const [coAttainmentReady, setCoAttainmentReady] = useState(false);
   const coAttainmentSettleTimerRef = useRef(null);
+  // null = not yet checked, true = no pair course, false = has a pair course
+  const [isStandaloneCourse, setIsStandaloneCourse] = useState(null);
 
   // COCalc state
   const [coCalcData, setCoCalcData] = useState([]);
@@ -1180,6 +1182,34 @@ const AttainmentView = () => {
     };
     loadCombinedCOPOMatrix();
   }, [selectedSheet, selectedCourse]);
+
+  // Detect whether the selected course is standalone (no paired theory/lab course in the database)
+  useEffect(() => {
+    if (!selectedCourse?.courseCode) {
+      setIsStandaloneCourse(null);
+      return;
+    }
+    const courseCode = selectedCourse.courseCode;
+    const lastDigit = parseInt(courseCode.slice(-1));
+    if (isNaN(lastDigit)) {
+      setIsStandaloneCourse(false); // Cannot determine — treat as paired
+      return;
+    }
+    const baseCode = courseCode.slice(0, -1);
+    const isTheory = lastDigit % 2 === 1;
+    const pairLastDigit = isTheory ? lastDigit + 1 : lastDigit - 1;
+    const pairCode = baseCode + pairLastDigit;
+    // Also verify both codes share the same first two numeric digits (same semester block)
+    const firstTwoDigits = (code) => (code.match(/\d+/)?.[0] || '').slice(0, 2);
+    const sameSemester = firstTwoDigits(courseCode) === firstTwoDigits(pairCode);
+    if (!sameSemester) {
+      setIsStandaloneCourse(true);
+      return;
+    }
+    getCourseProfile(pairCode)
+      .then(() => setIsStandaloneCourse(false))
+      .catch(() => setIsStandaloneCourse(true));
+  }, [selectedCourse]);
 
   // Calculate CO totals from CT table (sum of all CO Total values)
   const calculateCOTotals = () => {
@@ -4037,6 +4067,7 @@ const AttainmentView = () => {
                 selectedCourse={selectedCourse}
                 clos={combinedClos.length > 0 ? combinedClos : clos}
                 ownClos={clos}
+                isStandaloneCourse={isStandaloneCourse === true}
                 coAttainmentData={coAttainmentData}
                 theoryCoAttainmentData={theoryCoAttainmentData}
                 labCoAttainmentData={labCoAttainmentData}
@@ -4114,6 +4145,7 @@ const AttainmentView = () => {
               selectedCourse={selectedCourse}
               clos={clos}
               combinedClos={combinedClos}
+              isStandaloneCourse={isStandaloneCourse === true}
               programOutcomes={programOutcomes}
               combinedCOPOMatrix={combinedCOPOMatrix}
               theoryCoAttainmentData={theoryCoAttainmentData}

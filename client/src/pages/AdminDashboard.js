@@ -5,7 +5,7 @@ import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faHourglass, 
 import { getUser, logout } from '../components/ProtectedRoute';
 import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, setDepartmentHead, removeDepartmentHead, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers, updateUserProfile, assignBatchToCourse, unassignBatchFromCourse, getAssignedBatches, getStudentBatches } from '../services/adminService';
 import { createCourse, getAllCourses, getCourse, updateCourse, deleteCourse } from '../services/courseService';
-import { getAllProposals, getProposalById, approveProposal, rejectProposal } from '../services/courseProposalService';
+import { getAllProposals, getProposalById, approveProposal, rejectProposal, deleteProposal } from '../services/courseProposalService';
 import { computeResults, publishResults, unpublishResults, getBatchResults } from '../services/resultService';
 import CourseForm from '../components/CourseForm';
 import CourseOBEView from '../components/CourseOBEView';
@@ -248,14 +248,24 @@ const AdminDashboard = () => {
     setError('');
     try {
       const response = await getAllProposals();
-      const pendingOnly = (response.data || []).filter(
-        (p) => (p.status || '').toUpperCase() === 'PENDING'
-      );
-      setProposals(pendingOnly);
+      setProposals(response.data || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch proposals');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteProposal = async (proposalId) => {
+    if (!window.confirm('Are you sure you want to delete this proposal? This action cannot be undone.')) return;
+    try {
+      await deleteProposal(proposalId);
+      setSuccessMessage('Proposal deleted successfully');
+      fetchProposals();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      setError(err?.message || err?.error || 'Failed to delete proposal');
+      setTimeout(() => setError(''), 3000);
     }
   };
 
@@ -1675,8 +1685,8 @@ const AdminDashboard = () => {
               ) : proposals.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-icon"><FontAwesomeIcon icon={faClipboardList} /></div>
-                  <h3>No Pending Proposals</h3>
-                  <p>All proposals have been processed</p>
+                  <h3>No Proposals</h3>
+                  <p>There are no course proposals submitted yet</p>
                 </div>
               ) : (
                 <div className="proposals-grid">
@@ -1686,9 +1696,20 @@ const AdminDashboard = () => {
                         <span className={`proposal-type-badge ${proposal.proposalType.toLowerCase()}`}>
                           {proposal.proposalType}
                         </span>
-                        <span className={`status-badge status-${proposal.status.toLowerCase()}`}>
-                          {proposal.status}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span className={`status-badge status-${proposal.status.toLowerCase()}`}>
+                            {proposal.status}
+                          </span>
+                          {(proposal.status === 'APPROVED' || proposal.status === 'REJECTED') && (
+                            <button
+                              className="btn-icon-delete"
+                              onClick={() => handleDeleteProposal(proposal._id)}
+                              title="Delete proposal"
+                            >
+                              <FontAwesomeIcon icon={faTrash} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="proposal-body">
                         <h3>{proposal.proposedData.courseCode} - {proposal.proposedData.courseTitle}</h3>
