@@ -1432,6 +1432,29 @@
   font-size: 0.875rem;
 }
 
+/* Small icon-only delete button for proposal card header */
+.btn-icon-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: #fee2e2;
+  color: #dc2626;
+  cursor: pointer;
+  font-size: 0.7rem;
+  flex-shrink: 0;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.btn-icon-delete:hover {
+  background: #dc2626;
+  color: #fff;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

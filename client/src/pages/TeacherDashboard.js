@@ -491,7 +491,16 @@ const TeacherDashboard = () => {
                             {proposal.proposalType === 'CREATE' ? 'New Course' : 'Course Update'}
                           </span>
                         </div>
-                        {getStatusBadge(proposal.status)}
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                          {getStatusBadge(proposal.status)}
+                          <button
+                            className="btn-icon-delete"
+                            onClick={() => handleDeleteProposal(proposal._id)}
+                            title="Delete proposal"
+                          >
+                            <FontAwesomeIcon icon={faTrash} />
+                          </button>
+                        </div>
                       </div>
                       <div className="proposal-body">
                         <div className="proposal-info">
@@ -524,16 +533,7 @@ const TeacherDashboard = () => {
                           </div>
                         )}
                       </div>
-                      <div className="proposal-actions">
-                        {proposal.status === 'PENDING' && (
-                          <button
-                            className="btn btn-danger btn-sm"
-                            onClick={() => handleDeleteProposal(proposal._id)}
-                          >
-                            <FontAwesomeIcon icon={faTrash} /> Delete
-                          </button>
-                        )}
-                      </div>
+
                     </div>
                   ))}
                 </div>

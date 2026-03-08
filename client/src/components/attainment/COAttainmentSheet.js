@@ -238,7 +238,7 @@ const AttainmentTable = ({ clos, coAttainmentData, formatNumber, keyPrefix, titl
   </section>
 );
 
-const COAttainmentSheet = ({ selectedCourse, clos, ownClos, coAttainmentData, theoryCoAttainmentData, labCoAttainmentData, combinedCoAttainmentData, unnormedCoAttainmentData, equalWtCoAttainmentData, formatNumber }) => {
+const COAttainmentSheet = ({ selectedCourse, clos, ownClos, isStandaloneCourse, coAttainmentData, theoryCoAttainmentData, labCoAttainmentData, combinedCoAttainmentData, unnormedCoAttainmentData, equalWtCoAttainmentData, formatNumber }) => {
   const courseCode = selectedCourse?.courseCode || '';
   const lastDigit = parseInt(courseCode.replace(/\s/g, '').slice(-1));
   const isTheoryCourse = !isNaN(lastDigit) && lastDigit % 2 === 1;
@@ -295,24 +295,72 @@ const COAttainmentSheet = ({ selectedCourse, clos, ownClos, coAttainmentData, th
     const effectiveUnnormed = unnormedCoAttainmentData?.length > 0 ? unnormedCoAttainmentData : coAttainmentData;
     const effectiveEqualWt  = equalWtCoAttainmentData?.length  > 0 ? equalWtCoAttainmentData  : coAttainmentData;
 
-    if (isTheoryCourse) {
-      const d = buildSheet(separatedClos, effectiveTheory);
-      if (d) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d), 'Theory Courses');
+    if (isStandaloneCourse) {
+      // Only export the single standalone table
+      if (isTheoryCourse) {
+        const d = buildSheet(separatedClos, effectiveTheory);
+        if (d) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d), 'CO Attainment');
+      } else if (isLabCourse) {
+        const d = buildSheet(separatedClos, effectiveLab);
+        if (d) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d), 'CO Attainment');
+      }
+    } else {
+      if (isTheoryCourse) {
+        const d = buildSheet(separatedClos, effectiveTheory);
+        if (d) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d), 'Theory Courses');
+      }
+      if (isLabCourse) {
+        const d = buildSheet(separatedClos, effectiveLab);
+        if (d) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d), 'Lab Courses');
+      }
+      const d2 = buildSheet(clos, effectiveCombined);
+      if (d2) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d2), 'Combined (Theory+Lab)');
+      const d3 = buildSheet(clos, effectiveUnnormed);
+      if (d3) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d3), 'Unnormed (Theory+Lab)');
+      const d4 = buildSheet(clos, effectiveEqualWt);
+      if (d4) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d4), 'Equal Wt (Theory+Lab)');
     }
-    if (isLabCourse) {
-      const d = buildSheet(separatedClos, effectiveLab);
-      if (d) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d), 'Lab Courses');
-    }
-    const d2 = buildSheet(clos, effectiveCombined);
-    if (d2) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d2), 'Combined (Theory+Lab)');
-    const d3 = buildSheet(clos, effectiveUnnormed);
-    if (d3) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d3), 'Unnormed (Theory+Lab)');
-    const d4 = buildSheet(clos, effectiveEqualWt);
-    if (d4) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d4), 'Equal Wt (Theory+Lab)');
 
     if (wb.SheetNames.length === 0) return;
     XLSX.writeFile(wb, `CO_Attainment_${courseCode || 'export'}.xlsx`);
   };
+
+  // Standalone course: only show the single theory or lab table, no summary/combined tables
+  if (isStandaloneCourse) {
+    return (
+      <>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+          <button
+            onClick={handleExportToExcel}
+            style={{ padding: '8px 18px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
+            title="Export CO Attainment table to Excel"
+          >
+            ⬇ Export Excel
+          </button>
+        </div>
+        {isTheoryCourse && (
+          <AttainmentTable
+            clos={separatedClos}
+            coAttainmentData={theoryCoAttainmentData && theoryCoAttainmentData.length > 0 ? theoryCoAttainmentData : coAttainmentData}
+            formatNumber={formatNumber}
+            keyPrefix="theory"
+            title="CO Attainment - Theory"
+            showAchievementAvg
+          />
+        )}
+        {isLabCourse && (
+          <AttainmentTable
+            clos={separatedClos}
+            coAttainmentData={labCoAttainmentData && labCoAttainmentData.length > 0 ? labCoAttainmentData : coAttainmentData}
+            formatNumber={formatNumber}
+            keyPrefix="lab"
+            title="CO Attainment - Lab/Project"
+            showAchievementAvg
+          />
+        )}
+      </>
+    );
+  }
 
   return (
     <>

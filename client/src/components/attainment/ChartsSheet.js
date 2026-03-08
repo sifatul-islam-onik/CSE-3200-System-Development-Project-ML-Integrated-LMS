@@ -367,7 +367,8 @@ const ChartsSheet = ({
   selectedCourse, clos, combinedClos, programOutcomes,
   combinedCOPOMatrix,
   theoryCoAttainmentData,
-  combinedCoAttainmentData, unnormedCoAttainmentData, equalWtCoAttainmentData
+  combinedCoAttainmentData, unnormedCoAttainmentData, equalWtCoAttainmentData,
+  isStandaloneCourse
 }) => {
   const courseCode = selectedCourse?.courseCode || '';
   const lastDigit = parseInt(courseCode.charAt(courseCode.length - 1));
@@ -375,6 +376,7 @@ const ChartsSheet = ({
   const isTheory = lastDigit % 2 === 1;
   const theoryCourseCode = isTheory ? courseCode : baseCode + (lastDigit - 1);
   const labCourseCode    = isTheory ? baseCode + (lastDigit + 1) : courseCode;
+  const pairLabel = isStandaloneCourse ? courseCode : `${theoryCourseCode}+${labCourseCode}`;
 
   // Session label: batchYear + (yearLevel - 1) → e.g. batch "21", year 3 → "2023-24"
   const batchRaw = selectedCourse?.assignedBatches?.[0]?.batch;
@@ -385,7 +387,7 @@ const ChartsSheet = ({
   const sessionLabel = sessionStartYear
     ? `${sessionStartYear}-${String(sessionStartYear + 1).slice(-2)}`
     : '';
-  const pdfHeading = `Attainment Charts of ${theoryCourseCode}+${labCourseCode}${
+  const pdfHeading = `Attainment Charts of ${pairLabel}${
     sessionLabel ? ` of Session ${sessionLabel}` : ''
   }`;
 
@@ -519,7 +521,7 @@ const ChartsSheet = ({
       {/* CO Attainment Table */}
       <div className="table-container" style={{ marginTop: '20px', overflowX: 'auto' }}>
         <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>
-          CO Attainment of {theoryCourseCode}+{labCourseCode}
+          CO Attainment of {pairLabel}
         </h4>
         <table className="co-po-map-table">
           <thead>
@@ -546,21 +548,21 @@ const ChartsSheet = ({
       {/* Charts grid — CO charts, 2 columns on wide screens */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '0 24px' }}>
         <SingleBarChart
-          title={`CO Attainment \u2014 ${theoryCourseCode}+${labCourseCode}`}
+          title={`CO Attainment \u2014 ${pairLabel}`}
           labels={coNames}
           values={coAchievedVals}
           color="#2563eb"
           yLabel="Achieved (%)"
         />
         <SingleBarChart
-          title={`CO Attainment (Unnorm) \u2014 ${theoryCourseCode}+${labCourseCode}`}
+          title={`CO Attainment (Unnorm) \u2014 ${pairLabel}`}
           labels={coNames}
           values={coUnnormVals}
           color="#16a34a"
           yLabel="Unnorm Achieved (%)"
         />
         <SingleBarChart
-          title={`CO Attainment (Eq. Wt.) \u2014 ${theoryCourseCode}+${labCourseCode}`}
+          title={`CO Attainment (Eq. Wt.) \u2014 ${pairLabel}`}
           labels={coNames}
           values={coEqWtVals}
           color="#d97706"
@@ -568,7 +570,7 @@ const ChartsSheet = ({
         />
       </div>
       <GroupedBarChart
-        title={`CO Attainment (All Methods) \u2014 ${theoryCourseCode}+${labCourseCode}`}
+        title={`CO Attainment (All Methods) \u2014 ${pairLabel}`}
         labels={coNames}
         series={[
           { label: 'Achieved(%)',         values: coAchievedVals },
@@ -581,7 +583,7 @@ const ChartsSheet = ({
       {/* PO Attainment Table */}
       <div data-pdf-skip="true" className="table-container" style={{ marginTop: '30px', overflowX: 'auto' }}>
         <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>
-          PO Attainment of {theoryCourseCode}+{labCourseCode}
+          PO Attainment of {pairLabel}
         </h4>
         <table className="co-po-map-table">
           <thead>
@@ -605,7 +607,7 @@ const ChartsSheet = ({
 
       {/* PO charts — one per row */}
       <SingleBarChart
-        title={`PO Attainment \u2014 ${theoryCourseCode}+${labCourseCode}`}
+        title={`PO Attainment \u2014 ${pairLabel}`}
         labels={poNames}
         values={poAchievedVals}
         color="#2563eb"
@@ -613,7 +615,7 @@ const ChartsSheet = ({
         wide
       />
       <SingleBarChart
-        title={`PO Attainment (Unnorm) \u2014 ${theoryCourseCode}+${labCourseCode}`}
+        title={`PO Attainment (Unnorm) \u2014 ${pairLabel}`}
         labels={poNames}
         values={poUnnormVals}
         color="#16a34a"
@@ -621,7 +623,7 @@ const ChartsSheet = ({
         wide
       />
       <SingleBarChart
-        title={`PO Attainment (Eq. Wt.) \u2014 ${theoryCourseCode}+${labCourseCode}`}
+        title={`PO Attainment (Eq. Wt.) \u2014 ${pairLabel}`}
         labels={poNames}
         values={poEqWtVals}
         color="#d97706"
@@ -629,7 +631,7 @@ const ChartsSheet = ({
         wide
       />
       <GroupedBarChart
-        title={`PO Attainment (All Methods) \u2014 ${theoryCourseCode}+${labCourseCode}`}
+        title={`PO Attainment (All Methods) \u2014 ${pairLabel}`}
         labels={poNames}
         series={[
           { label: 'Achieved(%)',          values: poAchievedVals },
