@@ -17,6 +17,22 @@ exports.saveTermExamMarks = async (req, res) => {
       });
     }
 
+    // VULN-17: Validate imageUrl to prevent SSRF — only accept base64 data-URIs
+    if (imageUrl != null) {
+      if (!String(imageUrl).startsWith('data:image/')) {
+        return res.status(400).json({
+          success: false,
+          message: 'imageUrl must be a base64 data URI (data:image/...)'
+        });
+      }
+      if (imageUrl.length > 20 * 1024 * 1024) {
+        return res.status(400).json({
+          success: false,
+          message: 'Image data exceeds the 20 MB limit'
+        });
+      }
+    }
+
     // Verify course exists
     const course = await Course.findById(courseId);
     if (!course) {

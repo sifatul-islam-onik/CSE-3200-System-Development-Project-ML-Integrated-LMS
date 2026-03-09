@@ -69,11 +69,19 @@ exports.getSheets = async (req, res) => {
     // or admin sees all sheets directly
     if (req.user.role === 'teacher') {
       const teacherCourses = await getTeacherCourses(req.user._id);
-      
+
+      // VULN-13: Filter sheets to only those matching this teacher's assigned courses
+      const teacherCodesLc = teacherCourses.map(c => (c.courseCode || '').toLowerCase());
+      const filteredSheets = teacherCodesLc.length
+        ? allSheets.filter(sheet =>
+            teacherCodesLc.some(code => code && sheet.toLowerCase().includes(code))
+          )
+        : [];
+
       res.json({
         success: true,
-        sheets: allSheets,  // Return all sheets for now
-        courses: teacherCourses // Send course info for reference
+        sheets: filteredSheets,
+        courses: teacherCourses
       });
     } else {
       // Admins and students see all sheets

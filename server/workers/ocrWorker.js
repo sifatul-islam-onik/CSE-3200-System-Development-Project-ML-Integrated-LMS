@@ -88,10 +88,7 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
         throw new Error('Invalid base64 data - missing data after comma');
       }
       imageBlob = Buffer.from(base64Data, 'base64');
-    } else if (imageUrl.startsWith('http')) {
-      const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-      imageBlob = Buffer.from(response.data);
-    } else {
+    } else {  // VULN-04: HTTP fetch branch removed — only data-URIs are accepted
       throw new Error(`Invalid image URL format. Starts with: ${imageUrl.substring(0, 20)}`);
     }
 
@@ -112,7 +109,8 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
     const mlResponse = await axios.post(`${workerUrl}/api/extract-marks`, formData, {
       headers: {
         ...formData.getHeaders(),
-        'ngrok-skip-browser-warning': 'true'
+        'ngrok-skip-browser-warning': 'true',
+        'X-API-Key': process.env.ML_API_KEY || '' // VULN-11: ML server authentication
       },
       timeout: 180000 // 3 minutes timeout (increased from 2 minutes for cold starts)
     });

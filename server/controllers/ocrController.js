@@ -17,6 +17,21 @@ exports.submitOCRJob = async (req, res) => {
       });
     }
 
+    // VULN-04: Only accept base64 data-URIs to prevent SSRF via external URLs
+    if (!imageUrl.startsWith('data:image/')) {
+      return res.status(400).json({
+        success: false,
+        message: 'imageUrl must be a base64 data URI (data:image/...)'
+      });
+    }
+    // Enforce a 20 MB cap on the base64 payload (~15 MB decoded)
+    if (imageUrl.length > 20 * 1024 * 1024) {
+      return res.status(400).json({
+        success: false,
+        message: 'Image data exceeds the 20 MB limit'
+      });
+    }
+
     // Generate unique job ID
     const jobId = uuidv4();
 
