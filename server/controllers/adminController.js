@@ -203,6 +203,14 @@ exports.importStudentsFromExcel = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
+    // VULN-21: Magic byte validation — reject files that are not genuine Excel workbooks
+    const fileBuf = req.file.buffer;
+    const isXLSX = fileBuf[0] === 0x50 && fileBuf[1] === 0x4B && fileBuf[2] === 0x03 && fileBuf[3] === 0x04;
+    const isXLS  = fileBuf[0] === 0xD0 && fileBuf[1] === 0xCF && fileBuf[2] === 0x11 && fileBuf[3] === 0xE0;
+    if (!isXLSX && !isXLS) {
+      return res.status(400).json({ success: false, message: 'Invalid file format. Only .xlsx and .xls files are accepted.' });
+    }
+
     const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
@@ -310,6 +318,7 @@ exports.importStudentsFromExcel = async (req, res) => {
         name,
         email,
         password: randomPassword,
+        initialPassword: randomPassword, // VULN-16: persist for credential export
         role: 'student',
         roll,
         advisor,
@@ -595,7 +604,7 @@ exports.exportStudentCredentials = async (req, res) => {
     const students = await User.find({
       role: 'student',
       roll: { $regex: `^${rollPrefix}`, $options: 'i' }
-    }).select('name email roll').sort({ roll: 1 });
+    }).select('+initialPassword name email roll').sort({ roll: 1 });
 
     if (students.length === 0) {
       return res.status(404).json({ 
@@ -604,24 +613,13 @@ exports.exportStudentCredentials = async (req, res) => {
       });
     }
 
-    // For privacy, do not store plaintext in DB. Regenerate current passwords now and set them.
-    const exportData = [];
-    for (const student of students) {
-      const newPassword = generateRandomPassword();
-      // Set new password; pre-save hook will hash it
-      const dbUser = await User.findById(student._id).select('+password');
-      if (dbUser) {
-        dbUser.password = newPassword;
-        // Do NOT set or persist any plaintext field like initialPassword
-        await dbUser.save();
-      }
-      exportData.push({
-        Roll: student.roll,
-        Name: student.name,
-        Email: student.email,
-        Password: newPassword
-      });
-    }
+    // VULN-16: Read initialPassword stored at creation time — do NOT reset user passwords
+    const exportData = students.map(s => ({
+      Roll: s.roll,
+      Name: s.name,
+      Email: s.email,
+      Password: s.initialPassword || '[Not Available]'
+    }));
 
     // Create Excel workbook
     const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -653,6 +651,14 @@ exports.importTeachersFromExcel = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    // VULN-21: Magic byte validation — reject files that are not genuine Excel workbooks
+    const teacherFileBuf = req.file.buffer;
+    const isTeacherXLSX = teacherFileBuf[0] === 0x50 && teacherFileBuf[1] === 0x4B && teacherFileBuf[2] === 0x03 && teacherFileBuf[3] === 0x04;
+    const isTeacherXLS  = teacherFileBuf[0] === 0xD0 && teacherFileBuf[1] === 0xCF && teacherFileBuf[2] === 0x11 && teacherFileBuf[3] === 0xE0;
+    if (!isTeacherXLSX && !isTeacherXLS) {
+      return res.status(400).json({ success: false, message: 'Invalid file format. Only .xlsx and .xls files are accepted.' });
     }
 
     const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
