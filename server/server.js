@@ -1,17 +1,30 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const helmet = require('helmet');
 const dotenv = require('dotenv');
 
 // Load environment variables
 dotenv.config();
 
+// VULN-20: In production, suppress full stack traces in logs to avoid leaking
+// internal file paths, schema details, or dependency versions.
+if (process.env.NODE_ENV === 'production') {
+  const _consoleError = console.error.bind(console);
+  console.error = (...args) =>
+    _consoleError(...args.map(a => (a instanceof Error ? `${a.name}: ${a.message}` : a)));
+}
+
 const app = express();
 
 // Middleware
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(helmet()); // VULN-08: adds Content-Security-Policy, X-Frame-Options, HSTS, etc.
+app.use(cors({
+  origin: process.env.CLIENT_URL || 'http://localhost:3000', // VULN-07: restrict to known origin
+  credentials: true
+}));
+app.use(express.json({ limit: '10mb' })); // VULN-09: reduced from 50mb
+app.use(express.urlencoded({ extended: true, limit: '10mb' })); // VULN-09
 
 // One-time migration: replace the old non-partial unique index on courseoutcomes
 // with a partial one so soft-deleted docs don't block re-use of the same co_code.

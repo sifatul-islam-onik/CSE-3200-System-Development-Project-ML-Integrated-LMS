@@ -11,6 +11,9 @@ const CACHE_DURATION = {
   VERY_LONG: 24 * 60 * 60 * 1000  // 24 hours
 };
 
+// VULN-15: Cap the cache to prevent unbounded memory growth
+const MAX_CACHE_SIZE = 1000;
+
 /**
  * Clear cache for a specific key or pattern
  */
@@ -56,6 +59,11 @@ const cacheMiddleware = (duration = CACHE_DURATION.MEDIUM, keyGenerator) => {
     res.json = (data) => {
       // Only cache successful responses
       if (data && data.success !== false) {
+        // VULN-15: Evict oldest entry (FIFO) when cache is at its cap
+        if (cache.size >= MAX_CACHE_SIZE) {
+          const oldestKey = cache.keys().next().value;
+          cache.delete(oldestKey);
+        }
         cache.set(key, {
           data,
           expiry: Date.now() + duration
