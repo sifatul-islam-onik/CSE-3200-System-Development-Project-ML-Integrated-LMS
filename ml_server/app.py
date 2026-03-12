@@ -1,4 +1,5 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
+from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import cv2
@@ -13,6 +14,14 @@ from PIL import Image
 import re
 
 app = FastAPI(title="Marks Extraction API")
+
+# VULN-11: API key authentication — only the Node.js backend may call this endpoint
+_ML_API_KEY = os.environ.get("ML_API_KEY", "")
+_API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+async def verify_api_key(api_key: str = Depends(_API_KEY_HEADER)):
+    if not _ML_API_KEY or api_key != _ML_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
 # CORS middleware
 app.add_middleware(
@@ -428,7 +437,7 @@ async def startup_event():
 async def root():
     return {"message": "Marks Extraction API is running", "version": "1.0.0"}
 
-@app.post("/api/extract-marks", response_model=MarksResponse)
+@app.post("/api/extract-marks", response_model=MarksResponse, dependencies=[Depends(verify_api_key)])
 async def extract_marks(image: UploadFile = File(...)):
     """
     Extract marks from uploaded answer sheet image

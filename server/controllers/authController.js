@@ -1,8 +1,15 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto'); // VULN-06: used for cryptographically secure OTP generation
 const { validationResult } = require('express-validator');
 const { hashToken } = require('../utils/tokenUtils');
 const { sendVerificationEmail } = require('../utils/emailService');
+
+// VULN-18: In-memory login attempt tracking (resets on server restart).
+// For multi-instance deployments, migrate this to Redis.
+const loginAttempts = new Map(); // key: normalised email -> { count, lockedUntil }
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 // Generate JWT token
 const generateToken = (userId, role) => {
@@ -69,7 +76,7 @@ exports.register = async (req, res) => {
     }
 
     // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = crypto.randomInt(100000, 1000000).toString(); // VULN-06: CSPRNG
     const hashedOTP = hashToken(otp);
 
     // Create new user
@@ -133,6 +140,17 @@ exports.login = async (req, res) => {
 
     const { email, password } = req.body;
 
+    // VULN-18: Check account lockout before any DB query
+    const lockKey = String(email || '').toLowerCase().trim();
+    const lockInfo = loginAttempts.get(lockKey) || { count: 0, lockedUntil: 0 };
+    if (lockInfo.lockedUntil > Date.now()) {
+      const remainingMinutes = Math.ceil((lockInfo.lockedUntil - Date.now()) / 60000);
+      return res.status(429).json({
+        success: false,
+        message: `Too many failed login attempts. Please try again in ${remainingMinutes} minute(s).`
+      });
+    }
+
     // Find user and include password field
     const user = await User.findOne({ email }).select('+password');
     
@@ -146,11 +164,19 @@ exports.login = async (req, res) => {
     // Check password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
+      // VULN-18: Increment failed attempt counter; lock after threshold
+      const newCount = (lockInfo.count || 0) + 1;
+      const lockedUntil = newCount >= MAX_LOGIN_ATTEMPTS ? Date.now() + LOCKOUT_DURATION_MS : 0;
+      loginAttempts.set(lockKey, { count: newCount, lockedUntil });
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: newCount >= MAX_LOGIN_ATTEMPTS
+          ? 'Too many failed login attempts. Account locked for 15 minutes.'
+          : 'Invalid email or password'
       });
     }
+    // Clear lockout counter on correct password
+    loginAttempts.delete(lockKey);
 
     // Check if account is active
     if (!user.isActive) {
@@ -163,7 +189,7 @@ exports.login = async (req, res) => {
     // Check email verification (not required for admin)
     if (user.role !== 'admin' && !user.isEmailVerified) {
       // Generate new OTP for unverified user
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const otp = crypto.randomInt(100000, 1000000).toString(); // VULN-06: CSPRNG
       const hashedOTP = hashToken(otp);
 
       user.emailVerificationOTP = hashedOTP;
@@ -355,7 +381,7 @@ exports.resendOTP = async (req, res) => {
     }
 
     // Generate new OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = crypto.randomInt(100000, 1000000).toString(); // VULN-06: CSPRNG
     const hashedOTP = hashToken(otp);
 
     user.emailVerificationOTP = hashedOTP;
@@ -394,7 +420,6 @@ exports.updateProfile = async (req, res) => {
     const userId = req.user.id;
     const { 
       name,
-      email,
       profilePicture,
       signature,
       father,
@@ -410,6 +435,8 @@ exports.updateProfile = async (req, res) => {
       currentPassword,
       newPassword
     } = req.body;
+    // VULN-10: Email changes are disabled. Users must contact an administrator
+    // to change their email, ensuring re-verification is enforced.
 
     // If changing password, include password in query
     const user = await User.findById(userId).select(currentPassword && newPassword ? '+password' : '');
@@ -481,21 +508,6 @@ exports.updateProfile = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid gender value' });
       }
       user.gender = g;
-    }
-
-    // Update email if provided
-    if (email !== undefined) {
-      const normalized = String(email).trim().toLowerCase();
-      const emailRegex = /^\S+@\S+\.\S+$/;
-      if (!emailRegex.test(normalized)) {
-        return res.status(400).json({ success: false, message: 'Please enter a valid email' });
-      }
-      // Ensure email uniqueness
-      const existing = await User.findOne({ email: normalized, _id: { $ne: userId } });
-      if (existing) {
-        return res.status(409).json({ success: false, message: 'Email already in use' });
-      }
-      user.email = normalized;
     }
 
     // Handle password change if requested
