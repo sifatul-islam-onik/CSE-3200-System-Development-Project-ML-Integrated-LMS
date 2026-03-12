@@ -344,3 +344,20 @@ export const getSectionAData = async (courseId) => {
   }
 };
 
+/**
+ * Reset all attainment data (CT, Assignment, Lab Activity) for a course.
+ * @param {string} courseId - Course ID
+ */
+export const resetAttainmentData = async (courseId) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.delete(
+      `${API_URL}/attainment/reset/${courseId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+

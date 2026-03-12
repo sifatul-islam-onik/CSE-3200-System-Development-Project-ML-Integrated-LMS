@@ -139,6 +139,16 @@ router.get(
   attainmentController.getTermExamMarks
 );
 
+// Reset all attainment data for a course (teacher/admin only)
+router.delete(
+  '/reset/:courseId',
+  authorizeRoles('teacher', 'admin'),
+  invalidateCacheMiddleware((req) => `ct_${req.params.courseId}`),
+  invalidateCacheMiddleware((req) => `assignment_${req.params.courseId}`),
+  invalidateCacheMiddleware((req) => `labactivity_${req.params.courseId}`),
+  attainmentController.resetAttainmentData
+);
+
 // Get attainment data (default sheet or specific sheet) - must come last
 router.get('/:sheetName?', attainmentController.getAttainmentData);
 

@@ -1,4 +1,45 @@
-import React from 'react';
+import React, { useState } from 'react';
+
+const ASSIGN_INPUT_CSS = `
+.assign-cell-input {
+  display: block;
+  width: 100%;
+  min-width: 48px;
+  box-sizing: border-box;
+  padding: 5px 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 1.5px solid #c8d0da;
+  border-radius: 0;
+  font-size: 15px;
+  font-family: inherit;
+  text-align: center;
+  color: #1a2332;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.assign-cell-input:hover {
+  border-bottom-color: #5c7cfa;
+  background: rgba(92,124,250,0.04);
+}
+.assign-cell-input:focus {
+  border: 1px solid #5c7cfa;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(92,124,250,0.15);
+}
+/* hide browser number spinners */
+.assign-cell-input::-webkit-inner-spin-button {display:none;}
+`;
+
+let _assignStyleInjected = false;
+const injectAssignStyles = () => {
+  if (_assignStyleInjected) return;
+  const tag = document.createElement('style');
+  tag.textContent = ASSIGN_INPUT_CSS;
+  document.head.appendChild(tag);
+  _assignStyleInjected = true;
+};
 
 const AssignmentSheet = ({
   clos,
@@ -7,8 +48,15 @@ const AssignmentSheet = ({
   attendanceMarks,
   assignmentManualWts,
   assignmentSummary,
+  // Setters
+  setAssignmentRows,
+  setAttnAssignObtainedRows,
+  setAssignmentManualWts,
   setShowGeneratedTableModal,
   setShowObtainedGeneratedModal,
+  // Save
+  handleManualSaveAssignment,
+  // Helpers
   getActiveAssignments,
   getActiveAssignmentFields,
   computeAssignmentCOTotal,
@@ -19,11 +67,49 @@ const AssignmentSheet = ({
   sumAssignmentManualWtTotal,
   formatNumber,
 }) => {
+  injectAssignStyles();
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveMsg('');
+    try {
+      await handleManualSaveAssignment();
+      setSaveMsg('Saved!');
+    } catch (e) {
+      setSaveMsg('Save failed');
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSaveMsg(''), 3000);
+    }
+  };
+
+  const handleAssignmentCoMapCell = (rowIdx, field, raw) => {
+    const val = raw === '' ? 0 : (isNaN(parseFloat(raw)) ? 0 : parseFloat(raw));
+    setAssignmentRows(prev => prev.map((r, i) => i === rowIdx ? { ...r, [field]: val } : r));
+  };
+
+  const handleObtainedCell = (rowIdx, field, raw) => {
+    const trimmed = raw.trim();
+    const val = trimmed === '' ? 0 : isNaN(parseFloat(trimmed)) ? 0 : parseFloat(trimmed);
+    setAttnAssignObtainedRows(prev => prev.map((r, i) => i === rowIdx ? { ...r, [field]: val } : r));
+  };
+
+  const handleAttendanceCell = (rowIdx, raw) => {
+    const trimmed = raw.trim();
+    const val = trimmed === '' ? 0 : isNaN(parseFloat(trimmed)) ? 0 : parseFloat(trimmed);
+    setAttnAssignObtainedRows(prev => prev.map((r, i) => i === rowIdx ? { ...r, attendance: val } : r));
+  };
   return (
     <section className="ct-section" style={{ marginTop: '30px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
         <h2 style={{ margin: 0 }}>Allocated Marks for Attendance and Assignment (if taken)</h2>
-        <div className="action-buttons-container">
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {saveMsg && <span style={{ fontSize: '13px', color: saveMsg === 'Saved!' ? '#27ae60' : '#e74c3c', fontWeight: 600 }}>{saveMsg}</span>}
+          <button onClick={handleSave} disabled={saving} className="btn-professional btn-success">
+            {saving ? 'Saving...' : 'Save'}
+          </button>
           <button onClick={() => setShowGeneratedTableModal(true)} className="btn-professional btn-primary">
             View Generated Table
           </button>
@@ -37,8 +123,8 @@ const AssignmentSheet = ({
       {clos.length > 0 && (
         <>
           {/* Allocated Marks Table */}
-          <div className="table-wrapper">
-            <table className="ct-table">
+          <div className="table-wrapper" style={{ overflowX: 'auto' }}>
+            <table className="ct-table" style={{ minWidth: '560px', width: '100%' }}>
               <thead>
                 <tr>
                   <th rowSpan="3">CO No.</th>
@@ -68,8 +154,13 @@ const AssignmentSheet = ({
                     <td className="co-label">{row.coNumber || '-'}</td>
                     <td>-</td>
                     {getActiveAssignmentFields().map(field => (
-                      <td key={field} style={{ textAlign: 'center' }}>
-                        {row[field] ?? 0}
+                      <td key={field} style={{ padding: '2px 3px' }}>
+                        <input
+                          type="text"
+                          className="assign-cell-input"
+                          value={row[field] ?? 0}
+                          onChange={e => handleAssignmentCoMapCell(idx, field, e.target.value)}
+                        />
                       </td>
                     ))}
                     <td className="co-total">{computeAssignmentCOTotal(row)}</td>
@@ -120,8 +211,18 @@ const AssignmentSheet = ({
                 <tr>
                   <td className="footer-label" colSpan={2}>Manual Wt</td>
                   {getActiveAssignments().map(assignment => (
-                    <td key={assignment} colSpan={3} style={{ textAlign: 'center' }}>
-                      {formatNumber(assignmentManualWts[assignment] ?? 0)}
+                    <td key={assignment} colSpan={3} style={{ padding: '2px 3px', textAlign: 'center' }}>
+                      <input
+                        type="text"
+                        className="assign-cell-input"
+                        value={assignmentManualWts[assignment] ?? 0}
+                        onChange={e => {
+                          const raw = e.target.value;
+                          const val = raw === '' ? 0 : isNaN(parseFloat(raw)) ? 0 : parseFloat(raw);
+                          setAssignmentManualWts(prev => ({ ...prev, [assignment]: val }));
+                        }}
+                        style={{ width: '80px', display: 'inline-block' }}
+                      />
                     </td>
                   ))}
                   <td><strong>{formatNumber(sumAssignmentManualWtTotal())}</strong></td>
@@ -170,10 +271,6 @@ const AssignmentSheet = ({
                   <td style={{ backgroundColor: '#f8f9fa', fontWeight: 600 }}>Use Eq. Wt</td>
                   <td style={{ textAlign: 'center' }}>{assignmentSummary.useEqWt ?? 0}</td>
                 </tr>
-                <tr>
-                  <td style={{ backgroundColor: '#f8f9fa', fontWeight: 600 }}>Attendance Performance</td>
-                  <td style={{ textAlign: 'center' }}>{assignmentSummary.attendancePerformance ?? 0}</td>
-                </tr>
               </tbody>
             </table>
           </div>
@@ -182,14 +279,18 @@ const AssignmentSheet = ({
           <section style={{ marginTop: '30px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
               <h3 style={{ margin: 0 }}>Obtained Marks for Attendance, Performance and Assignment</h3>
-              <div className="action-buttons-container">
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {saveMsg && <span style={{ fontSize: '13px', color: saveMsg === 'Saved!' ? '#27ae60' : '#e74c3c', fontWeight: 600 }}>{saveMsg}</span>}
+                <button onClick={handleSave} disabled={saving} className="btn-professional btn-success">
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
                 <button onClick={() => setShowObtainedGeneratedModal(true)} className="btn-professional btn-primary">
                   View Generated Obtained Table
                 </button>
               </div>
             </div>
-            <div className="table-wrapper">
-              <table className="ct-obtained-table">
+            <div className="table-wrapper" style={{ overflowX: 'auto' }}>
+              <table className="ct-obtained-table" style={{ minWidth: '560px', width: '100%' }}>
                 <thead>
                   {(() => {
                     const colTotals = assignmentColumnGroupTotals();
@@ -224,10 +325,22 @@ const AssignmentSheet = ({
                   {attnAssignObtainedRows.length > 0 ? attnAssignObtainedRows.map((row, idx) => (
                     <tr key={`assign-${row.rollNumber}-${idx}`}>
                       <td>{row.rollNumber || '-'}</td>
-                      <td style={{ textAlign: 'center' }}>{row.attendance ?? 0}</td>
+                      <td style={{ padding: '2px 3px' }}>
+                        <input
+                          type="text"
+                          className="assign-cell-input"
+                          value={row.attendance ?? 0}
+                          onChange={e => handleAttendanceCell(idx, e.target.value)}
+                        />
+                      </td>
                       {getActiveAssignmentFields().map(field => (
-                        <td key={field} style={{ textAlign: 'center' }}>
-                          {row[field] ?? 0}
+                        <td key={field} style={{ padding: '2px 3px' }}>
+                          <input
+                            type="text"
+                            className="assign-cell-input"
+                            value={row[field] ?? 0}
+                            onChange={e => handleObtainedCell(idx, field, e.target.value)}
+                          />
                         </td>
                       ))}
                       <td style={{ textAlign: 'center' }}>{getActiveAssignmentFields().reduce((sum, field) => sum + (typeof row[field] === 'number' ? row[field] : 0), 0)}</td>
