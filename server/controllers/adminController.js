@@ -8,6 +8,7 @@ const AssignmentAttainment = require('../models/AssignmentAttainment');
 const TermExamAttainment = require('../models/TermExamAttainment');
 const LabActivityAttainment = require('../models/LabActivityAttainment');
 const TermExamMarks = require('../models/TermExamMarks');
+const { clearCache } = require('../middlewares/cacheMiddleware');
 
 // Helper function to generate random password
 const generateRandomPassword = () => {
@@ -1466,32 +1467,64 @@ exports.assignBatchToCourse = async (req, res) => {
       });
     }
 
-    // If the batch is changing, clear all student-specific obtained rows so old
-    // student data does not bleed into the new batch's attainment/result views.
-    // CO allocation rows (ctRows, sectionARows, etc.) are course-structure data
-    // and are intentionally preserved.
+    // If the batch is changing (or no batch was previously set because it was
+    // unassigned), clear all attainment data so the previous batch's exam
+    // structure and student data do not bleed into the new batch's attainment views.
     const oldAssignment = (course.assignedBatches || [])[0];
     const isBatchChange =
-      oldAssignment &&
+      !oldAssignment || // no prior batch — may still have leftover data from an unassign
       (oldAssignment.batch !== batch || oldAssignment.deptCode !== deptCode);
 
     if (isBatchChange) {
       await Promise.all([
         CTAttainment.updateOne(
           { course: courseId },
-          { $set: { ctObtainedRows: [] } }
+          {
+            $set: {
+              ctRows: [],
+              ctFactors: { CT1: 1, CT2: 1, CT3: 1 },
+              ctManualWts: {},
+              ctEqWts: { CT1: 0, CT2: 0, CT3: 0 },
+              ctSummary: { ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 },
+              ctObtainedRows: [],
+            }
+          }
         ),
         AssignmentAttainment.updateOne(
           { course: courseId },
-          { $set: { attnAssignObtainedRows: [] } }
+          {
+            $set: {
+              assignmentRows: [],
+              assignmentManualWts: {},
+              assignmentSummary: { assignTaken: 0, assignmentMarks30: 0, useEqWt: 0, attendancePerformance: 0 },
+              attendanceMarks: 0,
+              attnAssignObtainedRows: [],
+            }
+          }
         ),
         TermExamAttainment.updateOne(
           { course: courseId },
-          { $set: { sectionAObtainedRows: [], sectionBObtainedRows: [] } }
+          { $set: { sectionARows: [], sectionBRows: [], sectionAObtainedRows: [], sectionBObtainedRows: [] } }
         ),
         LabActivityAttainment.updateOne(
           { course: courseId },
-          { $set: { labActivityObtainedRows: [] } }
+          {
+            $set: {
+              labActivityRows: [],
+              labActivityFactors: {},
+              labActivityEqWts: {},
+              labActivityManualWts: {},
+              labAttendanceMarks: 0,
+              labQuizMarks: 0,
+              labVivaMarks: 0,
+              activityTaken: 0,
+              otherActivityRemaining: 0,
+              otherActivityMeasured: 0,
+              coMappedActivityMarks: 0,
+              useEqWtActivity: 0,
+              labActivityObtainedRows: [],
+            }
+          }
         ),
         TermExamMarks.deleteMany({ course: courseId }),
       ]);
@@ -1500,6 +1533,15 @@ exports.assignBatchToCourse = async (req, res) => {
     // Replace any existing assignment: a course can be assigned to only one batch
     course.assignedBatches = [{ batch, deptCode }];
     await course.save();
+
+    // Bust the attainment cache so the teacher immediately gets fresh (reset) data
+    if (isBatchChange) {
+      clearCache(`ct_${courseId}`);
+      clearCache(`assignment_${courseId}`);
+      clearCache(`labactivity_${courseId}`);
+      clearCache(`section-a_${courseId}`);
+      clearCache(`term_${courseId}`);
+    }
 
     // Populate and return updated course
     const updatedCourse = await Course.findById(courseId)
@@ -1567,30 +1609,68 @@ exports.unassignBatchFromCourse = async (req, res) => {
 
     await course.save();
 
-    // Clear all student-specific obtained rows for this course now that the
-    // batch has been unassigned, so old student data does not carry over if
-    // the course is later assigned to a different batch.
-    // CO allocation rows (ctRows, sectionARows, etc.) are course-structure
-    // data and are intentionally preserved.
+    // Clear ALL attainment data for this course now that the batch has been
+    // unassigned, so neither allocation rows nor student data carries over
+    // when the course is later assigned to a different batch.
     await Promise.all([
       CTAttainment.updateOne(
         { course: courseId },
-        { $set: { ctObtainedRows: [] } }
+        {
+          $set: {
+            ctRows: [],
+            ctFactors: { CT1: 1, CT2: 1, CT3: 1 },
+            ctManualWts: {},
+            ctEqWts: { CT1: 0, CT2: 0, CT3: 0 },
+            ctSummary: { ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 },
+            ctObtainedRows: [],
+          }
+        }
       ),
       AssignmentAttainment.updateOne(
         { course: courseId },
-        { $set: { attnAssignObtainedRows: [] } }
+        {
+          $set: {
+            assignmentRows: [],
+            assignmentManualWts: {},
+            assignmentSummary: { assignTaken: 0, assignmentMarks30: 0, useEqWt: 0, attendancePerformance: 0 },
+            attendanceMarks: 0,
+            attnAssignObtainedRows: [],
+          }
+        }
       ),
       TermExamAttainment.updateOne(
         { course: courseId },
-        { $set: { sectionAObtainedRows: [], sectionBObtainedRows: [] } }
+        { $set: { sectionARows: [], sectionBRows: [], sectionAObtainedRows: [], sectionBObtainedRows: [] } }
       ),
       LabActivityAttainment.updateOne(
         { course: courseId },
-        { $set: { labActivityObtainedRows: [] } }
+        {
+          $set: {
+            labActivityRows: [],
+            labActivityFactors: {},
+            labActivityEqWts: {},
+            labActivityManualWts: {},
+            labAttendanceMarks: 0,
+            labQuizMarks: 0,
+            labVivaMarks: 0,
+            activityTaken: 0,
+            otherActivityRemaining: 0,
+            otherActivityMeasured: 0,
+            coMappedActivityMarks: 0,
+            useEqWtActivity: 0,
+            labActivityObtainedRows: [],
+          }
+        }
       ),
       TermExamMarks.deleteMany({ course: courseId }),
     ]);
+
+    // Bust the attainment cache so the teacher immediately gets fresh (reset) data
+    clearCache(`ct_${courseId}`);
+    clearCache(`assignment_${courseId}`);
+    clearCache(`labactivity_${courseId}`);
+    clearCache(`section-a_${courseId}`);
+    clearCache(`term_${courseId}`);
 
     // Populate and return updated course
     const updatedCourse = await Course.findById(courseId)

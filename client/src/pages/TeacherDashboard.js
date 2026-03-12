@@ -6,6 +6,7 @@ import { getUser, logout } from '../components/ProtectedRoute';
 import { getProfile } from '../services/authService';
 import { getMyProposals, createCourseProposal, deleteProposal } from '../services/courseProposalService';
 import { getAllCourses, getCourseStudents } from '../services/courseService';
+import { getCourseProfile } from '../services/courseProfileService';
 import { getCTData, saveCTData, parseCTUpload, getLabActivityData, saveLabActivityData, parseLabUpload, getAssignmentData, saveAssignmentData, parseAssignUpload } from '../services/attainmentService';
 import CourseForm from '../components/CourseForm';
 import AttainmentView from '../components/AttainmentView';
@@ -70,7 +71,7 @@ const TeacherDashboard = () => {
   const [courseStudents, setCourseStudents] = useState([]);
   const [showCTMarksModal, setShowCTMarksModal] = useState(false);
   const [ctMarksCourse, setCtMarksCourse] = useState(null);
-  const [ctSettings, setCtSettings] = useState({ ctTaken: 3, coMappedMarks60: 0, useEqWt: 0 });
+  const [ctSettings, setCtSettings] = useState({ ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 });
   const [ctSettingsSaving, setCtSettingsSaving] = useState(false);
   const [ctSettingsLoading, setCtSettingsLoading] = useState(false);
   const [ctExistingData, setCtExistingData] = useState(null);
@@ -86,6 +87,7 @@ const TeacherDashboard = () => {
   const [showLabMarksModal, setShowLabMarksModal] = useState(false);
   const [labMarksCourse, setLabMarksCourse] = useState(null);
   const [labSettings, setLabSettings] = useState({ activityTaken: 1, otherActivityRemaining: 0, otherActivityMeasured: 0, coMappedActivityMarks: 0, useEqWtActivity: 0, attnMarks: 0, quizMarks: 0, vivaMarks: 0 });
+  const [labDataRefreshKey, setLabDataRefreshKey] = useState(0);
   const [labSettingsSaving, setLabSettingsSaving] = useState(false);
   const [labSettingsLoading, setLabSettingsLoading] = useState(false);
   const [labExistingData, setLabExistingData] = useState(null);
@@ -99,7 +101,7 @@ const TeacherDashboard = () => {
   // Attendance & Assignment Marks state
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [attendanceCourse, setAttendanceCourse] = useState(null);
-  const [assignSettings, setAssignSettings] = useState({ assignTaken: 3, assignmentMarks30: 30, useEqWt: 0, attendancePerformance: 0 });
+  const [assignSettings, setAssignSettings] = useState({ assignTaken: 0, assignmentMarks30: 0, useEqWt: 0, attendancePerformance: 0 });
   const [assignSettingsSaving, setAssignSettingsSaving] = useState(false);
   const [assignSettingsLoading, setAssignSettingsLoading] = useState(false);
   const [selectedAssignUpload, setSelectedAssignUpload] = useState('Assgn1');
@@ -130,16 +132,16 @@ const TeacherDashboard = () => {
               data.ctObtainedRows = data.ctObtainedRows.filter(r => r.rollNumber && r.rollNumber.toLowerCase() !== 'roll');
             }
             setCtExistingData(data);
-            const taken = data.ctSummary?.ctTaken || 3;
+            const taken = data.ctSummary?.ctTaken ?? 0;
             setCtSettings({
               ctTaken: taken,
-              coMappedMarks60: data.ctSummary?.coMappedMarks60 || 0,
-              useEqWt: data.ctSummary?.useEqWt || 0,
+              coMappedMarks60: data.ctSummary?.coMappedMarks60 ?? 0,
+              useEqWt: data.ctSummary?.useEqWt ?? 0,
             });
             setSelectedCTUpload(`CT${Math.min(taken, 1) || 1}`);
           } else {
             setCtExistingData(null);
-            setCtSettings({ ctTaken: 3, coMappedMarks60: 0, useEqWt: 0 });
+            setCtSettings({ ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 });
             setSelectedCTUpload('CT1');
           }
         })
@@ -196,17 +198,17 @@ const TeacherDashboard = () => {
           if (resp.success && resp.data) {
             const data = resp.data;
             setAssignExistingData(data);
-            const taken = data.assignmentSummary?.assignTaken || 3;
+            const taken = data.assignmentSummary?.assignTaken ?? 0;
             setAssignSettings({
               assignTaken: taken,
-              assignmentMarks30: data.assignmentSummary?.assignmentMarks30 || 30,
-              useEqWt: data.assignmentSummary?.useEqWt || 0,
-              attendancePerformance: data.assignmentSummary?.attendancePerformance || 0,
+              assignmentMarks30: data.assignmentSummary?.assignmentMarks30 ?? 0,
+              useEqWt: data.assignmentSummary?.useEqWt ?? 0,
+              attendancePerformance: data.assignmentSummary?.attendancePerformance ?? 0,
             });
             setSelectedAssignUpload('Assgn1');
           } else {
             setAssignExistingData(null);
-            setAssignSettings({ assignTaken: 3, assignmentMarks30: 30, useEqWt: 0, attendancePerformance: 0 });
+            setAssignSettings({ assignTaken: 0, assignmentMarks30: 0, useEqWt: 0, attendancePerformance: 0 });
             setSelectedAssignUpload('Assgn1');
           }
         })
@@ -1008,7 +1010,7 @@ const TeacherDashboard = () => {
         );
 
       case 'attainment':
-        return <AttainmentView />;
+        return <AttainmentView labDataRefreshKey={labDataRefreshKey} />;
 
       default:
         return null;
@@ -1409,7 +1411,10 @@ const TeacherDashboard = () => {
               )}
             </div>
 
-            <div className="modal-footer" style={{ padding: '14px 20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', backgroundColor: '#fff', borderTop: '1px solid #e5e7eb' }}>
+            <div className="modal-footer" style={{ padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: '#fff', borderTop: '1px solid #e5e7eb' }}>
+              {error && <div className="alert alert-error" style={{ margin: 0 }}>{error}</div>}
+              {successMessage && <div className="alert alert-success" style={{ margin: 0 }}>{successMessage}</div>}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               {ctUploadParsed && (
                 <button
                   className="btn btn-primary"
@@ -1419,7 +1424,17 @@ const TeacherDashboard = () => {
                     try {
                       const existing = ctExistingData || {};
                       const ctKey = selectedCTUpload;
-                      const newManualWts = { ...(existing.ctManualWts || {}), ...(ctUploadParsed.manualWt !== null ? { [ctKey]: ctUploadParsed.manualWt } : {}) };
+                      // Build updated manual weights:
+                      // - If the CSV included a "Manual Wt" row, use it.
+                      // - Otherwise, if no weight is already stored, auto-set to the sum of Q totals
+                      //   so the factor becomes 1.0 (student marks used at face value).
+                      const newManualWts = { ...(existing.ctManualWts || {}) };
+                      if (ctUploadParsed.manualWt !== null) {
+                        newManualWts[ctKey] = ctUploadParsed.manualWt;
+                      } else if (!newManualWts[ctKey]) {
+                        const totalDist = (ctUploadParsed.q1Total || 0) + (ctUploadParsed.q2Total || 0) + (ctUploadParsed.q3Total || 0);
+                        if (totalDist > 0) newManualWts[ctKey] = totalDist;
+                      }
                       const q1Field = `${ctKey}_Q1`;
                       const q2Field = `${ctKey}_Q2`;
                       const q3Field = `${ctKey}_Q3`;
@@ -1429,53 +1444,89 @@ const TeacherDashboard = () => {
                           parsedMap[parsed.rollNumber] = parsed;
                         }
                       });
+                      // Only update existing enrolled rows — never add rows from Excel
                       const existingObtained = (Array.isArray(existing.ctObtainedRows) ? existing.ctObtainedRows : [])
                         .filter(r => r.rollNumber && r.rollNumber.toLowerCase() !== 'roll')
                         .map(r => {
-                          const match = parsedMap[r.rollNumber];
+                          const match = parsedMap[String(r.rollNumber).trim()];
                           if (match) {
                             return {
                               ...r,
-                              [q1Field]: match.q1 !== null ? match.q1 : (r[q1Field] ?? 0),
-                              [q2Field]: match.q2 !== null ? match.q2 : (r[q2Field] ?? 0),
-                              [q3Field]: match.q3 !== null ? match.q3 : (r[q3Field] ?? 0),
+                              [q1Field]: match.q1 !== null ? Math.min(match.q1, ctUploadParsed.q1Total || Infinity) : (r[q1Field] ?? 0),
+                              [q2Field]: match.q2 !== null ? Math.min(match.q2, ctUploadParsed.q2Total || Infinity) : (r[q2Field] ?? 0),
+                              [q3Field]: match.q3 !== null ? Math.min(match.q3, ctUploadParsed.q3Total || Infinity) : (r[q3Field] ?? 0),
                             };
                           }
                           return r;
                         });
-                      // Build updated ctRows — only update existing CO rows, never add new ones
-                      const coSet = new Set((existing.ctRows || []).map(r => r.coNumber).filter(Boolean));
-                      const updatedCtRows = [...coSet].map(coNumber => {
-                        const existingRow = (existing.ctRows || []).find(r => r.coNumber === coNumber) || { coNumber };
-                        const newRow = { ...existingRow };
-                        if (ctUploadParsed.hasQ1 && ctUploadParsed.q1CO != null) {
+                      const enrolledRolls = new Set(existingObtained.map(r => String(r.rollNumber).trim()));
+                      const unmatchedRolls = Object.keys(parsedMap).filter(r => !enrolledRolls.has(String(r).trim()));
+                      // Build updated ctRows — update existing CO rows, or seed from parsed COs if none exist.
+                      // A Q can only be assigned to ONE CO at a time, so if the new upload assigns a Q to a
+                      // different CO than before, the old CO's value for that Q must be cleared to 0.
+                      const applyParsedToCORow = (newRow, coNumber) => {
+                        if (ctUploadParsed.hasQ1 && ctUploadParsed.q1CO != null)
                           newRow[q1Field] = ctUploadParsed.q1CO === coNumber ? ctUploadParsed.q1Total : 0;
-                        }
-                        if (ctUploadParsed.hasQ2 && ctUploadParsed.q2CO != null) {
+                        if (ctUploadParsed.hasQ2 && ctUploadParsed.q2CO != null)
                           newRow[q2Field] = ctUploadParsed.q2CO === coNumber ? ctUploadParsed.q2Total : 0;
-                        }
-                        if (ctUploadParsed.hasQ3 && ctUploadParsed.q3CO != null) {
+                        if (ctUploadParsed.hasQ3 && ctUploadParsed.q3CO != null)
                           newRow[q3Field] = ctUploadParsed.q3CO === coNumber ? ctUploadParsed.q3Total : 0;
-                        }
                         return newRow;
-                      });
+                      };
+                      let updatedCtRows;
+                      if ((existing.ctRows || []).length === 0) {
+                        // No existing CO rows — build from the COs mentioned in the Excel file
+                        const parsedCOs = [...new Set([
+                          ctUploadParsed.hasQ1 && ctUploadParsed.q1CO ? ctUploadParsed.q1CO : null,
+                          ctUploadParsed.hasQ2 && ctUploadParsed.q2CO ? ctUploadParsed.q2CO : null,
+                          ctUploadParsed.hasQ3 && ctUploadParsed.q3CO ? ctUploadParsed.q3CO : null,
+                        ].filter(Boolean))];
+                        updatedCtRows = parsedCOs.map(coNumber => applyParsedToCORow({ coNumber }, coNumber));
+                      } else {
+                        const coSet = new Set((existing.ctRows || []).map(r => r.coNumber).filter(Boolean));
+                        // Also include any COs from the current upload that don't yet have a row —
+                        // e.g. CT1 was uploaded for CO1 and now CT2 is uploaded for CO2.
+                        [
+                          ctUploadParsed.hasQ1 && ctUploadParsed.q1CO ? ctUploadParsed.q1CO : null,
+                          ctUploadParsed.hasQ2 && ctUploadParsed.q2CO ? ctUploadParsed.q2CO : null,
+                          ctUploadParsed.hasQ3 && ctUploadParsed.q3CO ? ctUploadParsed.q3CO : null,
+                        ].filter(Boolean).forEach(co => coSet.add(co));
+                        updatedCtRows = [...coSet].map(coNumber => {
+                          const existingRow = (existing.ctRows || []).find(r => r.coNumber === coNumber) || { coNumber };
+                          return applyParsedToCORow({ ...existingRow }, coNumber);
+                        });
+                      }
+                      // Auto-update ctTaken to at least the index of the CT being uploaded,
+                      // so COAttainment can include the newly uploaded data.
+                      const ctIndex = { CT1: 1, CT2: 2, CT3: 3 }[ctKey] || 1;
+                      const baseSummary = existing.ctSummary || ctSettings;
+                      const updatedCtSummary = {
+                        ...baseSummary,
+                        ctTaken: Math.max(baseSummary.ctTaken || 0, ctIndex),
+                      };
                       const fullData = {
                         ctRows: updatedCtRows,
                         ctFactors: existing.ctFactors || {},
                         ctManualWts: newManualWts,
                         ctEqWts: existing.ctEqWts || {},
-                        ctSummary: existing.ctSummary || ctSettings,
+                        ctSummary: updatedCtSummary,
                         ctObtainedRows: existingObtained,
                       };
                       await saveCTData(ctMarksCourse._id, fullData);
                       setCtExistingData(prev => ({ ...(prev || {}), ...fullData }));
-                      setSuccessMessage(`${ctKey} marks saved successfully`);
-                      setTimeout(() => setSuccessMessage(''), 3000);
+                      const msg = unmatchedRolls.length > 0
+                        ? `${ctKey} marks saved. ${unmatchedRolls.length} roll(s) in Excel not found in enrolled list: ${unmatchedRolls.join(', ')}`
+                        : `${ctKey} marks saved successfully`;
+                      setSuccessMessage(msg);
+                      setTimeout(() => setSuccessMessage(''), unmatchedRolls.length > 0 ? 8000 : 3000);
                       setCtUploadParsed(null);
                       setCtUploadFile(null);
                       setCtFileInputKey(k => k + 1);
-                      setError('Failed to save CT data');
-                      setTimeout(() => setError(''), 3000);
+                    } catch (err) {
+                      console.error('Error saving CT upload:', err);
+                      const errMsg = err && (err.error || err.message || (typeof err === 'string' ? err : null));
+                      setError(errMsg || 'Failed to save CT data');
+                      setTimeout(() => setError(''), 5000);
                     } finally {
                       setCtUploadSaving(false);
                     }
@@ -1488,6 +1539,7 @@ const TeacherDashboard = () => {
               <button className="btn btn-outline" onClick={() => setShowCTMarksModal(false)} style={{ width: '100px' }}>
                 Close
               </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1506,6 +1558,8 @@ const TeacherDashboard = () => {
             </div>
 
             <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', flex: '1 1 auto' }}>
+              {error && <div className="alert alert-error" style={{ marginBottom: '12px' }}>{error}</div>}
+              {successMessage && <div className="alert alert-success" style={{ marginBottom: '12px' }}>{successMessage}</div>}
               {labSettingsLoading ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>Loading existing lab data...</div>
               ) : (
@@ -1517,12 +1571,14 @@ const TeacherDashboard = () => {
                       <div>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Activity Taken (1–5)</label>
                         <input
-                          type="number" min={1} max={5}
+                          type="number" min={1}
                           value={labSettings.activityTaken}
                           onChange={e => {
-                            const v = Math.max(1, Math.min(5, parseInt(e.target.value) || 1));
-                            setLabSettings(prev => ({ ...prev, activityTaken: v }));
-                            setSelectedActivityUpload(`Activity1`);
+                            const raw = parseInt(e.target.value);
+                            if (!isNaN(raw) && raw >= 1) {
+                              setLabSettings(prev => ({ ...prev, activityTaken: raw }));
+                              setSelectedActivityUpload(`Activity1`);
+                            }
                           }}
                           style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
                         />
@@ -1539,9 +1595,9 @@ const TeacherDashboard = () => {
                       <div>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Other Activity Measured In</label>
                         <input
-                          type="number" min={0} max={50}
+                          type="number" min={0}
                           value={labSettings.otherActivityMeasured}
-                          onChange={e => setLabSettings(prev => ({ ...prev, otherActivityMeasured: Math.max(0, Math.min(50, parseFloat(e.target.value) || 0)) }))}
+                          onChange={e => setLabSettings(prev => ({ ...prev, otherActivityMeasured: Math.max(0, parseFloat(e.target.value) || 0) }))}
                           style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
                         />
                       </div>
@@ -1615,6 +1671,7 @@ const TeacherDashboard = () => {
                           };
                           await saveLabActivityData(labMarksCourse._id, fullData);
                           setLabExistingData(prev => ({ ...(prev || {}), ...fullData }));
+                          setLabDataRefreshKey(k => k + 1);
                           setSuccessMessage('Lab settings saved');
                           setTimeout(() => setSuccessMessage(''), 3000);
                         } catch (err) {
@@ -1747,7 +1804,10 @@ const TeacherDashboard = () => {
               )}
             </div>
 
-            <div className="modal-footer" style={{ padding: '14px 20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', backgroundColor: '#fff', borderTop: '1px solid #e5e7eb' }}>
+            <div className="modal-footer" style={{ padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: '#fff', borderTop: '1px solid #e5e7eb' }}>
+              {error && <div className="alert alert-error" style={{ margin: 0 }}>{error}</div>}
+              {successMessage && <div className="alert alert-success" style={{ margin: 0 }}>{successMessage}</div>}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               {labUploadParsed && (
                 <button
                   className="btn btn-primary"
@@ -1762,38 +1822,95 @@ const TeacherDashboard = () => {
                       const q2Field = `${actKey}_Q2`;
                       const q3Field = `${actKey}_Q3`;
 
+                      // Build parsedMap keyed by trimmed roll so later matching is reliable
                       const parsedMap = {};
                       labUploadParsed.rows.forEach(parsed => {
                         if (parsed.rollNumber && parsed.rollNumber.toLowerCase() !== 'roll') {
-                          parsedMap[parsed.rollNumber] = parsed;
+                          parsedMap[String(parsed.rollNumber).trim()] = parsed;
                         }
                       });
 
-                      // Update only existing obtained rows
-                      const existingObtained = (Array.isArray(existing.labActivityObtainedRows) ? existing.labActivityObtainedRows : [])
-                        .filter(r => r.rollNumber && r.rollNumber.toLowerCase() !== 'roll')
-                        .map(r => {
-                          const match = parsedMap[r.rollNumber];
-                          if (match) {
-                            return {
-                              ...r,
-                              attn: match.attn !== null ? match.attn : (r.attn ?? 0),
-                              quiz: match.quiz !== null ? match.quiz : (r.quiz ?? 0),
-                              viva: match.viva !== null ? match.viva : (r.viva ?? 0),
-                              [q1Field]: match.q1 !== null ? match.q1 : (r[q1Field] ?? 0),
-                              [q2Field]: match.q2 !== null ? match.q2 : (r[q2Field] ?? 0),
-                              [q3Field]: match.q3 !== null ? match.q3 : (r[q3Field] ?? 0),
-                              ...(labUploadParsed.hasOther && match.other !== null ? { otherMeasured: match.other } : {}),
-                            };
-                          }
-                          return r;
-                        });
+                      if (Object.keys(parsedMap).length === 0 && labUploadParsed.rows.length === 0) {
+                        // Parse returned no student rows — warn user and abort save
+                        setError('No student rows found. Ensure the file has a "Roll" header in column A (row 2 after the Manual Wt row).');
+                        setTimeout(() => setError(''), 6000);
+                        return;
+                      }
 
-                      // Update labActivityRows CO mapping — only update existing CO rows, never add new ones
-                      const coSet = new Set((existing.labActivityRows || []).map(r => r.coNumber).filter(Boolean));
+                      // Seed enrolled batch students into base list so Excel marks can be applied
+                      // even when no rows have been saved yet (mirrors mergeWithEnrolled in AttainmentView)
+                      const rawObtained = (Array.isArray(existing.labActivityObtainedRows) ? existing.labActivityObtainedRows : [])
+                        .filter(r => r.rollNumber && r.rollNumber.toLowerCase() !== 'roll');
+
+                      let baseObtained = rawObtained;
+                      try {
+                        const stuResp = await getCourseStudents(labMarksCourse._id);
+                        if (stuResp.success && Array.isArray(stuResp.data) && stuResp.data.length > 0) {
+                          const enrolled = stuResp.data
+                            .map(s => ({ rollNumber: String(s.roll || s.rollNumber || '').trim(), name: s.name || '' }))
+                            .filter(s => s.rollNumber);
+                          if (enrolled.length > 0) {
+                            const savedMap = {};
+                            rawObtained.forEach(r => { savedMap[String(r.rollNumber).trim()] = r; });
+                            baseObtained = enrolled.map(s => savedMap[s.rollNumber] || {
+                              rollNumber: s.rollNumber, name: s.name,
+                              attn: 0, quiz: 0, viva: 0,
+                              Activity1_Q1: 0, Activity1_Q2: 0, Activity1_Q3: 0,
+                              Activity2_Q1: 0, Activity2_Q2: 0, Activity2_Q3: 0,
+                              Activity3_Q1: 0, Activity3_Q2: 0, Activity3_Q3: 0,
+                              Activity4_Q1: 0, Activity4_Q2: 0, Activity4_Q3: 0,
+                              Activity5_Q1: 0, Activity5_Q2: 0, Activity5_Q3: 0,
+                              otherMeasured: 0, other: 0,
+                            });
+                          }
+                        }
+                      } catch (e) { /* use rawObtained as-is */ }
+
+                      // Helper to apply Excel marks to a single student row
+                      const applyParsedMarks = (r, match) => ({
+                        ...r,
+                        attn: match.attn !== null ? Math.min(match.attn, labSettings.attnMarks || Infinity) : (r.attn ?? 0),
+                        quiz: match.quiz !== null ? Math.min(match.quiz, labSettings.quizMarks || Infinity) : (r.quiz ?? 0),
+                        viva: match.viva !== null ? Math.min(match.viva, labSettings.vivaMarks || Infinity) : (r.viva ?? 0),
+                        [q1Field]: match.q1 !== null ? Math.min(match.q1, labUploadParsed.q1Total || Infinity) : (r[q1Field] ?? 0),
+                        [q2Field]: match.q2 !== null ? Math.min(match.q2, labUploadParsed.q2Total || Infinity) : (r[q2Field] ?? 0),
+                        [q3Field]: match.q3 !== null ? Math.min(match.q3, labUploadParsed.q3Total || Infinity) : (r[q3Field] ?? 0),
+                        ...(labUploadParsed.hasOther && match.other !== null ? { otherMeasured: match.other } : {}),
+                      });
+
+                      // Update only existing enrolled rows — never add rows from Excel.
+                      const existingObtained = Object.keys(parsedMap).length === 0
+                        ? baseObtained
+                        : baseObtained.map(r => {
+                            const match = parsedMap[String(r.rollNumber).trim()];
+                            return match ? applyParsedMarks(r, match) : r;
+                          });
+
+                      // Build CO row base from existing rows; seed from course profile if empty
+                      let baseLabRows = existing.labActivityRows || [];
+                      if (baseLabRows.length === 0) {
+                        try {
+                          const profileResp = await getCourseProfile(labMarksCourse.courseCode);
+                          if (profileResp.success && Array.isArray(profileResp.data) && profileResp.data.length > 0) {
+                            baseLabRows = profileResp.data.map(clo => ({
+                              coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
+                              attn: 0, quiz: 0, viva: 0,
+                              Activity1_Q1: 0, Activity1_Q2: 0, Activity1_Q3: 0,
+                              Activity2_Q1: 0, Activity2_Q2: 0, Activity2_Q3: 0,
+                              Activity3_Q1: 0, Activity3_Q2: 0, Activity3_Q3: 0,
+                              Activity4_Q1: 0, Activity4_Q2: 0, Activity4_Q3: 0,
+                              Activity5_Q1: 0, Activity5_Q2: 0, Activity5_Q3: 0,
+                              measuredTotal: 0, coTotal: 0,
+                            }));
+                          }
+                        } catch (e) { /* leave baseLabRows empty */ }
+                      }
+
+                      // Update labActivityRows CO mapping
+                      const coSet = new Set(baseLabRows.map(r => r.coNumber).filter(Boolean));
 
                       const updatedLabRows = [...coSet].map(coNumber => {
-                        const existingRow = (existing.labActivityRows || []).find(r => r.coNumber === coNumber) || { coNumber };
+                        const existingRow = baseLabRows.find(r => r.coNumber === coNumber) || { coNumber };
                         const newRow = { ...existingRow };
                         if (labUploadParsed.hasQ1 && labUploadParsed.q1CO != null) {
                           newRow[q1Field] = labUploadParsed.q1CO === coNumber ? labUploadParsed.q1Total : 0;
@@ -1807,17 +1924,18 @@ const TeacherDashboard = () => {
                         return newRow;
                       });
 
+                      // Auto-fill allocated mark settings from Excel headers when they're not configured
                       const fullData = {
                         labActivityRows: updatedLabRows,
                         labActivityFactors: existing.labActivityFactors || {},
                         labActivityManualWts: newManualWts,
                         labActivityEqWts: existing.labActivityEqWts || {},
-                        labAttendanceMarks: labSettings.attnMarks,
-                        labQuizMarks: labSettings.quizMarks,
-                        labVivaMarks: labSettings.vivaMarks,
+                        labAttendanceMarks: labSettings.attnMarks || labUploadParsed.attnTotal || 0,
+                        labQuizMarks: labSettings.quizMarks || labUploadParsed.quizTotal || 0,
+                        labVivaMarks: labSettings.vivaMarks || labUploadParsed.vivaTotal || 0,
                         activityTaken: labSettings.activityTaken,
                         otherActivityRemaining: labSettings.otherActivityRemaining,
-                        otherActivityMeasured: labSettings.otherActivityMeasured,
+                        otherActivityMeasured: labSettings.otherActivityMeasured || labUploadParsed.otherTotal || 0,
                         coMappedActivityMarks: labSettings.coMappedActivityMarks,
                         useEqWtActivity: labSettings.useEqWtActivity,
                         labActivityObtainedRows: existingObtained,
@@ -1825,13 +1943,17 @@ const TeacherDashboard = () => {
 
                       await saveLabActivityData(labMarksCourse._id, fullData);
                       setLabExistingData(prev => ({ ...(prev || {}), ...fullData }));
+                      setLabDataRefreshKey(k => k + 1);
                       setSuccessMessage(`${actKey} marks saved successfully`);
                       setTimeout(() => setSuccessMessage(''), 3000);
                       setLabUploadParsed(null);
                       setLabUploadFile(null);
                       setLabFileInputKey(k => k + 1);
-                      setError('Failed to save lab data');
-                      setTimeout(() => setError(''), 3000);
+                    } catch (err) {
+                      console.error('Error saving lab upload:', err);
+                      const errMsg = err && (err.error || err.message || (typeof err === 'string' ? err : null));
+                      setError(errMsg || 'Failed to save lab data');
+                      setTimeout(() => setError(''), 5000);
                     } finally {
                       setLabUploadSaving(false);
                     }
@@ -1844,6 +1966,7 @@ const TeacherDashboard = () => {
               <button className="btn btn-outline" onClick={() => setShowLabMarksModal(false)} style={{ width: '100px' }}>
                 Close
               </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1948,7 +2071,7 @@ const TeacherDashboard = () => {
                   </div>
 
                   {/* Assignment Upload Section */}
-                  <div style={{ padding: '16px', border: '1px solid #d1fae5', backgroundColor: '#f0fdf4', borderRadius: '8px' }}>
+                  {assignSettings.assignTaken > 0 && <div style={{ padding: '16px', border: '1px solid #d1fae5', backgroundColor: '#f0fdf4', borderRadius: '8px' }}>
                     <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 700, color: '#374151' }}>Upload Assignment Marks</h4>
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
                       <div>
@@ -2052,12 +2175,15 @@ const TeacherDashboard = () => {
                         </div>
                       </div>
                     )}
-                  </div>
+                  </div>}
                 </>
               )}
             </div>
 
-            <div className="modal-footer" style={{ padding: '14px 20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', backgroundColor: '#fff', borderTop: '1px solid #e5e7eb' }}>
+            <div className="modal-footer" style={{ padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: '#fff', borderTop: '1px solid #e5e7eb' }}>
+              {error && <div className="alert alert-error" style={{ margin: 0 }}>{error}</div>}
+              {successMessage && <div className="alert alert-success" style={{ margin: 0 }}>{successMessage}</div>}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               {assignUploadParsed && (
                 <button
                   className="btn btn-primary"
@@ -2082,51 +2208,105 @@ const TeacherDashboard = () => {
                       const existingObtained = (Array.isArray(existing.attnAssignObtainedRows) ? existing.attnAssignObtainedRows : [])
                         .filter(r => r.rollNumber && r.rollNumber.toLowerCase() !== 'roll');
 
-                      let updatedObtained;
-                      if (existingObtained.length > 0) {
-                        updatedObtained = existingObtained.map(r => {
-                          const match = parsedMap[r.rollNumber];
-                          if (match) {
-                            return {
-                              ...r,
-                              ...(assignUploadParsed.hasAttnPerf && match.attnPerf !== null ? { attendance: match.attnPerf } : {}),
-                              [q1Field]: match.q1 !== null ? match.q1 : (r[q1Field] ?? 0),
-                              [q2Field]: match.q2 !== null ? match.q2 : (r[q2Field] ?? 0),
-                              [q3Field]: match.q3 !== null ? match.q3 : (r[q3Field] ?? 0),
-                            };
+                      // Seed enrolled batch students into base list so Excel marks can be applied
+                      // even when no rows have been saved yet (mirrors mergeWithEnrolled in AttainmentView)
+                      let baseObtained = existingObtained;
+                      try {
+                        const stuResp = await getCourseStudents(attendanceCourse._id);
+                        if (stuResp.success && Array.isArray(stuResp.data) && stuResp.data.length > 0) {
+                          const enrolled = stuResp.data
+                            .map(s => ({ rollNumber: String(s.roll || s.rollNumber || '').trim(), name: s.name || '' }))
+                            .filter(s => s.rollNumber && /^[0-9]{4,}$/.test(s.rollNumber));
+                          if (enrolled.length > 0) {
+                            const savedMap = {};
+                            existingObtained.forEach(r => { savedMap[String(r.rollNumber).trim()] = r; });
+                            baseObtained = enrolled.map(s => savedMap[s.rollNumber] || {
+                              rollNumber: s.rollNumber, name: s.name,
+                              attendance: 0,
+                              Assgn1_Q1: 0, Assgn1_Q2: 0, Assgn1_Q3: 0,
+                              Assgn2_Q1: 0, Assgn2_Q2: 0, Assgn2_Q3: 0,
+                              Assgn3_Q1: 0, Assgn3_Q2: 0, Assgn3_Q3: 0,
+                            });
                           }
-                          return r;
-                        });
-                      } else {
-                        updatedObtained = existingObtained;
+                        }
+                      } catch (e) { /* use existingObtained as-is */ }
+
+                      // Fallback: if no base rows from DB or enrolled students, seed from parsed Excel rows
+                      if (baseObtained.length === 0 && Object.keys(parsedMap).length > 0) {
+                        baseObtained = Object.values(parsedMap).map(p => ({
+                          rollNumber: p.rollNumber, name: '',
+                          attendance: 0,
+                          Assgn1_Q1: 0, Assgn1_Q2: 0, Assgn1_Q3: 0,
+                          Assgn2_Q1: 0, Assgn2_Q2: 0, Assgn2_Q3: 0,
+                          Assgn3_Q1: 0, Assgn3_Q2: 0, Assgn3_Q3: 0,
+                        }));
                       }
 
+                      // Only update enrolled rows — never add rows from Excel
+                      const updatedObtained = Object.keys(parsedMap).length === 0
+                        ? baseObtained
+                        : baseObtained.map(r => {
+                            const match = parsedMap[String(r.rollNumber).trim()];
+                            if (match) {
+                              return {
+                                ...r,
+                                ...(assignUploadParsed.hasAttnPerf && match.attnPerf !== null ? { attendance: match.attnPerf } : {}),
+                                [q1Field]: match.q1 !== null ? match.q1 : (r[q1Field] ?? 0),
+                                [q2Field]: match.q2 !== null ? match.q2 : (r[q2Field] ?? 0),
+                                [q3Field]: match.q3 !== null ? match.q3 : (r[q3Field] ?? 0),
+                              };
+                            }
+                            return r;
+                          });
+
                       // Update assignmentManualWts for this assignment
-                      const newManualWts = { ...(existing.assignmentManualWts || {}), ...(assignUploadParsed.manualWt !== null ? { [assgnKey]: assignUploadParsed.manualWt } : {}) };
+                      const newManualWts = { ...(existing.assignmentManualWts || {}) };
+                      if (assignUploadParsed.manualWt !== null) {
+                        newManualWts[assgnKey] = assignUploadParsed.manualWt;
+                      } else if (!(existing.assignmentManualWts?.[assgnKey] > 0)) {
+                        // Auto-set from Q totals when no Manual Wt header and no existing weight
+                        const autoSum = (assignUploadParsed.q1Total || 0) + (assignUploadParsed.q2Total || 0) + (assignUploadParsed.q3Total || 0);
+                        if (autoSum > 0) newManualWts[assgnKey] = autoSum;
+                      }
 
-                      // Update assignmentRows CO mapping — only update existing CO rows, never add new ones
-                      const coSet = new Set((existing.assignmentRows || []).map(r => r.coNumber).filter(Boolean));
+                      // Auto-bump assignTaken to at least this assignment's index
+                      const assgnIndex = parseInt(assgnKey.replace('Assgn', ''), 10) || 1;
 
-                      const updatedAssignmentRows = [...coSet].map(coNumber => {
-                        const existingRow = (existing.assignmentRows || []).find(r => r.coNumber === coNumber) || { coNumber };
-                        const newRow = { ...existingRow };
-                        if (assignUploadParsed.hasQ1 && assignUploadParsed.q1CO != null) {
+                      // Update assignmentRows CO mapping
+                      const applyParsedToAssignRow = (newRow, coNumber) => {
+                        if (assignUploadParsed.hasQ1 && assignUploadParsed.q1CO != null)
                           newRow[q1Field] = assignUploadParsed.q1CO === coNumber ? assignUploadParsed.q1Total : 0;
-                        }
-                        if (assignUploadParsed.hasQ2 && assignUploadParsed.q2CO != null) {
+                        if (assignUploadParsed.hasQ2 && assignUploadParsed.q2CO != null)
                           newRow[q2Field] = assignUploadParsed.q2CO === coNumber ? assignUploadParsed.q2Total : 0;
-                        }
-                        if (assignUploadParsed.hasQ3 && assignUploadParsed.q3CO != null) {
+                        if (assignUploadParsed.hasQ3 && assignUploadParsed.q3CO != null)
                           newRow[q3Field] = assignUploadParsed.q3CO === coNumber ? assignUploadParsed.q3Total : 0;
-                        }
                         return newRow;
-                      });
+                      };
+                      let updatedAssignmentRows;
+                      if ((existing.assignmentRows || []).length === 0) {
+                        const parsedCOs = [...new Set([
+                          assignUploadParsed.hasQ1 && assignUploadParsed.q1CO ? assignUploadParsed.q1CO : null,
+                          assignUploadParsed.hasQ2 && assignUploadParsed.q2CO ? assignUploadParsed.q2CO : null,
+                          assignUploadParsed.hasQ3 && assignUploadParsed.q3CO ? assignUploadParsed.q3CO : null,
+                        ].filter(Boolean))];
+                        updatedAssignmentRows = parsedCOs.map(coNumber => applyParsedToAssignRow({ coNumber }, coNumber));
+                      } else {
+                        const coSet = new Set((existing.assignmentRows || []).map(r => r.coNumber).filter(Boolean));
+                        // Add any new COs from this parsed upload that aren't already in coSet
+                        [assignUploadParsed.q1CO, assignUploadParsed.q2CO, assignUploadParsed.q3CO].forEach(co => {
+                          if (co != null) coSet.add(co);
+                        });
+                        updatedAssignmentRows = [...coSet].map(coNumber => {
+                          const existingRow = (existing.assignmentRows || []).find(r => r.coNumber === coNumber) || { coNumber };
+                          return applyParsedToAssignRow({ ...existingRow }, coNumber);
+                        });
+                      }
 
                       const fullData = {
                         assignmentRows: updatedAssignmentRows,
                         assignmentManualWts: newManualWts,
                         assignmentSummary: {
-                          assignTaken: assignSettings.assignTaken,
+                          assignTaken: Math.max(assignSettings.assignTaken || 0, assgnIndex),
                           assignmentMarks30: assignSettings.assignmentMarks30,
                           useEqWt: assignSettings.useEqWt,
                           attendancePerformance: assignSettings.attendancePerformance,
@@ -2159,6 +2339,7 @@ const TeacherDashboard = () => {
               <button className="btn btn-outline" onClick={() => setShowAttendanceModal(false)} style={{ width: '100px' }}>
                 Close
               </button>
+              </div>
             </div>
           </div>
         </div>

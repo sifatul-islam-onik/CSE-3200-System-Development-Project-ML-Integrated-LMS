@@ -116,9 +116,12 @@ const computeCTFactors = (ctData) => {
   for (const key of ['CT1', 'CT2', 'CT3']) {
     const total = ctTotals[key] || 0;
     if (total > 0) {
-      result[key] = useEqWt !== 0
-        ? autoEqWt[key] / total
-        : (ctManualWts[key] || 0) / total;
+      if (useEqWt !== 0) {
+        result[key] = autoEqWt[key] / total;
+      } else {
+        const manualWt = ctManualWts[key] > 0 ? ctManualWts[key] : total;
+        result[key] = manualWt / total;
+      }
     } else {
       result[key] = 0;
     }
@@ -171,9 +174,12 @@ const computeAssignmentFactors = (assignData) => {
   for (const key of ['Assgn1', 'Assgn2', 'Assgn3']) {
     const total = totals[key] || 0;
     if (total > 0) {
-      result[key] = useEqWt !== 0
-        ? autoEqWt[key] / total
-        : (assignmentManualWts[key] || 0) / total;
+      if (useEqWt !== 0) {
+        result[key] = autoEqWt[key] / total;
+      } else {
+        const manualWt = assignmentManualWts[key] > 0 ? assignmentManualWts[key] : total;
+        result[key] = manualWt / total;
+      }
     } else {
       result[key] = 0;
     }

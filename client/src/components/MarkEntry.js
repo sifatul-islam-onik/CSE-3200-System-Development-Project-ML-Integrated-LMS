@@ -620,6 +620,19 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   const handleMarkChange = useCallback((row, question, value) => {
     // Only allow numbers
     if (value && !/^\d*\.?\d*$/.test(value)) return;
+
+    // Cap the value at the distribution mark for this sub-question
+    if (value !== '') {
+      const num = parseFloat(value);
+      if (!isNaN(num)) {
+        // Map question number to distribution field prefix (SecB uses Q1-Q4 internally)
+        const distRows = normalizedSection === 'A' ? distSectionARows : distSectionBRows;
+        const qNum = normalizedSection === 'A' ? question : String(parseInt(question) - 4);
+        const distField = `Q${qNum}${row}`;
+        const maxAllowed = distRows.reduce((sum, r) => sum + (parseFloat(r[distField]) || 0), 0);
+        if (maxAllowed > 0 && num > maxAllowed) return; // Reject values exceeding distribution
+      }
+    }
     
     setMarks(prev => ({
       ...prev,
@@ -629,7 +642,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
       }
     }));
     // Note: studentData cache update moved to handleNext/handleSave to reduce re-renders
-  }, []);
+  }, [normalizedSection, distSectionARows, distSectionBRows]);
 
   // Handle keyboard navigation between mark input cells
   const handleMarkKeyDown = useCallback((e, row, question) => {

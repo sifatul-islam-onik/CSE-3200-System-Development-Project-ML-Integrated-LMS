@@ -342,53 +342,104 @@ exports.parseCTUpload = async (req, res) => {
     let q1CO = null, q2CO = null, q3CO = null;
     let dataStartRow = -1;
 
+    // Safely convert an ExcelJS cell value to plain text.
+    // Formatted cells (bold, colours, Alt+Enter) are returned by ExcelJS as
+    // { richText: [{text:'...'}, ...] } objects — .toString() gives '[object Object]'.
+    const getCellText = (val) => {
+      if (val == null) return '';
+      if (typeof val === 'object') {
+        if (Array.isArray(val.richText))
+          return val.richText.map(rt => (rt.text || '')).join('');
+        // Formula cell — use the cached result (may itself be richText/string/number)
+        if ('result' in val && val.result != null) return getCellText(val.result);
+      }
+      return val.toString();
+    };
+
     const extractTotal = (cellValue) => {
-      const str = (cellValue == null ? '' : cellValue).toString();
+      const str = getCellText(cellValue).replace(/\s+/g, '');
       const match = str.match(/\((\d+(?:\.\d+)?)\)/);
       return match ? parseFloat(match[1]) : 0;
     };
 
-    // Extract CO label from format like "Q1(5)(CO1)" or "Q1(5)(CLO1)" → "CO1"
+    // Extract CO label — handles Q1(CO3), Q1(30)(CO3), Q1(CO3)(30), Q1(CLO3)
     const extractCO = (cellValue) => {
-      const str = (cellValue == null ? '' : cellValue).toString();
-      const matches = [...str.matchAll(/\(([^)]+)\)/g)];
-      // Second parenthetical group holds the CO/CLO label
-      if (matches.length >= 2) {
-        const co = matches[1][1].trim();
-        if (!co) return null;
-        // Normalize CLO → CO so it matches coNumber keys in ctRows
-        return co.replace(/^CLO/i, 'CO');
-      }
-      return null;
+      const str = getCellText(cellValue).replace(/\s+/g, '');
+      const m = str.match(/\(((?:CO|CLO)\d+)\)/i);
+      if (!m) return null;
+      return m[1].replace(/^CLO/i, 'CO').toUpperCase();
     };
 
     // Column indices — determined dynamically from header row labels
     let q1Col = -1, q2Col = -1, q3Col = -1;
 
     // Scan rows to find Manual Wt row and the header row with "Roll"
+    // The official template has multiple consecutive Roll rows; scan all of them.
     for (let r = 1; r <= totalRows; r++) {
       const row = worksheet.getRow(r);
-      const col1 = (row.getCell(1).value == null ? '' : row.getCell(1).value).toString().trim();
+      const col1 = getCellText(row.getCell(1).value).trim();
 
       if (col1.toLowerCase() === 'manual wt') {
-        manualWt = parseFloat(row.getCell(2).value) || 0;
+        manualWt = parseFloat(getCellText(row.getCell(2).value)) || 0;
         continue;
       }
 
       if (col1.toLowerCase() === 'roll') {
         const maxC = Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20);
+        let foundQ = false;
         for (let c = 2; c <= maxC; c++) {
-          const cv = (row.getCell(c).value == null ? '' : row.getCell(c).value).toString().trim();
+          const cv = getCellText(row.getCell(c).value).trim();
           if (!cv) continue;
           if (/^q\s*1\b/i.test(cv)) {
-            q1Col = c; q1Total = extractTotal(cv); q1CO = extractCO(cv);
+            q1Col = c; q1Total = extractTotal(cv) || q1Total; q1CO = extractCO(cv) || q1CO; foundQ = true;
           } else if (/^q\s*2\b/i.test(cv)) {
-            q2Col = c; q2Total = extractTotal(cv); q2CO = extractCO(cv);
+            q2Col = c; q2Total = extractTotal(cv) || q2Total; q2CO = extractCO(cv) || q2CO; foundQ = true;
           } else if (/^q\s*3\b/i.test(cv)) {
-            q3Col = c; q3Total = extractTotal(cv); q3CO = extractCO(cv);
+            q3Col = c; q3Total = extractTotal(cv) || q3Total; q3CO = extractCO(cv) || q3CO; foundQ = true;
           }
         }
+        // Set dataStartRow to the row after the LAST Roll header row
         dataStartRow = r + 1;
+        // Keep scanning if this Roll row had no Q columns — there may be another Roll row below
+        if (foundQ) break;
+        // Otherwise don't break: continue so the next Roll row (e.g. the Q1/Q2/Q3 one) is also scanned
+        continue;
+      }
+
+      // If we've passed the Roll section (non-Roll, non-empty row after Roll rows), stop header scan
+      if (dataStartRow !== -1 && col1 && col1.toLowerCase() !== 'roll') break;
+    }
+
+    // Fallback: if CO/total not found in Q headers, scan the "CO No." allocation table at the top.
+    // The official template stores CO-to-Q mapping in a separate table, not in the Roll header.
+    if (!q1CO || !q2CO || !q3CO || (!q1Total && !q2Total && !q3Total)) {
+      for (let r = 1; r <= totalRows; r++) {
+        const row = worksheet.getRow(r);
+        const c1 = getCellText(row.getCell(1).value).trim().toLowerCase();
+        if (c1 !== 'co no.' && c1 !== 'co no') continue;
+        const maxC2 = Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20);
+        let tq1 = -1, tq2 = -1, tq3 = -1;
+        for (let c = 2; c <= maxC2; c++) {
+          const cv = getCellText(row.getCell(c).value).trim();
+          if (!cv) continue;
+          if (/^q\s*1\b/i.test(cv) && tq1 === -1) { tq1 = c; if (!q1Total) q1Total = extractTotal(cv); }
+          else if (/^q\s*2\b/i.test(cv) && tq2 === -1) { tq2 = c; if (!q2Total) q2Total = extractTotal(cv); }
+          else if (/^q\s*3\b/i.test(cv) && tq3 === -1) { tq3 = c; if (!q3Total) q3Total = extractTotal(cv); }
+        }
+        if (tq1 === -1 && tq2 === -1 && tq3 === -1) continue;
+        let q1Sum = 0, q2Sum = 0, q3Sum = 0;
+        for (let dr = r + 1; dr <= totalRows; dr++) {
+          const drow = worksheet.getRow(dr);
+          const dc1 = getCellText(drow.getCell(1).value).trim();
+          if (!dc1 || !/^(CO|CLO)\d+$/i.test(dc1)) break;
+          const coNum = dc1.replace(/^CLO/i, 'CO').toUpperCase();
+          if (tq1 !== -1) { const v = parseFloat(getCellText(drow.getCell(tq1).value)) || 0; q1Sum += v; if (v > 0 && !q1CO) q1CO = coNum; }
+          if (tq2 !== -1) { const v = parseFloat(getCellText(drow.getCell(tq2).value)) || 0; q2Sum += v; if (v > 0 && !q2CO) q2CO = coNum; }
+          if (tq3 !== -1) { const v = parseFloat(getCellText(drow.getCell(tq3).value)) || 0; q3Sum += v; if (v > 0 && !q3CO) q3CO = coNum; }
+        }
+        if (!q1Total && q1Sum > 0) q1Total = q1Sum;
+        if (!q2Total && q2Sum > 0) q2Total = q2Sum;
+        if (!q3Total && q3Sum > 0) q3Total = q3Sum;
         break;
       }
     }
@@ -402,11 +453,10 @@ exports.parseCTUpload = async (req, res) => {
     }
 
     const parseCTCellValue = (raw) => {
-      if (raw === null || raw === undefined) return null;
-      const str = raw.toString().trim();
+      const str = getCellText(raw).trim();
       if (str === '') return null;
       if (str.toLowerCase() === 'a') return 'A';
-      return parseFloat(str) || 0;
+      return parseFloat(str) ?? 0;
     };
 
     // Data rows - skip empty rows, stop only when we've hit 5 consecutive empty rows
@@ -415,13 +465,13 @@ exports.parseCTUpload = async (req, res) => {
     for (let rowNum = dataStartRow; rowNum <= totalRows; rowNum++) {
       const dataRow = worksheet.getRow(rowNum);
       const rawRoll = dataRow.getCell(1).value;
-      if (rawRoll === null || rawRoll === undefined || rawRoll === '') {
+      const rollStr = getCellText(rawRoll).trim();
+      if (!rollStr) {
         emptyStreak++;
         if (emptyStreak >= 5) break;
         continue;
       }
       emptyStreak = 0;
-      const rollStr = rawRoll.toString().trim();
       if (!rollStr || rollStr.toLowerCase() === 'roll') continue;
       rows.push({
         rollNumber: rollStr,
@@ -477,26 +527,30 @@ exports.parseLabUpload = async (req, res) => {
 
     const totalRows = worksheet.rowCount;
     let manualWt = null;
-    let attnTotal = 0, quizTotal = 0, vivaTotal = 0;
+    let attnTotal = 0, quizTotal = 0, vivaTotal = 0, otherTotal = 0;
     let q1Total = 0, q2Total = 0, q3Total = 0;
     let q1CO = null, q2CO = null, q3CO = null;
     let dataStartRow = -1;
 
+    const getCellText = (val) => {
+      if (val == null) return '';
+      if (typeof val === 'object') {
+        if (Array.isArray(val.richText))
+          return val.richText.map(rt => (rt.text || '')).join('');
+        if ('result' in val && val.result != null) return getCellText(val.result);
+      }
+      return val.toString();
+    };
     const extractTotal = (cv) => {
-      const s = (cv == null ? '' : cv).toString();
-      const m = s.match(/(\d+(?:\.\d+)?)\/\d+|(\d+(?:\.\d+)?)\)/);
+      const s = getCellText(cv).replace(/\s+/g, '');
       const m2 = s.match(/\((\d+(?:\.\d+)?)\)/);
       return m2 ? parseFloat(m2[1]) : 0;
     };
     const extractCO = (cv) => {
-      const s = (cv == null ? '' : cv).toString();
-      const matches = [...s.matchAll(/\(([^)]+)\)/g)];
-      if (matches.length >= 2) {
-        const co = matches[1][1].trim();
-        if (!co) return null;
-        return co.replace(/^CLO/i, 'CO');
-      }
-      return null;
+      const s = getCellText(cv).replace(/\s+/g, '');
+      const m = s.match(/\(((?:CO|CLO)\d+)\)/i);
+      if (!m) return null;
+      return m[1].replace(/^CLO/i, 'CO').toUpperCase();
     };
 
     // Column index map — determined dynamically from header row
@@ -505,38 +559,77 @@ exports.parseLabUpload = async (req, res) => {
 
     for (let r = 1; r <= totalRows; r++) {
       const row = worksheet.getRow(r);
-      const col1 = (row.getCell(1).value == null ? '' : row.getCell(1).value).toString().trim();
-      if (col1.toLowerCase() === 'manual wt') { manualWt = parseFloat(row.getCell(2).value) || 0; continue; }
+      const col1 = getCellText(row.getCell(1).value).trim();
+      if (col1.toLowerCase() === 'manual wt') { manualWt = parseFloat(getCellText(row.getCell(2).value)) || 0; continue; }
       if (col1.toLowerCase() === 'roll') {
         // Scan columns 2..N to find each heading dynamically
         const maxC = Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20);
         for (let c = 2; c <= maxC; c++) {
-          const cv = (row.getCell(c).value == null ? '' : row.getCell(c).value).toString().trim();
+          const cv = getCellText(row.getCell(c).value).trim();
           const cvL = cv.toLowerCase();
           if (!cvL) continue;
           if (cvL.startsWith('attn')) {
             attnCol = c;
+            const t = extractTotal(cv); if (t) attnTotal = t;
           } else if (cvL.startsWith('quiz')) {
             quizCol = c;
+            const t = extractTotal(cv); if (t) quizTotal = t;
           } else if (cvL.includes('viva')) {
             vivaCol = c;
+            const t = extractTotal(cv); if (t) vivaTotal = t;
           } else if (cvL.startsWith('other')) {
             otherCol = c;
+            const t = extractTotal(cv); if (t) otherTotal = t;
           } else if (/^q\s*1\b/i.test(cv)) {
-            q1Col = c; q1Total = extractTotal(cv); q1CO = q1Total > 0 ? extractCO(cv) : null;
+            q1Col = c; q1Total = extractTotal(cv); q1CO = extractCO(cv);
           } else if (/^q\s*2\b/i.test(cv)) {
-            q2Col = c; q2Total = extractTotal(cv); q2CO = q2Total > 0 ? extractCO(cv) : null;
+            q2Col = c; q2Total = extractTotal(cv); q2CO = extractCO(cv);
           } else if (/^q\s*3\b/i.test(cv)) {
-            q3Col = c; q3Total = extractTotal(cv); q3CO = q3Total > 0 ? extractCO(cv) : null;
+            q3Col = c; q3Total = extractTotal(cv); q3CO = extractCO(cv);
           }
         }
         dataStartRow = r + 1;
         break;
       }
     }
+    // Fallback: CO allocation table scan if Q headers had no CO/total info
+    if (!q1CO || !q2CO || !q3CO || (!q1Total && !q2Total && !q3Total)) {
+      for (let r = 1; r <= totalRows; r++) {
+        const row = worksheet.getRow(r);
+        const c1 = getCellText(row.getCell(1).value).trim().toLowerCase();
+        if (c1 !== 'co no.' && c1 !== 'co no') continue;
+        const maxC2 = Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20);
+        let tq1 = -1, tq2 = -1, tq3 = -1;
+        for (let c = 2; c <= maxC2; c++) {
+          const cv = getCellText(row.getCell(c).value).trim();
+          if (!cv) continue;
+          if (/^q\s*1\b/i.test(cv) && tq1 === -1) { tq1 = c; if (!q1Total) q1Total = extractTotal(cv); }
+          else if (/^q\s*2\b/i.test(cv) && tq2 === -1) { tq2 = c; if (!q2Total) q2Total = extractTotal(cv); }
+          else if (/^q\s*3\b/i.test(cv) && tq3 === -1) { tq3 = c; if (!q3Total) q3Total = extractTotal(cv); }
+        }
+        if (tq1 === -1 && tq2 === -1 && tq3 === -1) continue;
+        let q1Sum = 0, q2Sum = 0, q3Sum = 0;
+        for (let dr = r + 1; dr <= totalRows; dr++) {
+          const drow = worksheet.getRow(dr);
+          const dc1 = getCellText(drow.getCell(1).value).trim();
+          if (!dc1 || !/^(CO|CLO)\d+$/i.test(dc1)) break;
+          const coNum = dc1.replace(/^CLO/i, 'CO').toUpperCase();
+          if (tq1 !== -1) { const v = parseFloat(getCellText(drow.getCell(tq1).value)) || 0; q1Sum += v; if (v > 0 && !q1CO) q1CO = coNum; }
+          if (tq2 !== -1) { const v = parseFloat(getCellText(drow.getCell(tq2).value)) || 0; q2Sum += v; if (v > 0 && !q2CO) q2CO = coNum; }
+          if (tq3 !== -1) { const v = parseFloat(getCellText(drow.getCell(tq3).value)) || 0; q3Sum += v; if (v > 0 && !q3CO) q3CO = coNum; }
+        }
+        if (!q1Total && q1Sum > 0) q1Total = q1Sum;
+        if (!q2Total && q2Sum > 0) q2Total = q2Sum;
+        if (!q3Total && q3Sum > 0) q3Total = q3Sum;
+        break;
+      }
+    }
     if (dataStartRow === -1) {
-      // No Roll header — Manual Wt only upload is valid
-      return res.json({ success: true, data: { manualWt, attnTotal, quizTotal, vivaTotal, q1Total, q2Total, q3Total, q1CO, q2CO, q3CO, hasAttn: false, hasQuiz: false, hasViva: false, hasOther: false, hasQ1: false, hasQ2: false, hasQ3: false, rows: [] } });
+      // No Roll header found — log for diagnostics then return empty rows
+      console.log('[parseLabUpload] No "Roll" header row found. totalRows=%d. First 5 col-1 values:', totalRows,
+        Array.from({ length: Math.min(5, totalRows) }, (_, i) => getCellText(worksheet.getRow(i + 1).getCell(1).value).trim())
+      );
+      return res.json({ success: true, data: { manualWt, attnTotal, quizTotal, vivaTotal, otherTotal, q1Total, q2Total, q3Total, q1CO, q2CO, q3CO, hasAttn: false, hasQuiz: false, hasViva: false, hasOther: false, hasQ1: false, hasQ2: false, hasQ3: false, rows: [] } });
     }
     const hasAttn = attnCol !== -1;
     const hasQuiz = quizCol !== -1;
@@ -544,24 +637,23 @@ exports.parseLabUpload = async (req, res) => {
     const hasOther = otherCol !== -1;
 
     const parseVal = (raw) => {
-      if (raw === null || raw === undefined) return null;
-      const s = raw.toString().trim();
+      const s = getCellText(raw).trim();
       if (s === '') return null;
       if (s.toLowerCase() === 'a') return 'A';
-      return parseFloat(s) || 0;
+      return parseFloat(s) ?? 0;
     };
     const rows = [];
     let emptyStreak = 0;
     for (let rn = dataStartRow; rn <= totalRows; rn++) {
       const dr = worksheet.getRow(rn);
       const rawRoll = dr.getCell(1).value;
-      if (rawRoll === null || rawRoll === undefined || rawRoll === '') {
+      const rollStr = getCellText(rawRoll).trim();
+      if (!rollStr) {
         if (++emptyStreak >= 5) break;
         continue;
       }
       emptyStreak = 0;
-      const rollStr = rawRoll.toString().trim();
-      if (!rollStr || rollStr.toLowerCase() === 'roll') continue;
+      if (rollStr.toLowerCase() === 'roll') continue;
       rows.push({
         rollNumber: rollStr,
         attn: hasAttn ? parseVal(dr.getCell(attnCol).value) : null,
@@ -573,7 +665,8 @@ exports.parseLabUpload = async (req, res) => {
         other: hasOther ? parseVal(dr.getCell(otherCol).value) : null,
       });
     }
-    return res.json({ success: true, data: { manualWt, attnTotal, quizTotal, vivaTotal, q1Total, q2Total, q3Total, q1CO, q2CO, q3CO, hasAttn, hasQuiz, hasViva, hasOther, hasQ1: q1Col !== -1, hasQ2: q2Col !== -1, hasQ3: q3Col !== -1, rows } });
+    console.log('[parseLabUpload] Parsed OK — rows=%d attnTotal=%s quizTotal=%s q1Total=%s q1CO=%s q2Total=%s q2CO=%s otherTotal=%s', rows.length, attnTotal, quizTotal, q1Total, q1CO, q2Total, q2CO, otherTotal);
+    return res.json({ success: true, data: { manualWt, attnTotal, quizTotal, vivaTotal, otherTotal, q1Total, q2Total, q3Total, q1CO, q2CO, q3CO, hasAttn, hasQuiz, hasViva, hasOther, hasQ1: q1Col !== -1, hasQ2: q2Col !== -1, hasQ3: q3Col !== -1, rows } });
   } catch (error) {
     console.error('Error parsing lab upload:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -620,44 +713,81 @@ exports.parseAssignUpload = async (req, res) => {
     let q1CO = null, q2CO = null, q3CO = null;
     let dataStartRow = -1;
 
+    const getCellText = (val) => {
+      if (val == null) return '';
+      if (typeof val === 'object') {
+        if (Array.isArray(val.richText))
+          return val.richText.map(rt => (rt.text || '')).join('');
+        if ('result' in val && val.result != null) return getCellText(val.result);
+      }
+      return val.toString();
+    };
     const extractTotal = (cv) => {
-      const s = (cv == null ? '' : cv).toString();
+      const s = getCellText(cv).replace(/\s+/g, '');
       const m2 = s.match(/\((\d+(?:\.\d+)?)\)/);
       return m2 ? parseFloat(m2[1]) : 0;
     };
     const extractCO = (cv) => {
-      const s = (cv == null ? '' : cv).toString();
-      const matches = [...s.matchAll(/\(([^)]+)\)/g)];
-      if (matches.length >= 2) {
-        const co = matches[1][1].trim();
-        if (!co) return null;
-        return co.replace(/^CLO/i, 'CO');
-      }
-      return null;
+      const s = getCellText(cv).replace(/\s+/g, '');
+      const m = s.match(/\(((?:CO|CLO)\d+)\)/i);
+      if (!m) return null;
+      return m[1].replace(/^CLO/i, 'CO').toUpperCase();
     };
 
     let attnPerfCol = -1, q1Col = -1, q2Col = -1, q3Col = -1;
     for (let r = 1; r <= totalRows; r++) {
       const row = worksheet.getRow(r);
-      const col1 = (row.getCell(1).value == null ? '' : row.getCell(1).value).toString().trim();
-      if (col1.toLowerCase() === 'manual wt') { manualWt = parseFloat(row.getCell(2).value) || 0; continue; }
+      const col1 = getCellText(row.getCell(1).value).trim();
+      if (col1.toLowerCase() === 'manual wt') { manualWt = parseFloat(getCellText(row.getCell(2).value)) || 0; continue; }
       if (col1.toLowerCase() === 'roll') {
         const maxC = Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20);
         for (let c = 2; c <= maxC; c++) {
-          const cv = (row.getCell(c).value == null ? '' : row.getCell(c).value).toString().trim();
+          const cv = getCellText(row.getCell(c).value).trim();
           const cvL = cv.toLowerCase();
           if (!cvL) continue;
           if (cvL.startsWith('attn')) {
             attnPerfCol = c;
           } else if (/^q\s*1\b/i.test(cv)) {
-            q1Col = c; q1Total = extractTotal(cv); q1CO = q1Total > 0 ? extractCO(cv) : null;
+            q1Col = c; q1Total = extractTotal(cv); q1CO = extractCO(cv);
           } else if (/^q\s*2\b/i.test(cv)) {
-            q2Col = c; q2Total = extractTotal(cv); q2CO = q2Total > 0 ? extractCO(cv) : null;
+            q2Col = c; q2Total = extractTotal(cv); q2CO = extractCO(cv);
           } else if (/^q\s*3\b/i.test(cv)) {
-            q3Col = c; q3Total = extractTotal(cv); q3CO = q3Total > 0 ? extractCO(cv) : null;
+            q3Col = c; q3Total = extractTotal(cv); q3CO = extractCO(cv);
           }
         }
         dataStartRow = r + 1;
+        break;
+      }
+    }
+    // Fallback: CO allocation table scan if Q headers had no CO/total info
+    if (!q1CO || !q2CO || !q3CO || (!q1Total && !q2Total && !q3Total)) {
+      for (let r = 1; r <= totalRows; r++) {
+        const row = worksheet.getRow(r);
+        const c1 = getCellText(row.getCell(1).value).trim().toLowerCase();
+        if (c1 !== 'co no.' && c1 !== 'co no') continue;
+        const maxC2 = Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20);
+        let tq1 = -1, tq2 = -1, tq3 = -1;
+        for (let c = 2; c <= maxC2; c++) {
+          const cv = getCellText(row.getCell(c).value).trim();
+          if (!cv) continue;
+          if (/^q\s*1\b/i.test(cv) && tq1 === -1) { tq1 = c; if (!q1Total) q1Total = extractTotal(cv); }
+          else if (/^q\s*2\b/i.test(cv) && tq2 === -1) { tq2 = c; if (!q2Total) q2Total = extractTotal(cv); }
+          else if (/^q\s*3\b/i.test(cv) && tq3 === -1) { tq3 = c; if (!q3Total) q3Total = extractTotal(cv); }
+        }
+        if (tq1 === -1 && tq2 === -1 && tq3 === -1) continue;
+        let q1Sum = 0, q2Sum = 0, q3Sum = 0;
+        for (let dr = r + 1; dr <= totalRows; dr++) {
+          const drow = worksheet.getRow(dr);
+          const dc1 = getCellText(drow.getCell(1).value).trim();
+          if (!dc1 || !/^(CO|CLO)\d+$/i.test(dc1)) break;
+          const coNum = dc1.replace(/^CLO/i, 'CO').toUpperCase();
+          if (tq1 !== -1) { const v = parseFloat(getCellText(drow.getCell(tq1).value)) || 0; q1Sum += v; if (v > 0 && !q1CO) q1CO = coNum; }
+          if (tq2 !== -1) { const v = parseFloat(getCellText(drow.getCell(tq2).value)) || 0; q2Sum += v; if (v > 0 && !q2CO) q2CO = coNum; }
+          if (tq3 !== -1) { const v = parseFloat(getCellText(drow.getCell(tq3).value)) || 0; q3Sum += v; if (v > 0 && !q3CO) q3CO = coNum; }
+        }
+        if (!q1Total && q1Sum > 0) q1Total = q1Sum;
+        if (!q2Total && q2Sum > 0) q2Total = q2Sum;
+        if (!q3Total && q3Sum > 0) q3Total = q3Sum;
         break;
       }
     }
@@ -667,24 +797,23 @@ exports.parseAssignUpload = async (req, res) => {
     }
     const hasAttnPerf = attnPerfCol !== -1;
     const parseVal = (raw) => {
-      if (raw === null || raw === undefined) return null;
-      const s = raw.toString().trim();
+      const s = getCellText(raw).trim();
       if (s === '') return null;
       if (s.toLowerCase() === 'a') return 'A';
-      return parseFloat(s) || 0;
+      return parseFloat(s) ?? 0;
     };
     const rows = [];
     let emptyStreak = 0;
     for (let rn = dataStartRow; rn <= totalRows; rn++) {
       const dr = worksheet.getRow(rn);
       const rawRoll = dr.getCell(1).value;
-      if (rawRoll === null || rawRoll === undefined || rawRoll === '') {
+      const rollStr = getCellText(rawRoll).trim();
+      if (!rollStr) {
         if (++emptyStreak >= 5) break;
         continue;
       }
       emptyStreak = 0;
-      const rollStr = rawRoll.toString().trim();
-      if (!rollStr || rollStr.toLowerCase() === 'roll') continue;
+      if (rollStr.toLowerCase() === 'roll') continue;
       rows.push({
         rollNumber: rollStr,
         attnPerf: hasAttnPerf ? parseVal(dr.getCell(attnPerfCol).value) : null,
@@ -850,8 +979,40 @@ exports.saveAssignmentData = async (req, res) => {
       }
     }
 
+    // Filter attnAssignObtainedRows to only include enrolled batch students
+    const User = require('../models/User');
+    const assignedBatches = course.assignedBatches || [];
+    let validRollSet = null; // null means "no batch configured — allow all"
+    if (assignedBatches.length > 0) {
+      const allStudents = await User.find({
+        role: 'student',
+        isActive: true,
+        isEmailVerified: true,
+        isApprovedByAdmin: true,
+      }).select('roll email').lean();
+      const enrolledRolls = allStudents
+        .map(s => {
+          let roll = s.roll;
+          if (!roll && s.email) {
+            const m = s.email.match(/^(\d+)/);
+            if (m) roll = m[1];
+          }
+          return roll;
+        })
+        .filter(roll => {
+          if (!roll || roll.length < 4) return false;
+          const batch = roll.substring(0, 2);
+          const deptCode = roll.substring(2, 4);
+          return assignedBatches.some(a => a.batch === batch && a.deptCode === deptCode);
+        });
+      validRollSet = new Set(enrolledRolls.map(r => String(r).trim()));
+    }
+
     // Update or create Assignment attainment data
-    const cleanedObtainedRows = (attnAssignObtainedRows || []).map(({ _id, __v, ...rest }) => rest);
+    const rawObtainedRows = (attnAssignObtainedRows || []).map(({ _id, __v, ...rest }) => rest);
+    const cleanedObtainedRows = validRollSet
+      ? rawObtainedRows.filter(r => r.rollNumber && validRollSet.has(String(r.rollNumber).trim()))
+      : rawObtainedRows;
     const assignmentData = await AssignmentAttainment.findOneAndUpdate(
       { course: courseId },
       {
@@ -1379,6 +1540,43 @@ exports.getSectionAData = async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+};
+
+/**
+ * Reset all attainment data (CT, Assignment, Lab Activity) for a course.
+ * DELETE /api/attainment/reset/:courseId
+ */
+exports.resetAttainmentData = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+
+    const course = await Course.findById(courseId).select('assignedTeachers').lean();
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    // Teachers may only reset their own courses
+    if (req.user.role === 'teacher') {
+      const isAssigned = course.assignedTeachers.some(a => {
+        const tid = a.teacher?._id || a.teacher;
+        return tid.toString() === req.user._id.toString();
+      });
+      if (!isAssigned) {
+        return res.status(403).json({ success: false, message: 'Access denied.' });
+      }
+    }
+
+    await Promise.all([
+      CTAttainment.deleteOne({ course: courseId }),
+      AssignmentAttainment.deleteOne({ course: courseId }),
+      LabActivityAttainment.deleteOne({ course: courseId }),
+    ]);
+
+    res.json({ success: true, message: 'Attainment data reset successfully' });
+  } catch (error) {
+    console.error('Error resetting attainment data:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 

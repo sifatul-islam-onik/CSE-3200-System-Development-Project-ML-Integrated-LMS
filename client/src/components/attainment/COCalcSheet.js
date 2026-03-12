@@ -224,7 +224,7 @@ const TheoryCOPOTable = ({ clos, coCalcData, attnAssignObtainedRows, attendanceM
 );
 
 // ─── Table 3a: CT and Assignment Marks (COCalc version, no Attn) ─────────────
-const CTAssignmentTableV1 = ({ clos, coCalcData, ctRows, assignmentRows, getActiveCTFields, getActiveAssignmentFields, calculateAutoFactor, calculateAutoAssignmentFactor, getStudentCTFactoredMarks, getStudentAssignmentFactoredMarks, formatNumber }) => (
+const CTAssignmentTableV1 = ({ clos, coCalcData, ctRows, assignmentRows, getActiveCTFields, getActiveAssignmentFields, calculateAutoFactor, calculateAutoAssignmentFactor, getStudentCTFactoredMarks, getStudentAssignmentFactoredMarks, getStudentAssignmentOriginalMarks, calculateAssignmentCOTotalsNoAttendance, calculateFactoredAssignmentCOTotals, formatNumber }) => (
   <section className="ct-assignment-section" style={{ marginTop: '30px' }}>
     <h2>CT and Assignment Marks</h2>
     {clos.length === 0 && <p style={{ padding: '20px', color: '#7f8c8d' }}>No student data available.</p>}
@@ -261,14 +261,7 @@ const CTAssignmentTableV1 = ({ clos, coCalcData, ctRows, assignmentRows, getActi
               })}
               {clos.map((clo, coIdx) => {
                 const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-                const assignRow = assignmentRows.find(r => r.coNumber === cn);
-                const coTotal = assignRow
-                  ? getActiveAssignmentFields().reduce((sum, field) => {
-                      const assignmentKey = field.replace(/(_Q[123])$/, '');
-                      const factor = calculateAutoAssignmentFactor()[assignmentKey] || 0;
-                      return sum + (factor * (assignRow[field] || 0));
-                    }, 0)
-                  : 0;
+                const coTotal = calculateFactoredAssignmentCOTotals()[cn] || 0;
                 return <th key={`asgn-msrd-${coIdx}`} style={{ fontSize: '13px', fontWeight: '600' }}>{formatNumber(coTotal)}</th>;
               })}
             </tr>
@@ -295,7 +288,7 @@ const CTAssignmentTableV1 = ({ clos, coCalcData, ctRows, assignmentRows, getActi
 );
 
 // ─── Table 3b: CT/Assignment/Attn Marks (COCalc_LabUnnorm version, with Attn) ─
-const CTAssignmentTableV2 = ({ clos, coCalcData, attnAssignObtainedRows, calculateFactoredCOTotals, calculateFactoredAssignmentCOTotals, getStudentCTFactoredMarks, getStudentAssignmentFactoredMarks, formatNumber }) => (
+const CTAssignmentTableV2 = ({ clos, coCalcData, attnAssignObtainedRows, calculateFactoredCOTotals, calculateFactoredAssignmentCOTotals, getStudentCTFactoredMarks, getStudentAssignmentFactoredMarks, getStudentAssignmentOriginalMarks, formatNumber }) => (
   <section className="ct-assignment-section" style={{ marginTop: '30px' }}>
     <h2>CT and Assignment Marks</h2>
     {clos.length === 0 && <SheetLoader label="Loading course outcomes…" />}
@@ -586,8 +579,10 @@ const COCalcSheet = ({
   coMappedActivityMarks,
   calculateFactoredCOTotals,
   calculateFactoredAssignmentCOTotals,
+  calculateAssignmentCOTotalsNoAttendance,
   getStudentCTFactoredMarks,
   getStudentAssignmentFactoredMarks,
+  getStudentAssignmentOriginalMarks,
   getLabActivityStudentCOMappedMarks,
   getLabActivityStudentCOMarks,
   computeLabActivityCOTotal,
@@ -835,6 +830,9 @@ const COCalcSheet = ({
               calculateAutoFactor={calculateAutoFactor} calculateAutoAssignmentFactor={calculateAutoAssignmentFactor}
               getStudentCTFactoredMarks={getStudentCTFactoredMarks}
               getStudentAssignmentFactoredMarks={getStudentAssignmentFactoredMarks}
+              getStudentAssignmentOriginalMarks={getStudentAssignmentOriginalMarks}
+              calculateAssignmentCOTotalsNoAttendance={calculateAssignmentCOTotalsNoAttendance}
+              calculateFactoredAssignmentCOTotals={calculateFactoredAssignmentCOTotals}
               formatNumber={formatNumber}
             />
           </>
@@ -874,6 +872,8 @@ const COCalcSheet = ({
               calculateFactoredAssignmentCOTotals={calculateFactoredAssignmentCOTotals}
               getStudentCTFactoredMarks={getStudentCTFactoredMarks}
               getStudentAssignmentFactoredMarks={getStudentAssignmentFactoredMarks}
+              getStudentAssignmentOriginalMarks={getStudentAssignmentOriginalMarks}
+              calculateAssignmentCOTotalsNoAttendance={calculateAssignmentCOTotalsNoAttendance}
               formatNumber={formatNumber}
             />
           </>

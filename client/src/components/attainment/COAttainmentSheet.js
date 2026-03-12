@@ -238,7 +238,7 @@ const AttainmentTable = ({ clos, coAttainmentData, formatNumber, keyPrefix, titl
   </section>
 );
 
-const COAttainmentSheet = ({ selectedCourse, clos, ownClos, isStandaloneCourse, coAttainmentData, theoryCoAttainmentData, labCoAttainmentData, combinedCoAttainmentData, unnormedCoAttainmentData, equalWtCoAttainmentData, formatNumber }) => {
+const COAttainmentSheet = ({ selectedCourse, clos, ownClos, isStandaloneCourse, coAttainmentData, theoryCoAttainmentData, labCoAttainmentData, combinedCoAttainmentData, unnormedCoAttainmentData, equalWtCoAttainmentData, formatNumber, onResetData }) => {
   const courseCode = selectedCourse?.courseCode || '';
   const lastDigit = parseInt(courseCode.replace(/\s/g, '').slice(-1));
   const isTheoryCourse = !isNaN(lastDigit) && lastDigit % 2 === 1;
@@ -329,7 +329,16 @@ const COAttainmentSheet = ({ selectedCourse, clos, ownClos, isStandaloneCourse, 
   if (isStandaloneCourse) {
     return (
       <>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '10px' }}>
+          {onResetData && (
+            <button
+              onClick={onResetData}
+              style={{ padding: '8px 18px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
+              title="Reset all CT, Assignment and Lab Activity attainment data for this course"
+            >
+              ↺ Reset Data
+            </button>
+          )}
           <button
             onClick={handleExportToExcel}
             style={{ padding: '8px 18px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
@@ -364,7 +373,16 @@ const COAttainmentSheet = ({ selectedCourse, clos, ownClos, isStandaloneCourse, 
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '10px' }}>
+        {onResetData && (
+          <button
+            onClick={onResetData}
+            style={{ padding: '8px 18px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
+            title="Reset all CT, Assignment and Lab Activity attainment data for this course"
+          >
+            ↺ Reset Data
+          </button>
+        )}
         <button
           onClick={handleExportToExcel}
           style={{ padding: '8px 18px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
