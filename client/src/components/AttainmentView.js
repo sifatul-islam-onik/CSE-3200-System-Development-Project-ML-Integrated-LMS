@@ -1723,7 +1723,32 @@ const AttainmentView = ({ labDataRefreshKey = 0 }) => {
             if (savedEq) setCtEqWts(savedEq);
             if (savedSummary) setCtSummary(savedSummary);
             if (savedObtained && savedObtained.length > 0) {
-              setCtObtainedRows(savedObtained.filter(r => r.rollNumber && r.rollNumber.toLowerCase() !== 'roll'));
+              const cleaned = savedObtained.filter(r => r.rollNumber && r.rollNumber.toLowerCase() !== 'roll');
+              try {
+                const stuResp = await fetchCourseStudentsCached(selectedCourse._id);
+                if (stuResp.success && Array.isArray(stuResp.data) && stuResp.data.length > 0) {
+                  const enrolled = stuResp.data
+                    .map(s => ({ rollNumber: String(s.roll || s.rollNumber || '').trim(), name: s.name || '' }))
+                    .filter(s => s.rollNumber && /^[0-9]{4,}$/.test(s.rollNumber));
+                  if (enrolled.length > 0) {
+                    const savedMap = {};
+                    cleaned.forEach(r => { savedMap[String(r.rollNumber).trim()] = r; });
+                    const merged = enrolled.map(s => savedMap[s.rollNumber] || {
+                      rollNumber: s.rollNumber, name: s.name,
+                      CT1_Q1: 0, CT1_Q2: 0, CT1_Q3: 0,
+                      CT2_Q1: 0, CT2_Q2: 0, CT2_Q3: 0,
+                      CT3_Q1: 0, CT3_Q2: 0, CT3_Q3: 0,
+                    });
+                    setCtObtainedRows(merged);
+                  } else {
+                    setCtObtainedRows(cleaned);
+                  }
+                } else {
+                  setCtObtainedRows(cleaned);
+                }
+              } catch (e) {
+                setCtObtainedRows(cleaned);
+              }
             } else {
               // No saved obtained rows - allow initialization and trigger it
               ctDataLoadedRef.current = false;
@@ -1999,14 +2024,43 @@ const AttainmentView = ({ labDataRefreshKey = 0 }) => {
             if (savedCoMapped !== undefined) setCoMappedActivityMarks(savedCoMapped);
             if (savedUseEqWt !== undefined) setUseEqWtActivity(savedUseEqWt);
             if (savedObtained && savedObtained.length > 0) {
-              setLabActivityObtainedRows(savedObtained);
+              const cleaned = savedObtained.filter(r => r.rollNumber && r.rollNumber.toLowerCase() !== 'roll');
+              try {
+                const stuResp = await fetchCourseStudentsCached(selectedCourse._id);
+                if (stuResp.success && Array.isArray(stuResp.data) && stuResp.data.length > 0) {
+                  const enrolled = stuResp.data
+                    .map(s => ({ rollNumber: String(s.roll || s.rollNumber || '').trim(), name: s.name || '' }))
+                    .filter(s => s.rollNumber && /^[0-9]{4,}$/.test(s.rollNumber));
+                  if (enrolled.length > 0) {
+                    const savedMap = {};
+                    cleaned.forEach(r => { savedMap[String(r.rollNumber).trim()] = r; });
+                    const merged = enrolled.map(s => savedMap[s.rollNumber] || {
+                      rollNumber: s.rollNumber, name: s.name,
+                      attn: 0, quiz: 0, viva: 0,
+                      Activity1_Q1: 0, Activity1_Q2: 0, Activity1_Q3: 0,
+                      Activity2_Q1: 0, Activity2_Q2: 0, Activity2_Q3: 0,
+                      Activity3_Q1: 0, Activity3_Q2: 0, Activity3_Q3: 0,
+                      Activity4_Q1: 0, Activity4_Q2: 0, Activity4_Q3: 0,
+                      Activity5_Q1: 0, Activity5_Q2: 0, Activity5_Q3: 0,
+                      otherMeasured: 0, other: 0,
+                    });
+                    setLabActivityObtainedRows(merged);
+                  } else {
+                    setLabActivityObtainedRows(cleaned);
+                  }
+                } else {
+                  setLabActivityObtainedRows(cleaned);
+                }
+              } catch (e) {
+                setLabActivityObtainedRows(cleaned);
+              }
             } else {
               // No saved obtained rows — seed from enrolled students directly.
               // Do NOT reset labActivityDataLoadedRef here; keeping it true protects
               // the marks (labAttendanceMarks etc.) from being zeroed by the
               // [selectedSheet, clos] init effect when CLOs load asynchronously.
               try {
-                const stuResp = await fetchCourseStudentsCached(courseIdToUse);
+                const stuResp = await fetchCourseStudentsCached(selectedCourse._id);
                 if (stuResp.success && Array.isArray(stuResp.data) && stuResp.data.length > 0) {
                   const enrolled = stuResp.data
                     .map(s => ({ rollNumber: String(s.roll || s.rollNumber || '').trim(), name: s.name || '' }))
