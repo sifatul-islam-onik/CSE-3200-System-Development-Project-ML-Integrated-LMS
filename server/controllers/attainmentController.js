@@ -5,6 +5,7 @@ const {
   getSheetNames
 } = require('../utils/attainmentExcelUtil');
 const Course = require('../models/Course');
+const User = require('../models/User');
 const CTAttainment = require('../models/CTAttainment');
 const AssignmentAttainment = require('../models/AssignmentAttainment');
 const LabActivityAttainment = require('../models/LabActivityAttainment');
@@ -239,7 +240,7 @@ exports.getCTData = async (req, res) => {
 
     // Parallel course check and CT data fetch for better performance
     const [course, ctData] = await Promise.all([
-      Course.findById(courseId).select('assignedTeachers').lean(),
+      Course.findById(courseId).select('assignedTeachers assignedBatches').lean(),
       CTAttainment.findOne({ course: courseId }).lean()
     ]);
 
@@ -265,17 +266,96 @@ exports.getCTData = async (req, res) => {
       }
     }
 
-    if (!ctData) {
+    // Identify enrolled students based on assigned batches
+    const assignedBatches = course.assignedBatches || [];
+    let enrolledStudents = [];
+
+    if (assignedBatches.length > 0) {
+      // Find all potential students
+      const students = await User.find({
+        role: 'student',
+        isActive: true,
+        isEmailVerified: true,
+        isApprovedByAdmin: true
+      }).select('name roll email department').lean();
+
+      // Filter based on batch/dept match
+      enrolledStudents = students.filter(student => {
+        let roll = student.roll;
+        if (!roll && student.email) {
+          const match = student.email.match(/^(\d+)/);
+          if (match) roll = match[1];
+        }
+        if (!roll || roll.length < 4) return false;
+
+        const batch = roll.substring(0, 2);
+        const deptCode = roll.substring(2, 4);
+
+        return assignedBatches.some(assignment => 
+          assignment.batch === batch && assignment.deptCode === deptCode
+        );
+      }).map(s => {
+          let roll = s.roll;
+          if (!roll && s.email) {
+            const match = s.email.match(/^(\d+)/);
+            if (match) roll = match[1];
+          }
+          return { rollNumber: roll, name: s.name };
+      }).sort((a, b) => (a.rollNumber || '').localeCompare(b.rollNumber || '', undefined, { numeric: true }));
+    }
+
+    let responseData = ctData;
+
+    if (!responseData) {
+      // If no CT data found, initialize with enrolled students
+      responseData = {
+        course: courseId,
+        ctRows: [],
+        ctFactors: { CT1: 1, CT2: 1, CT3: 1 },
+        ctManualWts: {},
+        ctEqWts: { CT1: 0, CT2: 0, CT3: 0 },
+        ctSummary: { ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 },
+        ctObtainedRows: enrolledStudents.map(s => ({
+          rollNumber: s.rollNumber,
+          name: s.name,
+          CT1_Q1: 0, CT1_Q2: 0, CT1_Q3: 0,
+          CT2_Q1: 0, CT2_Q2: 0, CT2_Q3: 0,
+          CT3_Q1: 0, CT3_Q2: 0, CT3_Q3: 0
+        }))
+      };
+      
       return res.json({
         success: true,
-        message: 'No CT data found',
-        data: null
+        message: 'No CT data found, initialized from enrollment',
+        data: responseData
       });
+    }
+
+    // Merge enrolled students into existing data if missing
+    if (enrolledStudents.length > 0) {
+      const existingRolls = new Set((responseData.ctObtainedRows || []).map(r => String(r.rollNumber || '').trim()));
+      const missingStudents = enrolledStudents.filter(s => !existingRolls.has(String(s.rollNumber).trim()));
+
+      if (missingStudents.length > 0) {
+        const newRows = missingStudents.map(s => ({
+          rollNumber: s.rollNumber,
+          name: s.name,
+          CT1_Q1: 0, CT1_Q2: 0, CT1_Q3: 0,
+          CT2_Q1: 0, CT2_Q2: 0, CT2_Q3: 0,
+          CT3_Q1: 0, CT3_Q2: 0, CT3_Q3: 0
+        }));
+
+        responseData.ctObtainedRows = [...(responseData.ctObtainedRows || []), ...newRows];
+        // Sort by roll number
+        responseData.ctObtainedRows.sort((a, b) => 
+           (String(a.rollNumber) || '').localeCompare(String(b.rollNumber) || '', undefined, { numeric: true })
+        );
+      }
     }
 
     res.json({
       success: true,
-      data: ctData
+      data: responseData
     });
   } catch (error) {
     console.error('Error getting CT data:', error);
@@ -1053,7 +1133,7 @@ exports.getAssignmentData = async (req, res) => {
 
     // Parallel course check and assignment data fetch for better performance
     const [course, assignmentData] = await Promise.all([
-      Course.findById(courseId).select('assignedTeachers').lean(),
+      Course.findById(courseId).select('assignedTeachers assignedBatches').lean(),
       AssignmentAttainment.findOne({ course: courseId }).lean()
     ]);
 
@@ -1079,17 +1159,97 @@ exports.getAssignmentData = async (req, res) => {
       }
     }
 
-    // Return data if found, otherwise return empty structure
-    if (!assignmentData) {
+    // Identify enrolled students based on assigned batches
+    const assignedBatches = course.assignedBatches || [];
+    let enrolledStudents = [];
+
+    if (assignedBatches.length > 0) {
+      // Find all potential students
+      const students = await User.find({
+        role: 'student',
+        isActive: true,
+        isEmailVerified: true,
+        isApprovedByAdmin: true
+      }).select('name roll email department').lean();
+
+      // Filter based on batch/dept match
+      enrolledStudents = students.filter(student => {
+        let roll = student.roll;
+        if (!roll && student.email) {
+          const match = student.email.match(/^(\d+)/);
+          if (match) roll = match[1];
+        }
+        if (!roll || roll.length < 4) return false;
+
+        const batch = roll.substring(0, 2);
+        const deptCode = roll.substring(2, 4);
+
+        return assignedBatches.some(assignment => 
+          assignment.batch === batch && assignment.deptCode === deptCode
+        );
+      }).map(s => {
+          let roll = s.roll;
+          if (!roll && s.email) {
+            const match = s.email.match(/^(\d+)/);
+            if (match) roll = match[1];
+          }
+          return { rollNumber: roll, name: s.name };
+      }).sort((a, b) => (a.rollNumber || '').localeCompare(b.rollNumber || '', undefined, { numeric: true }));
+    }
+
+    let responseData = assignmentData;
+
+    // Return data if found, otherwise initialized empty structure
+    if (!responseData) {
+      responseData = {
+        course: courseId,
+        assignmentRows: [],
+        assignmentManualWts: {},
+        assignmentSummary: { assignTaken: 0, assignmentMarks30: 0, useEqWt: 0, attendancePerformance: 0 },
+        attendanceMarks: 0,
+        attnAssignObtainedRows: enrolledStudents.map(s => ({
+          rollNumber: s.rollNumber,
+          name: s.name,
+          attendance: 0,
+          Assgn1_Q1: 0, Assgn1_Q2: 0, Assgn1_Q3: 0,
+          Assgn2_Q1: 0, Assgn2_Q2: 0, Assgn2_Q3: 0,
+          Assgn3_Q1: 0, Assgn3_Q2: 0, Assgn3_Q3: 0
+        }))
+      };
+      
       return res.json({
         success: true,
-        data: null
+        message: 'No assignment data found, initialized from enrollment',
+        data: responseData
       });
+    }
+
+    // Merge enrolled students into existing data if missing
+    if (enrolledStudents.length > 0) {
+      const existingRolls = new Set((responseData.attnAssignObtainedRows || []).map(r => String(r.rollNumber || '').trim()));
+      const missingStudents = enrolledStudents.filter(s => !existingRolls.has(String(s.rollNumber).trim()));
+
+      if (missingStudents.length > 0) {
+        const newRows = missingStudents.map(s => ({
+          rollNumber: s.rollNumber,
+          name: s.name,
+          attendance: 0,
+          Assgn1_Q1: 0, Assgn1_Q2: 0, Assgn1_Q3: 0,
+          Assgn2_Q1: 0, Assgn2_Q2: 0, Assgn2_Q3: 0,
+          Assgn3_Q1: 0, Assgn3_Q2: 0, Assgn3_Q3: 0
+        }));
+
+        responseData.attnAssignObtainedRows = [...(responseData.attnAssignObtainedRows || []), ...newRows];
+        // Sort by roll number
+        responseData.attnAssignObtainedRows.sort((a, b) => 
+           (String(a.rollNumber) || '').localeCompare(String(b.rollNumber) || '', undefined, { numeric: true })
+        );
+      }
     }
 
     res.json({
       success: true,
-      data: assignmentData
+      data: responseData
     });
   } catch (error) {
     console.error('Error getting assignment data:', error);
@@ -1197,7 +1357,7 @@ exports.getLabActivityData = async (req, res) => {
 
     // Parallel course check and lab activity data fetch for better performance
     const [course, labActivityData] = await Promise.all([
-      Course.findById(courseId).select('assignedTeachers').lean(),
+      Course.findById(courseId).select('assignedTeachers assignedBatches').lean(),
       LabActivityAttainment.findOne({ course: courseId }).lean()
     ]);
 
@@ -1223,17 +1383,105 @@ exports.getLabActivityData = async (req, res) => {
       }
     }
 
-    // Return data if found, otherwise return empty structure
-    if (!labActivityData) {
+    // Identify enrolled students based on assigned batches
+    const assignedBatches = course.assignedBatches || [];
+    let enrolledStudents = [];
+
+    if (assignedBatches.length > 0) {
+      // Find all potential students
+      const students = await User.find({
+        role: 'student',
+        isActive: true,
+        isEmailVerified: true,
+        isApprovedByAdmin: true
+      }).select('name roll email department').lean();
+
+      // Filter based on batch/dept match
+      enrolledStudents = students.filter(student => {
+        let roll = student.roll;
+        if (!roll && student.email) {
+          const match = student.email.match(/^(\d+)/);
+          if (match) roll = match[1];
+        }
+        if (!roll || roll.length < 4) return false;
+
+        const batch = roll.substring(0, 2);
+        const deptCode = roll.substring(2, 4);
+
+        return assignedBatches.some(assignment => 
+          assignment.batch === batch && assignment.deptCode === deptCode
+        );
+      }).map(s => {
+          let roll = s.roll;
+          if (!roll && s.email) {
+            const match = s.email.match(/^(\d+)/);
+            if (match) roll = match[1];
+          }
+          return { rollNumber: roll, name: s.name };
+      }).sort((a, b) => (a.rollNumber || '').localeCompare(b.rollNumber || '', undefined, { numeric: true }));
+    }
+
+    let responseData = labActivityData;
+
+    // Return data if found, otherwise initialized empty structure
+    if (!responseData) {
+      responseData = {
+        course: courseId,
+        labActivityRows: [],
+        labActivityManualWts: {},
+        labActivityEqWts: {},
+        labActivityObtainedRows: enrolledStudents.map(s => ({
+          rollNumber: s.rollNumber,
+          name: s.name,
+          attn: 0, quiz: 0, viva: 0,
+          Activity1_Q1: 0, Activity1_Q2: 0, Activity1_Q3: 0,
+          Activity2_Q1: 0, Activity2_Q2: 0, Activity2_Q3: 0,
+          Activity3_Q1: 0, Activity3_Q2: 0, Activity3_Q3: 0,
+          Activity4_Q1: 0, Activity4_Q2: 0, Activity4_Q3: 0,
+          Activity5_Q1: 0, Activity5_Q2: 0, Activity5_Q3: 0,
+          otherMeasured: 0, other: 0
+        })),
+        labActivityFactors: { Activity1: 1, Activity2: 1, Activity3: 1, Activity4: 1, Activity5: 1 },
+        labAttendanceMarks: 0, labQuizMarks: 0, labVivaMarks: 0,
+        activityTaken: 1, otherActivityRemaining: 0, otherActivityMeasured: 0, coMappedActivityMarks: 0, useEqWtActivity: 0
+      };
+
       return res.json({
         success: true,
-        data: null
+        message: 'No lab activity data found, initialized from enrollment',
+        data: responseData
       });
+    }
+
+    // Merge enrolled students into existing data if missing
+    if (enrolledStudents.length > 0) {
+      const existingRolls = new Set((responseData.labActivityObtainedRows || []).map(r => String(r.rollNumber || '').trim()));
+      const missingStudents = enrolledStudents.filter(s => !existingRolls.has(String(s.rollNumber).trim()));
+
+      if (missingStudents.length > 0) {
+        const newRows = missingStudents.map(s => ({
+          rollNumber: s.rollNumber,
+          name: s.name,
+          attn: 0, quiz: 0, viva: 0,
+          Activity1_Q1: 0, Activity1_Q2: 0, Activity1_Q3: 0,
+          Activity2_Q1: 0, Activity2_Q2: 0, Activity2_Q3: 0,
+          Activity3_Q1: 0, Activity3_Q2: 0, Activity3_Q3: 0,
+          Activity4_Q1: 0, Activity4_Q2: 0, Activity4_Q3: 0,
+          Activity5_Q1: 0, Activity5_Q2: 0, Activity5_Q3: 0,
+          otherMeasured: 0, other: 0
+        }));
+
+        responseData.labActivityObtainedRows = [...(responseData.labActivityObtainedRows || []), ...newRows];
+        // Sort by roll number
+        responseData.labActivityObtainedRows.sort((a, b) => 
+           (String(a.rollNumber) || '').localeCompare(String(b.rollNumber) || '', undefined, { numeric: true })
+        );
+      }
     }
 
     res.json({
       success: true,
-      data: labActivityData
+      data: responseData
     });
   } catch (error) {
     console.error('Error getting lab activity data:', error);
