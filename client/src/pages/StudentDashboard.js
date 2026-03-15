@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBook, faSignOutAlt, faClipboardList, faGraduationCap, faCalendarAlt, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { faBook, faSignOutAlt, faGraduationCap, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
 import { getAllCourses } from '../services/courseService';
 import CourseOBEView from '../components/CourseOBEView';
@@ -309,24 +309,6 @@ const StudentDashboard = () => {
             </div>
           </div>
         );
-      case 'assignments':
-        return (
-          <div className="section-container">
-            <div className="section-header">
-              <div className="header-content">
-                <h2>Assignments</h2>
-                <p>View and submit assignments</p>
-              </div>
-            </div>
-            <div className="section-body">
-              <div className="empty-state">
-                <div className="empty-icon">📝</div>
-                <h3>No assignments found</h3>
-                <p>Assigned tasks will show up here.</p>
-              </div>
-            </div>
-          </div>
-        );
       case 'grades':
         return (
           <div className="section-container">
@@ -338,24 +320,6 @@ const StudentDashboard = () => {
             </div>
             <div className="section-body">
               <ResultView />
-            </div>
-          </div>
-        );
-      case 'schedule':
-        return (
-          <div className="section-container">
-            <div className="section-header">
-              <div className="header-content">
-                <h2>Schedule</h2>
-                <p>View your class calendar</p>
-              </div>
-            </div>
-            <div className="section-body">
-              <div className="empty-state">
-                <div className="empty-icon">📅</div>
-                <h3>No schedule entries</h3>
-                <p>Your timetable will be shown here.</p>
-              </div>
             </div>
           </div>
         );
@@ -660,27 +624,11 @@ const StudentDashboard = () => {
           </button>
 
           <button
-            className={`nav-item ${activeSection === 'assignments' ? 'active' : ''}`}
-            onClick={() => handleSectionChange('assignments')}
-          >
-            <span className="nav-icon"><FontAwesomeIcon icon={faClipboardList} /></span>
-            {sidebarOpen && <span className="nav-label">Assignments</span>}
-          </button>
-
-          <button
             className={`nav-item ${activeSection === 'grades' ? 'active' : ''}`}
             onClick={() => handleSectionChange('grades')}
           >
             <span className="nav-icon"><FontAwesomeIcon icon={faGraduationCap} /></span>
             {sidebarOpen && <span className="nav-label">Grades</span>}
-          </button>
-
-          <button
-            className={`nav-item ${activeSection === 'schedule' ? 'active' : ''}`}
-            onClick={() => handleSectionChange('schedule')}
-          >
-            <span className="nav-icon"><FontAwesomeIcon icon={faCalendarAlt} /></span>
-            {sidebarOpen && <span className="nav-label">Schedule</span>}
           </button>
         </nav>
 

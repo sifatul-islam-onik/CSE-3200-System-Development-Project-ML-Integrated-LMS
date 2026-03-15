@@ -1886,6 +1886,9 @@ const TeacherDashboard = () => {
                             return match ? applyParsedMarks(r, match) : r;
                           });
 
+                      const enrolledRolls = new Set(baseObtained.map(r => String(r.rollNumber).trim()));
+                      const unmatchedRolls = Object.keys(parsedMap).filter(r => !enrolledRolls.has(String(r).trim()));
+
                       // Build CO row base from existing rows; seed from course profile if empty
                       let baseLabRows = existing.labActivityRows || [];
                       if (baseLabRows.length === 0) {
@@ -1944,8 +1947,11 @@ const TeacherDashboard = () => {
                       await saveLabActivityData(labMarksCourse._id, fullData);
                       setLabExistingData(prev => ({ ...(prev || {}), ...fullData }));
                       setLabDataRefreshKey(k => k + 1);
-                      setSuccessMessage(`${actKey} marks saved successfully`);
-                      setTimeout(() => setSuccessMessage(''), 3000);
+                      const msg = unmatchedRolls.length > 0
+                        ? `${actKey} marks saved. ${unmatchedRolls.length} roll(s) in Excel not found in enrolled list: ${unmatchedRolls.join(', ')}`
+                        : `${actKey} marks saved successfully`;
+                      setSuccessMessage(msg);
+                      setTimeout(() => setSuccessMessage(''), unmatchedRolls.length > 0 ? 8000 : 3000);
                       setLabUploadParsed(null);
                       setLabUploadFile(null);
                       setLabFileInputKey(k => k + 1);
@@ -2258,6 +2264,9 @@ const TeacherDashboard = () => {
                             }
                             return r;
                           });
+                      
+                      const enrolledRolls = new Set(baseObtained.map(r => String(r.rollNumber).trim()));
+                      const unmatchedRolls = Object.keys(parsedMap).filter(r => !enrolledRolls.has(String(r).trim()));
 
                       // Update assignmentManualWts for this assignment
                       const newManualWts = { ...(existing.assignmentManualWts || {}) };
@@ -2317,8 +2326,11 @@ const TeacherDashboard = () => {
 
                       await saveAssignmentData(attendanceCourse._id, fullData);
                       setAssignExistingData(prev => ({ ...(prev || {}), ...fullData }));
-                      setSuccessMessage(`${assgnKey} marks saved successfully`);
-                      setTimeout(() => setSuccessMessage(''), 3000);
+                      const msg = unmatchedRolls.length > 0
+                        ? `${assgnKey} marks saved. ${unmatchedRolls.length} roll(s) in Excel not found in enrolled list: ${unmatchedRolls.join(', ')}`
+                        : `${assgnKey} marks saved successfully`;
+                      setSuccessMessage(msg);
+                      setTimeout(() => setSuccessMessage(''), unmatchedRolls.length > 0 ? 8000 : 3000);
                       setAssignUploadParsed(null);
                       setAssignUploadFile(null);
                       setAssignFileInputKey(k => k + 1);
