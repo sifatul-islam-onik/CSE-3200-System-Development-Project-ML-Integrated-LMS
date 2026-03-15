@@ -48,6 +48,7 @@ exports.setCOPOMappings = async (req, res) => {
     const validPOCodes = ['PO_A', 'PO_B', 'PO_C', 'PO_D', 'PO_E', 'PO_F', 'PO_G', 'PO_H', 'PO_I', 'PO_J', 'PO_K', 'PO_L'];
     const processedMappings = [];
     const seenPOs = new Set();
+    const poCodesToQuery = new Set();
 
     for (const mapping of mappings) {
       const { program_outcome_code, level } = mapping;
@@ -85,15 +86,7 @@ exports.setCOPOMappings = async (req, res) => {
         });
       }
       seenPOs.add(poCodeUpper);
-
-      // Verify PO exists in database
-      const poExists = await ProgramOutcome.findOne({ po_code: poCodeUpper });
-      if (!poExists) {
-        return res.status(400).json({
-          success: false,
-          message: `Program outcome ${poCodeUpper} does not exist`
-        });
-      }
+      poCodesToQuery.add(poCodeUpper);
 
       processedMappings.push({
         program_outcome_code: poCodeUpper,
@@ -101,19 +94,30 @@ exports.setCOPOMappings = async (req, res) => {
       });
     }
 
+    // Verify POs exist in database
+    const existingPOs = await ProgramOutcome.find({ po_code: { $in: Array.from(poCodesToQuery) } }).select('po_code').lean();
+    const existingPOCodes = new Set(existingPOs.map(po => po.po_code));
+
+    for (const poCode of poCodesToQuery) {
+      if (!existingPOCodes.has(poCode)) {
+        return res.status(400).json({
+          success: false,
+          message: `Program outcome ${poCode} does not exist`
+        });
+      }
+    }
+
     // Delete existing mappings for this CO
     await COPOMapping.deleteMany({ course_outcome: coId });
 
-    // Create new mappings (only non-zero levels, which are all 1-3)
-    const createdMappings = [];
-    for (const mapping of processedMappings) {
-      const copoMapping = await COPOMapping.create({
-        course_outcome: coId,
-        program_outcome_code: mapping.program_outcome_code,
-        level: mapping.level
-      });
-      createdMappings.push(copoMapping);
-    }
+    // Create new mappings
+    const mappingsToInsert = processedMappings.map(mapping => ({
+      course_outcome: coId,
+      program_outcome_code: mapping.program_outcome_code,
+      level: mapping.level
+    }));
+
+    const createdMappings = await COPOMapping.insertMany(mappingsToInsert);
 
     res.status(200).json({
       success: true,

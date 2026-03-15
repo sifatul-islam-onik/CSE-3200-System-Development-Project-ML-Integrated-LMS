@@ -200,6 +200,7 @@ exports.getAllUsers = async (req, res) => {
 // @access  Admin only
 exports.importStudentsFromExcel = async (req, res) => {
   try {
+    const bcrypt = require('bcryptjs');
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
@@ -231,17 +232,12 @@ exports.importStudentsFromExcel = async (req, res) => {
     };
 
     const normalizeVal = (row, keys) => {
-      // Normalize a string for comparison
       const normalize = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      
-      // Try exact matches first
       for (const key of keys) {
         if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
           return String(row[key]).trim();
         }
       }
-      
-      // If no exact match, try normalized matching against all row keys
       const targetNorms = keys.map(normalize);
       for (const [rowKey, rowValue] of Object.entries(row)) {
         const rowKeyNorm = normalize(rowKey);
@@ -249,66 +245,97 @@ exports.importStudentsFromExcel = async (req, res) => {
           return String(rowValue).trim();
         }
       }
-      
       return '';
     };
+
+    // PASS 1: Extract all needed emails, rolls, and dept codes
+    const emailsToQuery = [];
+    const rollsToQuery = [];
+    const deptCodesToQuery = new Set();
+    const processedRows = [];
 
     for (let idx = 0; idx < rows.length; idx++) {
       const row = rows[idx];
       const roll = normalizeVal(row, ['Roll', 'roll']);
       const name = normalizeVal(row, ['name', 'Name']);
-      const advisor = normalizeVal(row, ['advisor', 'Advisor']);
-      const father = normalizeVal(row, ['father', 'Father']);
-      const mother = normalizeVal(row, ['mother', 'Mother']);
-      const hall = normalizeVal(row, ['hall', 'Hall']);
-      const scholarship = normalizeVal(row, ['scholarship', 'Scholarship']);
-      const department = normalizeVal(row, ['department', 'Department', 'dept', 'Dept']);
-
+      
       if (!roll || !name) {
         results.errors.push({ row: idx + 2, reason: 'Missing roll or name' });
         continue;
       }
 
-      // Generate email: lastname + roll + @kuet.ac.bd
       const nameParts = name.trim().split(/\s+/);
       const lastNameRaw = nameParts[nameParts.length - 1] || 'student';
       const lastName = lastNameRaw.toLowerCase().replace(/[^a-z0-9]/g, '');
       const email = `${lastName}${roll}@stud.kuet.ac.bd`.toLowerCase();
 
-      // Skip if email or roll already exists
-      const existing = await User.findOne({ $or: [{ email }, { roll }] });
-      if (existing) {
-        results.skipped.push({ row: idx + 2, roll, email, reason: 'Email or roll already exists' });
+      const rollDigits = roll.replace(/\D/g, '');
+      let deptCode = null;
+      if (rollDigits.length >= 4) {
+        deptCode = rollDigits.substring(2, 4);
+        deptCodesToQuery.add(deptCode);
+      }
+
+      emailsToQuery.push(email);
+      rollsToQuery.push(roll);
+
+      processedRows.push({
+        idx, row, roll, name, email, deptCode,
+        advisor: normalizeVal(row, ['advisor', 'Advisor']),
+        father: normalizeVal(row, ['father', 'Father']),
+        mother: normalizeVal(row, ['mother', 'Mother']),
+        hall: normalizeVal(row, ['hall', 'Hall']),
+        scholarship: normalizeVal(row, ['scholarship', 'Scholarship']),
+        department: normalizeVal(row, ['department', 'Department', 'dept', 'Dept'])
+      });
+    }
+
+    // PRE-FETCH
+    const Department = require('../models/Department');
+    const existingUsers = await User.find({ 
+      $or: [
+        { email: { $in: emailsToQuery } }, 
+        { roll: { $in: rollsToQuery } }
+      ] 
+    }).select('email roll').lean();
+
+    const existingEmails = new Set(existingUsers.map(u => u.email));
+    const existingRolls = new Set(existingUsers.map(u => u.roll));
+    
+    const fetchedDepts = await Department.find({ numericCode: { $in: Array.from(deptCodesToQuery) } }).lean();
+    const deptMap = new Map(fetchedDepts.map(d => [d.numericCode, d._id]));
+
+    const usersToInsert = [];
+    const intraBatchEmails = new Set();
+    const intraBatchRolls = new Set();
+
+    for (const data of processedRows) {
+      const { idx, roll, name, email, deptCode, advisor, father, mother, hall, scholarship, department } = data;
+
+      if (existingEmails.has(email) || existingRolls.has(roll) || intraBatchEmails.has(email) || intraBatchRolls.has(roll)) {
+        results.skipped.push({ row: idx + 2, roll, email, reason: 'Email or roll already exists/duplicated' });
         continue;
       }
 
-      // Extract department from roll if not provided
-      // KUET roll format typically: YYMMNNN where MM is department code
+      intraBatchEmails.add(email);
+      intraBatchRolls.add(roll);
+
       let finalDepartment = department;
-      if (!finalDepartment && roll) {
-        const rollDigits = roll.replace(/\D/g, '');
-        if (rollDigits.length >= 4) {
-          const deptCode = rollDigits.substring(2, 4);
-          
-          // Dynamically map department from database instead of hardcoded map
-          const Department = require('../models/Department');
-          const deptDoc = await Department.findOne({ numericCode: deptCode });
-          if (deptDoc) {
-            finalDepartment = deptDoc._id; // Short alphanumeric code e.g. CSE
-          } else {
-            finalDepartment = '';
-          }
-        }
+      if (!finalDepartment && deptCode && deptMap.has(deptCode)) {
+        finalDepartment = deptMap.get(deptCode);
+      } else if (!finalDepartment) {
+        finalDepartment = '';
       }
 
-      // Generate random password (stored only as hash; no plaintext stored)
       const randomPassword = generateRandomPassword();
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(randomPassword, salt);
 
-      const user = new User({
+      usersToInsert.push({
         name,
         email,
-        password: randomPassword,
-        initialPassword: randomPassword, // VULN-16: persist for credential export
+        password: hashedPassword,
+        initialPassword: randomPassword,
         role: 'student',
         roll,
         advisor,
@@ -321,12 +348,14 @@ exports.importStudentsFromExcel = async (req, res) => {
         isApprovedByAdmin: true,
         isActive: true
       });
+    }
 
+    if (usersToInsert.length > 0) {
       try {
-        await user.save();
-        results.created += 1;
-      } catch (saveErr) {
-        results.errors.push({ row: idx + 2, roll, email, reason: saveErr.message });
+        await User.insertMany(usersToInsert);
+        results.created += usersToInsert.length;
+      } catch (err) {
+        results.errors.push({ reason: 'Bulk insert failed: ' + err.message });
       }
     }
 
@@ -1769,11 +1798,21 @@ exports.normalizeBatchAssignments = async (req, res) => {
     }
 
     const affectedCourseIds = [];
+    const bulkOps = [];
     for (const c of courses) {
       const latest = c.assignedBatches[c.assignedBatches.length - 1];
-      c.assignedBatches = latest ? [latest] : [];
-      await c.save();
+      const newBatches = latest ? [latest] : [];
       affectedCourseIds.push(c._id);
+      bulkOps.push({
+        updateOne: {
+          filter: { _id: c._id },
+          update: { $set: { assignedBatches: newBatches } }
+        }
+      });
+    }
+
+    if (bulkOps.length > 0) {
+      await Course.bulkWrite(bulkOps);
     }
 
     return res.status(200).json({

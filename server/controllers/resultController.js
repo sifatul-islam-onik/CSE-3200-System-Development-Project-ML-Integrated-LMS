@@ -217,7 +217,7 @@ exports.computeResults = async (req, res) => {
 
     const semester = (Number(yearLevel) - 1) * 2 + Number(term);
 
-    // Pre-load attainment data for each course once (avoids N×M DB round-trips)
+    // Pre-load attainment data for each course once
     const courseAttainmentMap = new Map();
     await Promise.all(
       courses.map(async (course) => {
@@ -229,7 +229,24 @@ exports.computeResults = async (req, res) => {
       })
     );
 
-    const savedResults = [];
+    // PRE-FETCH PRIOR RESULTS FOR ALL STUDENTS
+    const studentIds = students.map(s => s._id);
+    const allPriorResults = await TermResult.find({
+      student: { $in: studentIds },
+      isPublished: true,
+      $nor: [{ yearLevel: Number(yearLevel), term: Number(term) }],
+    }).lean();
+
+    const priorResultsByStudent = new Map();
+    for (const pr of allPriorResults) {
+      const sId = String(pr.student);
+      if (!priorResultsByStudent.has(sId)) {
+        priorResultsByStudent.set(sId, []);
+      }
+      priorResultsByStudent.get(sId).push(pr);
+    }
+
+    const bulkOps = [];
 
     for (const student of students) {
       const courseResults = [];
@@ -270,12 +287,8 @@ exports.computeResults = async (req, res) => {
         .reduce((s, cr) => s + (cr.credit || 0), 0);
       const termGPA = computeTermGPA(courseResults);
 
-      // Previous published results for CGPA computation
-      const priorResults = await TermResult.find({
-        student: student._id,
-        isPublished: true,
-        $nor: [{ yearLevel: Number(yearLevel), term: Number(term) }],
-      }).lean();
+      // Fetch pre-grouped prior results
+      const priorResults = priorResultsByStudent.get(String(student._id)) || [];
 
       // Compute totalCreditCompleted across all prior published terms + this term
       const priorCreditCompleted = priorResults.reduce((s, tr) => s + (tr.creditCompleted || 0), 0);
@@ -288,31 +301,42 @@ exports.computeResults = async (req, res) => {
       ];
       const cgpa = computeCGPA(allTermResultsForCGPA);
 
-      const resultDoc = await TermResult.findOneAndUpdate(
-        { student: student._id, yearLevel: Number(yearLevel), term: Number(term) },
-        {
-          $set: {
-            studentRoll: student.roll,
-            studentName: student.name,
-            batch,
-            deptCode,
-            semester,
-            courses: courseResults,
-            creditTaken,
-            creditCompleted,
-            totalCreditCompleted,
-            termGPA,
-            cgpa,
-            isPublished: false,
-            publishedAt: null,
-            publishedBy: null,
+      bulkOps.push({
+        updateOne: {
+          filter: { student: student._id, yearLevel: Number(yearLevel), term: Number(term) },
+          update: {
+            $set: {
+              studentRoll: student.roll,
+              studentName: student.name,
+              batch,
+              deptCode,
+              semester,
+              courses: courseResults,
+              creditTaken,
+              creditCompleted,
+              totalCreditCompleted,
+              termGPA,
+              cgpa,
+              isPublished: false,
+              publishedAt: null,
+              publishedBy: null,
+            }
           },
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
-
-      savedResults.push(resultDoc);
+          upsert: true
+        }
+      });
     }
+
+    if (bulkOps.length > 0) {
+      await TermResult.bulkWrite(bulkOps);
+    }
+
+    // Retrieve the saved documents to return
+    const savedResults = await TermResult.find({
+      student: { $in: studentIds },
+      yearLevel: Number(yearLevel),
+      term: Number(term)
+    }).lean();
 
     return res.status(200).json({
       message: `Computed results for ${savedResults.length} students across ${courses.length} courses.`,
