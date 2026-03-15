@@ -289,26 +289,15 @@ exports.importStudentsFromExcel = async (req, res) => {
         const rollDigits = roll.replace(/\D/g, '');
         if (rollDigits.length >= 4) {
           const deptCode = rollDigits.substring(2, 4);
-          // Map KUET department codes to names
-          const departmentMap = {
-            '01': 'CE',
-            '03': 'EEE',
-            '05': 'ME',
-            '07': 'CSE',
-            '09': 'ECE',
-            '11': 'IEM',
-            '13': 'ESE',
-            '15': 'BME',
-            '17': 'URP',
-            '19': 'LE',
-            '21': 'TE',
-            '23': 'BECM',
-            '25': 'ARCH',
-            '27': 'MSE',
-            '29': 'CHE',
-            '31': 'MTE'
-          };
-          finalDepartment = departmentMap[deptCode] || '';
+          
+          // Dynamically map department from database instead of hardcoded map
+          const Department = require('../models/Department');
+          const deptDoc = await Department.findOne({ numericCode: deptCode });
+          if (deptDoc) {
+            finalDepartment = deptDoc._id; // Short alphanumeric code e.g. CSE
+          } else {
+            finalDepartment = '';
+          }
         }
       }
 
@@ -1348,9 +1337,11 @@ exports.assignBatchToCourse = async (req, res) => {
       });
     }
 
-    // Validate department code
-    const validDeptCodes = ['01', '03', '05', '07', '09', '11', '13', '15', '17', '19', '21', '23', '25', '27', '29', '31'];
-    if (!validDeptCodes.includes(deptCode)) {
+    // Validate department code dynamically
+    const Department = require('../models/Department');
+    const isValidDept = await Department.exists({ numericCode: deptCode });
+    
+    if (!isValidDept) {
       return res.status(400).json({
         success: false,
         message: 'Invalid department code'

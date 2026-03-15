@@ -50,8 +50,8 @@ const courseProposalSchema = new mongoose.Schema({
     },
     course_offered_to: {
       type: String,
-      required: true,
-      enum: ['CSE', 'EEE', 'ME', 'CE', 'ECE', 'IEM', 'ESE', 'BME', 'URP', 'LE', 'TE', 'BECM', 'ARCH', 'MSE', 'CHE', 'MTE']
+      ref: 'Department',
+      required: true
     },
     category: {
       type: String,
