@@ -30,7 +30,7 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
 
   try {
     // Verify job exists in store (prevent processing lost jobs)
-    const jobInStore = ocrJobStore.getJob(jobId);
+    const jobInStore = await ocrJobStore.getJob(jobId);
     if (!jobInStore) {
       console.error(`❌ Job ${jobId} not found in store - creating entry`);
       // Recreate job entry if somehow lost
@@ -68,12 +68,13 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
     workerRegistry.requestStart(workerId);
 
     // Update status to processing
-    ocrJobStore.updateJob(jobId, {
+    await ocrJobStore.updateJob(jobId, {
       status: 'processing',
       startedAt: new Date(),
       progress: 10,
       assignedWorker: workerId,
       attemptNumber: attemptNumber,
+      maxAttempts: maxAttempts,
       isRetry: isRetry,
       error: null
     });
@@ -92,7 +93,7 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
       throw new Error(`Invalid image URL format. Starts with: ${imageUrl.substring(0, 20)}`);
     }
 
-    ocrJobStore.updateJob(jobId, { progress: 30 });
+    await ocrJobStore.updateJob(jobId, { progress: 30 });
     job.progress(30);
 
     // Send to ML server
@@ -100,7 +101,7 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
     const formData = new FormData();
     formData.append('image', imageBlob, { filename: 'answer-sheet.jpg' });
 
-    ocrJobStore.updateJob(jobId, { progress: 50 });
+    await ocrJobStore.updateJob(jobId, { progress: 50 });
     job.progress(50);
 
     console.log(`  → Sending request to ML server ${workerId}...`);
@@ -118,12 +119,12 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
     const mlDuration = ((Date.now() - mlStartTime) / 1000).toFixed(2);
     console.log(`  → ML server ${workerId} responded in ${mlDuration}s`);
 
-    ocrJobStore.updateJob(jobId, { progress: 90 });
+    await ocrJobStore.updateJob(jobId, { progress: 90 });
     job.progress(90);
 
     if (mlResponse.data.success && mlResponse.data.marks) {
       // Update job with results
-      ocrJobStore.updateJob(jobId, {
+      await ocrJobStore.updateJob(jobId, {
         status: 'completed',
         marks: mlResponse.data.marks,
         confidence: mlResponse.data.confidence,
@@ -164,7 +165,7 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
     
     if (willRetry) {
       console.log(`  🔄 Will retry (attempt ${attemptNumber}/${maxAttempts})`);
-      ocrJobStore.updateJob(jobId, {
+      await ocrJobStore.updateJob(jobId, {
         status: 'retrying',
         error: error.message,
         progress: 0,
@@ -175,7 +176,7 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
       });
     } else {
       console.log(`  ❌ Final failure (all ${maxAttempts} attempts exhausted)`);
-      ocrJobStore.updateJob(jobId, {
+      await ocrJobStore.updateJob(jobId, {
         status: 'failed',
         error: error.message,
         progress: 0,

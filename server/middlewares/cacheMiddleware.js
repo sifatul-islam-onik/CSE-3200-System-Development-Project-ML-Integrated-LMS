@@ -1,55 +1,74 @@
 /**
- * Simple in-memory cache middleware for Express
- * For production, consider using Redis for distributed caching
+ * Redis-backed cache middleware for Express
+ * Fixes horizontal scalability issues by moving state out of Node.js memory
  */
+const redisClient = require('../config/redisClient');
 
-const cache = new Map();
 const CACHE_DURATION = {
-  SHORT: 5 * 60 * 1000,      // 5 minutes
-  MEDIUM: 30 * 60 * 1000,    // 30 minutes
-  LONG: 60 * 60 * 1000,      // 1 hour
-  VERY_LONG: 24 * 60 * 60 * 1000  // 24 hours
+  SHORT: 5 * 60,      // 5 minutes in seconds
+  MEDIUM: 30 * 60,    // 30 minutes
+  LONG: 60 * 60,      // 1 hour
+  VERY_LONG: 24 * 60 * 60  // 24 hours
 };
-
-// VULN-15: Cap the cache to prevent unbounded memory growth
-const MAX_CACHE_SIZE = 1000;
 
 /**
  * Clear cache for a specific key or pattern
  */
-const clearCache = (keyPattern) => {
-  if (keyPattern) {
-    // Clear keys matching pattern
-    for (const key of cache.keys()) {
-      if (key.includes(keyPattern)) {
-        cache.delete(key);
-      }
+const clearCache = async (keyPattern) => {
+  try {
+    if (keyPattern) {
+      // Find all keys matching the pattern and delete them
+      let cursor = '0';
+      const maxBatchSize = 100;
+      do {
+        const result = await redisClient.scan(
+          cursor,
+          'MATCH',
+          `*${keyPattern}*`,
+          'COUNT',
+          maxBatchSize
+        );
+        cursor = result[0];
+        const keys = result[1];
+        if (keys.length > 0) {
+          await redisClient.del(keys);
+        }
+      } while (cursor !== '0');
+    } else {
+      // Very dangerous in production but kept for API compatibility: flush whole DB
+      // Ideally should use a prefix like `cache:` and clear those instead.
+      // await redisClient.flushdb();
     }
-  } else {
-    // Clear all cache
-    cache.clear();
+  } catch (error) {
+    console.error('Redis Cache Clear Error:', error);
   }
 };
 
 /**
  * Caching middleware
- * @param {number} duration - Cache duration in milliseconds
+ * @param {number} duration - Cache duration in seconds
  * @param {function} keyGenerator - Function to generate cache key from request
  */
 const cacheMiddleware = (duration = CACHE_DURATION.MEDIUM, keyGenerator) => {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     // Only cache GET requests
     if (req.method !== 'GET') {
       return next();
     }
 
     // Generate cache key
-    const key = keyGenerator ? keyGenerator(req) : `${req.originalUrl || req.url}_${req.user?._id || 'anonymous'}`;
-    
-    // Check if cached response exists and is still valid
-    const cachedResponse = cache.get(key);
-    if (cachedResponse && Date.now() < cachedResponse.expiry) {
-      return res.json(cachedResponse.data);
+    const rawKey = keyGenerator ? keyGenerator(req) : `${req.originalUrl || req.url}_${req.user?._id || 'anonymous'}`;
+    const key = `cache:${rawKey}`;
+
+    try {
+      // Check if cached response exists
+      const cachedData = await redisClient.get(key);
+      if (cachedData) {
+        return res.json(JSON.parse(cachedData));
+      }
+    } catch (err) {
+      console.error('Redis Get Error:', err);
+      // Fallback to normal processing if Redis is down
     }
 
     // Store original json method
@@ -59,14 +78,8 @@ const cacheMiddleware = (duration = CACHE_DURATION.MEDIUM, keyGenerator) => {
     res.json = (data) => {
       // Only cache successful responses
       if (data && data.success !== false) {
-        // VULN-15: Evict oldest entry (FIFO) when cache is at its cap
-        if (cache.size >= MAX_CACHE_SIZE) {
-          const oldestKey = cache.keys().next().value;
-          cache.delete(oldestKey);
-        }
-        cache.set(key, {
-          data,
-          expiry: Date.now() + duration
+        redisClient.setex(key, duration, JSON.stringify(data)).catch((err) => {
+          console.error('Redis Set Error:', err);
         });
       }
       return originalJson(data);
@@ -87,6 +100,7 @@ const invalidateCacheMiddleware = (keyPattern) => {
     // Override json method to clear cache after successful mutation
     res.json = (data) => {
       if (data && data.success !== false) {
+        // Execute invalidate async
         clearCache(keyPattern(req));
       }
       return originalJson(data);
@@ -97,51 +111,26 @@ const invalidateCacheMiddleware = (keyPattern) => {
 };
 
 /**
- * Get cache statistics
+ * Get cache statistics directly from Redis Keyspace
  */
-const getCacheStats = () => {
-  const now = Date.now();
-  let validEntries = 0;
-  let expiredEntries = 0;
-  let totalSize = 0;
-
-  for (const [key, value] of cache.entries()) {
-    totalSize += JSON.stringify(value.data).length;
-    if (now < value.expiry) {
-      validEntries++;
-    } else {
-      expiredEntries++;
-    }
+const getCacheStats = async () => {
+  try {
+    const info = await redisClient.info('keyspace');
+    const db0 = info.split('\n').find(line => line.startsWith('db0:'));
+    if (!db0) return { totalEntries: 0 };
+    
+    // Parse db0:keys=10,expires=10,avg_ttl=...
+    const keysMatch = db0.match(/keys=(\d+)/);
+    const totalEntries = keysMatch ? parseInt(keysMatch[1]) : 0;
+    
+    return {
+      totalEntries,
+      info: db0
+    };
+  } catch (error) {
+    return { error: 'Could not fetch Redis stats' };
   }
-
-  return {
-    totalEntries: cache.size,
-    validEntries,
-    expiredEntries,
-    estimatedSizeBytes: totalSize,
-    estimatedSizeMB: (totalSize / (1024 * 1024)).toFixed(2)
-  };
 };
-
-/**
- * Clean expired entries periodically
- */
-const cleanupExpiredCache = () => {
-  const now = Date.now();
-  let cleaned = 0;
-
-  for (const [key, value] of cache.entries()) {
-    if (now >= value.expiry) {
-      cache.delete(key);
-      cleaned++;
-    }
-  }
-
-};
-
-// Run cleanup every 10 minutes
-setInterval(cleanupExpiredCache, 10 * 60 * 1000);
-
 module.exports = {
   cacheMiddleware,
   invalidateCacheMiddleware,
