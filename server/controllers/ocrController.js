@@ -36,7 +36,7 @@ exports.submitOCRJob = async (req, res) => {
     const jobId = uuidv4();
 
     // Create OCR job in memory store
-    const ocrJob = ocrJobStore.createJob({
+    const ocrJob = await ocrJobStore.createJob({
       jobId,
       userId: req.user._id.toString(),
       studentId,
@@ -66,7 +66,7 @@ exports.submitOCRJob = async (req, res) => {
       );
       // IMMEDIATELY update job store BEFORE job can be picked up by worker
       // This prevents race condition where worker tries to access incomplete job data
-      ocrJobStore.updateJob(ocrJob.jobId, {
+      await ocrJobStore.updateJob(ocrJob.jobId, {
         queuedAt: new Date(),
         sequence: sequence,
         bullJobId: bullJob.id // Store Bull's auto-generated ID for later reference
@@ -78,7 +78,7 @@ exports.submitOCRJob = async (req, res) => {
     } catch (queueError) {
       // If queue add fails, mark job as failed and throw error
       console.error(`❌ Failed to add job ${ocrJob.jobId} to queue:`, queueError);
-      ocrJobStore.updateJob(ocrJob.jobId, {
+      await ocrJobStore.updateJob(ocrJob.jobId, {
         status: 'failed',
         error: `Failed to add to queue: ${queueError.message}`
       });
@@ -121,7 +121,7 @@ exports.getUserOCRJobs = async (req, res) => {
     if (studentId) filters.studentId = studentId;
     if (status) filters.status = status;
 
-    const jobs = ocrJobStore.getUserJobs(req.user._id.toString(), filters);
+    const jobs = await ocrJobStore.getUserJobs(req.user._id.toString(), filters);
 
     res.status(200).json({
       success: true,
@@ -145,7 +145,7 @@ exports.getOCRJobStatus = async (req, res) => {
   try {
     const { jobId } = req.params;
 
-    const job = ocrJobStore.getJob(jobId);
+    const job = await ocrJobStore.getJob(jobId);
 
     if (!job || job.userId !== req.user._id.toString()) {
       return res.status(404).json({
@@ -175,7 +175,7 @@ exports.deleteOCRJob = async (req, res) => {
   try {
     const { jobId } = req.params;
 
-    const job = ocrJobStore.getJob(jobId);
+    const job = await ocrJobStore.getJob(jobId);
 
     if (!job || job.userId !== req.user._id.toString()) {
       return res.status(404).json({
@@ -186,7 +186,7 @@ exports.deleteOCRJob = async (req, res) => {
 
     // Remove from memory store first
     const bullJobId = job.bullJobId; // Get Bull's auto-generated ID
-    ocrJobStore.deleteJob(jobId);
+    await ocrJobStore.deleteJob(jobId);
 
     // Remove from Bull queue if it's there (using Bull's ID)
     if (bullJobId) {
