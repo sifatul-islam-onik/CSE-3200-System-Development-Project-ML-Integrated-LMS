@@ -75,9 +75,21 @@ exports.createCourseOutcomes = async (req, res) => {
 
     // Create course outcomes
     const createdOutcomes = [];
+    
+    // Batch extract CO codes for duplicate validation
+    const coCodes = outcomes.map(o => o.co_code ? o.co_code.toUpperCase() : null).filter(Boolean);
+    
+    const existingCOs = await CourseOutcome.find({
+      course: courseId,
+      co_code: { $in: coCodes }
+    }).select('co_code').lean();
+    
+    const existingCOSet = new Set(existingCOs.map(co => co.co_code));
+    const processedOutcomes = [];
+
     for (const outcome of outcomes) {
       const { co_code, description } = outcome;
-      
+
       if (!co_code || !description) {
         return res.status(400).json({
           success: false,
@@ -86,12 +98,7 @@ exports.createCourseOutcomes = async (req, res) => {
       }
 
       // Check for duplicate CO code within the same course
-      const existing = await CourseOutcome.findOne({ 
-        course: courseId, 
-        co_code: co_code.toUpperCase() 
-      });
-
-      if (existing) {
+      if (existingCOSet.has(co_code.toUpperCase())) {
         return res.status(400).json({
           success: false,
           message: `Duplicate CO code: ${co_code}`
@@ -111,13 +118,16 @@ exports.createCourseOutcomes = async (req, res) => {
         }
       }
 
-      const courseOutcome = await CourseOutcome.create({
+      processedOutcomes.push({
         course: courseId,
-        co_code,
+        co_code: co_code.toUpperCase(),
         description
       });
+    }
 
-      createdOutcomes.push(courseOutcome);
+    if (processedOutcomes.length > 0) {
+      const inserted = await CourseOutcome.insertMany(processedOutcomes);
+      createdOutcomes.push(...inserted);
     }
 
     res.status(201).json({

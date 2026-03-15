@@ -78,6 +78,7 @@ const validateTeacherData = (row, index) => {
 
 // Bulk import teachers
 const bulkImportTeachers = async (data) => {
+  const bcrypt = require('bcryptjs');
   const results = {
     created: 0,
     skipped: [],
@@ -90,10 +91,14 @@ const bulkImportTeachers = async (data) => {
     return results;
   }
 
+  // First pass: extract and normalize values, gather all emails to query
+  const processedRows = [];
+  const emailsToQuery = [];
+
   for (let idx = 0; idx < data.length; idx++) {
     const row = data[idx];
-    const rowRef = `Row ${idx + 2}`;
-    
+    const rowRef = 'Row ' + (idx + 2);
+
     // Get values from different possible column names
     const fullNameResult = normalizeVal(row, ['Full Name', 'full name', 'FullName', 'fullName']);
     const nameForEmailResult = normalizeVal(row, ['Name', 'name']);
@@ -115,16 +120,9 @@ const bulkImportTeachers = async (data) => {
     // Extract first word from nameForEmail for email creation
     const emailPrefix = nameForEmail.split(/\s+/)[0].toLowerCase().replace(/[^a-z0-9]/g, '');
     const deptLower = dept.toLowerCase().replace(/[^a-z]/g, '');
-    
-    // Generate email: name@dept.kuet.ac.bd
-    const email = `${emailPrefix}@${deptLower}.kuet.ac.bd`;
 
-    // Check if email already exists
-    const existingEmail = await User.findOne({ email });
-    if (existingEmail) {
-      results.skipped.push({ row: idx + 2, reason: 'Email already exists', email });
-      continue;
-    }
+    // Generate email: name@dept.kuet.ac.bd
+    const email = emailPrefix + '@' + deptLower + '.kuet.ac.bd';
 
     // Resolve designation (default to Lecturer if empty/invalid)
     let designation = 'Lecturer';
@@ -133,47 +131,76 @@ const bulkImportTeachers = async (data) => {
       if (norm === 'professor') designation = 'Professor';
       else if (norm === 'assistant professor' || norm === 'assistantprofessor' || norm === 'asst professor' || norm === 'assistant_professor') designation = 'Assistant Professor';
       else if (norm === 'lecturer') designation = 'Lecturer';
-      else {
-        // Unknown designation; fall back to default
-        designation = 'Lecturer';
-      }
     }
+
+    processedRows.push({ idx, rowRef, fullName, email, dept, designation });
+    emailsToQuery.push(email);
+  }
+
+  // Pre-fetch existing emails efficiently
+  const existingUsers = await User.find({ email: { $in: emailsToQuery } }).select('email').lean();
+  const existingEmailsSet = new Set(existingUsers.map(u => u.email));
+
+  const teachersToInsert = [];
+  // Track emails we're inserting in this batch to prevent intra-sheet duplicates
+  const seenEmailsInMatch = new Set();
+
+  for (const rowData of processedRows) {
+    const { idx, rowRef, fullName, email, dept, designation } = rowData;
+
+    if (existingEmailsSet.has(email)) {
+      results.skipped.push({ row: idx + 2, reason: 'Email already exists', email });
+      continue;
+    }
+
+    if (seenEmailsInMatch.has(email)) {
+      results.skipped.push({ row: idx + 2, reason: 'Duplicate email in import list', email });
+      continue;
+    }
+
+    seenEmailsInMatch.add(email);
 
     // Generate random password
     const password = generatePassword();
-    
-    console.log(`Creating teacher: ${fullName} (${email}) with designation: ${designation}`);
+    console.log('Preparing teacher: ' + fullName + ' (' + email + ') with designation: ' + designation);
 
+    // Pre-hash password because insertMany bypasses Mongoose pre-save hooks
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    teachersToInsert.push({
+      name: fullName,
+      email,
+      password: hashedPassword,
+      initialPassword: password, // Store plaintext password for export       
+      role: 'teacher',
+      department: dept,
+      designation,
+      isEmailVerified: true, // Auto-verify for bulk imported teachers        
+      isApprovedByAdmin: true, // Auto-approve for bulk imported teachers     
+      isActive: true
+    });
+  }
+
+  if (teachersToInsert.length > 0) {
     try {
-      // Create new teacher user
-      const teacher = new User({
-        name: fullName,
-        email,
-        password, // Will be hashed by the pre-save hook
-        initialPassword: password, // Store plaintext password for export
-        role: 'teacher',
-        department: dept,
-        designation,
-        isEmailVerified: true, // Auto-verify for bulk imported teachers
-        isApprovedByAdmin: true, // Auto-approve for bulk imported teachers
-        isActive: true
-      });
+      // Create imported teachers in bulk
+      await User.insertMany(teachersToInsert);
 
-      await teacher.save();
-      
-      console.log(`Successfully created teacher: ${email}, designation: ${teacher.designation}, initialPassword set: ${!!teacher.initialPassword}`);
-      
-      results.created++;
-      results.createdTeachers.push({
-        name: fullName,
-        email,
-        password, // Return password so it can be displayed to admin
-        department: dept,
-        designation
-      });
+      for (const t of teachersToInsert) {
+        console.log('Successfully created teacher: ' + t.email + ', designation: ' + t.designation);
+        results.created++;
+        results.createdTeachers.push({
+          name: t.name,
+          email: t.email,
+          password: t.initialPassword, // Return password so it can be displayed to admin
+          department: t.department,
+          designation: t.designation
+        });
+      }
     } catch (err) {
-      console.error(`Failed to create teacher ${email}:`, err.message);
-      results.errors.push(`${rowRef}: Failed to create teacher - ${err.message}`);
+      console.error('Failed to bulk create teachers:', err.message);
+      results.errors.push('Bulk import failed: ' + err.message);
     }
   }
 
