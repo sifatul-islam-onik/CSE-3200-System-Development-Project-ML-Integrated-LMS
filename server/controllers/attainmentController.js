@@ -1,9 +1,3 @@
-const {
-  readAttainmentData,
-  writeStudentPoValue,
-  batchUpdateStudentPoValues,
-  getSheetNames
-} = require('../utils/attainmentExcelUtil');
 const Course = require('../models/Course');
 const User = require('../models/User');
 const CTAttainment = require('../models/CTAttainment');
@@ -43,11 +37,21 @@ const getTeacherCourses = async (teacherId) => {
 exports.getAttainmentData = async (req, res) => {
   try {
     const { sheetName } = req.params;
-    const data = await readAttainmentData(sheetName || null);
     
+    // Return a static skeleton for the frontend
     res.json({
       success: true,
-      data
+      data: {
+        sheetName: sheetName || 'CT',
+        metadata: {},
+        coPoMatrix: {
+          coLabels: ['CO1', 'CO2', 'CO3', 'CO4', 'CO5', 'CO6'],
+          poLabels: ['PO1', 'PO2', 'PO3', 'PO4', 'PO5', 'PO6', 'PO7', 'PO8', 'PO9', 'PO10', 'PO11', 'PO12'],
+          values: []
+        },
+        students: [], // Empty since data comes from MongoDB now
+        summary: {}
+      }
     });
   } catch (error) {
     console.error('Error reading attainment data:', error);
@@ -64,8 +68,13 @@ exports.getAttainmentData = async (req, res) => {
  */
 exports.getSheets = async (req, res) => {
   try {
-    const allSheets = await getSheetNames();
-    
+    const allSheets = [
+      'CourseProfile', 'CT', 'Attn_Assign', 'SectionA', 
+      'SectionB', 'LabActivity', 'COAttainment', 'COCalc', 
+      'COCalc_LabUnnorm', 'COPOMap', 'POCalcMax', 'Charts', 
+      'POCalc', 'CheckPO'
+    ];
+
     // For teachers, return all sheets (filtering will happen on the frontend based on course metadata)
     // or admin sees all sheets directly
     if (req.user.role === 'teacher') {
@@ -85,78 +94,6 @@ exports.getSheets = async (req, res) => {
     }
   } catch (error) {
     console.error('Error reading sheet names:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-};
-
-/**
- * Update single student PO value
- * PUT /api/attainment/update
- * Body: { sheetName, rollNumber, poNumber, value }
- */
-exports.updateStudentPoValue = async (req, res) => {
-  try {
-    const { sheetName, rollNumber, poNumber, value } = req.body;
-    
-    // Validate required fields
-    if (!rollNumber || !poNumber) {
-      return res.status(400).json({
-        success: false,
-        error: 'rollNumber and poNumber are required'
-      });
-    }
-    
-    const result = await writeStudentPoValue(
-      sheetName || null,
-      rollNumber,
-      poNumber,
-      value
-    );
-    
-    res.json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    console.error('Error updating student PO value:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-};
-
-/**
- * Batch update multiple student PO values
- * PUT /api/attainment/batch-update
- * Body: { sheetName, updates: [{rollNumber, poNumber, value}] }
- */
-exports.batchUpdateStudentPoValues = async (req, res) => {
-  try {
-    const { sheetName, updates } = req.body;
-    
-    // Validate required fields
-    if (!updates || !Array.isArray(updates)) {
-      return res.status(400).json({
-        success: false,
-        error: 'updates array is required'
-      });
-    }
-    
-    const results = await batchUpdateStudentPoValues(
-      sheetName || null,
-      updates
-    );
-    
-    res.json({
-      success: true,
-      data: results
-    });
-  } catch (error) {
-    console.error('Error batch updating student PO values:', error);
     res.status(500).json({
       success: false,
       error: error.message

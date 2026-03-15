@@ -29,11 +29,8 @@ const courseSchema = new mongoose.Schema({
   },
   course_offered_to: {
     type: String,
-    required: [true, 'Course offered to department is required'],
-    enum: {
-      values: ['CSE', 'EEE', 'ME', 'CE', 'ECE', 'IEM', 'ESE', 'BME', 'URP', 'LE', 'TE', 'BECM', 'ARCH', 'MSE', 'CHE', 'MTE'],
-      message: 'Course must be offered to a valid department'
-    }
+    ref: 'Department',
+    required: [true, 'Course offered to department is required']
   },
   category: {
     type: String,
@@ -287,7 +284,6 @@ const courseSchema = new mongoose.Schema({
     deptCode: {
       type: String,
       required: true,
-      enum: ['01', '03', '05', '07', '09', '11', '13', '15', '17', '19', '21', '23', '25', '27', '29', '31'],
       message: 'Department code must be valid'
     }
   }],

@@ -4,6 +4,7 @@ const { body } = require('express-validator');
 const { authenticateUser } = require('../middlewares/authMiddleware');
 const { authorizeAdmin } = require('../middlewares/roleMiddleware');
 const courseController = require('../controllers/courseController');
+const Department = require('../models/Department');
 
 // Validation middleware for course creation/update
 const courseValidation = [
@@ -36,8 +37,13 @@ const courseValidation = [
     .notEmpty()
     .withMessage('Course offered to department is required')
     .toUpperCase()
-    .isIn(['CSE', 'EEE', 'ME', 'CE', 'ECE', 'IEM', 'ESE', 'BME', 'URP', 'LE', 'TE', 'BECM', 'ARCH', 'MSE', 'CHE', 'MTE'])
-    .withMessage('Invalid department code'),
+    .custom(async (value) => {
+      const dept = await Department.findById(value);
+      if (!dept) {
+        throw new Error('Invalid department code');
+      }
+      return true;
+    }),
   body('category')
     .notEmpty()
     .withMessage('Category is required')

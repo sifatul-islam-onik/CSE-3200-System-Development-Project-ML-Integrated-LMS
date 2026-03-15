@@ -29,23 +29,9 @@ const ctUpload = multer({
 router.use(authenticateUser);
 
 // Get list of all sheet names (must come before /:sheetName? route)
-router.get('/sheets', 
+router.get('/sheets',
   cacheMiddleware(CACHE_DURATION.MEDIUM, (req) => `sheets_${req.user._id}`),
   attainmentController.getSheets
-);
-
-// Update single student PO value (teacher only)
-router.put(
-  '/update',
-  authorizeRoles('teacher', 'admin'),
-  attainmentController.updateStudentPoValue
-);
-
-// Batch update student PO values (teacher only)
-router.put(
-  '/batch-update',
-  authorizeRoles('teacher', 'admin'),
-  attainmentController.batchUpdateStudentPoValues
 );
 
 // Parse CT Excel/CSV upload and return structured data (teacher only)
