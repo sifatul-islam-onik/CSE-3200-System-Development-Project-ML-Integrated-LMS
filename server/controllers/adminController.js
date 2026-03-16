@@ -178,7 +178,35 @@ exports.rejectUser = async (req, res) => {
 // @access  Admin only
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select('-password');
+    const { role, department, designation, search, batch } = req.query;
+
+    let filter = {};
+
+    if (role) filter.role = role.toLowerCase();
+
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      filter.$or = [
+        { name: searchRegex },
+        { email: searchRegex },
+        { roll: searchRegex }
+      ];
+    }
+
+    if (department) filter.department = new RegExp(`^${department}$`, 'i');
+    if (designation) filter.designation = new RegExp(`^${designation}$`, 'i');
+
+    if (batch) {
+      const batchRegex = new RegExp(`^${batch}0[1-9]`);
+      if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, { roll: batchRegex }];
+        delete filter.$or;
+      } else {
+        filter.roll = batchRegex;
+      }
+    }
+
+    const users = await User.find(filter).select('-password');
 
     res.status(200).json({
       success: true,
@@ -191,6 +219,30 @@ exports.getAllUsers = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error fetching users'
+    });
+  }
+};
+
+// @desc    Get user metadata (departments, batches)
+// @route   GET /api/admin/users/metadata
+// @access  Admin only
+exports.getUsersMetadata = async (req, res) => {
+  try {
+    const teachers = await User.find({ role: 'teacher' }).select('department email -_id').lean();
+    const students = await User.find({ role: 'student' }).select('department roll -_id').lean();
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        teachers,
+        students
+      }
+    });
+  } catch (error) {
+    console.error('Get users metadata error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching users metadata'
     });
   }
 };
