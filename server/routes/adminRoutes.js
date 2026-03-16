@@ -15,6 +15,7 @@ router.use(authorizeAdmin);
 router.get('/pending-users', adminController.getPendingUsers);
 router.put('/approve-user/:userId', adminController.approveUser);
 router.put('/reject-user/:userId', adminController.rejectUser);
+router.get('/users/metadata', adminController.getUsersMetadata);
 router.get('/users', adminController.getAllUsers);
 router.put('/users/:userId/toggle-status', adminController.toggleUserStatus);
 router.put('/users/:userId/status', adminController.setUserStatus);

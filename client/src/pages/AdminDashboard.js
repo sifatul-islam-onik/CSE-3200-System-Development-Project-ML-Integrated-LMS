@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faHourglass, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye, faExclamationTriangle, faGraduationCap } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
-import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, setDepartmentHead, removeDepartmentHead, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers, updateUserProfile, assignBatchToCourse, unassignBatchFromCourse, getAssignedBatches, getStudentBatches } from '../services/adminService';
+import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, setDepartmentHead, removeDepartmentHead, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers, updateUserProfile, assignBatchToCourse, unassignBatchFromCourse, getAssignedBatches, getStudentBatches, getUsersMetadata } from '../services/adminService';
 import { createCourse, getAllCourses, getCourse, updateCourse, deleteCourse } from '../services/courseService';
 import { getAllProposals, getProposalById, approveProposal, rejectProposal, deleteProposal } from '../services/courseProposalService';
 import { computeResults, publishResults, unpublishResults, getBatchResults } from '../services/resultService';
@@ -31,6 +31,9 @@ const AdminDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 1024);
   const [pendingUsers, setPendingUsers] = useState([]);
   const [users, setUsers] = useState([]);
+  const [systemUsersMeta, setSystemUsersMeta] = useState({ teachers: [], students: [] });
+  const [hasQueriedUsers, setHasQueriedUsers] = useState(false);
+  const [allTeachers, setAllTeachers] = useState([]);
   const [userSearch, setUserSearch] = useState('');
   const [importFile, setImportFile] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
@@ -271,6 +274,8 @@ const AdminDashboard = () => {
 
   const toggleUserGroup = (role) => {
     setSelectedUserRole(role);
+    setUsers([]);
+    setHasQueriedUsers(false);
     if (role === 'student') {
       // Fetch available batches from server
       (async () => {
@@ -287,17 +292,21 @@ const AdminDashboard = () => {
 
   const goBackUserGroups = () => {
     setSelectedUserRole(null);
+    setUsers([]);
+    setHasQueriedUsers(false);
   };
 
   const fetchAllUsers = async () => {
     setUsersLoading(true);
     setUsersError('');
     try {
-      const response = await getAllUsers();
-      setUsers(response.data || []);
+      const response = await getUsersMetadata();
+      const teachers = response.data?.teachers || [];
+      const students = response.data?.students || [];
       
+      setSystemUsersMeta({ teachers, students });
+
       // Extract unique departments from teacher accounts
-      const teachers = (response.data || []).filter(u => u.role === 'teacher');
       const depts = new Set();
       teachers.forEach(t => {
         if (t.department) {
@@ -313,7 +322,6 @@ const AdminDashboard = () => {
       setAvailableTeacherDepartments(teacherDeptList);
 
       // Extract unique departments from students
-      const students = (response.data || []).filter(u => u.role === 'student');
       const studentDepts = new Set();
       students.forEach(s => {
         if (s.department) {
@@ -330,7 +338,33 @@ const AdminDashboard = () => {
       });
       setAvailableStudentDepartments(Array.from(studentDepts).sort());
     } catch (err) {
-      setUsersError(err.response?.data?.message || 'Failed to fetch users');
+      setUsersError(err.response?.data?.message || 'Failed to fetch users metadata');
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const handleApplyUserFilter = async () => {
+    setUsersLoading(true);
+    setUsersError('');
+    try {
+      const params = { role: selectedUserRole };
+      if (userSearchText) params.search = userSearchText;
+      if (selectedUserRole === 'teacher') {
+        if (teacherFilterDept) params.department = teacherFilterDept;
+        if (teacherFilterDesignation) params.designation = teacherFilterDesignation;
+      } else if (selectedUserRole === 'student') {
+        if (studentFilterDept) params.department = studentFilterDept;
+        if (studentFilterBatch) {
+           const strBatch = String(studentFilterBatch);
+           params.batch = strBatch.length === 4 ? strBatch.slice(-2) : strBatch;
+        }
+      }
+      const res = await getAllUsers(params);
+      setUsers(res.data || []);
+      setHasQueriedUsers(true);
+    } catch (err) {
+      setUsersError(err.response?.data?.message || 'Failed to fetch filtered users');
     } finally {
       setUsersLoading(false);
     }
@@ -582,6 +616,7 @@ const AdminDashboard = () => {
     try {
       await setUserStatus(member._id, isActive);
       setSuccessMessage(`User ${isActive ? 'activated' : 'deactivated'} successfully`);
+      setUsers(prev => prev.map(u => u._id === member._id ? { ...u, isActive } : u));
       fetchAllUsers();
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
@@ -629,11 +664,11 @@ const AdminDashboard = () => {
     setLookupUser(null);
 
     try {
-      const response = await getAllUsers();
-      const allUsers = response.data || [];
-      
       const searchTerm = userLookupInput.trim().toLowerCase();
-      const foundUser = allUsers.find(u => 
+      const response = await getAllUsers({ search: searchTerm });
+      const allUsers = response.data || [];
+
+      const foundUser = allUsers.find(u =>
         (u.email || '').toLowerCase() === searchTerm ||
         (u.roll || '').toLowerCase() === searchTerm ||
         (u._id || '').toLowerCase() === searchTerm
@@ -812,11 +847,11 @@ const AdminDashboard = () => {
     setAssignmentSuccess('');
     setTeacherFilter('');
     
-    // Fetch users if not already loaded
-    if (users.length === 0) {
+    // Fetch teachers if not already loaded
+    if (allTeachers.length === 0) {
       try {
-        const response = await getAllUsers();
-        setUsers(response.data || []);
+        const response = await getAllUsers({ role: 'teacher' });
+        setAllTeachers(response.data || []);
       } catch (err) {
         setAssignmentError('Failed to load teachers');
       }
@@ -825,15 +860,15 @@ const AdminDashboard = () => {
 
   const handleAssignTeacher = async (teacherId, section) => {
     if (!selectedCourseForAssignment) return;
-    
+
     setAssignmentLoading(true);
     setAssignmentError('');
     setAssignmentSuccess('');
-    
+
     try {
       const response = await assignTeacherToCourse(selectedCourseForAssignment._id, teacherId, section);
       setAssignmentSuccess('Teacher assigned successfully');
-      
+
       // Update the selected course with the new assignment data
       if (response.data?.assignedTeachers) {
         setSelectedCourseForAssignment(prev => ({
@@ -841,7 +876,7 @@ const AdminDashboard = () => {
           assignedTeachers: response.data.assignedTeachers
         }));
       }
-      
+
       // Clear the section selection for this teacher
       setTeacherSectionSelections(prev => {
         const updated = { ...prev };
@@ -1996,8 +2031,8 @@ const AdminDashboard = () => {
       case 'users':
         // Group users by role and support drill-down view
         const groupedUsers = [
-          { role: 'teacher', members: users.filter(u => (u.role || '').toLowerCase() === 'teacher') },
-          { role: 'student', members: users.filter(u => (u.role || '').toLowerCase() === 'student') },
+          { role: 'teacher', members: systemUsersMeta.teachers },
+          { role: 'student', members: systemUsersMeta.students },
         ];
 
         return (
@@ -2155,6 +2190,13 @@ const AdminDashboard = () => {
                               <option key={b} value={String(b)}>{b}</option>
                             ))}
                           </select>
+                          <button 
+                            className="btn btn-primary" 
+                            onClick={handleApplyUserFilter}
+                            style={{ padding: '8px 16px', minWidth: '120px' }}
+                          >
+                            Apply Filter
+                          </button>
                         </div>
                       </div>
                     </>
@@ -2282,12 +2324,24 @@ const AdminDashboard = () => {
                             <option value="Assistant Professor">Assistant Professor</option>
                             <option value="Lecturer">Lecturer</option>
                           </select>
+                          <button 
+                            className="btn btn-primary" 
+                            onClick={handleApplyUserFilter}
+                            style={{ padding: '8px 16px', minWidth: '120px' }}
+                          >
+                            Apply Filter
+                          </button>
                         </div>
                       </div>
                     </>
                   )}
 
                   {/* User List */}
+                  {!hasQueriedUsers ? (
+                    <div style={{ marginTop: '20px', padding: '20px', textAlign: 'center', backgroundColor: '#f9fafb', borderRadius: '8px', color: '#6b7280' }}>
+                      <p>Please click 'Apply Filter' to load the users list from the database.</p>
+                    </div>
+                  ) : (
                   <div className="user-groups-container" style={{ marginTop: '20px' }}>
                     <h3 style={{ fontSize: '24px', marginBottom: '16px', textTransform: 'capitalize', fontWeight: '700' }}>
                       {selectedUserRole}s ({users.filter(u => {
@@ -2477,9 +2531,11 @@ const AdminDashboard = () => {
                                               if (user.isDepartmentHead) {
                                                 await removeDepartmentHead(user._id);
                                                 setSuccessMessage('Department head status removed');
+                                                setUsers(prev => prev.map(u => u._id === user._id ? { ...u, isDepartmentHead: false } : u));
                                               } else {
                                                 await setDepartmentHead(user._id);
                                                 setSuccessMessage('Appointed as department head');
+                                                setUsers(prev => prev.map(u => u._id === user._id ? { ...u, isDepartmentHead: true } : u));
                                               }
                                               fetchAllUsers();
                                               setTimeout(() => setSuccessMessage(''), 3000);
@@ -2540,7 +2596,9 @@ const AdminDashboard = () => {
                         ))}
                     </div>
                   </div>
+                  )}
                 </div>
+
               ) : groupedUsers.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-icon"><FontAwesomeIcon icon={faUsers} /></div>
@@ -3437,7 +3495,7 @@ const AdminDashboard = () => {
                   // Check if max 2 teachers already assigned
                   const hasReachedMaxTeachers = (selectedCourseForAssignment.assignedTeachers || []).length >= 2;
                   
-                  let availableTeachers = users.filter(u => 
+                  let availableTeachers = allTeachers.filter(u => 
                     u.role === 'teacher' && 
                     u.isActive &&
                     !assignedTeacherIds.includes(u._id)

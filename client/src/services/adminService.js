@@ -67,10 +67,21 @@ export const rejectUser = async (userId) => {
   }
 };
 
-// Get all users
-export const getAllUsers = async () => {
+// Get user metadata
+export const getUsersMetadata = async () => {
   try {
-    const response = await axios.get(`${API_URL}/admin/users`, getAuthHeader());
+    const response = await axios.get(`${API_URL}/admin/users/metadata`, getAuthHeader());
+    return response.data;
+  } catch (error) {
+    return handleError(error);
+  }
+};
+
+// Get all users
+export const getAllUsers = async (params = {}) => {
+  try {
+    const queryString = new URLSearchParams(params).toString();
+    const response = await axios.get(`${API_URL}/admin/users${queryString ? `?${queryString}` : ''}`, getAuthHeader());
     return response.data;
   } catch (error) {
     return handleError(error);

@@ -1,4 +1,4 @@
-﻿import React, { useRef } from 'react';
+﻿import React, { useRef, useState } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { SheetLoader } from './LoadingSpinner';
@@ -396,6 +396,7 @@ const ChartsSheet = ({
 
   // Must be called before any early returns (Rules of Hooks)
   const sectionRef = useRef(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   if (!effectiveClos.length) return <SheetLoader label="Loading Course Outcomes…" />;
   if (!programOutcomes || programOutcomes.length === 0) return <SheetLoader label="Loading Program Outcomes…" />;
@@ -441,12 +442,11 @@ const ChartsSheet = ({
   const cellStyle  = { textAlign: 'center' };
 
   const handleExportToPDF = async () => {
-    if (!sectionRef.current) return;
-    const btn = sectionRef.current.querySelector('button');
-    if (btn) btn.style.display = 'none';
+    if (!sectionRef.current || isExporting) return;
+    setIsExporting(true);
     try {
       // A4 portrait: 595 x 842 pt
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true });
       const pageW = pdf.internal.pageSize.getWidth();   // 595
       const pageH = pdf.internal.pageSize.getHeight();  // 842
       const margin = 28;
@@ -495,14 +495,16 @@ const ChartsSheet = ({
         }
 
         const xPos = margin + (contentW - drawW) / 2;
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', xPos, currentY, drawW, drawH);
+        pdf.addImage(canvas.toDataURL('image/jpeg', 1.0), 'JPEG', xPos, currentY, drawW, drawH, undefined, 'FAST');
         currentY += drawH + 10;
         isFirstPage = false;
       }
 
       pdf.save(`Charts_${courseCode}.pdf`);
+    } catch (err) {
+      console.error(err);
     } finally {
-      if (btn) btn.style.display = '';
+      setIsExporting(false);
     }
   };
 
@@ -512,9 +514,18 @@ const ChartsSheet = ({
         <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#2c3e50', margin: 0 }}>Charts</h3>
         <button
           onClick={handleExportToPDF}
-          style={{ flexShrink: 0, marginLeft: '16px', backgroundColor: '#e74c3c', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 18px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
+          disabled={isExporting}
+          className={isExporting ? "loading" : ""}
+          style={{ flexShrink: 0, marginLeft: '16px', backgroundColor: isExporting ? '#95a5a6' : '#e74c3c', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 18px', cursor: isExporting ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}
         >
-          Export to PDF
+          {isExporting ? (
+            <>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+              Exporting...
+            </>
+          ) : (
+            'Export to PDF'
+          )}
         </button>
       </div>
 
