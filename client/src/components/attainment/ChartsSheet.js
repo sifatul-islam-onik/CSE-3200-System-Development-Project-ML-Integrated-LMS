@@ -103,26 +103,35 @@ const fmt = v => (v != null && v !== 0 && !isNaN(v)) ? v : '-';
 
 // â”€â”€ SVG Bar Chart helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const CHART_H   = 320;
-const PAD        = { top: 30, right: 40, bottom: 72, left: 56 };
+const CHART_H   = 380;
+const DEFAULT_PAD = { top: 40, right: 40, bottom: 80, left: 60 };
+const TIGHT_PAD   = { top: 40, right: 40, bottom: 80, left: 60 }; // Reset tight pad for now, will adjust in components if needed, or use specific tight logic for combined. 
+// User asked to increase combined CO/PO combined charts on left/right -> decrease margins.
+// So TIGHT_PAD should be smaller.
+const REDUCED_PAD = { top: 40, right: 20, bottom: 80, left: 20 };
+
 const THRESHOLD  = 55;
-const PLOT_H     = CHART_H - PAD.top - PAD.bottom;
+const PLOT_H     = CHART_H - DEFAULT_PAD.top - DEFAULT_PAD.bottom;
 
-const computeChartW = (n, minPerBar = 68) =>
-  Math.min(560, Math.max(320, n * minPerBar + PAD.left + PAD.right));
+const computeChartW = (n, minPerBar = 110, pad = DEFAULT_PAD) =>
+  Math.min(1000, Math.max(480, n * minPerBar + pad.left + pad.right));
 
-const ChartCard = ({ children }) => (
-  <div style={{
-    display: 'inline-block',
-    width: '100%',
-    marginTop: '28px',
-    background: '#fff',
-    borderRadius: '10px',
-    border: '1px solid #e2e8f0',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
-    padding: '20px 24px 16px',
-    boxSizing: 'border-box',
-  }}>
+const ChartCard = ({ children, tight = false }) => (
+  <div
+    style={{
+      display: 'flex',
+      flexDirection: 'column',
+      width: '100%',
+      marginTop: '28px',
+      background: '#fff',
+      borderRadius: '10px',
+      border: '1px solid #e2e8f0',
+      boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
+      padding: tight ? '20px 0px 16px' : '20px 24px 16px',
+      boxSizing: 'border-box',
+    }}
+    data-chart-card="true"
+  >
     {children}
   </div>
 );
@@ -133,11 +142,12 @@ let _gradId = 0;
 const SingleBarChart = ({ title, labels, values, color = '#2563eb', yLabel = 'Achieved (%)', wide = false }) => {
   const n      = labels.length;
   if (n === 0) return null;
-  const chartW = wide ? 700 : computeChartW(n);
-  const plotW  = chartW - PAD.left - PAD.right;
+  const pad    = DEFAULT_PAD;
+  const chartW = wide ? 700 : computeChartW(n, 110, pad);
+  const plotW  = chartW - pad.left - pad.right;
   const maxVal = Math.max(100, ...values.map(v => typeof v === 'number' ? v : 0));
   const yTicks = [0, 20, 40, 60, 80, 100].filter(t => t <= maxVal + 5);
-  const barW   = Math.max(wide ? 10 : 18, Math.floor(plotW / n) - (wide ? 6 : 8));
+  const barW   = Math.max(wide ? 10 : 20, Math.floor(plotW / n) - (wide ? 6 : 14));
   const xStep  = plotW / n;
   const thY    = PLOT_H - (THRESHOLD / maxVal) * PLOT_H;
   const gradId = `sg${++_gradId}`;
@@ -156,24 +166,24 @@ const SingleBarChart = ({ title, labels, values, color = '#2563eb', yLabel = 'Ac
           </linearGradient>
         </defs>
       )}
-      <g transform={`translate(${PAD.left},${PAD.top})`}>
+      <g transform={`translate(${pad.left},${pad.top})`}>
         {!wide && <rect x={0} y={0} width={plotW} height={PLOT_H} fill="#f8fafc" rx={3} />}
         {yTicks.map(t => {
           const y = PLOT_H - (t / maxVal) * PLOT_H;
           return (
             <g key={t}>
               <line x1={0} y1={y} x2={plotW} y2={y} stroke={wide ? '#ddd' : '#e2e8f0'} strokeDasharray={wide ? '3,3' : undefined} strokeWidth={1} />
-              <text x={wide ? -6 : -8} y={y + 4} textAnchor="end" fontSize={wide ? 11 : 10} fill={wide ? '#555' : '#64748b'}>{t}</text>
+              <text x={wide ? -6 : -8} y={y + 4} textAnchor="end" fontSize={wide ? 13 : 12} fill={wide ? '#555' : '#64748b'}>{t}</text>
             </g>
           );
         })}
         {!wide && (
           <>
             <line x1={0} y1={thY} x2={plotW} y2={thY} stroke="#ef4444" strokeDasharray="5,3" strokeWidth={1.5} />
-            <text x={plotW + 6} y={thY + 4} fontSize={9} fill="#ef4444" fontWeight="bold">55%</text>
+            <text x={plotW + 6} y={thY + 4} fontSize={11} fill="#ef4444" fontWeight="bold">55%</text>
           </>
         )}
-        <text transform="rotate(-90)" x={-PLOT_H / 2} y={wide ? -38 : -42} textAnchor="middle" fontSize={wide ? 12 : 11} fill={wide ? '#333' : '#475569'}>{yLabel}</text>
+        <text transform="rotate(-90)" x={-PLOT_H / 2} y={wide ? -38 : -42} textAnchor="middle" fontSize={wide ? 14 : 13} fill={wide ? '#333' : '#475569'}>{yLabel}</text>
         <line x1={0} y1={0} x2={0} y2={PLOT_H} stroke={wide ? '#333' : '#94a3b8'} strokeWidth={wide ? 1 : 1.5} />
         <line x1={0} y1={PLOT_H} x2={plotW} y2={PLOT_H} stroke={wide ? '#333' : '#94a3b8'} strokeWidth={wide ? 1 : 1.5} />
         {labels.map((lbl, i) => {
@@ -190,13 +200,13 @@ const SingleBarChart = ({ title, labels, values, color = '#2563eb', yLabel = 'Ac
                 rx={wide ? 2 : 3}
               />
               {val > 0 && (
-                <text x={cx} y={PLOT_H - barH - (wide ? 4 : 5)} textAnchor="middle" fontSize={wide ? 10 : 10} fontWeight={wide ? undefined : '600'} fill={wide ? '#333' : '#1e293b'}>
+                <text x={cx} y={PLOT_H - barH - (wide ? 4 : 5)} textAnchor="middle" fontSize={wide ? 12 : 11} fontWeight={wide ? undefined : '600'} fill={wide ? '#333' : '#1e293b'}>
                   {val}
                 </text>
               )}
               <text
                 x={cx} y={PLOT_H + (wide ? 14 : 16)}
-                textAnchor="middle" fontSize={11} fill={wide ? '#333' : '#374151'} fontWeight={wide ? undefined : '500'}
+                textAnchor="middle" fontSize={13} fill={wide ? '#333' : '#374151'} fontWeight={wide ? undefined : '500'}
                 transform={n > 8 ? `rotate(${wide ? -35 : -40},${cx},${PLOT_H + (wide ? 14 : 16)})` : undefined}
               >
                 {lbl}
@@ -217,17 +227,17 @@ const SingleBarChart = ({ title, labels, values, color = '#2563eb', yLabel = 'Ac
     );
   }
   return (
-    <ChartCard>
-      <h4 style={{ margin: '0 0 14px', color: '#1e293b', textAlign: 'center', fontWeight: 700, fontSize: '14px' }}>
+    <ChartCard tight={!wide}>
+      <h4 style={{ margin: '0 0 14px', color: '#1e293b', textAlign: 'center', fontWeight: 700, fontSize: '16px' }}>
         {title}
       </h4>
       <div style={{ display: 'flex', justifyContent: 'center' }}>{inner}</div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: '18px', marginTop: '10px' }}>
-        <span style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <span style={{ fontSize: '13px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '5px' }}>
           <span style={{ width: 12, height: 12, background: color, borderRadius: 2, display: 'inline-block' }} />
           Achieved (&ge;55%)
         </span>
-        <span style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <span style={{ fontSize: '13px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '5px' }}>
           <span style={{ width: 12, height: 12, background: '#f87171', borderRadius: 2, display: 'inline-block' }} />
           Not achieved (&lt;55%)
         </span>
@@ -240,15 +250,16 @@ const SingleBarChart = ({ title, labels, values, color = '#2563eb', yLabel = 'Ac
 const SERIES_COLORS       = ['#2563eb', '#16a34a', '#d97706'];
 const SERIES_COLORS_LIGHT = ['#3b82f6', '#22c55e', '#f59e0b'];
 
-const GroupedBarChart = ({ title, labels, series, yLabel, wide = false }) => {
+const GroupedBarChart = ({ title, labels, series, yLabel, wide = false, hideBarText = false }) => {
   const n = labels.length;
   const k = series.length;
   if (n === 0 || k === 0) return null;
+  const pad      = wide ? DEFAULT_PAD : REDUCED_PAD;
   const allVals  = series.flatMap(s => s.values.map(v => typeof v === 'number' ? v : 0));
   const maxVal   = Math.max(100, ...allVals);
   const yTicks   = [0, 20, 40, 60, 80, 100].filter(t => t <= maxVal + 5);
-  const chartW   = wide ? 700 : computeChartW(n, Math.max(56, k * 22 + 12));
-  const plotW    = chartW - PAD.left - PAD.right;
+  const chartW   = wide ? 700 : computeChartW(n, Math.max(130, k * 35 + 20), pad);
+  const plotW    = chartW - pad.left - pad.right;
   const groupW   = plotW / n;
   const gap      = wide ? 3 : 4;
   const barW     = Math.max(wide ? 6 : 8, Math.floor((groupW - gap * (k + 1)) / k));
@@ -258,7 +269,7 @@ const GroupedBarChart = ({ title, labels, series, yLabel, wide = false }) => {
   const legend = (
     <div style={{ display: 'flex', justifyContent: 'center', gap: wide ? '20px' : '18px', marginBottom: wide ? '6px' : '10px', flexWrap: 'wrap' }}>
       {series.map((s, si) => (
-        <div key={si} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: wide ? '#333' : '#374151' }}>
+        <div key={si} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '14px', color: wide ? '#333' : '#374151' }}>
           <div style={{ width: wide ? 14 : 13, height: wide ? 14 : 13, background: SERIES_COLORS[si], borderRadius: 2 }} />
           {s.label}
         </div>
@@ -282,24 +293,24 @@ const GroupedBarChart = ({ title, labels, series, yLabel, wide = false }) => {
           ))}
         </defs>
       )}
-      <g transform={`translate(${PAD.left},${PAD.top})`}>
+      <g transform={`translate(${pad.left},${pad.top})`}>
         {!wide && <rect x={0} y={0} width={plotW} height={PLOT_H} fill="#f8fafc" rx={3} />}
         {yTicks.map(t => {
           const y = PLOT_H - (t / maxVal) * PLOT_H;
           return (
             <g key={t}>
               <line x1={0} y1={y} x2={plotW} y2={y} stroke={wide ? '#ddd' : '#e2e8f0'} strokeDasharray={wide ? '3,3' : undefined} strokeWidth={1} />
-              <text x={wide ? -6 : -8} y={y + 4} textAnchor="end" fontSize={wide ? 11 : 10} fill={wide ? '#555' : '#64748b'}>{t}</text>
+              <text x={wide ? -6 : -8} y={y + 4} textAnchor="end" fontSize={wide ? 13 : 12} fill={wide ? '#555' : '#64748b'}>{t}</text>
             </g>
           );
         })}
         {!wide && (
           <>
             <line x1={0} y1={thY} x2={plotW} y2={thY} stroke="#ef4444" strokeDasharray="5,3" strokeWidth={1.5} />
-            <text x={plotW + 6} y={thY + 4} fontSize={9} fill="#ef4444" fontWeight="bold">55%</text>
+            <text x={plotW + 6} y={thY + 4} fontSize={11} fill="#ef4444" fontWeight="bold">55%</text>
           </>
         )}
-        {yLabel && <text transform="rotate(-90)" x={-PLOT_H / 2} y={wide ? -38 : -42} textAnchor="middle" fontSize={wide ? 12 : 11} fill={wide ? '#333' : '#475569'}>{yLabel}</text>}
+        {yLabel && <text transform="rotate(-90)" x={-PLOT_H / 2} y={wide ? -38 : -42} textAnchor="middle" fontSize={wide ? 14 : 13} fill={wide ? '#333' : '#475569'}>{yLabel}</text>}
         <line x1={0} y1={0} x2={0} y2={PLOT_H} stroke={wide ? '#333' : '#94a3b8'} strokeWidth={wide ? 1 : 1.5} />
         <line x1={0} y1={PLOT_H} x2={plotW} y2={PLOT_H} stroke={wide ? '#333' : '#94a3b8'} strokeWidth={wide ? 1 : 1.5} />
         {labels.map((lbl, i) => {
@@ -319,8 +330,8 @@ const GroupedBarChart = ({ title, labels, series, yLabel, wide = false }) => {
                       fill={wide ? SERIES_COLORS[si] : `url(#gg${gid}_${si})`}
                       rx={2}
                     />
-                    {!wide && barH > 14 && barW > 12 && (
-                      <text x={bx + barW / 2} y={PLOT_H - barH - 3} textAnchor="middle" fontSize={8} fill="#1e293b" fontWeight="600">
+                    {!wide && !hideBarText && barH > 14 && barW > 12 && (
+                      <text x={bx + barW / 2} y={PLOT_H - barH - 3} textAnchor="middle" fontSize={10} fill="#1e293b" fontWeight="600">
                         {val}
                       </text>
                     )}
@@ -329,7 +340,7 @@ const GroupedBarChart = ({ title, labels, series, yLabel, wide = false }) => {
               })}
               <text
                 x={cx} y={PLOT_H + (wide ? 14 : 16)}
-                textAnchor="middle" fontSize={11} fill={wide ? '#333' : '#374151'} fontWeight={wide ? undefined : '500'}
+                textAnchor="middle" fontSize={13} fill={wide ? '#333' : '#374151'} fontWeight={wide ? undefined : '500'}
                 transform={n > 8 ? `rotate(${wide ? -35 : -40},${cx},${PLOT_H + (wide ? 14 : 16)})` : undefined}
               >
                 {lbl}
@@ -352,7 +363,7 @@ const GroupedBarChart = ({ title, labels, series, yLabel, wide = false }) => {
   }
   return (
     <ChartCard>
-      <h4 style={{ margin: '0 0 10px', color: '#1e293b', textAlign: 'center', fontWeight: 700, fontSize: '14px' }}>
+      <h4 style={{ margin: '0 0 10px', color: '#1e293b', textAlign: 'center', fontWeight: 700, fontSize: '16px' }}>
         {title}
       </h4>
       {legend}
@@ -449,22 +460,32 @@ const ChartsSheet = ({
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true });
       const pageW = pdf.internal.pageSize.getWidth();   // 595
       const pageH = pdf.internal.pageSize.getHeight();  // 842
-      const margin = 28;
+      const margin = 10;
       const contentW = pageW - margin * 2;
       const maxContentH = pageH - margin * 2;
 
-      // Skip heading (children[0]) and button wrapper (children[1]) — heading is
+      // Skip heading/button wrapper (children[0]) — heading is
       // rendered as text via jsPDF below; button is hidden anyway.
-      const blocks = Array.from(sectionRef.current.children).slice(2);
+      // We start from index 1 to include the CO Attainment table.
+      const blocks = Array.from(sectionRef.current.children).slice(1);
       let currentY = margin;
 
       // Render heading as text on the first page
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(14);
-      pdf.setTextColor('#2c3e50');
+      pdf.setFontSize(18);
+      pdf.setTextColor('#1e293b');
       const headingLines = pdf.splitTextToSize(pdfHeading, contentW);
-      pdf.text(headingLines, margin, currentY + 14);
-      currentY += headingLines.length * 18 + 10;
+      // Center the title
+      pdf.text(headingLines, pageW / 2, currentY + 20, { align: 'center' });
+      
+      // Add a decorative underline
+      const titleHeight = headingLines.length * 24; // approx line height
+      const lineWidth = 400; // width of the underline - increased for visibility
+      pdf.setDrawColor(37, 99, 235); // blue underline #2563eb
+      pdf.setLineWidth(2.5); // thicker line
+      pdf.line((pageW - lineWidth) / 2, currentY + titleHeight, (pageW + lineWidth) / 2, currentY + titleHeight);
+      
+      currentY += titleHeight + 30; // space after title
 
       let isFirstPage = true;
 
@@ -476,6 +497,13 @@ const ChartsSheet = ({
           backgroundColor: '#ffffff',
           scrollX: 0,
           scrollY: -window.scrollY,
+          onclone: (clonedDoc) => {
+            const chartCards = clonedDoc.querySelectorAll('[data-chart-card="true"]');
+            chartCards.forEach(card => {
+              card.style.border = 'none';
+              card.style.boxShadow = 'none';
+            });
+          }
         });
         const ratio = contentW / canvas.width;
         let drawW = contentW;
@@ -554,32 +582,29 @@ const ChartsSheet = ({
 
 
       {/* CO Charts - all on one page */}
-      <div>
       {/* â”€â”€ Charts â”€â”€ */}
       {/* Charts grid — CO charts, 2 columns on wide screens */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '0 24px' }}>
-        <SingleBarChart
-          title={`CO Attainment \u2014 ${pairLabel}`}
-          labels={coNames}
-          values={coAchievedVals}
-          color="#2563eb"
-          yLabel="Achieved (%)"
-        />
-        <SingleBarChart
-          title={`CO Attainment (Unnorm) \u2014 ${pairLabel}`}
-          labels={coNames}
-          values={coUnnormVals}
-          color="#16a34a"
-          yLabel="Unnorm Achieved (%)"
-        />
-        <SingleBarChart
-          title={`CO Attainment (Eq. Wt.) \u2014 ${pairLabel}`}
-          labels={coNames}
-          values={coEqWtVals}
-          color="#d97706"
-          yLabel="Eq. Wt. Achieved (%)"
-        />
-      </div>
+      <SingleBarChart
+        title={`CO Attainment \u2014 ${pairLabel}`}
+        labels={coNames}
+        values={coAchievedVals}
+        color="#2563eb"
+        yLabel="Achieved (%)"
+      />
+      <SingleBarChart
+        title={`CO Attainment (Unnorm) \u2014 ${pairLabel}`}
+        labels={coNames}
+        values={coUnnormVals}
+        color="#16a34a"
+        yLabel="Unnorm Achieved (%)"
+      />
+      <SingleBarChart
+        title={`CO Attainment (Eq. Wt.) \u2014 ${pairLabel}`}
+        labels={coNames}
+        values={coEqWtVals}
+        color="#d97706"
+        yLabel="Eq. Wt. Achieved (%)"
+      />
       <GroupedBarChart
         title={`CO Attainment (All Methods) \u2014 ${pairLabel}`}
         labels={coNames}
@@ -588,11 +613,9 @@ const ChartsSheet = ({
           { label: 'Unnorm Achieved(%)',  values: coUnnormVals   },
           { label: 'Eq. Wt. Achieved(%)', values: coEqWtVals    },
         ]}
-        wide
       />
-      </div>
       {/* PO Attainment Table */}
-      <div data-pdf-skip="true" className="table-container" style={{ marginTop: '30px', overflowX: 'auto' }}>
+      <div className="table-container" style={{ marginTop: '30px', overflowX: 'auto' }}>
         <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>
           PO Attainment of {pairLabel}
         </h4>
@@ -623,7 +646,6 @@ const ChartsSheet = ({
         values={poAchievedVals}
         color="#2563eb"
         yLabel="Achieved (%)"
-        wide
       />
       <SingleBarChart
         title={`PO Attainment (Unnorm) \u2014 ${pairLabel}`}
@@ -631,7 +653,6 @@ const ChartsSheet = ({
         values={poUnnormVals}
         color="#16a34a"
         yLabel="Unnorm Achieved (%)"
-        wide
       />
       <SingleBarChart
         title={`PO Attainment (Eq. Wt.) \u2014 ${pairLabel}`}
@@ -639,17 +660,16 @@ const ChartsSheet = ({
         values={poEqWtVals}
         color="#d97706"
         yLabel="Eq. Wt. Achieved (%)"
-        wide
       />
       <GroupedBarChart
         title={`PO Attainment (All Methods) \u2014 ${pairLabel}`}
         labels={poNames}
+        hideBarText={true}
         series={[
           { label: 'Achieved(%)',          values: poAchievedVals },
           { label: 'Unnorm Achieved(%)',   values: poUnnormVals   },
           { label: 'Eq. Wt. Achieved(%)', values: poEqWtVals     },
         ]}
-        wide
       />
     </section>
   );
