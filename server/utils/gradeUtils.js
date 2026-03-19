@@ -511,6 +511,7 @@ module.exports = {
   computeCTFactors,
   computeAssignmentColumnTotals,
   computeAssignmentFactors,
+  computeLabActivityColumnTotals,
   getStudentCTFactoredMarks,
   getStudentAssignmentFactoredMarks,
   computeSectionCOMarks,

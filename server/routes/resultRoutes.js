@@ -7,6 +7,7 @@ const {
   publishResults,
   unpublishResults,
   getBatchResults,
+  getBatchCOAttainments,
   getStudentResults,
   getStudentResultsByAdmin,
 } = require('../controllers/resultController');
@@ -22,6 +23,9 @@ router.post('/unpublish', authenticateUser, authorizeAdmin, unpublishResults);
 
 // Admin: get all results for a batch+term (includes drafts)
 router.get('/batch', authenticateUser, authorizeAdmin, getBatchResults);
+
+// Admin/Teacher: get all CO attainment statistics for a batch+term
+router.get('/batch-co-attainments', authenticateUser, authorizeRoles('admin', 'teacher'), getBatchCOAttainments);
 
 // Student: get own published results
 router.get('/student', authenticateUser, authorizeRoles('student', 'admin'), getStudentResults);
