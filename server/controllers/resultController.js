@@ -6,7 +6,9 @@ const TermExamAttainment = require('../models/TermExamAttainment');
 const TermExamMarks = require('../models/TermExamMarks');
 const LabActivityAttainment = require('../models/LabActivityAttainment');
 const TermResult = require('../models/TermResult');
+const CourseCOAttainment = require('../models/CourseCOAttainment');
 const User = require('../models/User');
+const { calculateCourseCOAttainment } = require('../utils/coAttainmentCalc');
 const {
   computeStudentTotal,
   getLetterGrade,
@@ -151,18 +153,14 @@ const loadLabCourseAttainmentData = async (courseId) => {
     return {};
   };
 
-  return {
-    labActivityRows: labDoc.labActivityRows || [],
-    labActivityObtainedRows: labDoc.labActivityObtainedRows || [],
-    labAttendanceMarks: labDoc.labAttendanceMarks || 0,
-    labQuizMarks: labDoc.labQuizMarks || 0,
-    labVivaMarks: labDoc.labVivaMarks || 0,
-    activityTaken: labDoc.activityTaken || 5,
-    useEqWtActivity: labDoc.useEqWtActivity || 0,
-    coMappedActivityMarks: labDoc.coMappedActivityMarks || 0,
-    labActivityManualWts: unwrapMap(labDoc.labActivityManualWts),
-    otherActivityRemaining: labDoc.otherActivityRemaining || 0,
-  };
+    const labActivityRows = labDoc.labActivityRows || [];
+    const coNumbers = labActivityRows.map(row => String(row.coNumber || '').replace('CLO', 'CO')).filter(Boolean);
+
+    return {
+      coNumbers: [...new Set(coNumbers)], // Deduplicate
+      labActivityRows,
+      labActivityScores: unwrapMap(labDoc.labActivityScores)
+    };
 };
 
 // ---------------------------------------------------------------------------
@@ -258,14 +256,14 @@ exports.computeResults = async (req, res) => {
           totalMarks = attainment ? computeLabStudentTotal(student.roll, attainment) : 0;
           letterGrade = getLetterGradeForLab(totalMarks);
         } else {
-          totalMarks = computeStudentTotal(
+          totalMarks = attainment ? computeStudentTotal(
             student.roll,
             attainment.coNumbers,
             attainment.sectionAData,
             attainment.sectionBData,
             attainment.ctData,
             attainment.assignData
-          );
+          ) : 0;
           letterGrade = getLetterGrade(totalMarks);
         }
         const gradePoint = getGradePoint(letterGrade);
@@ -331,6 +329,38 @@ exports.computeResults = async (req, res) => {
       await TermResult.bulkWrite(bulkOps);
     }
 
+    // Compute and save CO Attainments per course blindly during the batch result generation
+    const coAttainmentBulkOps = [];
+    for (const course of courses) {
+      const { data: attainment, isLab } = courseAttainmentMap.get(String(course._id)) || {};
+      
+      if (!attainment || !attainment.coNumbers) {
+        continue;
+      }
+
+      const coStats = calculateCourseCOAttainment(course.course_type, students, attainment.coNumbers, attainment);
+
+      coAttainmentBulkOps.push({
+        updateOne: {
+          filter: { course: course._id, batch, yearLevel: Number(yearLevel), term: Number(term) },
+          update: {
+            $set: {
+              deptCode,
+              coData: coStats,
+              isPublished: false,
+              publishedAt: null,
+              publishedBy: null,
+            }
+          },
+          upsert: true
+        }
+      });
+    }
+
+    if (coAttainmentBulkOps.length > 0) {
+      await CourseCOAttainment.bulkWrite(coAttainmentBulkOps);
+    }
+
     // Retrieve the saved documents to return
     const savedResults = await TermResult.find({
       student: { $in: studentIds },
@@ -362,6 +392,24 @@ exports.publishResults = async (req, res) => {
     }
 
     const result = await TermResult.updateMany(
+      {
+        batch,
+        deptCode,
+        yearLevel: Number(yearLevel),
+        term: Number(term),
+        isPublished: false,
+      },
+      {
+        $set: {
+          isPublished: true,
+          publishedAt: new Date(),
+          publishedBy: req.user._id,
+        },
+      }
+    );
+
+    // Also publish the aggregated CO Attainments
+    await CourseCOAttainment.updateMany(
       {
         batch,
         deptCode,
@@ -417,6 +465,24 @@ exports.unpublishResults = async (req, res) => {
       }
     );
 
+    // Also unpublish the aggregated CO Attainments
+    await CourseCOAttainment.updateMany(
+      {
+        batch,
+        deptCode,
+        yearLevel: Number(yearLevel),
+        term: Number(term),
+        isPublished: true,
+      },
+      {
+        $set: {
+          isPublished: false,
+          publishedAt: null,
+          publishedBy: null,
+        },
+      }
+    );
+
     return res.status(200).json({
       message: `Unpublished ${result.modifiedCount} result(s).`,
       modifiedCount: result.modifiedCount,
@@ -455,6 +521,35 @@ exports.getBatchResults = async (req, res) => {
   } catch (err) {
     console.error('[resultController.getBatchResults]', err);
     return res.status(500).json({ message: 'Failed to fetch batch results.', error: err.message });
+  }
+};
+
+// ============================================================================
+// Get computed CO attainments for a specific batch+term
+// Admin/Teacher: get all CO stats for the batch (includes drafts)
+// ============================================================================
+exports.getBatchCOAttainments = async (req, res) => {
+  try {
+    const { batch, deptCode, yearLevel, term, publishedOnly } = req.query;
+    if (!batch || !deptCode || !yearLevel || !term) {
+      return res.status(400).json({ message: 'batch, deptCode, yearLevel, and term are required.' });
+    }
+
+    const filter = {
+      batch,
+      deptCode,
+      yearLevel: Number(yearLevel),
+      term: Number(term),
+    };
+    if (publishedOnly === 'true') filter.isPublished = true;
+
+    const coAttainments = await CourseCOAttainment.find(filter)
+        .populate('course', 'courseCode courseTitle course_type')
+
+    return res.status(200).json({ coAttainments });
+  } catch (err) {
+    console.error('[resultController.getBatchCOAttainments]', err);
+    return res.status(500).json({ message: 'Failed to fetch batch CO attainments.', error: err.message });
   }
 };
 

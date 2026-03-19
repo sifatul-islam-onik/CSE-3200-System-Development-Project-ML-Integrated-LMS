@@ -6,9 +6,10 @@ import { getUser, logout } from '../components/ProtectedRoute';
 import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, setDepartmentHead, removeDepartmentHead, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers, updateUserProfile, assignBatchToCourse, unassignBatchFromCourse, getAssignedBatches, getStudentBatches, getUsersMetadata } from '../services/adminService';
 import { createCourse, getAllCourses, getCourse, updateCourse, deleteCourse } from '../services/courseService';
 import { getAllProposals, getProposalById, approveProposal, rejectProposal, deleteProposal } from '../services/courseProposalService';
-import { computeResults, publishResults, unpublishResults, getBatchResults } from '../services/resultService';
+import { computeResults, publishResults, unpublishResults, getBatchResults, getBatchCOAttainments } from '../services/resultService';
 import CourseForm from '../components/CourseForm';
 import CourseOBEView from '../components/CourseOBEView';
+import AttainmentView from '../components/AttainmentView';
 import '../styles/Dashboard.css';
 import '../styles/AdminDashboard.css';
 import '../styles/spinner.css';
@@ -25,6 +26,10 @@ const AdminDashboard = () => {
   const [resultYearLevel, setResultYearLevel] = useState('1');
   const [resultTerm, setResultTerm] = useState('1');
   const [batchResults, setBatchResults] = useState([]);
+  const [batchCOAttainments, setBatchCOAttainments] = useState([]);
+  const [resultsActiveTab, setResultsActiveTab] = useState('student-results'); // 'student-results' or 'co-attainments'
+  const [showAttainmentModal, setShowAttainmentModal] = useState(false);
+  const [selectedAttainmentCourse, setSelectedAttainmentCourse] = useState(null);
   const [resultsLoading, setResultsLoading] = useState(false);
   const [resultsMsg, setResultsMsg] = useState('');
   const [resultsMsgType, setResultsMsgType] = useState('success');
@@ -2978,6 +2983,10 @@ const AdminDashboard = () => {
                     try {
                       const fetched = await getBatchResults({ batch: resultBatch, deptCode: resultDeptCode, yearLevel: resultYearLevel, term: resultTerm });
                       setBatchResults(fetched.results || []);
+                      
+                      const fetchedCO = await getBatchCOAttainments({ batch: resultBatch, deptCode: resultDeptCode, yearLevel: resultYearLevel, term: resultTerm });
+                      setBatchCOAttainments(fetchedCO.coAttainments || []);
+
                       if (!fetched.results?.length) {
                         setResultsMsg('No saved results found for this batch/term.');
                         setResultsMsgType('error');
@@ -3012,6 +3021,9 @@ const AdminDashboard = () => {
                       setResultsMsgType('success');
                       const fetched = await getBatchResults({ batch: resultBatch, deptCode: resultDeptCode, yearLevel: resultYearLevel, term: resultTerm });
                       setBatchResults(fetched.results || []);
+                      
+                      const fetchedCO = await getBatchCOAttainments({ batch: resultBatch, deptCode: resultDeptCode, yearLevel: resultYearLevel, term: resultTerm });
+                      setBatchCOAttainments(fetchedCO.coAttainments || []);
                     } catch (err) {
                       setResultsMsg(err.response?.data?.message || 'Failed to compute results.');
                       setResultsMsgType('error');
@@ -3070,39 +3082,136 @@ const AdminDashboard = () => {
                 </button>
               </div>
 
-              {/* Results preview table */}
-              {batchResults.length > 0 && (
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                    <thead>
-                      <tr>
-                        <th style={{ padding: '8px 10px', textAlign: 'left' }}>Roll</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'left' }}>Name</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>Credit Taken</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>Credit Completed</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>Term GPA</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>CGPA</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {batchResults.map((r, i) => (
-                        <tr key={r._id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                          <td style={{ padding: '7px 10px' }}>{r.studentRoll}</td>
-                          <td style={{ padding: '7px 10px' }}>{r.studentName}</td>
-                          <td style={{ padding: '7px 10px', textAlign: 'center' }}>{r.creditTaken}</td>
-                          <td style={{ padding: '7px 10px', textAlign: 'center' }}>{r.creditCompleted}</td>
-                          <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>{r.termGPA?.toFixed(2)}</td>
-                          <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>{r.cgpa?.toFixed(2)}</td>
-                          <td style={{ padding: '7px 10px', textAlign: 'center' }}>
-                            <span style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 700, background: r.isPublished ? '#dcfce7' : '#fef9c3', color: r.isPublished ? '#166534' : '#92400e' }}>
-                              {r.isPublished ? 'Published' : 'Draft'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {/* Results & CO Attainments view */}
+              {(batchResults.length > 0 || batchCOAttainments.length > 0) && (
+                <div style={{ marginTop: '20px' }}>
+                  <div style={{ marginBottom: '16px', display: 'flex', gap: '8px' }}>
+                    <button 
+                      className={`btn ${resultsActiveTab === 'student-results' ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setResultsActiveTab('student-results')}
+                    >
+                      Student Results
+                    </button>
+                    <button 
+                      className={`btn ${resultsActiveTab === 'co-attainments' ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setResultsActiveTab('co-attainments')}
+                    >
+                      CO Attainments
+                    </button>
+                  </div>
+
+                  {resultsActiveTab === 'student-results' && batchResults.length > 0 && (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                          <tr>
+                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>Roll</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>Name</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'center' }}>Credit Taken</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'center' }}>Credit Completed</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'center' }}>Term GPA</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'center' }}>CGPA</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'center' }}>Status</th>
+                              <th style={{ padding: '8px 10px', textAlign: 'center' }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {batchResults.map((r, i) => (
+                            <tr key={r._id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                              <td style={{ padding: '7px 10px' }}>{r.studentRoll}</td>
+                              <td style={{ padding: '7px 10px' }}>{r.studentName}</td>
+                              <td style={{ padding: '7px 10px', textAlign: 'center' }}>{r.creditTaken}</td>
+                              <td style={{ padding: '7px 10px', textAlign: 'center' }}>{r.creditCompleted}</td>
+                              <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>{r.termGPA?.toFixed(2)}</td>
+                              <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>{r.cgpa?.toFixed(2)}</td>
+                              <td style={{ padding: '7px 10px', textAlign: 'center' }}>
+                                <span style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 700, background: r.isPublished ? '#dcfce7' : '#fef9c3', color: r.isPublished ? '#166534' : '#92400e' }}>
+                                  {r.isPublished ? 'Published' : 'Draft'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {resultsActiveTab === 'co-attainments' && batchCOAttainments.length > 0 && (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                          <tr>
+                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>Course</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'center' }}>Type</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>CO Data</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'center' }}>Status</th>
+                              <th style={{ padding: '8px 10px', textAlign: 'center' }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {batchCOAttainments.map((att, i) => (
+                            <tr key={att._id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top' }}>
+                              <td style={{ padding: '10px' }}>
+                                <strong>{att.course?.courseCode}</strong><br/>
+                                <span style={{ color: '#4b5563', fontSize: '12px' }}>{att.course?.courseTitle}</span>
+                              </td>
+                              <td style={{ padding: '10px', textAlign: 'center' }}>
+                                <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 600, background: '#e0e7ff', color: '#1e40af' }}>
+                                  {att.course?.course_type}
+                                </span>
+                              </td>
+                              <td style={{ padding: '10px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  {att.coData.map((co) => (
+                                    <div key={co.coNumber} style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <strong style={{ minWidth: '40px' }}>{co.coNumber}:</strong> 
+                                      <span style={{ 
+                                        fontWeight: 'bold',
+                                        color: co.attainmentLevel === 0 ? '#dc2626' : (co.attainmentLevel === 3 ? '#166534' : '#000') 
+                                      }}>
+                                        Level {co.attainmentLevel}
+                                      </span> 
+                                      <span style={{ color: '#6b7280' }}>
+                                        ({co.passPercentage?.toFixed(1)}% passed, {co.studentsPassed}/{co.studentsAttempted})
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                              <td style={{ padding: '10px', textAlign: 'center' }}>
+                                <span style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 700, background: att.isPublished ? '#dcfce7' : '#fef9c3', color: att.isPublished ? '#166534' : '#92400e' }}>
+                                  {att.isPublished ? 'Published' : 'Draft'}
+                                </span>
+                              </td>
+                                <td style={{ padding: '10px', textAlign: 'center' }}>
+                                  <button
+                                    className="btn btn-sm btn-secondary"
+                                    onClick={() => {
+                                      setSelectedAttainmentCourse(att.course);
+                                      setShowAttainmentModal(true);
+                                    }}
+                                    title="View Detailed Attainment"
+                                  >
+                                    <FontAwesomeIcon icon={faEye} /> View
+                                  </button>
+                                </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {resultsActiveTab === 'co-attainments' && batchCOAttainments.length === 0 && (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: '8px', background: '#f9fafb' }}>
+                      No CO Attainment data computed for this batch yet.
+                    </div>
+                  )}
+                  {resultsActiveTab === 'student-results' && batchResults.length === 0 && (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: '8px', background: '#f9fafb' }}>
+                      No student results computed for this batch yet.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -4179,7 +4288,30 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Proposal Detail Modal */}
+              {/* Admin Attainment Modal */}
+        {showAttainmentModal && selectedAttainmentCourse && (
+          <div className="modal-overlay" onClick={() => setShowAttainmentModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{maxWidth: '95%', width: '1200px', height: '90vh', padding: 0, display: 'flex', flexDirection: 'column'}}>
+              <div className="modal-header" style={{padding: '15px 20px', borderBottom: '1px solid #e5e7eb'}}>
+                <h3 style={{margin: 0}}>{selectedAttainmentCourse.courseCode} - {selectedAttainmentCourse.courseTitle} CO Attainment</h3>
+                <button className="close-btn" onClick={() => setShowAttainmentModal(false)}></button>
+              </div>
+              <div className="modal-body" style={{flex: 1, overflowY: 'auto', padding: '0'}}>
+                <AttainmentView preselectedAdminCourse={{
+                  ...selectedAttainmentCourse,
+                  _id: selectedAttainmentCourse._id,
+                  courseCode: selectedAttainmentCourse.courseCode,
+                  courseTitle: selectedAttainmentCourse.courseTitle,
+                  batch: resultBatch,
+                  term: resultTerm,
+                  yearLevel: resultYearLevel
+                }} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Proposal Detail Modal */}
       {showProposalDetail && selectedProposal && (
         <div className="modal-overlay" onClick={() => !loading && setShowProposalDetail(false)}>
           <div className="modal-content proposal-detail-modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '900px', maxHeight: '90vh'}}>

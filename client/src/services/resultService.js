@@ -59,6 +59,18 @@ export const getBatchResults = async ({ batch, deptCode, yearLevel, term, publis
 };
 
 /**
+ * Admin/Teacher: get CO attainment statistics for a batch+term.
+ * @param {{ batch, deptCode, yearLevel, term, publishedOnly? }} params
+ */
+export const getBatchCOAttainments = async ({ batch, deptCode, yearLevel, term, publishedOnly = false }) => {
+  const response = await axios.get(`${API_URL}/results/batch-co-attainments`, {
+    params: { batch, deptCode, yearLevel, term, publishedOnly },
+    ...getAuthHeader(),
+  });
+  return response.data;
+};
+
+/**
  * Student: get own published results.
  */
 export const getStudentResults = async () => {

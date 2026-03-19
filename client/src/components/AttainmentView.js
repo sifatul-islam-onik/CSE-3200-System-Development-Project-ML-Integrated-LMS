@@ -45,7 +45,7 @@ const formatNumber = (num) => {
   return parseFloat(Number(num).toFixed(2)).toString();
 };
 
-const AttainmentView = ({ labDataRefreshKey = 0 }) => {
+const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }) => {
   const [sheetNames, setSheetNames] = useState([]);
   const [teacherCourses, setTeacherCourses] = useState([]);
   const [selectedSheet, setSelectedSheet] = useState(null);
@@ -179,6 +179,13 @@ const AttainmentView = ({ labDataRefreshKey = 0 }) => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     setUserRole(user.role || '');
   }, []);
+
+  // Preselect course if navigated from Admin Dashboard
+  useEffect(() => {
+    if (preselectedAdminCourse) {
+      setSelectedCourse(preselectedAdminCourse);
+    }
+  }, [preselectedAdminCourse]);
 
   // Load sheet names on mount
   useEffect(() => {
