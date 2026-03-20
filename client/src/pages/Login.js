@@ -84,7 +84,7 @@ const Login = () => {
           <div className="login-box">
             <h2>Login</h2>
             <p className="login-subtitle">
-              Welcome back! Please login to your account
+              
             </p>
 
             {error && (
@@ -102,7 +102,7 @@ const Login = () => {
                   name="identifier"
                   value={formData.identifier}
                   onChange={handleChange}
-                  placeholder="Enter your email or roll number"
+                  placeholder="Email or roll number"
                   disabled={loading}
                 />
               </div>
@@ -115,9 +115,20 @@ const Login = () => {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  placeholder="Enter your password"
+                  placeholder="Password"
                   disabled={loading}
                 />
+              </div>
+
+              <div className="forgot-password-row">
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => navigate('/forgot-password')}
+                  disabled={loading}
+                >
+                  Forgot password?
+                </button>
               </div>
 
               <button 
@@ -129,13 +140,6 @@ const Login = () => {
                 {loading ? 'Logging in...' : 'Login'}
               </button>
             </form>
-
-            <div className="login-footer">
-              <p>
-                If you have any problems, please contact{' '}
-                <span className="contact-info">01714087214</span>.
-              </p>
-            </div>
           </div>
         </div>
       </main>

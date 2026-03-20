@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto'); // VULN-06: used for cryptographically secure OTP generation
 const { validationResult } = require('express-validator');
 const { hashToken } = require('../utils/tokenUtils');
-const { sendVerificationEmail } = require('../utils/emailService');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailService');
 
 // VULN-18: In-memory login attempt tracking (resets on server restart).
 // For multi-instance deployments, migrate this to Redis.
@@ -418,6 +418,133 @@ exports.resendOTP = async (req, res) => {
     });
   }
 };
+
+// @desc    Request password reset OTP
+// @route   POST /api/auth/forgot-password
+// @access  Public
+exports.forgotPassword = async (req, res) => {
+  try {
+    let { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    email = email.trim().toLowerCase();
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this email'
+      });
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const hashedOTP = hashToken(otp);
+
+    user.passwordResetOTP = hashedOTP;
+    user.passwordResetExpires = Date.now() + 15 * 60 * 1000;
+    await user.save();
+
+    try {
+      await sendPasswordResetEmail(user.email, user.name, otp);
+    } catch (emailError) {
+      console.error('Failed to send password reset email:', emailError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send password reset code'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'A password reset code has been sent to your email'
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
+// @desc    Reset password using OTP
+// @route   POST /api/auth/reset-password
+// @access  Public
+exports.resetPassword = async (req, res) => {
+  try {
+    let { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, OTP and new password are required'
+      });
+    }
+
+    email = email.trim().toLowerCase();
+    otp = String(otp).trim();
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters'
+      });
+    }
+
+    const user = await User.findOne({ email }).select('+passwordResetOTP +passwordResetExpires');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (!user.passwordResetOTP || !user.passwordResetExpires) {
+      return res.status(400).json({
+        success: false,
+        message: 'No active reset request found. Please request a new code.'
+      });
+    }
+
+    if (user.passwordResetExpires < Date.now()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reset code has expired. Please request a new code.'
+      });
+    }
+
+    const hashedOTP = hashToken(otp);
+    if (hashedOTP !== user.passwordResetOTP) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid reset code'
+      });
+    }
+
+    user.password = newPassword;
+    user.passwordResetOTP = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password reset successful. You can now log in.'
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
 // @desc    Update user profile
 // @route   PUT /api/auth/profile/update
 // @access  Protected

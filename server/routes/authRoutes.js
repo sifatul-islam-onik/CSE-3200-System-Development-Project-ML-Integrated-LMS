@@ -74,6 +74,8 @@ router.post('/login', loginLimiter, loginValidation, authController.login);
 // Email verification with OTP
 router.post('/verify-email', otpLimiter, authController.verifyEmail);
 router.post('/resend-otp', otpLimiter, authController.resendOTP);
+router.post('/forgot-password', otpLimiter, authController.forgotPassword);
+router.post('/reset-password', otpLimiter, authController.resetPassword);
 
 // Profile routes (protected)
 router.put('/profile/update', authenticateUser, authController.updateProfile);
