@@ -12,9 +12,12 @@ const Home = () => {
       
       <main className="home-main">
         <div className="hero-section">
-          <h1 className="hero-title">Welcome to University LMS</h1>
+          <h1 className="hero-title">COBALT</h1>
+          <p className="hero-subtitle" style={{ marginBottom: '1rem', fontWeight: 600, fontSize: '1.5rem', color: 'var(--color-primary)' }}>
+            Course Outcome-Based Attainment and Learning Tracker
+          </p>
           <p className="hero-subtitle">
-            A comprehensive Learning Management System for students, teachers, and administrators
+            An ML-Integrated Learning Management System for Automated CO-PO Attainment Tracking in Outcome-Based Engineering Education
           </p>
 
           <div className="action-buttons">
@@ -29,7 +32,17 @@ const Home = () => {
       </main>
 
       <footer className="home-footer">
-        <p>&copy; 2025 University LMS. All rights reserved.</p>
+        <p>
+          &copy; 2026{' '}
+          <a
+            href="https://kuet.ac.bd/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'inherit', textDecoration: 'none' }}
+          >
+            Khulna University of Engineering & Technology
+          </a>
+        </p>
       </footer>
     </div>
   );

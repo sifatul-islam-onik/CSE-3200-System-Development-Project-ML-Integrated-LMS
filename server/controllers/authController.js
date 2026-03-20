@@ -138,10 +138,10 @@ exports.login = async (req, res) => {
       });
     }
 
-    const { email, password } = req.body;
+    const { identifier, password } = req.body;
 
     // VULN-18: Check account lockout before any DB query
-    const lockKey = String(email || '').toLowerCase().trim();
+    const lockKey = String(identifier || '').toLowerCase().trim();
     const lockInfo = loginAttempts.get(lockKey) || { count: 0, lockedUntil: 0 };
     if (lockInfo.lockedUntil > Date.now()) {
       const remainingMinutes = Math.ceil((lockInfo.lockedUntil - Date.now()) / 60000);
@@ -152,12 +152,18 @@ exports.login = async (req, res) => {
     }
 
     // Find user and include password field
-    const user = await User.findOne({ email }).select('+password');
+    // Allow login with either email or roll number
+    const user = await User.findOne({
+      $or: [
+        { email: identifier.toLowerCase() },
+        { roll: identifier }
+      ]
+    }).select('+password');
     
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'Invalid email/roll number or password'
       });
     }
 
@@ -172,7 +178,7 @@ exports.login = async (req, res) => {
         success: false,
         message: newCount >= MAX_LOGIN_ATTEMPTS
           ? 'Too many failed login attempts. Account locked for 15 minutes.'
-          : 'Invalid email or password'
+          : 'Invalid email/roll number or password'
       });
     }
     // Clear lockout counter on correct password
