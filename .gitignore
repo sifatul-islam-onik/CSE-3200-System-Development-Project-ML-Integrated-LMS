@@ -4,7 +4,6 @@ venv
 ml_server/models
 ml_server/output
 ml_server/images
-ml_server_huggingface
 ml_server_colab
 
 # Environment variables
