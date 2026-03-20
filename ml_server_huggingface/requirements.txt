@@ -1,0 +1,26 @@
+fastapi==0.115.6
+uvicorn==0.34.0
+python-multipart==0.0.20
+pydantic==2.12.5
+pydantic_core==2.41.5
+
+# Computer Vision
+opencv-python-headless==4.12.0.88
+opencv-contrib-python==4.10.0.84
+pillow==11.1.0
+numpy==2.2.4
+
+# PaddleOCR dependencies
+paddleocr==3.3.2
+paddlepaddle==3.0.0
+paddlex==3.3.12
+
+# Image processing
+scikit-image==0.25.2
+imageio==2.37.2
+tifffile==2025.5.10
+
+# Additional utilities
+requests==2.32.5
+tqdm==4.67.1
+PyYAML==6.0.2
