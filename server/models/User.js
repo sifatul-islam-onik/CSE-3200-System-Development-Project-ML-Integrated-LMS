@@ -127,6 +127,14 @@ const userSchema = new mongoose.Schema({
     type: Date,
     select: false
   },
+  passwordResetOTP: {
+    type: String,
+    select: false
+  },
+  passwordResetExpires: {
+    type: Date,
+    select: false
+  },
   department: {
     type: String,
     default: ''

@@ -104,6 +104,12 @@
   color: var(--color-text-light);
 }
 
+.forgot-password-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -0.25rem;
+}
+
 /* Submit Button */
 .btn-submit {
   display: inline-flex;

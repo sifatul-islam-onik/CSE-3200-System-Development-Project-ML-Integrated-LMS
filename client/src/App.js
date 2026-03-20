@@ -4,6 +4,7 @@ import './styles/App.css';
 import Home from './pages/Home';
 import Register from './pages/Register';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
 import VerifyEmail from './pages/VerifyEmail';
 import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
@@ -29,6 +30,7 @@ function App() {
           <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
           <Route path="/register/:role" element={<PublicRoute><Register /></PublicRoute>} />
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
           <Route path="/verify-email" element={<VerifyEmail />} />
 
           {/* Protected routes - accessible to all authenticated users */}

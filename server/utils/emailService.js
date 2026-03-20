@@ -95,3 +95,49 @@ exports.sendApprovalEmail = async (email, name) => {
     throw new Error('Failed to send approval email');
   }
 };
+
+// Send password reset OTP email
+exports.sendPasswordResetEmail = async (email, name, otp) => {
+  try {
+    const transporter = createTransporter();
+
+    const mailOptions = {
+      from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
+      to: email,
+      subject: 'Password Reset OTP - LMS',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+          <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h2 style="color: #1E3A8A; margin-bottom: 20px;">Reset Your Password</h2>
+            <p style="color: #333; font-size: 16px;">Hello <strong>${name}</strong>,</p>
+            <p style="color: #555; font-size: 14px; line-height: 1.6;">
+              We received a request to reset your password.
+            </p>
+            <p style="color: #555; font-size: 14px; line-height: 1.6;">
+              Use this 6-digit code to reset your password:
+            </p>
+            <div style="background-color: #f0f4ff; border: 2px solid #1E3A8A; border-radius: 8px;
+                        padding: 20px; margin: 25px 0; text-align: center;">
+              <h1 style="color: #1E3A8A; font-size: 36px; letter-spacing: 8px; margin: 0;">
+                ${otp}
+              </h1>
+            </div>
+            <p style="color: #999; font-size: 12px; margin-top: 30px;">
+              ⏰ This code will expire in <strong>15 minutes</strong>.
+            </p>
+            <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+            <p style="color: #999; font-size: 12px;">
+              If you did not request a password reset, please ignore this email.
+            </p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error('Error sending password reset email:', error);
+    throw new Error('Failed to send password reset email');
+  }
+};

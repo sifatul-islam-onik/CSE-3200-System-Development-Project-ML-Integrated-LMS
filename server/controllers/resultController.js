@@ -160,6 +160,16 @@ const loadLabCourseAttainmentData = async (courseId) => {
       coNumbers: [...new Set(coNumbers)], // Deduplicate
       labActivityRows,
       labActivityScores: unwrapMap(labDoc.labActivityScores)
+        , labActivityObtainedRows: labDoc.labActivityObtainedRows || []
+        , labAttendanceMarks: labDoc.labAttendanceMarks || 0
+        , labQuizMarks: labDoc.labQuizMarks || 0
+        , labVivaMarks: labDoc.labVivaMarks || 0
+        , activityTaken: labDoc.activityTaken || 5
+        , useEqWtActivity: labDoc.useEqWtActivity || 0
+        , coMappedActivityMarks: labDoc.coMappedActivityMarks || 0
+        , labActivityManualWts: unwrapMap(labDoc.labActivityManualWts)
+        , otherActivityRemaining: labDoc.otherActivityRemaining || 0
+        , otherActivityMeasured: labDoc.otherActivityMeasured || 0
     };
 };
 
