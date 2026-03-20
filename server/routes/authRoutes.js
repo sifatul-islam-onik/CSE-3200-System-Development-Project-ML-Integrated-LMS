@@ -58,13 +58,10 @@ const registerValidation = [
 ];
 
 const loginValidation = [
-  body('email')
+  body('identifier')
     .trim()
     .notEmpty()
-    .withMessage('Email is required')
-    .isEmail()
-    .withMessage('Please enter a valid email')
-    .toLowerCase(),
+    .withMessage('Email or Roll Number is required'),
   body('password')
     .notEmpty()
     .withMessage('Password is required')

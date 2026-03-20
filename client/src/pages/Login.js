@@ -8,7 +8,7 @@ const Login = () => {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    email: '',
+    identifier: '',
     password: ''
   });
 
@@ -29,7 +29,7 @@ const Login = () => {
     setLoading(true);
 
     // Validation
-    if (!formData.email || !formData.password) {
+    if (!formData.identifier || !formData.password) {
       setError('All fields are required');
       setLoading(false);
       return;
@@ -66,9 +66,9 @@ const Login = () => {
           return;
         }
         
-        setError(errorData.message || 'Login failed');
+        setError(errorData.message || 'Invalid credentials. Please verify your email/roll number and password.');
       } else {
-        setError('Network error. Please try again.');
+        setError('Unable to connect to the server. Please check your internet connection.');
       }
     } finally {
       setLoading(false);
@@ -95,14 +95,14 @@ const Login = () => {
 
             <form onSubmit={handleSubmit} className="login-form">
               <div className="form-group">
-                <label htmlFor="email">Email Address</label>
+                <label htmlFor="identifier">Email or Roll Number</label>
                 <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
+                  type="text"
+                  id="identifier"
+                  name="identifier"
+                  value={formData.identifier}
                   onChange={handleChange}
-                  placeholder="Enter your email"
+                  placeholder="Enter your email or roll number"
                   disabled={loading}
                 />
               </div>
@@ -130,7 +130,12 @@ const Login = () => {
               </button>
             </form>
 
-
+            <div className="login-footer">
+              <p>
+                If you have any problems, please contact{' '}
+                <span className="contact-info">01714087214</span>.
+              </p>
+            </div>
           </div>
         </div>
       </main>
