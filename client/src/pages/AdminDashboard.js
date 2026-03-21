@@ -1257,11 +1257,11 @@ const AdminDashboard = () => {
     }
 
     return (
-      <div className="detail-item" style={{backgroundColor: '#fff3cd', padding: '12px', borderRadius: '6px', border: '2px solid #ffc107'}}>
+      <div className="detail-item" style={{backgroundColor: '#fff8ea', padding: '12px', borderRadius: '6px', border: '2px solid #e9c176'}}>
         <strong>{label}:</strong>
         <div style={{marginTop: '6px'}}>
           <div style={{
-            color: '#dc3545',
+            color: '#ba1a1a',
             textDecoration: 'line-through',
             opacity: 0.7,
             marginBottom: '4px',
@@ -1270,11 +1270,11 @@ const AdminDashboard = () => {
             <span style={{fontWeight: 600, marginRight: '6px'}}>Old:</span>{formatter(oldValue)}
           </div>
           <div style={{
-            color: '#28a745',
+            color: '#1f7a4a',
             fontWeight: 600,
             fontSize: '14px',
             padding: '4px 8px',
-            backgroundColor: '#d4edda',
+            backgroundColor: '#eaf7ef',
             borderRadius: '4px',
             display: 'inline-block'
           }}>
@@ -1298,24 +1298,24 @@ const AdminDashboard = () => {
 
     return (
       <div style={{marginTop: '20px'}}>
-        <h4>{title} {hasChanges && <span style={{color: '#ffc107', fontSize: '14px', marginLeft: '8px'}}>✦ Modified</span>}</h4>
+        <h4>{title} {hasChanges && <span style={{color: '#e9c176', fontSize: '14px', marginLeft: '8px'}}>✦ Modified</span>}</h4>
         {hasChanges && (
           <div style={{
-            backgroundColor: '#fff3cd',
+            backgroundColor: '#fff8ea',
             padding: '12px',
             borderRadius: '6px',
-            border: '2px solid #ffc107',
+            border: '2px solid #e9c176',
             marginTop: '10px'
           }}>
             {removed.length > 0 && (
               <div style={{marginBottom: removed.length > 0 && added.length > 0 ? '12px' : '0'}}>
-                <div style={{color: '#dc3545', fontWeight: 600, marginBottom: '6px', fontSize: '14px'}}>🗑 Removed:</div>
+                <div style={{color: '#ba1a1a', fontWeight: 600, marginBottom: '6px', fontSize: '14px'}}>🗑 Removed:</div>
                 {removed.map((item, idx) => renderItem(item, idx, 'removed'))}
               </div>
             )}
             {added.length > 0 && (
               <div>
-                <div style={{color: '#28a745', fontWeight: 600, marginBottom: '6px', fontSize: '14px'}}>✅ Added:</div>
+                <div style={{color: '#1f7a4a', fontWeight: 600, marginBottom: '6px', fontSize: '14px'}}>✅ Added:</div>
                 {added.map((item, idx) => renderItem(item, idx, 'added'))}
               </div>
             )}
@@ -1380,7 +1380,7 @@ const AdminDashboard = () => {
     
     return (
       <div style={{marginTop: '20px'}}>
-        <h4>Course Outcomes ({newCOs.length}) {hasChanges && <span style={{color: '#ffc107', fontSize: '14px', marginLeft: '8px'}}>✦ Modified</span>}</h4>
+        <h4>Course Outcomes ({newCOs.length}) {hasChanges && <span style={{color: '#e9c176', fontSize: '14px', marginLeft: '8px'}}>✦ Modified</span>}</h4>
         <div style={{marginTop: '10px', overflowX: 'auto'}}>
           <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '13px'}}>
             <thead>
@@ -1394,9 +1394,9 @@ const AdminDashboard = () => {
             <tbody>
               {changes.map((change, idx) => {
                 const co = change.co || change.newCO || change.oldCO;
-                const bgColor = change.type === 'removed' ? '#f8d7da' : 
-                               change.type === 'added' ? '#d4edda' : 
-                               change.type === 'modified' ? '#fff3cd' : 'transparent';
+                const bgColor = change.type === 'removed' ? '#ffebe9' : 
+                               change.type === 'added' ? '#eaf7ef' : 
+                               change.type === 'modified' ? '#fff8ea' : 'transparent';
                 
                 return (
                   <tr key={idx} style={{backgroundColor: bgColor}}>
@@ -1404,8 +1404,8 @@ const AdminDashboard = () => {
                     <td style={{padding: '8px', border: '1px solid #ddd'}}>
                       {change.type === 'modified' && change.oldCO.description !== change.newCO.description ? (
                         <>
-                          <div style={{color: '#dc3545', textDecoration: 'line-through', marginBottom: '4px'}}>{change.oldCO.description}</div>
-                          <div style={{color: '#28a745', fontWeight: 600}}>{change.newCO.description}</div>
+                          <div style={{color: '#ba1a1a', textDecoration: 'line-through', marginBottom: '4px'}}>{change.oldCO.description}</div>
+                          <div style={{color: '#1f7a4a', fontWeight: 600}}>{change.newCO.description}</div>
                         </>
                       ) : co.description}
                     </td>
@@ -1432,7 +1432,7 @@ const AdminDashboard = () => {
                           if (posChanged) {
                             return (
                               <>
-                                <div style={{color: '#dc3545', textDecoration: 'line-through', marginBottom: '4px'}}>
+                                <div style={{color: '#ba1a1a', textDecoration: 'line-through', marginBottom: '4px'}}>
                                   {change.oldCO.po_mappings && change.oldCO.po_mappings.length > 0 
                                     ? change.oldCO.po_mappings.map(m => {
                                         const letter = m.program_outcome_code.split('_')[1]?.toLowerCase() || '';
@@ -1441,7 +1441,7 @@ const AdminDashboard = () => {
                                     : '-'
                                   }
                                 </div>
-                                <div style={{color: '#28a745', fontWeight: 600}}>
+                                <div style={{color: '#1f7a4a', fontWeight: 600}}>
                                   {change.newCO.po_mappings && change.newCO.po_mappings.length > 0 
                                     ? change.newCO.po_mappings.map(m => {
                                         const letter = m.program_outcome_code.split('_')[1]?.toLowerCase() || '';
@@ -1483,10 +1483,10 @@ const AdminDashboard = () => {
                         <>
                           {(change.oldCO.taxonomy_levels || []).sort().join(', ') !== (change.newCO.taxonomy_levels || []).sort().join(', ') && (
                             <>
-                              <div style={{color: '#dc3545', textDecoration: 'line-through', marginBottom: '4px'}}>
+                              <div style={{color: '#ba1a1a', textDecoration: 'line-through', marginBottom: '4px'}}>
                                 {change.oldCO.taxonomy_levels && change.oldCO.taxonomy_levels.length > 0 ? change.oldCO.taxonomy_levels.join(', ') : '-'}
                               </div>
-                              <div style={{color: '#28a745', fontWeight: 600}}>
+                              <div style={{color: '#1f7a4a', fontWeight: 600}}>
                                 {change.newCO.taxonomy_levels && change.newCO.taxonomy_levels.length > 0 ? change.newCO.taxonomy_levels.join(', ') : '-'}
                               </div>
                             </>
@@ -1529,7 +1529,7 @@ const AdminDashboard = () => {
     
     return (
       <div style={{marginTop: '20px'}}>
-        <h4>Lecture Plan {hasChanges && <span style={{color: '#ffc107', fontSize: '14px', marginLeft: '8px'}}>✦ Modified</span>}</h4>
+        <h4>Lecture Plan {hasChanges && <span style={{color: '#e9c176', fontSize: '14px', marginLeft: '8px'}}>✦ Modified</span>}</h4>
         <div style={{marginTop: '10px', overflowX: 'auto'}}>
           <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '13px'}}>
             <thead>
@@ -1540,9 +1540,9 @@ const AdminDashboard = () => {
             </thead>
             <tbody>
               {changes.map((change, idx) => {
-                const bgColor = change.type === 'removed' ? '#f8d7da' : 
-                               change.type === 'added' ? '#d4edda' : 
-                               change.type === 'modified' ? '#fff3cd' : 'transparent';
+                const bgColor = change.type === 'removed' ? '#ffebe9' : 
+                               change.type === 'added' ? '#eaf7ef' : 
+                               change.type === 'modified' ? '#fff8ea' : 'transparent';
                 
                 return (
                   <tr key={idx} style={{backgroundColor: bgColor}}>
@@ -1550,8 +1550,8 @@ const AdminDashboard = () => {
                     <td style={{padding: '8px', border: '1px solid #ddd'}}>
                       {change.type === 'modified' ? (
                         <>
-                          <div style={{color: '#dc3545', textDecoration: 'line-through', marginBottom: '4px'}}>{change.oldPlan}</div>
-                          <div style={{color: '#28a745', fontWeight: 600}}>{change.newPlan}</div>
+                          <div style={{color: '#ba1a1a', textDecoration: 'line-through', marginBottom: '4px'}}>{change.oldPlan}</div>
+                          <div style={{color: '#1f7a4a', fontWeight: 600}}>{change.newPlan}</div>
                         </>
                       ) : change.plan}
                     </td>
@@ -1901,7 +1901,7 @@ const AdminDashboard = () => {
                             <button
                               className="btn btn-sm"
                               style={{
-                                backgroundColor: '#10b981',
+                                backgroundColor: '#1f7a4a',
                                 color: 'white',
                                 border: 'none'
                               }}
@@ -1965,8 +1965,8 @@ const AdminDashboard = () => {
                                     {course.assignedTeachers && course.assignedTeachers.length > 0 && (
                                       <span className="course-assigned" style={{ 
                                         fontSize: '12px', 
-                                        color: '#059669', 
-                                        backgroundColor: '#d1fae5',
+                                        color: '#1f7a4a', 
+                                        backgroundColor: '#cfe8d8',
                                         padding: '2px 8px',
                                         borderRadius: '4px',
                                         marginLeft: '8px'
@@ -2616,7 +2616,7 @@ const AdminDashboard = () => {
                     <div key={group.role} className="proposal-card">
                       <div className="proposal-header" style={{justifyContent: 'space-between', alignItems: 'center'}}>
                         <span className="proposal-type-badge" style={{textTransform: 'capitalize'}}>{group.role}</span>
-                        <span className="status-badge" style={{backgroundColor: '#0d6efd'}}>{group.members.length} user{group.members.length !== 1 ? 's' : ''}</span>
+                        <span className="status-badge" style={{backgroundColor: '#38485f'}}>{group.members.length} user{group.members.length !== 1 ? 's' : ''}</span>
                       </div>
                       <div className="proposal-actions">
                         <button
@@ -3125,7 +3125,7 @@ const AdminDashboard = () => {
                               <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>{r.termGPA?.toFixed(2)}</td>
                               <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>{r.cgpa?.toFixed(2)}</td>
                               <td style={{ padding: '7px 10px', textAlign: 'center' }}>
-                                <span style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 700, background: r.isPublished ? '#dcfce7' : '#fef9c3', color: r.isPublished ? '#166534' : '#92400e' }}>
+                                <span style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 700, background: r.isPublished ? '#dcfce7' : '#fef9c3', color: r.isPublished ? '#1f7a4a' : '#8a5b0f' }}>
                                   {r.isPublished ? 'Published' : 'Draft'}
                                 </span>
                               </td>
@@ -3156,7 +3156,7 @@ const AdminDashboard = () => {
                                 <span style={{ color: '#4b5563', fontSize: '12px' }}>{att.course?.courseTitle}</span>
                               </td>
                               <td style={{ padding: '10px', textAlign: 'center' }}>
-                                <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 600, background: '#e0e7ff', color: '#1e40af' }}>
+                                <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 600, background: '#dde9ff', color: '#38485f' }}>
                                   {att.course?.course_type}
                                 </span>
                               </td>
@@ -3167,7 +3167,7 @@ const AdminDashboard = () => {
                                       <strong style={{ minWidth: '40px' }}>{co.coNumber}:</strong> 
                                       <span style={{ 
                                         fontWeight: 'bold',
-                                        color: co.attainmentLevel === 0 ? '#dc2626' : (co.attainmentLevel === 3 ? '#166534' : '#000') 
+                                        color: co.attainmentLevel === 0 ? '#ba1a1a' : (co.attainmentLevel === 3 ? '#1f7a4a' : '#000') 
                                       }}>
                                         Level {co.attainmentLevel}
                                       </span> 
@@ -3179,7 +3179,7 @@ const AdminDashboard = () => {
                                 </div>
                               </td>
                               <td style={{ padding: '10px', textAlign: 'center' }}>
-                                <span style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 700, background: att.isPublished ? '#dcfce7' : '#fef9c3', color: att.isPublished ? '#166534' : '#92400e' }}>
+                                <span style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 700, background: att.isPublished ? '#dcfce7' : '#fef9c3', color: att.isPublished ? '#1f7a4a' : '#8a5b0f' }}>
                                   {att.isPublished ? 'Published' : 'Draft'}
                                 </span>
                               </td>
@@ -3475,12 +3475,12 @@ const AdminDashboard = () => {
                     {selectedCourseForAssignment.course_type === 'THEORY' && selectedCourseForAssignment.assignedTeachers.some(a => !a.section) && (
                       <div style={{
                         padding: '10px 12px',
-                        backgroundColor: '#fef3c7',
-                        border: '1px solid #fbbf24',
+                        backgroundColor: '#fff8ea',
+                        border: '1px solid #e9c176',
                         borderRadius: '6px',
                         marginBottom: '12px',
                         fontSize: '13px',
-                        color: '#92400e'
+                        color: '#8a5b0f'
                       }}>
                         <strong>⚠️ Warning:</strong> Some teachers don't have a section assigned. For THEORY courses, sections (A or B) are required. Please remove and reassign them with a section.
                       </div>
@@ -3509,8 +3509,8 @@ const AdminDashboard = () => {
                                 <span style={{
                                   marginLeft: '8px',
                                   padding: '2px 8px',
-                                  backgroundColor: '#dbeafe',
-                                  color: '#1e40af',
+                                  backgroundColor: '#e6eeff',
+                                  color: '#38485f',
                                   borderRadius: '4px',
                                   fontSize: '12px',
                                   fontWeight: 600
@@ -3521,8 +3521,8 @@ const AdminDashboard = () => {
                                 <span style={{
                                   marginLeft: '8px',
                                   padding: '2px 8px',
-                                  backgroundColor: '#fef3c7',
-                                  color: '#92400e',
+                                  backgroundColor: '#fff8ea',
+                                  color: '#8a5b0f',
                                   borderRadius: '4px',
                                   fontSize: '12px',
                                   fontWeight: 600
@@ -3552,11 +3552,11 @@ const AdminDashboard = () => {
                 ) : (
                   <div style={{
                     padding: '16px',
-                    backgroundColor: '#fef3c7',
-                    border: '1px solid #fbbf24',
+                    backgroundColor: '#fff8ea',
+                    border: '1px solid #e9c176',
                     borderRadius: '6px',
                     textAlign: 'center',
-                    color: '#92400e',
+                    color: '#8a5b0f',
                     fontSize: '13px'
                   }}>
                     No teachers assigned yet
@@ -3647,10 +3647,10 @@ const AdminDashboard = () => {
                       {hasReachedMaxTeachers && (
                         <div style={{
                           padding: '10px 12px',
-                          backgroundColor: '#fef3c7',
-                          border: '1px solid #fcd34d',
+                          backgroundColor: '#fff8ea',
+                          border: '1px solid #e9c176',
                           borderRadius: '6px',
-                          color: '#92400e',
+                          color: '#8a5b0f',
                           fontSize: '13px',
                           fontWeight: 500
                         }}>
@@ -3829,7 +3829,7 @@ const AdminDashboard = () => {
                 {/* Always show Name and Email */}
                 <div>
                   <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
-                    Full Name <span style={{color: '#dc2626'}}>*</span>
+                    Full Name <span style={{color: '#ba1a1a'}}>*</span>
                   </label>
                   <input
                     type="text"
@@ -4068,7 +4068,7 @@ const AdminDashboard = () => {
                         onClick={handleRemoveAllBatches}
                         disabled={batchAssignmentLoading}
                         style={{
-                          backgroundColor: '#ef4444',
+                          backgroundColor: '#d96b6b',
                           color: 'white',
                           border: 'none',
                           width: '100%',
@@ -4119,7 +4119,7 @@ const AdminDashboard = () => {
                     </div>
                   ) : (
                     <div style={{
-                      padding: '12px', backgroundColor: '#fee2e2', border: '1px solid #ef4444', borderRadius: '6px', color: '#991b1b', fontSize: '13px'
+                      padding: '12px', backgroundColor: '#ffebe9', border: '1px solid #d96b6b', borderRadius: '6px', color: '#93000a', fontSize: '13px'
                     }}>
                       Course must have valid yearLevel and semester set before assigning a batch.
                     </div>
@@ -4170,11 +4170,11 @@ const AdminDashboard = () => {
                 ) : (
                   <div style={{
                     padding: '16px',
-                    backgroundColor: '#fef3c7',
-                    border: '1px solid #fbbf24',
+                    backgroundColor: '#fff8ea',
+                    border: '1px solid #e9c176',
                     borderRadius: '6px',
                     textAlign: 'center',
-                    color: '#92400e',
+                    color: '#8a5b0f',
                     fontSize: '13px'
                   }}>
                     No batches assigned yet
@@ -4195,7 +4195,7 @@ const AdminDashboard = () => {
                         .map(ab => `${formatBatchYear(ab.batch)} • ${departmentMap[ab.deptCode]} (${ab.deptCode})`)
                         .join(', ')}
                     </p>
-                    <p style={{fontSize: '12px', color: '#dc2626', marginBottom: '12px', fontStyle: 'italic'}}>
+                    <p style={{fontSize: '12px', color: '#ba1a1a', marginBottom: '12px', fontStyle: 'italic'}}>
                       Note: Assigning a new batch will replace the current assignment
                     </p>
                   </>
@@ -4423,9 +4423,9 @@ const AdminDashboard = () => {
                         (kpa, idx, type) => (
                           <span key={idx} style={{
                             padding: '4px 12px',
-                            backgroundColor: type === 'removed' ? '#f8d7da' : type === 'added' ? '#d4edda' : '#e3f2fd',
-                            color: type === 'removed' ? '#721c24' : type === 'added' ? '#155724' : '#1976d2',
-                            border: type === 'removed' ? '1px solid #dc3545' : type === 'added' ? '1px solid #28a745' : 'none',
+                            backgroundColor: type === 'removed' ? '#ffebe9' : type === 'added' ? '#eaf7ef' : '#e6eeff',
+                            color: type === 'removed' ? '#7a2424' : type === 'added' ? '#1f7a4a' : '#38485f',
+                            border: type === 'removed' ? '1px solid #ba1a1a' : type === 'added' ? '1px solid #1f7a4a' : 'none',
                             borderRadius: '4px',
                             fontSize: '13px',
                             fontWeight: '500',
@@ -4444,8 +4444,8 @@ const AdminDashboard = () => {
                           {selectedProposal.proposedData.kpa_mapping.map((kpa, idx) => (
                             <span key={idx} style={{
                               padding: '4px 12px',
-                              backgroundColor: '#e3f2fd',
-                              color: '#1976d2',
+                              backgroundColor: '#e6eeff',
+                              color: '#38485f',
                               borderRadius: '4px',
                               fontSize: '13px',
                               fontWeight: '500'
@@ -4466,8 +4466,8 @@ const AdminDashboard = () => {
                       {selectedProposal.proposedData.prerequisites.map((prereq, idx) => (
                         <span key={idx} style={{
                           padding: '4px 12px',
-                          border: '1px solid #1976d2',
-                          color: '#1976d2',
+                          border: '1px solid #38485f',
+                          color: '#38485f',
                           borderRadius: '4px',
                           fontSize: '13px'
                         }}>
@@ -4488,8 +4488,8 @@ const AdminDashboard = () => {
                         (knowledge, idx, type) => (
                           <li key={idx} style={{
                             marginBottom: '8px',
-                            color: type === 'removed' ? '#721c24' : type === 'added' ? '#155724' : '#333',
-                            backgroundColor: type === 'removed' ? '#f8d7da' : type === 'added' ? '#d4edda' : 'transparent',
+                            color: type === 'removed' ? '#7a2424' : type === 'added' ? '#1f7a4a' : '#333',
+                            backgroundColor: type === 'removed' ? '#ffebe9' : type === 'added' ? '#eaf7ef' : 'transparent',
                             padding: type !== 'unchanged' ? '6px 10px' : '2px 0',
                             borderRadius: '4px',
                             textDecoration: type === 'removed' ? 'line-through' : 'none'
@@ -4518,8 +4518,8 @@ const AdminDashboard = () => {
                         (objective, idx, type) => (
                           <li key={idx} style={{
                             marginBottom: '8px',
-                            color: type === 'removed' ? '#721c24' : type === 'added' ? '#155724' : '#333',
-                            backgroundColor: type === 'removed' ? '#f8d7da' : type === 'added' ? '#d4edda' : 'transparent',
+                            color: type === 'removed' ? '#7a2424' : type === 'added' ? '#1f7a4a' : '#333',
+                            backgroundColor: type === 'removed' ? '#ffebe9' : type === 'added' ? '#eaf7ef' : 'transparent',
                             padding: type !== 'unchanged' ? '8px 10px' : '2px 0',
                             borderRadius: '4px',
                             textDecoration: type === 'removed' ? 'line-through' : 'none'
@@ -4558,31 +4558,31 @@ const AdminDashboard = () => {
 
                         return (
                           <div style={{marginTop: '20px'}}>
-                            <h4>Course Details {hasChanges && <span style={{color: '#ffc107', fontSize: '14px', marginLeft: '8px'}}>✦ Modified</span>}</h4>
+                            <h4>Course Details {hasChanges && <span style={{color: '#e9c176', fontSize: '14px', marginLeft: '8px'}}>✦ Modified</span>}</h4>
                             {hasChanges && (
                               <div style={{
-                                backgroundColor: '#fff3cd',
+                                backgroundColor: '#fff8ea',
                                 padding: '12px',
                                 borderRadius: '6px',
-                                border: '2px solid #ffc107',
+                                border: '2px solid #e9c176',
                                 marginTop: '10px'
                               }}>
                                 {removed.length > 0 && (
                                   <div style={{marginBottom: removed.length > 0 && added.length > 0 ? '12px' : '0'}}>
-                                    <div style={{color: '#dc3545', fontWeight: 600, marginBottom: '6px', fontSize: '14px'}}>🗑 Removed:</div>
+                                    <div style={{color: '#ba1a1a', fontWeight: 600, marginBottom: '6px', fontSize: '14px'}}>🗑 Removed:</div>
                                     {removed.map((content, idx) => (
                                       <div key={idx} style={{
                                         marginBottom: '12px',
                                         padding: '10px',
-                                        backgroundColor: '#f8d7da',
-                                        border: '1px solid #dc3545',
+                                        backgroundColor: '#ffebe9',
+                                        border: '1px solid #ba1a1a',
                                         borderRadius: '4px',
                                         textDecoration: 'line-through'
                                       }}>
-                                        <h5 style={{margin: '0 0 5px 0', color: '#721c24'}}>
+                                        <h5 style={{margin: '0 0 5px 0', color: '#7a2424'}}>
                                           {content.concept_name}
                                         </h5>
-                                        <p style={{margin: '0', fontSize: '14px', color: '#721c24'}}>
+                                        <p style={{margin: '0', fontSize: '14px', color: '#7a2424'}}>
                                           {content.concept_description}
                                         </p>
                                       </div>
@@ -4591,19 +4591,19 @@ const AdminDashboard = () => {
                                 )}
                                 {added.length > 0 && (
                                   <div>
-                                    <div style={{color: '#28a745', fontWeight: 600, marginBottom: '6px', fontSize: '14px'}}>✅ Added:</div>
+                                    <div style={{color: '#1f7a4a', fontWeight: 600, marginBottom: '6px', fontSize: '14px'}}>✅ Added:</div>
                                     {added.map((content, idx) => (
                                       <div key={idx} style={{
                                         marginBottom: '12px',
                                         padding: '10px',
-                                        backgroundColor: '#d4edda',
-                                        border: '1px solid #28a745',
+                                        backgroundColor: '#eaf7ef',
+                                        border: '1px solid #1f7a4a',
                                         borderRadius: '4px'
                                       }}>
-                                        <h5 style={{margin: '0 0 5px 0', color: '#155724'}}>
+                                        <h5 style={{margin: '0 0 5px 0', color: '#1f7a4a'}}>
                                           {content.concept_name}
                                         </h5>
-                                        <p style={{margin: '0', fontSize: '14px', color: '#155724'}}>
+                                        <p style={{margin: '0', fontSize: '14px', color: '#1f7a4a'}}>
                                           {content.concept_description}
                                         </p>
                                       </div>
@@ -4757,7 +4757,7 @@ const AdminDashboard = () => {
                   />
                   {reviewError && (
                     <div style={{
-                      color: '#dc3545',
+                      color: '#ba1a1a',
                       fontSize: '13px',
                       marginTop: '6px'
                     }}>
@@ -4828,3 +4828,4 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
+

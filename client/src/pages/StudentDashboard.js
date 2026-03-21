@@ -172,7 +172,7 @@ const StudentDashboard = () => {
                   <h3>No courses assigned yet</h3>
                   <p>Courses assigned to your batch will appear here.</p>
                   {user?.roll && (
-                    <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '8px' }}>
+                    <p style={{ fontSize: '13px', color: '#44474d', marginTop: '8px' }}>
                       Your batch: 20{user.roll.substring(0, 2)} • Department: {user.roll.substring(2, 4)}
                     </p>
                   )}
@@ -194,8 +194,8 @@ const StudentDashboard = () => {
                             fontSize: '20px',
                             fontWeight: 700,
                             marginBottom: '20px',
-                            color: '#1f2937',
-                            backgroundColor: '#f3f4f6',
+                            color: '#0b1c31',
+                            backgroundColor: '#eff3ff',
                             padding: '15px 16px',
                             borderRadius: '8px',
                             border: 'none',
@@ -223,18 +223,18 @@ const StudentDashboard = () => {
                                         <div key={course._id} className="proposal-card">
                                   <div className="proposal-header">
                                     <div style={{ flex: 1 }}>
-                                      <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#1f2937' }}>
+                                      <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#0b1c31' }}>
                                         {course.courseCode}
                                       </h4>
-                                      <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '14px' }}>
+                                      <p style={{ margin: '4px 0 0', color: '#44474d', fontSize: '14px' }}>
                                         {course.courseTitle}
                                       </p>
                                     </div>
                                     <span 
                                       className="proposal-type-badge" 
                                       style={{ 
-                                        backgroundColor: course.course_type === 'THEORY' ? '#3b82f6' : 
-                                                         course.course_type === 'SESSIONAL' ? '#10b981' : '#8b5cf6'
+                                        backgroundColor: course.course_type === 'THEORY' ? '#04152b' : 
+                                                         course.course_type === 'SESSIONAL' ? '#1f7a4a' : '#505f78'
                                       }}
                                     >
                                       {course.course_type}
@@ -243,29 +243,29 @@ const StudentDashboard = () => {
                                   <div className="proposal-body">
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
                                       <div>
-                                        <span style={{ color: '#6b7280' }}>Credit: </span>
-                                        <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.credit}</span>
+                                        <span style={{ color: '#44474d' }}>Credit: </span>
+                                        <span style={{ fontWeight: 600, color: '#0b1c31' }}>{course.credit}</span>
                                       </div>
                                       <div>
-                                        <span style={{ color: '#6b7280' }}>Category: </span>
-                                        <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.category}</span>
+                                        <span style={{ color: '#44474d' }}>Category: </span>
+                                        <span style={{ fontWeight: 600, color: '#0b1c31' }}>{course.category}</span>
                                       </div>
                                       {course.contactHours && (
                                         <div>
-                                          <span style={{ color: '#6b7280' }}>Contact Hours: </span>
-                                          <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.contactHours}</span>
+                                          <span style={{ color: '#44474d' }}>Contact Hours: </span>
+                                          <span style={{ fontWeight: 600, color: '#0b1c31' }}>{course.contactHours}</span>
                                         </div>
                                       )}
                                       {course.academicYear && (
                                         <div>
-                                          <span style={{ color: '#6b7280' }}>Academic Year: </span>
-                                          <span style={{ fontWeight: 600, color: '#1f2937' }}>{course.academicYear}</span>
+                                          <span style={{ color: '#44474d' }}>Academic Year: </span>
+                                          <span style={{ fontWeight: 600, color: '#0b1c31' }}>{course.academicYear}</span>
                                         </div>
                                       )}
                                     </div>
                                     {course.assignedTeachers && course.assignedTeachers.length > 0 && (
-                                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb' }}>
-                                        <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>Instructor(s):</span>
+                                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #c4c6cd' }}>
+                                        <span style={{ fontSize: '12px', color: '#44474d', fontWeight: 600 }}>Instructor(s):</span>
                                         <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                                           {course.assignedTeachers.map((assignment, idx) => {
                                             const teacher = assignment.teacher || assignment;
@@ -275,9 +275,9 @@ const StudentDashboard = () => {
                                                 style={{
                                                   fontSize: '12px',
                                                   padding: '4px 8px',
-                                                  backgroundColor: '#f3f4f6',
+                                                  backgroundColor: '#eff3ff',
                                                   borderRadius: '4px',
-                                                  color: '#374151'
+                                                  color: '#0b1c31'
                                                 }}
                                               >
                                                 {teacher.name}

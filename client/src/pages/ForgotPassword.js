@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Header from '../components/Header';
+import { Link, useNavigate } from 'react-router-dom';
 import { forgotPassword, resetPassword } from '../services/authService';
-import '../styles/Login.css';
+import '../styles/ForgotPassword.css';
 import '../styles/spinner.css';
 
 const ForgotPassword = () => {
@@ -91,43 +90,50 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="login-page">
-      <Header />
+    <div className="reset-page cobalt-reset-page">
+      <main className="cobalt-reset-main">
+        <div className="cobalt-reset-container">
+          <div className="cobalt-reset-branding">
+            <h1>
+              <Link className="cobalt-reset-logo-link" to="/">COBALT</Link>
+            </h1>
+            <p>Academic Portal</p>
+          </div>
 
-      <main className="login-main">
-        <div className="login-container">
-          <div className="login-box">
-            <h2>Reset Password</h2>
-            <p className="login-subtitle">
-              {step === 1
-                ? 'Enter your email to receive a 6-digit reset code'
-                : `Enter the reset code sent to ${email}`}
-            </p>
+          <div className="cobalt-reset-card">
+            <div className="cobalt-reset-header">
+              <h1>{step === 1 ? 'Reset Your Password' : 'Set New Password'}</h1>
+              <p>
+                {step === 1
+                  ? 'Enter your registered institutional email to receive a 6-digit verification code.'
+                  : `Enter the code sent to ${email} and choose a new password.`}
+              </p>
+            </div>
 
-            {message && <div className="alert" style={{ backgroundColor: 'rgba(21,128,61,0.12)', color: 'var(--color-success)', border: '1px solid var(--color-success-light)' }}>{message}</div>}
-            {error && <div className="alert alert-error">{error}</div>}
+            {message && <div className="reset-alert reset-alert-success">{message}</div>}
+            {error && <div className="reset-alert reset-alert-error">{error}</div>}
 
             {step === 1 ? (
-              <form onSubmit={handleRequestReset} className="login-form">
-                <div className="form-group">
+              <form onSubmit={handleRequestReset} className="cobalt-reset-form">
+                <div className="cobalt-reset-field">
                   <label htmlFor="email">Email</label>
                   <input
                     type="email"
                     id="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your registered email"
+                    placeholder="name@institution.edu"
                     disabled={loading}
                   />
                 </div>
 
-                <button type="submit" className="btn-submit" disabled={loading}>
+                <button type="submit" className="cobalt-reset-btn" disabled={loading}>
                   {loading ? 'Sending...' : 'Send Reset Code'}
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleResetPassword} className="login-form">
-                <div className="form-group">
+              <form onSubmit={handleResetPassword} className="cobalt-reset-form">
+                <div className="cobalt-reset-field">
                   <label htmlFor="otp">6-Digit OTP</label>
                   <input
                     type="text"
@@ -140,7 +146,7 @@ const ForgotPassword = () => {
                   />
                 </div>
 
-                <div className="form-group">
+                <div className="cobalt-reset-field">
                   <label htmlFor="newPassword">New Password</label>
                   <input
                     type="password"
@@ -152,7 +158,7 @@ const ForgotPassword = () => {
                   />
                 </div>
 
-                <div className="form-group">
+                <div className="cobalt-reset-field">
                   <label htmlFor="confirmPassword">Confirm New Password</label>
                   <input
                     type="password"
@@ -164,16 +170,16 @@ const ForgotPassword = () => {
                   />
                 </div>
 
-                <button type="submit" className="btn-submit" disabled={loading}>
+                <button type="submit" className="cobalt-reset-btn" disabled={loading}>
                   {loading ? 'Resetting...' : 'Reset Password'}
                 </button>
 
-                <div className="login-footer" style={{ marginTop: '0.5rem', paddingTop: '1rem' }}>
+                <div className="cobalt-reset-meta">
                   <p>Didn't receive the code?</p>
                   <button
                     type="button"
                     onClick={handleResendCode}
-                    className={`link-button ${resendLoading ? 'loading' : ''}`}
+                    className="cobalt-reset-link"
                     disabled={resendLoading || loading}
                   >
                     {resendLoading && <span className="spinner spinner-dark"></span>}
@@ -183,10 +189,14 @@ const ForgotPassword = () => {
               </form>
             )}
 
-            <div className="login-footer">
-              <button type="button" className="link-button" onClick={() => navigate('/login')}>
+            <div className="cobalt-reset-nav">
+              <button type="button" className="cobalt-reset-link" onClick={() => navigate('/login')}>
                 Back to Login
               </button>
+            </div>
+
+            <div className="cobalt-reset-prism">
+              <p>Verification codes are valid for 15 minutes. Please check your institutional spam folder.</p>
             </div>
           </div>
         </div>

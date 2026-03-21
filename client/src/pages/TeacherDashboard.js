@@ -644,8 +644,8 @@ const TeacherDashboard = () => {
                                   {teacherSection && (
                                     <span style={{
                                       padding: '2px 8px',
-                                      backgroundColor: '#dbeafe',
-                                      color: '#1e40af',
+                                      backgroundColor: '#e6eeff',
+                                      color: '#38485f',
                                       borderRadius: '4px',
                                       fontSize: '12px',
                                       fontWeight: 600,
@@ -657,8 +657,8 @@ const TeacherDashboard = () => {
                                   {!teacherSection && course.course_type === 'THEORY' && (
                                     <span style={{
                                       padding: '2px 8px',
-                                      backgroundColor: '#fef3c7',
-                                      color: '#92400e',
+                                      backgroundColor: '#fff8ea',
+                                      color: '#8a5b0f',
                                       borderRadius: '4px',
                                       fontSize: '12px',
                                       fontWeight: 600,
@@ -1305,7 +1305,7 @@ const TeacherDashboard = () => {
 
                   {/* CT Upload Section */}
                   {ctSettings.ctTaken > 0 && (
-                    <div style={{ padding: '16px', border: '1px solid #d1fae5', backgroundColor: '#f0fdf4', borderRadius: '8px' }}>
+                    <div style={{ padding: '16px', border: '1px solid #cfe8d8', backgroundColor: '#eaf7ef', borderRadius: '8px' }}>
                       <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 700, color: '#374151' }}>Upload CT Marks</h4>
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
                         <div>
@@ -1393,7 +1393,7 @@ const TeacherDashboard = () => {
                                     {['q1', 'q2', 'q3'].map(q => {
                                       const isAbsent = row[q] === 'A' || row[q] === 'Absent';
                                       return (
-                                        <td key={q} style={{ padding: '7px 12px', textAlign: 'center', border: '1px solid #e5e7eb', color: isAbsent ? '#e74c3c' : undefined, fontStyle: isAbsent ? 'italic' : undefined }}>
+                                        <td key={q} style={{ padding: '7px 12px', textAlign: 'center', border: '1px solid #e5e7eb', color: isAbsent ? '#ba1a1a' : undefined, fontStyle: isAbsent ? 'italic' : undefined }}>
                                           {isAbsent ? 'Absent' : row[q]}
                                         </td>
                                       );
@@ -1689,7 +1689,7 @@ const TeacherDashboard = () => {
                   </div>
 
                   {/* Lab Activity Upload Section */}
-                  <div style={{ padding: '16px', border: '1px solid #d1fae5', backgroundColor: '#f0fdf4', borderRadius: '8px' }}>
+                  <div style={{ padding: '16px', border: '1px solid #cfe8d8', backgroundColor: '#eaf7ef', borderRadius: '8px' }}>
                     <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 700, color: '#374151' }}>Upload Activity Marks</h4>
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
                       <div>
@@ -1787,7 +1787,7 @@ const TeacherDashboard = () => {
                                   ].map(f => {
                                     const isAbsent = row[f] === 'A' || row[f] === 'Absent';
                                     return (
-                                      <td key={f} style={{ padding: '7px 12px', textAlign: 'center', border: '1px solid #e5e7eb', color: isAbsent ? '#e74c3c' : undefined, fontStyle: isAbsent ? 'italic' : undefined }}>
+                                      <td key={f} style={{ padding: '7px 12px', textAlign: 'center', border: '1px solid #e5e7eb', color: isAbsent ? '#ba1a1a' : undefined, fontStyle: isAbsent ? 'italic' : undefined }}>
                                         {isAbsent ? 'Absent' : row[f]}
                                       </td>
                                     );
@@ -1995,7 +1995,7 @@ const TeacherDashboard = () => {
               ) : (
                 <>
                   {/* Assignment Settings Section */}
-                  <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#fef3c7', border: '1px solid #fde68a', borderRadius: '8px' }}>
+                  <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#fff8ea', border: '1px solid #f4dfb3', borderRadius: '8px' }}>
                     <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 700, color: '#374151' }}>Assignment &amp; Attendance Settings</h4>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '14px' }}>
                       <div>
@@ -2077,7 +2077,7 @@ const TeacherDashboard = () => {
                   </div>
 
                   {/* Assignment Upload Section */}
-                  {assignSettings.assignTaken > 0 && <div style={{ padding: '16px', border: '1px solid #d1fae5', backgroundColor: '#f0fdf4', borderRadius: '8px' }}>
+                  {assignSettings.assignTaken > 0 && <div style={{ padding: '16px', border: '1px solid #cfe8d8', backgroundColor: '#eaf7ef', borderRadius: '8px' }}>
                     <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 700, color: '#374151' }}>Upload Assignment Marks</h4>
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
                       <div>
@@ -2169,7 +2169,7 @@ const TeacherDashboard = () => {
                                   ].map(f => {
                                     const isAbsent = row[f] === 'A' || row[f] === 'Absent';
                                     return (
-                                      <td key={f} style={{ padding: '7px 12px', textAlign: 'center', border: '1px solid #e5e7eb', color: isAbsent ? '#e74c3c' : undefined, fontStyle: isAbsent ? 'italic' : undefined }}>
+                                      <td key={f} style={{ padding: '7px 12px', textAlign: 'center', border: '1px solid #e5e7eb', color: isAbsent ? '#ba1a1a' : undefined, fontStyle: isAbsent ? 'italic' : undefined }}>
                                         {isAbsent ? 'Absent' : row[f]}
                                       </td>
                                     );
@@ -2361,3 +2361,4 @@ const TeacherDashboard = () => {
 };
 
 export default TeacherDashboard;
+

@@ -2254,3 +2254,69 @@
   }
 }
 
+/* ===== COBALT Theme Overrides ===== */
+.dashboard-layout {
+  background-color: #f9f9ff;
+}
+
+.sidebar {
+  background: linear-gradient(180deg, #04152b 0%, #1a2a40 100%);
+}
+
+.nav-submenu {
+  border-left-color: rgba(233, 193, 118, 0.45);
+}
+
+.nav-item.active {
+  border-left-color: #e9c176;
+}
+
+.user-avatar-small {
+  background: #e9c176;
+  color: #1e1300;
+}
+
+.btn-logout {
+  background: rgba(186, 26, 26, 0.92);
+}
+
+.btn-logout:hover {
+  background: #93000a;
+}
+
+.section-container {
+  box-shadow: 0 1px 3px rgba(11, 28, 49, 0.12);
+}
+
+.section-header {
+  border-bottom-color: #c4c6cd;
+}
+
+.header-content h2,
+.import-box h3,
+.export-section h3 {
+  color: #0b1c31;
+}
+
+.header-subtitle,
+.import-info {
+  color: #44474d;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #04152b 0%, #1a2a40 100%);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 4px 12px rgba(4, 21, 43, 0.28);
+}
+
+.btn-outline {
+  color: #04152b;
+  border-color: #04152b;
+}
+
+.btn-outline:hover {
+  background: #eff3ff;
+}
+

@@ -214,13 +214,13 @@
 .breadcrumb-nav {
   margin-bottom: 1rem;
   padding-bottom: 1rem;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid #c4c6cd;
 }
 
 .breadcrumb-btn {
-  background-color: #f3f4f6;
-  border: 1px solid #d1d5db;
-  color: #374151;
+  background-color: #eff3ff;
+  border: 1px solid #c4c6cd;
+  color: #0b1c31;
   padding: 0.5rem 1rem;
   border-radius: 4px;
   font-size: 0.9rem;
@@ -231,8 +231,8 @@
 }
 
 .breadcrumb-btn:hover {
-  background-color: #e5e7eb;
-  border-color: #9ca3af;
+  background-color: #dde9ff;
+  border-color: #75777d;
 }
 
 .tree-group {
@@ -268,33 +268,33 @@
 }
 
 .tree-year-header {
-  background-color: #f0f9ff;
-  border-left: 4px solid #1e3a8a;
-  color: #1e3a8a;
+  background-color: #e6eeff;
+  border-left: 4px solid #04152b;
+  color: #04152b;
 }
 
 .tree-year-header:hover {
-  background-color: #e0f2fe;
+  background-color: #dde9ff;
 }
 
 .tree-sem-header {
-  background-color: #f5f3ff;
-  border-left: 4px solid #6d28d9;
-  color: #6d28d9;
+  background-color: #eff3ff;
+  border-left: 4px solid #505f78;
+  color: #38485f;
 }
 
 .tree-sem-header:hover {
-  background-color: #ede9fe;
+  background-color: #e6eeff;
 }
 
 .tree-type-header {
-  background-color: #fefce8;
-  border-left: 4px solid #b45309;
-  color: #b45309;
+  background-color: #fff8ea;
+  border-left: 4px solid #e9c176;
+  color: #5d4201;
 }
 
 .tree-type-header:hover {
-  background-color: #fef3c7;
+  background-color: #fcefcf;
 }
 
 .tree-header svg {
@@ -328,16 +328,16 @@
   align-items: center;
   padding: 0.75rem 1rem;
   background-color: #ffffff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #c4c6cd;
   border-radius: 4px;
   transition: all 0.2s ease;
   margin-left: 1rem;
 }
 
 .course-item:hover {
-  background-color: #f9fafb;
-  border-color: #1e3a8a;
-  box-shadow: 0 1px 3px rgba(30, 58, 138, 0.1);
+  background-color: #eff3ff;
+  border-color: #04152b;
+  box-shadow: 0 1px 3px rgba(4, 21, 43, 0.12);
 }
 
 .course-item-header {
@@ -355,7 +355,7 @@
 
 .course-code {
   font-weight: 700;
-  color: #1e3a8a;
+  color: #04152b;
   font-size: 0.95rem;
 }
 
