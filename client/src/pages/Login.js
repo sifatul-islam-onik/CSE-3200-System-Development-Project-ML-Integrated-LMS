@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Header from '../components/Header';
+import { Link, useNavigate } from 'react-router-dom';
 import { login } from '../services/authService';
 import '../styles/Login.css';
 
@@ -76,16 +75,20 @@ const Login = () => {
   };
 
   return (
-    <div className="login-page">
-      <Header />
-      
-      <main className="login-main">
-        <div className="login-container">
-          <div className="login-box">
-            <h2>Login</h2>
-            <p className="login-subtitle">
-              
-            </p>
+    <div className="login-page cobalt-login-page">
+      <main className="login-main cobalt-login-main">
+        <div className="login-container cobalt-login-container">
+          <div className="cobalt-branding">
+            <h1>
+              <Link className="cobalt-brand-link" to="/">COBALT</Link>
+            </h1>
+            <p>Academic Portal</p>
+          </div>
+
+          <div className="login-box cobalt-login-box">
+            <header className="cobalt-login-header">
+              <h2>Login</h2>
+            </header>
 
             {error && (
               <div className="alert alert-error">
@@ -93,8 +96,8 @@ const Login = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="login-form">
-              <div className="form-group">
+            <form onSubmit={handleSubmit} className="login-form cobalt-login-form">
+              <div className="form-group cobalt-form-group">
                 <label htmlFor="identifier">Email or Roll Number</label>
                 <input
                   type="text"
@@ -107,7 +110,7 @@ const Login = () => {
                 />
               </div>
 
-              <div className="form-group">
+              <div className="form-group cobalt-form-group">
                 <label htmlFor="password">Password</label>
                 <input
                   type="password"
@@ -120,10 +123,10 @@ const Login = () => {
                 />
               </div>
 
-              <div className="forgot-password-row">
+              <div className="forgot-password-row cobalt-forgot-row">
                 <button
                   type="button"
-                  className="link-button"
+                  className="link-button cobalt-link-button"
                   onClick={() => navigate('/forgot-password')}
                   disabled={loading}
                 >
@@ -131,9 +134,9 @@ const Login = () => {
                 </button>
               </div>
 
-              <button 
-                type="submit" 
-                className={`btn-submit ${loading ? 'loading' : ''}`}
+              <button
+                type="submit"
+                className={`btn-submit cobalt-btn-submit ${loading ? 'loading' : ''}`}
                 disabled={loading}
               >
                 {loading && <span className="spinner"></span>}

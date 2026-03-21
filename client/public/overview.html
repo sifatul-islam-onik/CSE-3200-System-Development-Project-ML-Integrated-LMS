@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>COBALT | ML-Integrated Outcome-Based Engineering Education</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "inverse-primary": "#b7c7e4",
+                        "surface": "#f9f9ff",
+                        "on-tertiary-container": "#ae8b46",
+                        "tertiary": "#1e1300",
+                        "on-error": "#ffffff",
+                        "on-tertiary-fixed": "#261900",
+                        "on-error-container": "#93000a",
+                        "tertiary-container": "#382600",
+                        "on-surface-variant": "#44474d",
+                        "outline-variant": "#c4c6cd",
+                        "on-secondary-fixed": "#111c2c",
+                        "surface-tint": "#505f78",
+                        "error-container": "#ffdad6",
+                        "surface-container-highest": "#d4e3ff",
+                        "tertiary-fixed-dim": "#e9c176",
+                        "error": "#ba1a1a",
+                        "surface-container": "#e6eeff",
+                        "surface-container-high": "#dde9ff",
+                        "on-tertiary-fixed-variant": "#5d4201",
+                        "on-primary-fixed-variant": "#38485f",
+                        "inverse-surface": "#213147",
+                        "on-secondary-container": "#586377",
+                        "secondary-container": "#d5e0f7",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#545f72",
+                        "on-surface": "#0b1c31",
+                        "primary-fixed": "#d4e3ff",
+                        "surface-variant": "#d4e3ff",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#eff3ff",
+                        "surface-bright": "#f9f9ff",
+                        "primary-fixed-dim": "#b7c7e4",
+                        "on-primary-container": "#8191ac",
+                        "outline": "#75777d",
+                        "on-primary-fixed": "#0b1c31",
+                        "on-background": "#0b1c31",
+                        "surface-dim": "#cbdbf8",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "primary-container": "#1a2a40",
+                        "inverse-on-surface": "#ebf1ff",
+                        "background": "#f9f9ff",
+                        "primary": "#04152b",
+                        "on-secondary-fixed-variant": "#3c475a",
+                        "tertiary-fixed": "#ffdea5",
+                        "secondary-fixed": "#d8e3fa",
+                        "secondary-fixed-dim": "#bcc7dd"
+                    },
+                    fontFamily: {
+                        "headline": ["Newsreader", "serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "none": "0px",
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @media (min-width: 768px) {
+            body { height: 100vh; overflow: hidden; }
+        }
+        .serif-text { font-family: 'Newsreader', serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .hero-gradient {
+            background: linear-gradient(135deg, #04152b 0%, #1a2a40 100%);
+        }
+        .insight-prism {
+            border-left: 2px solid #e9c176;
+            background-color: #dde9ff;
+            opacity: 0.95;
+        }
+        .nav-link-active {
+            color: #e9c176;
+            border-bottom: 1px solid #e9c176;
+            padding-bottom: 0.25rem;
+        }
+        /* Hide scrollbar but keep functionality for desktop main canvas */
+        @media (min-width: 768px) {
+            .no-scrollbar::-webkit-scrollbar { display: none; }
+            .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        }
+        
+        .arch-node {
+            border: 1px solid rgba(117, 119, 125, 0.2);
+            background: #ffffff;
+            transition: all 0.3s ease;
+        }
+        .arch-node:hover {
+            border-color: #e9c176;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        }
+
+        #mobile-menu-toggle:checked ~ #mobile-nav {
+            display: flex;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface flex flex-col">
+<!-- TopNavBar -->
+<nav class="flex justify-between items-center w-full px-6 md:px-12 py-6 max-w-none border-none bg-[#04152b] top-0 rounded-none flat no-shadows sticky z-[100] shrink-0">
+<div class="text-2xl font-serif tracking-tighter text-[#f9f9ff]">COBALT</div>
+<!-- Desktop Nav -->
+<div class="hidden md:flex items-center gap-10">
+<a class="nav-link-active Headlines: Newsreader. Body: Inter. uppercase tracking-widest text-[0.75rem] font-medium" href="#features">Features</a>
+<a class="text-[#f9f9ff]/70 hover:text-[#f9f9ff] transition-colors Headlines: Newsreader. Body: Inter. uppercase tracking-widest text-[0.75rem] font-medium" href="#architecture">Architecture</a>
+<a class="text-[#f9f9ff]/70 hover:text-[#f9f9ff] transition-colors Headlines: Newsreader. Body: Inter. uppercase tracking-widest text-[0.75rem] font-medium" href="#ocr-pipeline">OCR Pipeline</a>
+<a class="text-[#f9f9ff]/70 hover:text-[#f9f9ff] transition-colors Headlines: Newsreader. Body: Inter. uppercase tracking-widest text-[0.75rem] font-medium" href="#documentation">Documentation</a>
+</div>
+<div class="flex items-center gap-4">
+<a class="hidden sm:block bg-[#e9c176] text-[#1e1300] px-6 py-2 text-[0.7rem] uppercase tracking-widest font-bold hover:brightness-110 transition-all" href="/login" target="_top">
+                Login
+            </a>
+<!-- Mobile Menu Toggle -->
+<label class="md:hidden text-[#f9f9ff] cursor-pointer" for="mobile-menu-toggle">
+<span class="material-symbols-outlined">menu</span>
+</label>
+</div>
+<input class="hidden peer" id="mobile-menu-toggle" type="checkbox"/>
+<!-- Mobile Nav Overlay -->
+<div class="hidden absolute top-full left-0 w-full bg-[#04152b] border-t border-white/10 flex-col p-6 gap-6 md:hidden" id="mobile-nav">
+<a class="text-[#f9f9ff] uppercase tracking-widest text-[0.75rem] font-medium" href="#features">Features</a>
+<a class="text-[#f9f9ff]/70 uppercase tracking-widest text-[0.75rem] font-medium" href="#architecture">Architecture</a>
+<a class="text-[#f9f9ff]/70 uppercase tracking-widest text-[0.75rem] font-medium" href="#ocr-pipeline">OCR Pipeline</a>
+<a class="text-[#f9f9ff]/70 uppercase tracking-widest text-[0.75rem] font-medium" href="#documentation">Documentation</a>
+<a class="bg-[#e9c176] text-[#1e1300] px-6 py-3 text-[0.7rem] uppercase tracking-widest font-bold" href="/login" target="_top">
+                Login
+            </a>
+</div>
+</nav>
+<!-- Main Scrollable Canvas -->
+<main class="flex-grow md:overflow-y-auto no-scrollbar">
+<!-- Hero Section -->
+<section class="hero-gradient px-6 md:px-12 py-16 md:py-20 relative flex flex-col lg:grid lg:grid-cols-12 items-center min-h-[60vh]" id="features">
+<div class="lg:col-span-7 mb-12 lg:mb-0">
+<span class="text-tertiary-fixed-dim font-label text-[0.65rem] md:text-[0.75rem] uppercase tracking-[0.2em] mb-4 block">Archive Specification v2.4</span>
+<h1 class="font-headline text-on-primary text-4xl md:text-5xl lg:text-6xl leading-tight mb-6">
+                    COBALT — The ML-Integrated LMS for Outcome-Based Engineering Education.
+                </h1>
+<p class="font-body text-primary-fixed text-lg md:text-xl max-w-2xl leading-relaxed opacity-80">
+                    Bridging AI-Powered Grading and Complex Educational Analytics. A unified framework for intellectual rigor and institutional precision.
+                </p>
+</div>
+<div class="lg:col-span-5 w-full flex justify-center lg:justify-end">
+<div class="insight-prism p-6 md:p-8 w-full max-w-sm">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-tertiary-fixed-dim" data-icon="analytics">analytics</span>
+<span class="font-label text-[0.7rem] uppercase tracking-widest font-bold text-on-surface">System Insight</span>
+</div>
+<p class="font-body text-sm text-on-surface-variant leading-relaxed">
+                        Automated mapping of student performance to programmatic outcomes (POs) is currently operational via neural OCR extraction.
+                    </p>
+</div>
+</div>
+</section>
+<!-- Feature Bento Grid -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-0 border-t border-outline-variant/10">
+<!-- Column 1: Core Integration -->
+<div class="bg-surface-container-lowest p-8 md:p-12 flex flex-col justify-between group hover:bg-surface-container-low transition-colors duration-500 border-b md:border-b-0 md:border-r border-outline-variant/10">
+<div class="mb-8">
+<span class="material-symbols-outlined text-primary mb-6 scale-125 md:scale-150" data-icon="account_tree">account_tree</span>
+<h3 class="font-headline text-2xl mb-4">Outcome-Based Education (OBE) Integration</h3>
+<p class="font-body text-on-surface-variant text-sm leading-relaxed">
+                        Holistic alignment of curriculum, assessment, and reporting. COBALT synchronizes performance data directly with accreditation standards.
+                    </p>
+</div>
+<div class="pt-8 border-t border-outline-variant/20 flex items-center justify-between">
+<span class="font-label text-[0.65rem] uppercase tracking-widest text-outline">Module A-1</span>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors" data-icon="arrow_forward">arrow_forward</span>
+</div>
+</div>
+<!-- Column 2: OCR Intelligence -->
+<div class="bg-surface-container p-8 md:p-12 flex flex-col justify-between border-b md:border-b-0 md:border-r border-outline-variant/10 group hover:bg-surface-container-high transition-colors duration-500">
+<div class="mb-8">
+<span class="material-symbols-outlined text-primary mb-6 scale-125 md:scale-150" data-icon="document_scanner">document_scanner</span>
+<h3 class="font-headline text-2xl mb-4">AI-Powered Marks Extraction (OCR)</h3>
+<p class="font-body text-on-surface-variant text-sm leading-relaxed">
+                        Transform handwritten assessments into structured data. Our proprietary vision pipeline ensures 99.4% accuracy in high-stakes grading scenarios.
+                    </p>
+</div>
+<div class="pt-8 border-t border-outline-variant/20 flex items-center justify-between">
+<span class="font-label text-[0.65rem] uppercase tracking-widest text-outline">Module B-4</span>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors" data-icon="arrow_forward">arrow_forward</span>
+</div>
+</div>
+<!-- Column 3: Architecture -->
+<div class="bg-surface-container-high p-8 md:p-12 flex flex-col justify-between group hover:bg-surface-container-highest transition-colors duration-500">
+<div class="mb-8">
+<span class="material-symbols-outlined text-primary mb-6 scale-125 md:scale-150" data-icon="memory">memory</span>
+<h3 class="font-headline text-2xl mb-4">Microservices Architecture</h3>
+<p class="font-body text-on-surface-variant text-sm leading-relaxed">
+                        Decoupled high-availability clusters designed for institutional scale. Engineered for low-latency response and elastic computing loads.
+                    </p>
+</div>
+<div class="pt-8 border-t border-outline-variant/20 flex items-center justify-between">
+<span class="font-label text-[0.65rem] uppercase tracking-widest text-outline">Infrastructure C-9</span>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors" data-icon="arrow_forward">arrow_forward</span>
+</div>
+</div>
+</section>
+<!-- 1. Architecture Section -->
+<section class="bg-surface py-16 md:py-24 px-6 md:px-12 border-t border-outline-variant/20" id="architecture">
+<div class="max-w-6xl mx-auto">
+<div class="mb-12 md:mb-16">
+<span class="text-outline font-label text-[0.7rem] uppercase tracking-[0.3em] mb-4 block">Structural Blueprint</span>
+<h2 class="font-headline text-3xl md:text-4xl text-primary mb-6">System Architecture &amp; Core Infrastructure</h2>
+<p class="font-body text-on-surface-variant max-w-3xl leading-relaxed">
+                        A decoupled microservices ecosystem utilizing a message-queue pattern for high-fidelity ML inference and institutional data persistence.
+                    </p>
+</div>
+<!-- Architecture Diagram -->
+<div class="grid grid-cols-1 md:grid-cols-7 gap-4 md:gap-2 items-center py-10 md:py-12 px-6 md:px-8 bg-surface-container-low border border-outline-variant/10">
+<div class="arch-node p-4 md:p-6 flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-2xl md:text-3xl mb-3 text-primary" data-icon="web">web</span>
+<h4 class="font-headline text-base md:text-lg mb-1">React Client</h4>
+<p class="text-[0.6rem] md:text-[0.65rem] uppercase tracking-widest text-outline font-bold">Frontend SPA</p>
+</div>
+<div class="flex justify-center py-2 md:py-0"><span class="material-symbols-outlined text-outline-variant rotate-90 md:rotate-0" data-icon="arrow_forward">arrow_forward</span></div>
+<div class="arch-node p-4 md:p-6 flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-2xl md:text-3xl mb-3 text-primary" data-icon="api">api</span>
+<h4 class="font-headline text-base md:text-lg mb-1">Express API</h4>
+<p class="text-[0.6rem] md:text-[0.65rem] uppercase tracking-widest text-outline font-bold">Node.js Server</p>
+</div>
+<div class="flex justify-center py-2 md:py-0"><span class="material-symbols-outlined text-outline-variant rotate-90 md:rotate-0" data-icon="sync_alt">sync_alt</span></div>
+<div class="arch-node p-4 md:p-6 flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-2xl md:text-3xl mb-3 text-primary" data-icon="data_usage">data_usage</span>
+<h4 class="font-headline text-base md:text-lg mb-1">Redis + Bull</h4>
+<p class="text-[0.6rem] md:text-[0.65rem] uppercase tracking-widest text-outline font-bold">Job Queue</p>
+</div>
+<div class="flex justify-center py-2 md:py-0"><span class="material-symbols-outlined text-outline-variant rotate-90 md:rotate-0" data-icon="arrow_forward">arrow_forward</span></div>
+<div class="arch-node p-4 md:p-6 flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-2xl md:text-3xl mb-3 text-primary" data-icon="model_training">model_training</span>
+<h4 class="font-headline text-base md:text-lg mb-1">FastAPI OCR</h4>
+<p class="text-[0.6rem] md:text-[0.65rem] uppercase tracking-widest text-outline font-bold">ML Microservice</p>
+</div>
+</div>
+<!-- Tech Stack Detail -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mt-12 md:mt-16">
+<div class="border-l border-outline-variant/30 pl-6">
+<h5 class="font-headline text-xl mb-2">Core Runtime</h5>
+<p class="text-sm text-on-surface-variant font-body">Node.js 18+ with Express framework for the centralized API gateway.</p>
+</div>
+<div class="border-l border-outline-variant/30 pl-6">
+<h5 class="font-headline text-xl mb-2">Persistence</h5>
+<p class="text-sm text-on-surface-variant font-body">MongoDB with Mongoose ODM for curriculum and OBE data structures.</p>
+</div>
+<div class="border-l border-outline-variant/30 pl-6">
+<h5 class="font-headline text-xl mb-2">Concurrency</h5>
+<p class="text-sm text-on-surface-variant font-body">Redis-backed Bull queues for asynchronous processing of intensive OCR tasks.</p>
+</div>
+<div class="border-l border-outline-variant/30 pl-6">
+<h5 class="font-headline text-xl mb-2">ML Engine</h5>
+<p class="text-sm text-on-surface-variant font-body">Python &amp; FastAPI handling heavy neural network inference tasks.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- 2. OCR Pipeline Section -->
+<section class="bg-primary text-on-primary py-16 md:py-24 px-6 md:px-12" id="ocr-pipeline">
+<div class="max-w-6xl mx-auto">
+<div class="flex flex-col lg:grid lg:grid-cols-12 gap-12 md:gap-16 items-start">
+<div class="lg:col-span-4 w-full">
+<span class="text-tertiary-fixed-dim font-label text-[0.7rem] uppercase tracking-[0.3em] mb-4 block">Vision Pipeline</span>
+<h2 class="font-headline text-3xl md:text-4xl mb-6">Neural Extraction Workflow</h2>
+<p class="text-primary-fixed opacity-70 font-body leading-relaxed mb-8">
+                            Proprietary sequence for transforming unstructured paper-based assessments into verified academic data.
+                        </p>
+<div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-4">
+<div class="bg-primary-container p-4 border border-outline/20">
+<p class="text-[0.6rem] uppercase tracking-widest text-tertiary-fixed-dim font-bold mb-1">Layout detection</p>
+<p class="text-sm font-headline italic">PP-DocLayout_plus-L</p>
+</div>
+<div class="bg-primary-container p-4 border border-outline/20">
+<p class="text-[0.6rem] uppercase tracking-widest text-tertiary-fixed-dim font-bold mb-1">Cell detection</p>
+<p class="text-sm font-headline italic">RT-DETR-L_wired_table</p>
+</div>
+<div class="bg-primary-container p-4 border border-outline/20">
+<p class="text-[0.6rem] uppercase tracking-widest text-tertiary-fixed-dim font-bold mb-1">Recognition</p>
+<p class="text-sm font-headline italic">en_PP-OCRv5_mobile</p>
+</div>
+</div>
+</div>
+<div class="lg:col-span-8 w-full">
+<div class="space-y-0">
+<!-- Steps -->
+<div class="flex items-start gap-6 md:gap-8 border-b border-on-primary/10 pb-8 md:pb-10 mb-8 md:mb-10">
+<span class="font-headline text-4xl md:text-5xl text-tertiary-fixed-dim opacity-40">01</span>
+<div>
+<h4 class="font-headline text-xl md:text-2xl mb-2">Secure Submission</h4>
+<p class="text-primary-fixed/60 text-sm font-body max-w-xl">Initial ingestion of Base64 encoded document payloads with SSRF mitigation and payload validation.</p>
+</div>
+</div>
+<div class="flex items-start gap-6 md:gap-8 border-b border-on-primary/10 pb-8 md:pb-10 mb-8 md:mb-10">
+<span class="font-headline text-4xl md:text-5xl text-tertiary-fixed-dim opacity-40">02</span>
+<div>
+<h4 class="font-headline text-xl md:text-2xl mb-2">Bull-Redis Queuing</h4>
+<p class="text-primary-fixed/60 text-sm font-body max-w-xl">Jobs are enqueued in the persistent Redis store, allowing the system to handle spikes in institutional load without data loss.</p>
+</div>
+</div>
+<div class="flex items-start gap-6 md:gap-8 border-b border-on-primary/10 pb-8 md:pb-10 mb-8 md:mb-10">
+<span class="font-headline text-4xl md:text-5xl text-tertiary-fixed-dim opacity-40">03</span>
+<div>
+<h4 class="font-headline text-xl md:text-2xl mb-2">Worker Orchestration</h4>
+<p class="text-primary-fixed/60 text-sm font-body max-w-xl">Adaptive worker selection chooses the healthiest ML endpoint based on real-time health checks and latency metrics.</p>
+</div>
+</div>
+<div class="flex items-start gap-6 md:gap-8 border-b border-on-primary/10 pb-8 md:pb-10 mb-8 md:mb-10">
+<span class="font-headline text-4xl md:text-5xl text-tertiary-fixed-dim opacity-40">04</span>
+<div>
+<h4 class="font-headline text-xl md:text-2xl mb-2">Neural ML Parsing</h4>
+<p class="text-primary-fixed/60 text-sm font-body max-w-xl">Deep vision models execute table detection, box segmentation, and character recognition using multi-variant preprocessing.</p>
+</div>
+</div>
+<div class="flex items-start gap-6 md:gap-8">
+<span class="font-headline text-4xl md:text-5xl text-tertiary-fixed-dim opacity-40">05</span>
+<div>
+<h4 class="font-headline text-xl md:text-2xl mb-2">Data Reconciliation</h4>
+<p class="text-primary-fixed/60 text-sm font-body max-w-xl">Extracted marks are mapped to course outcomes and saved to the primary DB with confidence scores for human verification.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 3. Documentation Section -->
+<section class="bg-surface-container-lowest py-16 md:py-24 px-6 md:px-12 border-t border-outline-variant/10" id="documentation">
+<div class="max-w-6xl mx-auto">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 md:mb-16 gap-6">
+<div>
+<span class="text-outline font-label text-[0.7rem] uppercase tracking-[0.3em] mb-4 block">Knowledge Base</span>
+<h2 class="font-headline text-3xl md:text-4xl text-primary">Core Functional Areas</h2>
+</div>
+<div class="flex gap-4 w-full md:w-auto">
+<button class="flex-grow md:flex-grow-0 p-3 border border-outline-variant/30 hover:bg-surface-container transition-colors"><span class="material-symbols-outlined" data-icon="search">search</span></button>
+<button class="flex-[3] md:flex-grow-0 px-6 py-3 bg-primary text-on-primary text-[0.7rem] uppercase tracking-widest font-bold">Download Full Specs</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+<!-- User Management -->
+<div class="p-6 md:p-8 border border-outline-variant/10 bg-surface">
+<div class="flex items-center gap-4 mb-6">
+<span class="material-symbols-outlined text-tertiary-fixed-dim" data-icon="shield_person">shield_person</span>
+<h4 class="font-headline text-xl md:text-2xl">Identity &amp; Access</h4>
+</div>
+<ul class="space-y-4 font-body text-sm text-on-surface-variant">
+<li class="flex gap-3"><span class="text-tertiary-fixed-dim">•</span> Role-based access control (Admin, Teacher, Student)</li>
+<li class="flex gap-3"><span class="text-tertiary-fixed-dim">•</span> JWT-based stateless authentication protocols</li>
+<li class="flex gap-3"><span class="text-tertiary-fixed-dim">•</span> OTP-verified self-registration for academic staff</li>
+</ul>
+</div>
+<!-- OBE Data -->
+<div class="p-6 md:p-8 border border-outline-variant/10 bg-surface">
+<div class="flex items-center gap-4 mb-6">
+<span class="material-symbols-outlined text-tertiary-fixed-dim" data-icon="school">school</span>
+<h4 class="font-headline text-xl md:text-2xl">OBE Framework</h4>
+</div>
+<ul class="space-y-4 font-body text-sm text-on-surface-variant">
+<li class="flex gap-3"><span class="text-tertiary-fixed-dim">•</span> CO/PO mapping matrix and attainment logic</li>
+<li class="flex gap-3"><span class="text-tertiary-fixed-dim">•</span> Course profile generation and curriculum alignment</li>
+<li class="flex gap-3"><span class="text-tertiary-fixed-dim">•</span> Automated programmatic outcome calculation engines</li>
+</ul>
+</div>
+<!-- Assessment -->
+<div class="p-6 md:p-8 border border-outline-variant/10 bg-surface">
+<div class="flex items-center gap-4 mb-6">
+<span class="material-symbols-outlined text-tertiary-fixed-dim" data-icon="assignment_turned_in">assignment_turned_in</span>
+<h4 class="font-headline text-xl md:text-2xl">Assessment Layer</h4>
+</div>
+<ul class="space-y-4 font-body text-sm text-on-surface-variant">
+<li class="flex gap-3"><span class="text-tertiary-fixed-dim">•</span> Capture workflows for CTs, Labs, and Term Exams</li>
+<li class="flex gap-3"><span class="text-tertiary-fixed-dim">•</span> Batch-level result computation and publishing</li>
+<li class="flex gap-3"><span class="text-tertiary-fixed-dim">•</span> Multi-section grading and moderation support</li>
+</ul>
+</div>
+<!-- OCR Marks -->
+<div class="p-6 md:p-8 border border-outline-variant/10 bg-surface">
+<div class="flex items-center gap-4 mb-6">
+<span class="material-symbols-outlined text-tertiary-fixed-dim" data-icon="neurology">neurology</span>
+<h4 class="font-headline text-xl md:text-2xl">OCR Automation</h4>
+</div>
+<ul class="space-y-4 font-body text-sm text-on-surface-variant">
+<li class="flex gap-3"><span class="text-tertiary-fixed-dim">•</span> High-concurrency image processing queues</li>
+<li class="flex gap-3"><span class="text-tertiary-fixed-dim">•</span> Vision-based handwritten marks identification</li>
+<li class="flex gap-3"><span class="text-tertiary-fixed-dim">•</span> Automated error detection and reconciliation tools</li>
+</ul>
+</div>
+</div>
+<!-- Workflow Ribbon -->
+<div class="mt-12 md:mt-16 p-6 md:p-8 bg-[#dde9ff] flex flex-col md:flex-row items-center justify-between gap-6">
+<div class="text-center md:text-left">
+<h5 class="font-headline text-xl text-primary mb-1">Standard Implementation Workflow</h5>
+<p class="text-sm font-body text-on-surface-variant">Curriculum Definition → Assessment Design → OCR Ingestion → Attainment Analysis</p>
+</div>
+<button class="p-4 rounded-full border border-primary hover:bg-primary hover:text-white transition-all">
+<span class="material-symbols-outlined" data-icon="play_circle">play_circle</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Tech Stack Ribbon -->
+<section class="bg-surface-container-lowest py-8 px-6 md:px-12 border-t border-outline-variant/20 flex flex-col lg:flex-row items-center justify-between gap-6 shrink-0">
+<span class="font-label text-[0.7rem] uppercase tracking-[0.3em] text-on-surface-variant">Technological Nucleus</span>
+<div class="flex flex-wrap justify-center gap-6 md:gap-12 items-center opacity-60">
+<div class="flex items-center gap-2"><span class="font-body font-bold text-xs">Node.js</span></div>
+<div class="flex items-center gap-2"><span class="font-body font-bold text-xs">Python / FastAPI</span></div>
+<div class="flex items-center gap-2"><span class="font-body font-bold text-xs">MongoDB</span></div>
+<div class="flex items-center gap-2"><span class="font-body font-bold text-xs">Redis</span></div>
+<div class="flex items-center gap-2"><span class="font-body font-bold text-xs">React.js</span></div>
+</div>
+<div class="hidden lg:block h-4 w-[1px] bg-outline-variant"></div>
+<div class="flex items-center gap-4 text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]" data-icon="security">security</span>
+<span class="font-label text-[0.65rem] uppercase tracking-widest">Encrypted Protocols</span>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="flex flex-col lg:flex-row justify-between items-center w-full px-6 md:px-12 py-6 md:py-4 bg-[#f9f9ff] shrink-0 border-t border-[#c4c6cd]/20 z-50 gap-6">
+<div class="text-sm font-bold text-[#04152b]">COBALT</div>
+<div class="font-sans text-[0.6rem] md:text-[0.7rem] uppercase tracking-[0.05em] text-[#0b1c31]/60 text-center">
+            © 2024 COBALT Academic Archive. ML-Integrated Outcome-Based Engineering Education.
+        </div>
+<div class="flex flex-wrap justify-center gap-4 md:gap-8">
+<a class="font-sans text-[0.6rem] md:text-[0.7rem] uppercase tracking-[0.05em] text-[#0b1c31]/60 hover:text-[#04152b] underline decoration-[#e9c176]" href="#">Institutional Access</a>
+<a class="font-sans text-[0.6rem] md:text-[0.7rem] uppercase tracking-[0.05em] text-[#0b1c31]/60 hover:text-[#04152b] underline decoration-[#e9c176]" href="#">Privacy Protocol</a>
+<a class="font-sans text-[0.6rem] md:text-[0.7rem] uppercase tracking-[0.05em] text-[#0b1c31]/60 hover:text-[#04152b] underline decoration-[#e9c176]" href="#">Research Attribution</a>
+</div>
+</footer>
+<script>
+        // Simple scroll spy for navigation
+        const sections = document.querySelectorAll('section');
+        const navLinks = document.querySelectorAll('nav a[href^="#"]');
+        const mainCanvas = document.querySelector('main');
+        const isMobile = window.innerWidth < 768;
+        const scrollTarget = isMobile ? window : mainCanvas;
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        const scrollToSection = (sectionId) => {
+            const section = document.querySelector(sectionId);
+            if (!section) return;
+
+            if (isMobile) {
+                section.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+                return;
+            }
+
+            const targetTop = section.offsetTop;
+            mainCanvas.scrollTo({
+                top: targetTop,
+                behavior: prefersReducedMotion ? 'auto' : 'smooth'
+            });
+        };
+
+        navLinks.forEach(link => {
+            link.addEventListener('click', (event) => {
+                const href = link.getAttribute('href');
+                if (!href || !href.startsWith('#')) return;
+
+                event.preventDefault();
+                scrollToSection(href);
+                history.replaceState(null, '', href);
+
+                if (link.closest('#mobile-nav')) {
+                    document.getElementById('mobile-menu-toggle').checked = false;
+                }
+            });
+        });
+
+        const updateNav = () => {
+            let current = '';
+            const scrollPos = isMobile ? window.scrollY : mainCanvas.scrollTop;
+            
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (scrollPos >= (sectionTop - 200)) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                const href = link.getAttribute('href');
+                if (href && href.startsWith('#')) {
+                    link.classList.remove('nav-link-active');
+                    link.classList.add('text-[#f9f9ff]/70');
+                    if (href.includes(current)) {
+                        link.classList.add('nav-link-active');
+                        link.classList.remove('text-[#f9f9ff]/70');
+                    }
+                }
+            });
+        };
+
+        scrollTarget.addEventListener('scroll', updateNav);
+        updateNav();
+        
+        // Close mobile menu on click
+        document.querySelectorAll('#mobile-nav a').forEach(link => {
+            link.addEventListener('click', () => {
+                document.getElementById('mobile-menu-toggle').checked = false;
+            });
+        });
+    </script>
+</body></html>

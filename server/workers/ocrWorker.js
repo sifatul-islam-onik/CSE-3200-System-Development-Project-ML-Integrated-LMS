@@ -141,6 +141,16 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
       
       // Mark worker request as complete BEFORE calling done()
       workerRegistry.requestComplete(workerId, true);
+
+      // Remove completed jobs from Redis job store to avoid buildup.
+      // Bull jobs are already removed via removeOnComplete=true.
+      try {
+        await ocrJobStore.deleteJob(jobId);
+        console.log(`🗑️  Removed completed job ${jobId} from Redis job store`);
+      } catch (cleanupError) {
+        // Do not fail a successful OCR job because cleanup failed.
+        console.warn(`⚠️  Failed to remove completed job ${jobId} from Redis: ${cleanupError.message}`);
+      }
       
       // Signal successful completion to Bull queue
       done(null, { 
