@@ -28,9 +28,9 @@
   margin: 0;
   font-family: 'Newsreader', serif;
   font-size: 2.7rem;
-  font-weight: 700;
+  font-weight: 400;
   color: #04152b;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.05em;
 }
 
 .cobalt-brand-link {
@@ -43,33 +43,34 @@
 }
 
 .cobalt-branding p {
-  margin: 0.55rem 0 0;
+  margin: 0.5rem 0 0;
   font-family: 'Inter', sans-serif;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  color: #44474d;
+  font-size: 0.85rem;
+  color: #64748b;
+  letter-spacing: normal;
+  text-transform: none !important;
 }
 
 .cobalt-login-box {
   background: #ffffff;
-  border-radius: 0;
-  padding: 2.5rem 2.35rem;
-  box-shadow: 0 24px 48px rgba(11, 28, 49, 0.06);
-  border: 1px solid rgba(196, 198, 205, 0.2);
+  border-radius: 4px;
+  padding: 3.5rem 2.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.01);
+  border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .cobalt-login-header {
-  margin-bottom: 2.1rem;
+  margin-bottom: 2.5rem;
 }
 
 .cobalt-login-header h2 {
   margin: 0;
   text-align: center;
   font-family: 'Newsreader', serif;
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: 2.2rem;
+  font-weight: 500;
   color: #0b1c31;
+  letter-spacing: -0.01em;
 }
 
 /* Alerts */
@@ -100,28 +101,32 @@
 }
 
 .cobalt-form-group label {
+  display: block;
   font-family: 'Inter', sans-serif;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: #0b1c31;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #475569;
+  text-transform: none !important;
+  letter-spacing: normal;
 }
 
 .cobalt-form-group input {
-  padding: 0.78rem 0.95rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
   font-size: 0.95rem;
-  border: 1px solid rgba(196, 198, 205, 0.55);
-  border-radius: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background-color: #ffffff;
   font-family: 'Inter', sans-serif;
   transition: all 0.2s ease;
-  color: #0b1c31;
-  background: transparent;
+  color: #1e293b;
 }
 
 .cobalt-form-group input:focus {
   outline: none;
   border-color: #04152b;
+  background-color: #ffffff;
   box-shadow: 0 0 0 1px #04152b;
 }
 
@@ -146,23 +151,27 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
   padding: 0.95rem;
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-transform: none !important;
+  letter-spacing: normal;
   color: #ffffff;
-  background: #1a2a40;
+  background: #04152b;
   border: none;
-  border-radius: 0;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
   font-family: 'Inter', sans-serif;
-  margin-top: 0.45rem;
+  margin-top: 1.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .cobalt-btn-submit:hover:not(:disabled) {
-  filter: brightness(1.1);
+  background: #1e293b;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 .cobalt-btn-submit:disabled {
@@ -173,19 +182,19 @@
 .cobalt-link-button {
   background: none;
   border: none;
-  color: #04152b;
-  font-weight: 700;
+  color: #334155;
+  font-weight: 500;
   cursor: pointer;
   padding: 0;
-  font-size: 0.77rem;
-  letter-spacing: 0.02em;
+  font-size: 0.875rem;
+  letter-spacing: normal;
   font-family: 'Inter', sans-serif;
   text-decoration: none;
   transition: color 0.2s ease;
 }
 
 .cobalt-link-button:hover {
-  color: #1a2a40;
+  color: #04152b;
   text-decoration: underline;
 }
 

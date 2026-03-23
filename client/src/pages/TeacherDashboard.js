@@ -390,7 +390,12 @@ const TeacherDashboard = () => {
       setShowCourseForm(false);
       setSelectedCourse(null);
       setChangeDescription('');
-      if (activeSection === 'proposals') {
+      
+      if (activeSection === 'create-proposal') {
+        setActiveSection('proposals');
+      }
+      
+      if (activeSection === 'proposals' || activeSection === 'create-proposal') {
         fetchMyProposals();
       }
       setTimeout(() => setSuccessMessage(''), 5000);
@@ -1160,6 +1165,9 @@ const TeacherDashboard = () => {
                 setShowCourseForm(false);
                 setSelectedCourse(null);
                 setChangeDescription('');
+                if (activeSection === 'create-proposal') {
+                  setActiveSection('proposals');
+                }
               }}
               aria-label="Close modal"
             >
@@ -1188,6 +1196,9 @@ const TeacherDashboard = () => {
                 setShowCourseForm(false);
                 setSelectedCourse(null);
                 setChangeDescription('');
+                if (activeSection === 'create-proposal') {
+                  setActiveSection('proposals');
+                }
               }}
               loading={courseFormLoading}
               initialData={proposalType === 'UPDATE' ? selectedCourse : null}
