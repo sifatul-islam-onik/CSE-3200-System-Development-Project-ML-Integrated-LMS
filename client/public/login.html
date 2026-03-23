@@ -62,7 +62,8 @@
               "surface": "#f9f9ff"
             },
             fontFamily: {
-              "headline": ["Newsreader", "serif"],
+              "headline": ["Inter", "sans-serif"],
+              "serif": ["Newsreader", "serif"],
               "body": ["Inter", "sans-serif"],
               "label": ["Inter", "sans-serif"]
             },
@@ -90,8 +91,8 @@
 <div class="w-full max-w-md">
 <!-- Branding / Logo Anchor -->
 <div class="mb-12 text-center">
-<h1 class="font-headline text-4xl font-bold tracking-tighter text-primary">COBALT</h1>
-<p class="font-label text-[0.7rem] uppercase tracking-[0.2em] text-on-surface-variant mt-2">Academic Portal</p>
+<h1 class="font-serif text-4xl tracking-tighter text-primary">COBALT</h1>
+<p class="font-label text-[0.8rem] text-on-surface-variant mt-2">Academic Portal</p>
 </div>
 <!-- Login Card: Rational Asymmetry & Tonal Depth -->
 <div class="bg-surface-container-lowest p-10 md:p-12 border-none ring-1 ring-outline-variant/10 shadow-[0_24px_48px_rgba(11,28,49,0.06)] rounded-lg">
@@ -99,12 +100,12 @@
 <form class="space-y-8">
 <!-- Email / Roll Number Field -->
 <div class="relative mb-8">
-<label class="block font-label text-[0.7rem] uppercase tracking-wider text-on-surface font-bold mb-2" for="identity">EMAIL OR ROLL NUMBER</label>
+<label class="block font-label text-sm text-on-surface font-medium mb-2" for="identity">Email or Roll Number</label>
 <input class="w-full bg-transparent border border-outline-variant/30 rounded py-3 px-4 focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-300 font-body text-on-surface placeholder:text-on-surface-variant/40" id="identity" name="identity" placeholder="Email or roll number" type="text"/>
 </div>
 <!-- Password Field -->
 <div class="relative mb-4">
-<label class="block font-label text-[0.7rem] uppercase tracking-wider text-on-surface font-bold mb-2" for="password">PASSWORD</label>
+<label class="block font-label text-sm text-on-surface font-medium mb-2" for="password">Password</label>
 <input class="w-full bg-transparent border border-outline-variant/30 rounded py-3 px-4 focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-300 font-body text-on-surface placeholder:text-on-surface-variant/40" id="password" name="password" placeholder="Password" type="password"/>
 <div class="mt-4 text-right">
 <a class="font-label text-[0.75rem] font-bold text-primary hover:underline transition-colors" href="#">Forgot password?</a>

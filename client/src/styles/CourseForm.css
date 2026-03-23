@@ -166,6 +166,7 @@
 .form-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: var(--spacing-sm);
   margin-top: var(--spacing-sm);
   padding-top: var(--spacing-md);
@@ -174,7 +175,9 @@
 
 .btn-cancel,
 .btn-submit {
-  padding: var(--spacing-xs) var(--spacing-md);
+  box-sizing: border-box;
+  padding: 0 var(--spacing-md);
+  height: 2.5rem;
   font-size: 0.9rem;
   font-weight: 600;
   border: none;
@@ -182,6 +185,10 @@
   cursor: pointer;
   transition: var(--transition-base);
   font-family: 'Inter', sans-serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .btn-cancel {
@@ -196,12 +203,12 @@
 .btn-submit {
   background: var(--color-primary);
   color: var(--color-text-white);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .btn-submit:hover:not(:disabled) {
   background: var(--color-primary-dark);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
 }
 
 .btn-cancel:disabled,
@@ -244,13 +251,16 @@
     gap: var(--spacing-sm);
   }
 
+  /* Keep buttons on the same line even on small screens */
   .form-actions {
-    flex-direction: column-reverse;
+    flex-direction: row;
+    justify-content: space-between; /* Space them out if needed, or stick with flex-end */
   }
 
   .btn-cancel,
   .btn-submit {
-    width: 100%;
+    width: auto;
+    flex: 1; /* Make them equal width for better touch targets, or remove if not desired */
   }
 }
 
