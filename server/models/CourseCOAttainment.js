@@ -20,7 +20,6 @@ const courseCOAttainmentSchema = new mongoose.Schema({
   yearLevel: { type: Number, required: true },
   term: { type: Number, required: true },
   
-  // Stats broken down per Course Outcome
   coData: [coStatSchema],
   
   isPublished: { type: Boolean, default: false },
@@ -28,7 +27,6 @@ const courseCOAttainmentSchema = new mongoose.Schema({
   publishedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 
-// Compound index to ensure uniqueness for a batch+course calculation
 courseCOAttainmentSchema.index({ course: 1, batch: 1, yearLevel: 1, term: 1 }, { unique: true });
 courseCOAttainmentSchema.index({ isPublished: 1 });
 

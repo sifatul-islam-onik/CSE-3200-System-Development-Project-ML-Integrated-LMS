@@ -55,14 +55,11 @@ const courseOutcomeSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Compound index – unique only among active (non-deleted) documents.
-// Soft-deleted COs keep their co_code so they don't block future re-use.
 courseOutcomeSchema.index(
   { course: 1, co_code: 1 },
   { unique: true, partialFilterExpression: { is_deleted: { $ne: true } } }
 );
 
-// Cascade delete CO-PO mappings when CO is deleted
 courseOutcomeSchema.pre('deleteOne', { document: true, query: false }, async function(next) {
   try {
     const COPOMapping = require('./COPOMapping');

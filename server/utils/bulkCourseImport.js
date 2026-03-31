@@ -8,7 +8,6 @@ const ProgramOutcome = require('../models/ProgramOutcome');
 const User = require('../models/User');
 require('dotenv').config();
 
-// ANSI color codes for console output
 const colors = {
   reset: '\x1b[0m',
   bright: '\x1b[1m',
@@ -20,12 +19,10 @@ const colors = {
   magenta: '\x1b[35m'
 };
 
-// Validation functions
 const validateCourseData = (course, index) => {
   const errors = [];
   const courseRef = `Course #${index + 1} (${course.courseCode || 'UNKNOWN'})`;
 
-  // Required fields validation
   if (!course.courseCode || !course.courseCode.trim()) {
     errors.push(`${courseRef}: courseCode is required`);
   }
@@ -61,7 +58,6 @@ const validateCourseData = (course, index) => {
     errors.push(`${courseRef}: course_content is required and must be a non-empty array`);
   }
 
-  // Validate course_content structure
   if (course.course_content && Array.isArray(course.course_content)) {
     course.course_content.forEach((content, idx) => {
       if (!content.concept_description || !content.concept_description.trim()) {
@@ -70,7 +66,6 @@ const validateCourseData = (course, index) => {
     });
   }
 
-  // Validate course outcomes if present
   if (course.courseOutcomes && Array.isArray(course.courseOutcomes)) {
     course.courseOutcomes.forEach((co, idx) => {
       if (!co.co_code || !co.co_code.trim()) {
@@ -95,7 +90,6 @@ const validateCourseData = (course, index) => {
   return errors;
 };
 
-// Progress tracking
 const logProgress = (message, type = 'info') => {
   const timestamp = new Date().toISOString().substring(11, 19);
   let color = colors.reset;
@@ -127,7 +121,6 @@ const logProgress = (message, type = 'info') => {
   console.log(`${colors.bright}[${timestamp}]${colors.reset} ${color}${prefix} ${message}${colors.reset}`);
 };
 
-// Main import function
 const bulkImportCourses = async (jsonFilePath, dryRun = false) => {
   let session = null;
   const stats = {
@@ -141,12 +134,10 @@ const bulkImportCourses = async (jsonFilePath, dryRun = false) => {
   };
 
   try {
-    // Connect to MongoDB
     logProgress('Connecting to MongoDB...', 'info');
     await mongoose.connect(process.env.MONGO_URI);
     logProgress('MongoDB connected successfully', 'success');
 
-    // Read JSON file
     logProgress(`Reading course data from: ${jsonFilePath}`, 'info');
     const fileContent = await fs.readFile(jsonFilePath, 'utf-8');
     const data = JSON.parse(fileContent);
@@ -158,7 +149,6 @@ const bulkImportCourses = async (jsonFilePath, dryRun = false) => {
     stats.total = data.courses.length;
     logProgress(`Found ${stats.total} courses to import`, 'info');
 
-    // Verify Program Outcomes exist
     logProgress('Verifying Program Outcomes...', 'info');
     const poCount = await ProgramOutcome.countDocuments();
     if (poCount === 0) {
@@ -166,7 +156,6 @@ const bulkImportCourses = async (jsonFilePath, dryRun = false) => {
     }
     logProgress(`Found ${poCount} Program Outcomes`, 'success');
 
-    // Find an admin user to use as createdBy
     logProgress('Finding admin user...', 'info');
     const adminUser = await User.findOne({ role: 'admin' });
     if (!adminUser) {
@@ -174,14 +163,12 @@ const bulkImportCourses = async (jsonFilePath, dryRun = false) => {
     }
     logProgress(`Using admin user: ${adminUser.email}`, 'success');
 
-    // Validate all courses first
     logProgress('Validating course data...', 'progress');
     const allValidationErrors = [];
     const validCourses = [];
     const existingCourseCodes = new Set();
     const seenCourseCodes = new Set(); // Track codes from input file
 
-    // Check for existing courses in database
     const existingCourses = await Course.find({}, 'courseCode');
     existingCourses.forEach(c => existingCourseCodes.add(c.courseCode.toUpperCase().trim()));
 
@@ -205,11 +192,9 @@ const bulkImportCourses = async (jsonFilePath, dryRun = false) => {
       }
     }
 
-    // Report validation errors
     if (allValidationErrors.length > 0) {
       logProgress(`Found ${allValidationErrors.length} validation errors:`, 'error');
       allValidationErrors.forEach(err => {
-        // Extract course code for highlighting
         const match = err.match(/\(([^)]+)\):/);
         if (match) {
           const courseCode = match[1];
@@ -236,12 +221,10 @@ const bulkImportCourses = async (jsonFilePath, dryRun = false) => {
       return stats;
     }
 
-    // Start transaction
     logProgress('Starting MongoDB transaction...', 'progress');
     session = await mongoose.startSession();
     session.startTransaction();
 
-    // Import courses
     logProgress('Importing courses with CO and CO-PO mappings...', 'progress');
     console.log(''); // Empty line for progress display
 
@@ -250,71 +233,58 @@ const bulkImportCourses = async (jsonFilePath, dryRun = false) => {
       const progress = `[${i + 1}/${validCourses.length}]`;
 
       try {
-        // Normalize course_type (handle LAB/LABORATORY -> SESSIONAL)
         if (courseData.course_type === 'LAB' || courseData.course_type === 'LABORATORY') {
           courseData.course_type = 'SESSIONAL';
         }
 
-        // Normalize courseCode to always have a space (CSE3217 -> CSE 3217)
         if (courseData.courseCode) {
           courseData.courseCode = courseData.courseCode.replace(/^([A-Z]+)(\d{4})$/, '$1 $2');
         }
 
-        // Extract yearLevel and term from courseCode if not set (e.g., CSE 3217 -> year: 3, term: 2)
         const courseCodeMatch = courseData.courseCode?.match(/^[A-Z]+\s*(\d)(\d)\d{2}$/);
         if (courseCodeMatch) {
           const extractedYear = parseInt(courseCodeMatch[1]);
           const extractedTerm = parseInt(courseCodeMatch[2]);
           
-          // Set yearLevel if not already set or invalid
           if (!courseData.yearLevel || courseData.yearLevel < 1) {
             courseData.yearLevel = extractedYear;
           }
           
-          // Set term if not already set or invalid (convert 0 to 1, and ensure 1-2 range)
           if (!courseData.term || courseData.term < 1 || courseData.term > 2) {
             courseData.term = (extractedTerm === 0 || extractedTerm > 2) ? 1 : extractedTerm;
           }
         } else {
-          // Fallback: Normalize term (only 1 or 2 allowed, set to 1 for invalid values)
           if (!courseData.term || courseData.term < 1 || courseData.term > 2) {
             courseData.term = 1;
           }
         }
 
-        // Set elective_group to OPTIONAL_I if category is OPTIONAL and elective_group is missing
         if (courseData.category === 'OPTIONAL' && !courseData.elective_group) {
           courseData.elective_group = 'OPTIONAL_I';
         }
 
-        // Filter out lecture plans with empty plan descriptions
         if (courseData.lecture_plan && Array.isArray(courseData.lecture_plan)) {
           courseData.lecture_plan = courseData.lecture_plan.filter(item => 
             item.plan && item.plan.trim() !== ''
           );
         }
 
-        // Extract courseOutcomes before creating course
         const courseOutcomesData = courseData.courseOutcomes || [];
         delete courseData.courseOutcomes; // Remove from course data
 
-        // Create course
         process.stdout.write(`\r${colors.blue}${progress}${colors.reset} Creating course: ${colors.bright}${courseData.courseCode}${colors.reset}...`);
         
-        // Add createdBy field
         courseData.createdBy = adminUser._id;
         
         const course = new Course(courseData);
         await course.save({ session });
         stats.coursesCreated++;
 
-        // Create course outcomes if present
         if (courseOutcomesData.length > 0) {
           for (const coData of courseOutcomesData) {
             const poMappingsData = coData.po_mappings || [];
             delete coData.po_mappings; // Remove from CO data
 
-            // Create course outcome
             const courseOutcome = new CourseOutcome({
               ...coData,
               course: course._id
@@ -322,7 +292,6 @@ const bulkImportCourses = async (jsonFilePath, dryRun = false) => {
             await courseOutcome.save({ session });
             stats.cosCreated++;
 
-            // Create CO-PO mappings
             if (poMappingsData.length > 0) {
               const copoMappings = poMappingsData.map(mapping => ({
                 course_outcome: courseOutcome._id,
@@ -346,7 +315,6 @@ const bulkImportCourses = async (jsonFilePath, dryRun = false) => {
       }
     }
 
-    // Commit transaction
     logProgress('\nCommitting transaction...', 'progress');
     await session.commitTransaction();
     logProgress('Transaction committed successfully!', 'success');
@@ -368,7 +336,6 @@ const bulkImportCourses = async (jsonFilePath, dryRun = false) => {
   return stats;
 };
 
-// CLI execution
 const main = async () => {
   console.log(`\n${colors.bright}${colors.magenta}═══════════════════════════════════════════════════════${colors.reset}`);
   console.log(`${colors.bright}${colors.magenta}    BULK COURSE IMPORT UTILITY${colors.reset}`);
@@ -387,7 +354,6 @@ const main = async () => {
   try {
     const stats = await bulkImportCourses(jsonFilePath, dryRun);
 
-    // Display summary
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`\n${colors.bright}${colors.magenta}═══════════════════════════════════════════════════════${colors.reset}`);
     console.log(`${colors.bright}${colors.cyan}IMPORT SUMMARY${colors.reset}`);
@@ -419,7 +385,6 @@ const main = async () => {
   }
 };
 
-// Run if executed directly
 if (require.main === module) {
   main();
 }

@@ -1,9 +1,4 @@
-/**
- * Curriculum Validation Utilities for KUET CSE (April 2024)
- * Provides OBE validation and compliance checks
- */
 
-// KUET CSE Program Outcomes (PO1-PO12)
 const PROGRAM_OUTCOMES = {
   PO1: 'Engineering knowledge',
   PO2: 'Problem analysis',
@@ -19,7 +14,6 @@ const PROGRAM_OUTCOMES = {
   PO12: 'Life-long learning'
 };
 
-// Bloom's Taxonomy levels
 const BLOOM_LEVELS = [
   'Remember',
   'Understand',
@@ -29,7 +23,6 @@ const BLOOM_LEVELS = [
   'Create'
 ];
 
-// KUET CSE curriculum constraints
 const CURRICULUM_CONSTRAINTS = {
   minCreditsPerSemester: 12,
   maxCreditsPerSemester: 21,
@@ -38,9 +31,6 @@ const CURRICULUM_CONSTRAINTS = {
   maxCOsPerCourse: 8
 };
 
-/**
- * Validate Course Outcomes
- */
 const validateCourseOutcomes = (courseOutcomes) => {
   const errors = [];
   const warnings = [];
@@ -58,19 +48,16 @@ const validateCourseOutcomes = (courseOutcomes) => {
     warnings.push(`Course has ${courseOutcomes.length} COs. Recommended maximum is ${CURRICULUM_CONSTRAINTS.maxCOsPerCourse}.`);
   }
 
-  // Check each CO
   courseOutcomes.forEach((co, index) => {
     if (!co.coNumber || !co.description) {
       errors.push(`CO ${index + 1}: Missing required fields (coNumber or description)`);
     }
 
-    // Check if at least one PO is mapped
     const hasPOMapping = co.poMapping && Object.values(co.poMapping).some(val => val > 0);
     if (!hasPOMapping) {
       warnings.push(`CO ${co.coNumber || index + 1}: No PO mapping defined`);
     }
 
-    // Validate Bloom's level
     if (co.bloomLevel && !BLOOM_LEVELS.includes(co.bloomLevel)) {
       errors.push(`CO ${co.coNumber}: Invalid Bloom's taxonomy level "${co.bloomLevel}"`);
     }
@@ -83,10 +70,6 @@ const validateCourseOutcomes = (courseOutcomes) => {
   };
 };
 
-/**
- * Validate PO mapping coverage
- * Checks if PO mappings are distributed across multiple POs
- */
 const validatePOCoverage = (courseOutcomes) => {
   const warnings = [];
   
@@ -99,7 +82,6 @@ const validatePOCoverage = (courseOutcomes) => {
     poCoverage[po] = 0;
   });
 
-  // Aggregate PO mappings
   courseOutcomes.forEach(co => {
     if (co.poMapping) {
       Object.keys(co.poMapping).forEach(po => {
@@ -126,9 +108,6 @@ const validatePOCoverage = (courseOutcomes) => {
   };
 };
 
-/**
- * Validate semester and year level consistency
- */
 const validateSemesterYear = (semester, yearLevel) => {
   if (!semester || !yearLevel) {
     return { valid: true, message: 'Semester/year not specified' };
@@ -145,9 +124,6 @@ const validateSemesterYear = (semester, yearLevel) => {
   return { valid: true, message: 'Semester and year are consistent' };
 };
 
-/**
- * Validate assessment plan totals to 100%
- */
 const validateAssessmentPlan = (assessmentPlan) => {
   if (!assessmentPlan) {
     return { valid: true, message: 'No assessment plan provided' };
@@ -167,9 +143,6 @@ const validateAssessmentPlan = (assessmentPlan) => {
   return { valid: true, message: 'Assessment plan is valid', total };
 };
 
-/**
- * Main validation function for OBE compliance
- */
 const validateOBECompliance = (courseData) => {
   const results = {
     valid: true,
@@ -178,7 +151,6 @@ const validateOBECompliance = (courseData) => {
     details: {}
   };
 
-  // Validate course outcomes
   const coCheck = validateCourseOutcomes(courseData.courseOutcomes);
   results.details.courseOutcomes = coCheck;
   if (!coCheck.valid) {
@@ -189,14 +161,12 @@ const validateOBECompliance = (courseData) => {
     results.warnings.push(...coCheck.warnings);
   }
 
-  // Validate PO coverage
   const poCheck = validatePOCoverage(courseData.courseOutcomes);
   results.details.poCoverage = poCheck;
   if (poCheck.warnings.length > 0) {
     results.warnings.push(...poCheck.warnings);
   }
 
-  // Validate semester/year consistency
   if (courseData.semester && courseData.yearLevel) {
     const semesterCheck = validateSemesterYear(courseData.semester, courseData.yearLevel);
     results.details.semesterYear = semesterCheck;
@@ -206,7 +176,6 @@ const validateOBECompliance = (courseData) => {
     }
   }
 
-  // Validate assessment plan
   if (courseData.assessmentPlan) {
     const assessmentCheck = validateAssessmentPlan(courseData.assessmentPlan);
     results.details.assessmentPlan = assessmentCheck;
@@ -219,9 +188,6 @@ const validateOBECompliance = (courseData) => {
   return results;
 };
 
-/**
- * Generate CO-PO mapping matrix for reporting
- */
 const generateCOPOMatrix = (courseOutcomes) => {
   if (!courseOutcomes || courseOutcomes.length === 0) {
     return null;
@@ -242,7 +208,6 @@ const generateCOPOMatrix = (courseOutcomes) => {
       ...co.poMapping
     };
     
-    // Calculate totals
     Object.keys(co.poMapping || {}).forEach(po => {
       if (co.poMapping[po] > 0) {
         poTotals[po] += co.poMapping[po];

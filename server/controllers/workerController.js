@@ -1,8 +1,5 @@
 const workerRegistry = require('../utils/workerRegistry');
 
-// @desc    Get all workers
-// @route   GET /api/workers
-// @access  Private (Admin)
 exports.getAllWorkers = async (req, res) => {
   try {
     const activeOnly = req.query.activeOnly === 'true';
@@ -22,9 +19,6 @@ exports.getAllWorkers = async (req, res) => {
   }
 };
 
-// @desc    Get worker by ID
-// @route   GET /api/workers/:workerId
-// @access  Private (Admin)
 exports.getWorker = async (req, res) => {
   try {
     const { workerId } = req.params;
@@ -50,9 +44,6 @@ exports.getWorker = async (req, res) => {
   }
 };
 
-// @desc    Add a new worker
-// @route   POST /api/workers
-// @access  Private (Admin)
 exports.addWorker = async (req, res) => {
   try {
     const { workerId, url, name, description } = req.body;
@@ -64,7 +55,6 @@ exports.addWorker = async (req, res) => {
       });
     }
 
-    // Validate URL format
     try {
       new URL(url);
     } catch (error) {
@@ -101,9 +91,6 @@ exports.addWorker = async (req, res) => {
   }
 };
 
-// @desc    Remove a worker
-// @route   DELETE /api/workers/:workerId
-// @access  Private (Admin)
 exports.removeWorker = async (req, res) => {
   try {
     const { workerId } = req.params;
@@ -131,9 +118,6 @@ exports.removeWorker = async (req, res) => {
   }
 };
 
-// @desc    Enable/disable a worker
-// @route   PATCH /api/workers/:workerId/status
-// @access  Private (Admin)
 exports.setWorkerStatus = async (req, res) => {
   try {
     const { workerId } = req.params;
@@ -170,9 +154,6 @@ exports.setWorkerStatus = async (req, res) => {
   }
 };
 
-// @desc    Check health of a specific worker
-// @route   POST /api/workers/:workerId/health-check
-// @access  Private (Admin)
 exports.checkWorkerHealth = async (req, res) => {
   try {
     const { workerId } = req.params;
@@ -207,9 +188,6 @@ exports.checkWorkerHealth = async (req, res) => {
   }
 };
 
-// @desc    Check health of all workers
-// @route   POST /api/workers/health-check-all
-// @access  Private (Admin)
 exports.checkAllWorkersHealth = async (req, res) => {
   try {
     const result = await workerRegistry.checkAllWorkersHealth();
@@ -240,9 +218,6 @@ exports.checkAllWorkersHealth = async (req, res) => {
   }
 };
 
-// @desc    Get worker registry statistics
-// @route   GET /api/workers/stats
-// @access  Private (Admin)
 exports.getWorkerStats = async (req, res) => {
   try {
     const stats = workerRegistry.getStats();
@@ -260,9 +235,6 @@ exports.getWorkerStats = async (req, res) => {
   }
 };
 
-// @desc    Set load balancing strategy
-// @route   PATCH /api/workers/config/load-balance-strategy
-// @access  Private (Admin)
 exports.setLoadBalanceStrategy = async (req, res) => {
   try {
     const { strategy } = req.body;

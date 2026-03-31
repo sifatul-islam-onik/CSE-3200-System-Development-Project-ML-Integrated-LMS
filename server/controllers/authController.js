@@ -1,17 +1,14 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto'); // VULN-06: used for cryptographically secure OTP generation
+const crypto = require('crypto');
 const { validationResult } = require('express-validator');
 const { hashToken } = require('../utils/tokenUtils');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailService');
 
-// VULN-18: In-memory login attempt tracking (resets on server restart).
-// For multi-instance deployments, migrate this to Redis.
 const loginAttempts = new Map(); // key: normalised email -> { count, lockedUntil }
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
-// Generate JWT token
 const generateToken = (userId, role) => {
   return jwt.sign(
     { 
@@ -25,109 +22,6 @@ const generateToken = (userId, role) => {
   );
 };
 
-// @desc    Register a new user (teacher or student only)
-// @route   POST /api/auth/register
-// @access  Public
-exports.register = async (req, res) => {
-  try {
-    // Check for validation errors
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        success: false, 
-        errors: errors.array() 
-      });
-    }
-
-    let { name, email, password, role } = req.body;
-
-    // CRITICAL: Prevent admin registration through public API
-    // Double-check and sanitize role to prevent any bypass attempts
-    if (role === 'admin' || role?.toLowerCase() === 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Admin accounts cannot be created through registration. Contact system administrator.'
-      });
-    }
-
-    // Disallow student self-registration; only teachers may self-register
-    if (role === 'student') {
-      return res.status(403).json({
-        success: false,
-        message: 'Student accounts cannot be created via self-registration. Please contact an administrator.'
-      });
-    }
-
-    // Force role to be teacher only at this endpoint
-    if (role !== 'teacher') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid role. Only teacher self-registration is allowed.'
-      });
-    }
-
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'User with this email already exists'
-      });
-    }
-
-    // Generate 6-digit OTP
-    const otp = crypto.randomInt(100000, 1000000).toString(); // VULN-06: CSPRNG
-    const hashedOTP = hashToken(otp);
-
-    // Create new user
-    const user = new User({
-      name,
-      email,
-      password,
-      initialPassword: password,
-      role
-    });
-
-    // Set OTP fields explicitly
-    user.emailVerificationOTP = hashedOTP;
-    user.emailVerificationExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
-    
-    // Save user
-    await user.save();
-
-    // Send verification email with OTP
-    try {
-      await sendVerificationEmail(user.email, user.name, otp);
-    } catch (emailError) {
-      console.error('Failed to send verification email:', emailError);
-      // Continue with registration even if email fails
-    }
-
-    res.status(201).json({
-      success: true,
-      message: 'Registration successful! A 6-digit OTP has been sent to your email. Please verify your email within 15 minutes. After verification, your account will need admin approval before you can log in.',
-      data: {
-        userId: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isEmailVerified: user.isEmailVerified,
-        isApprovedByAdmin: user.isApprovedByAdmin
-      }
-    });
-
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during registration'
-    });
-  }
-};
-
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
 exports.login = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -140,7 +34,6 @@ exports.login = async (req, res) => {
 
     const { identifier, password } = req.body;
 
-    // VULN-18: Check account lockout before any DB query
     const lockKey = String(identifier || '').toLowerCase().trim();
     const lockInfo = loginAttempts.get(lockKey) || { count: 0, lockedUntil: 0 };
     if (lockInfo.lockedUntil > Date.now()) {
@@ -151,8 +44,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Find user and include password field
-    // Allow login with either email or roll number
     const user = await User.findOne({
       $or: [
         { email: identifier.toLowerCase() },
@@ -167,10 +58,8 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Check password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      // VULN-18: Increment failed attempt counter; lock after threshold
       const newCount = (lockInfo.count || 0) + 1;
       const lockedUntil = newCount >= MAX_LOGIN_ATTEMPTS ? Date.now() + LOCKOUT_DURATION_MS : 0;
       loginAttempts.set(lockKey, { count: newCount, lockedUntil });
@@ -181,10 +70,8 @@ exports.login = async (req, res) => {
           : 'Invalid email/roll number or password'
       });
     }
-    // Clear lockout counter on correct password
     loginAttempts.delete(lockKey);
 
-    // Check if account is active
     if (!user.isActive) {
       return res.status(403).json({
         success: false,
@@ -192,40 +79,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Check email verification (not required for admin)
-    if (user.role !== 'admin' && !user.isEmailVerified) {
-      // Generate new OTP for unverified user
-      const otp = crypto.randomInt(100000, 1000000).toString(); // VULN-06: CSPRNG
-      const hashedOTP = hashToken(otp);
-
-      user.emailVerificationOTP = hashedOTP;
-      user.emailVerificationExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
-      await user.save();
-
-      // Send new verification email
-      try {
-        await sendVerificationEmail(user.email, user.name, otp);
-      } catch (emailError) {
-        console.error('Failed to send OTP:', emailError);
-      }
-
-      return res.status(403).json({
-        success: false,
-        message: 'Your email is not verified. A new verification code has been sent to your email.',
-        requiresVerification: true,
-        email: user.email
-      });
-    }
-
-    // Check admin approval (not required for admin)
-    if (user.role !== 'admin' && !user.isApprovedByAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'Your account is pending admin approval'
-      });
-    }
-
-    // Generate token with user id and role
     const token = generateToken(user._id, user.role);
 
     res.status(200).json({
@@ -267,9 +120,6 @@ exports.login = async (req, res) => {
   }
 };
 
-// @desc    Verify email with OTP
-// @route   POST /api/auth/verify-email
-// @access  Public
 exports.verifyEmail = async (req, res) => {
   try {
     let { email, otp } = req.body;
@@ -281,11 +131,9 @@ exports.verifyEmail = async (req, res) => {
       });
     }
 
-    // Normalize email (trim and lowercase)
     email = email.trim().toLowerCase();
     otp = otp.trim();
 
-    // Find user with email
     const user = await User.findOne({ email }).select('+emailVerificationOTP +emailVerificationExpires');
     
     if (!user) {
@@ -295,7 +143,6 @@ exports.verifyEmail = async (req, res) => {
       });
     }
 
-    // Check if already verified
     if (user.isEmailVerified) {
       return res.status(400).json({
         success: false,
@@ -303,7 +150,6 @@ exports.verifyEmail = async (req, res) => {
       });
     }
 
-    // Check if OTP exists
     if (!user.emailVerificationOTP) {
       return res.status(400).json({
         success: false,
@@ -311,7 +157,6 @@ exports.verifyEmail = async (req, res) => {
       });
     }
 
-    // Check if OTP expired
     if (user.emailVerificationExpires < Date.now()) {
       return res.status(400).json({
         success: false,
@@ -319,7 +164,6 @@ exports.verifyEmail = async (req, res) => {
       });
     }
 
-    // Hash the provided OTP and compare
     const hashedOTP = hashToken(otp);
     if (hashedOTP !== user.emailVerificationOTP) {
       return res.status(400).json({
@@ -328,7 +172,6 @@ exports.verifyEmail = async (req, res) => {
       });
     }
 
-    // Verify email
     user.isEmailVerified = true;
     user.emailVerificationOTP = undefined;
     user.emailVerificationExpires = undefined;
@@ -353,9 +196,6 @@ exports.verifyEmail = async (req, res) => {
   }
 };
 
-// @desc    Resend verification OTP
-// @route   POST /api/auth/resend-otp
-// @access  Public
 exports.resendOTP = async (req, res) => {
   try {
     let { email } = req.body;
@@ -367,7 +207,6 @@ exports.resendOTP = async (req, res) => {
       });
     }
 
-    // Normalize email
     email = email.trim().toLowerCase();
 
     const user = await User.findOne({ email });
@@ -386,15 +225,13 @@ exports.resendOTP = async (req, res) => {
       });
     }
 
-    // Generate new OTP
-    const otp = crypto.randomInt(100000, 1000000).toString(); // VULN-06: CSPRNG
+    const otp = crypto.randomInt(100000, 1000000).toString();
     const hashedOTP = hashToken(otp);
 
     user.emailVerificationOTP = hashedOTP;
     user.emailVerificationExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
     await user.save();
 
-    // Send verification email
     try {
       await sendVerificationEmail(user.email, user.name, otp);
     } catch (emailError) {
@@ -419,9 +256,6 @@ exports.resendOTP = async (req, res) => {
   }
 };
 
-// @desc    Request password reset OTP
-// @route   POST /api/auth/forgot-password
-// @access  Public
 exports.forgotPassword = async (req, res) => {
   try {
     let { email } = req.body;
@@ -473,9 +307,6 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
-// @desc    Reset password using OTP
-// @route   POST /api/auth/reset-password
-// @access  Public
 exports.resetPassword = async (req, res) => {
   try {
     let { email, otp, newPassword } = req.body;
@@ -545,9 +376,6 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
-// @desc    Update user profile
-// @route   PUT /api/auth/profile/update
-// @access  Protected
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -568,10 +396,7 @@ exports.updateProfile = async (req, res) => {
       currentPassword,
       newPassword
     } = req.body;
-    // VULN-10: Email changes are disabled. Users must contact an administrator
-    // to change their email, ensuring re-verification is enforced.
 
-    // If changing password, include password in query
     const user = await User.findById(userId).select(currentPassword && newPassword ? '+password' : '');
     if (!user) {
       return res.status(404).json({
@@ -580,7 +405,6 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
-    // Update name if provided
     if (name !== undefined) {
       if (!name || !name.trim()) {
         return res.status(400).json({
@@ -598,17 +422,14 @@ exports.updateProfile = async (req, res) => {
       user.name = name.trim();
     }
 
-    // Update profile picture if provided (base64 string)
     if (profilePicture !== undefined) {
       user.profilePicture = profilePicture;
     }
 
-    // Update signature if provided (base64 string)
     if (signature !== undefined) {
       user.signature = signature;
     }
 
-    // Update simple text fields if provided
     if (father !== undefined) user.father = father;
     if (mother !== undefined) user.mother = mother;
     if (advisor !== undefined) user.advisor = advisor;
@@ -617,7 +438,6 @@ exports.updateProfile = async (req, res) => {
     if (hall !== undefined) user.hall = hall;
     if (scholarship !== undefined) user.scholarship = scholarship;
     if (bloodGroup !== undefined) user.bloodGroup = bloodGroup;
-    // Update religion if provided and valid; map to canonical case
     if (religion !== undefined) {
       const rRaw = String(religion || '').trim().toLowerCase();
       const allowedReligions = ['islam', 'hinduism', 'buddhism', 'christian', 'others'];
@@ -634,7 +454,6 @@ exports.updateProfile = async (req, res) => {
       user.religion = canonicalReligionMap[rRaw];
     }
 
-    // Update gender if provided and valid
     if (gender !== undefined) {
       const g = String(gender || '').toLowerCase();
       if (!['male', 'female', 'others'].includes(g)) {
@@ -643,7 +462,6 @@ exports.updateProfile = async (req, res) => {
       user.gender = g;
     }
 
-    // Handle password change if requested
     if (currentPassword !== undefined || newPassword !== undefined) {
       if (!currentPassword || !newPassword) {
         return res.status(400).json({ success: false, message: 'Current and new password are required' });
@@ -701,9 +519,6 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-// @desc    Get current user profile
-// @route   GET /api/auth/profile
-// @access  Protected
 exports.getProfile = async (req, res) => {
   try {
     const userId = req.user.id;

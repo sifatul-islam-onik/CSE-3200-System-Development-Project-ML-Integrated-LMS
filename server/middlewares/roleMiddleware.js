@@ -1,4 +1,3 @@
-// Restrict access to admin role only
 exports.authorizeAdmin = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({
@@ -17,7 +16,6 @@ exports.authorizeAdmin = (req, res, next) => {
   next();
 };
 
-// Restrict access to specific roles
 exports.authorizeRoles = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {
@@ -38,7 +36,6 @@ exports.authorizeRoles = (...roles) => {
   };
 };
 
-// Teacher or Admin access
 exports.teacherOrAdmin = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({
@@ -57,7 +54,6 @@ exports.teacherOrAdmin = (req, res, next) => {
   next();
 };
 
-// Admin only access
 exports.adminOnly = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({

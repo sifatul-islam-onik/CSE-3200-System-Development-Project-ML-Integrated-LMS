@@ -2,11 +2,6 @@ const CourseOutcome = require('../models/CourseOutcome');
 const Course = require('../models/Course');
 const { validationResult } = require('express-validator');
 
-/**
- * Returns the paired theory/lab course code, or null if no valid pair exists
- * (pair must differ only in the last digit by ±1 AND share the same first-two
- * digits of the numeric portion to guarantee they belong to the same semester).
- */
 function getPairCourseCode(courseCode) {
   const lastDigit = parseInt(courseCode.slice(-1));
   if (isNaN(lastDigit)) return null;
@@ -18,9 +13,6 @@ function getPairCourseCode(courseCode) {
   return pairCode;
 }
 
-// @desc    Create course outcomes for a course
-// @route   POST /api/courses/:courseId/outcomes
-// @access  Admin only
 exports.createCourseOutcomes = async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -41,7 +33,6 @@ exports.createCourseOutcomes = async (req, res) => {
     const { courseId } = req.params;
     const { outcomes } = req.body; // Array of {co_code, description}
 
-    // Verify course exists
     const course = await Course.findById(courseId);
     if (!course) {
       return res.status(404).json({
@@ -50,7 +41,6 @@ exports.createCourseOutcomes = async (req, res) => {
       });
     }
 
-    // Validate outcomes array
     if (!Array.isArray(outcomes) || outcomes.length === 0) {
       return res.status(400).json({
         success: false,
@@ -58,7 +48,6 @@ exports.createCourseOutcomes = async (req, res) => {
       });
     }
 
-    // Pre-load pair course outcomes for content-consistency check
     let pairCourseOutcomes = [];
     let pairCourseCode = null;
     const pairCode = getPairCourseCode(course.courseCode);
@@ -73,10 +62,8 @@ exports.createCourseOutcomes = async (req, res) => {
       }
     }
 
-    // Create course outcomes
     const createdOutcomes = [];
     
-    // Batch extract CO codes for duplicate validation
     const coCodes = outcomes.map(o => o.co_code ? o.co_code.toUpperCase() : null).filter(Boolean);
     
     const existingCOs = await CourseOutcome.find({
@@ -97,7 +84,6 @@ exports.createCourseOutcomes = async (req, res) => {
         });
       }
 
-      // Check for duplicate CO code within the same course
       if (existingCOSet.has(co_code.toUpperCase())) {
         return res.status(400).json({
           success: false,
@@ -105,7 +91,6 @@ exports.createCourseOutcomes = async (req, res) => {
         });
       }
 
-      // Check content consistency with the paired course
       if (pairCourseOutcomes.length > 0) {
         const pairMatch = pairCourseOutcomes.find(
           p => p.co_code === co_code.toUpperCase()
@@ -145,14 +130,10 @@ exports.createCourseOutcomes = async (req, res) => {
   }
 };
 
-// @desc    Get all course outcomes for a course
-// @route   GET /api/courses/:courseId/outcomes
-// @access  Public
 exports.getCourseOutcomes = async (req, res) => {
   try {
     const { courseId } = req.params;
 
-    // Verify course exists
     const course = await Course.findById(courseId);
     if (!course) {
       return res.status(404).json({
@@ -161,11 +142,9 @@ exports.getCourseOutcomes = async (req, res) => {
       });
     }
 
-    // Get COs for this course
     let outcomes = await CourseOutcome.find({ course: courseId })
       .sort({ co_code: 1 });
 
-    // Check if we need to merge with theory/lab course
     const courseCode = course.courseCode;
     const codeMatch = courseCode.match(/^([A-Z]+)\s*(\d+)$/i);
     
@@ -173,13 +152,10 @@ exports.getCourseOutcomes = async (req, res) => {
       const prefix = codeMatch[1];
       const number = parseInt(codeMatch[2]);
       
-      // Determine if this is theory (odd) or lab (even)
       const isLab = number % 2 === 0;
       const theoryCode = isLab ? `${prefix} ${number - 1}` : courseCode;
       const labCode = `${prefix} ${isLab ? number : number + 1}`;
       
-      // If current course is lab, get COs from theory course
-      // If current course is theory, get COs from lab course (theory + 1)
       const relatedCourseCode = isLab ? theoryCode : labCode;
       
       try {
@@ -192,10 +168,8 @@ exports.getCourseOutcomes = async (req, res) => {
             course: relatedCourse._id 
           }).sort({ co_code: 1 });
           
-          // Merge outcomes (union) - remove duplicates by CO code
           const coMap = new Map();
           
-          // Add all outcomes from both courses
           [...outcomes, ...relatedOutcomes].forEach(co => {
             const coCode = co.co_code.toUpperCase();
             if (!coMap.has(coCode)) {
@@ -203,13 +177,11 @@ exports.getCourseOutcomes = async (req, res) => {
             }
           });
           
-          // Convert back to array and sort
           outcomes = Array.from(coMap.values()).sort((a, b) => 
             a.co_code.localeCompare(b.co_code)
           );
         }
       } catch (err) {
-        // If related course doesn't exist, just return current course COs
 
       }
     }
@@ -228,15 +200,11 @@ exports.getCourseOutcomes = async (req, res) => {
   }
 };
 
-// @desc    Update a course outcome
-// @route   PUT /api/courses/:courseId/outcomes/:outcomeId
-// @access  Admin only (or teacher updating co_po_correlation only)
 exports.updateCourseOutcome = async (req, res) => {
   try {
     const { courseId, outcomeId } = req.params;
     const { co_code, description, co_po_correlation } = req.body;
 
-    // Teachers may only update co_po_correlation
     const isTeacher = req.user.role === 'teacher';
     if (isTeacher && (co_code !== undefined || description !== undefined)) {
       return res.status(403).json({
@@ -263,7 +231,6 @@ exports.updateCourseOutcome = async (req, res) => {
       });
     }
 
-    // Check for duplicate CO code if co_code is being updated
     if (co_code && co_code.toUpperCase() !== outcome.co_code) {
       const existing = await CourseOutcome.findOne({
         course: courseId,
@@ -281,7 +248,6 @@ exports.updateCourseOutcome = async (req, res) => {
 
     if (co_code) outcome.co_code = co_code;
 
-    // Check content consistency with paired course when description changes
     const newDescription = description !== undefined ? description : outcome.description;
     if (description !== undefined && description.trim() !== outcome.description.trim()) {
       const fullCourse = await Course.findById(courseId);
@@ -325,9 +291,6 @@ exports.updateCourseOutcome = async (req, res) => {
   }
 };
 
-// @desc    Delete a course outcome
-// @route   DELETE /api/courses/:courseId/outcomes/:outcomeId
-// @access  Admin only
 exports.deleteCourseOutcome = async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -365,9 +328,6 @@ exports.deleteCourseOutcome = async (req, res) => {
   }
 };
 
-// @desc    Delete all course outcomes for a course
-// @route   DELETE /api/courses/:courseId/outcomes
-// @access  Admin only
 exports.deleteAllCourseOutcomes = async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -379,7 +339,6 @@ exports.deleteAllCourseOutcomes = async (req, res) => {
 
     const { courseId } = req.params;
 
-    // Verify course exists
     const course = await Course.findById(courseId);
     if (!course) {
       return res.status(404).json({
@@ -405,16 +364,11 @@ exports.deleteAllCourseOutcomes = async (req, res) => {
   }
 };
 
-/**
- * Get course outcomes with CO-PO mappings for course profile
- * GET /api/course-outcomes/profile/:courseCode
- */
 exports.getCourseProfileData = async (req, res) => {
   try {
     const { courseCode } = req.params;
     const COPOMapping = require('../models/COPOMapping');
 
-    // Find the course
     const course = await Course.findOne({ courseCode: courseCode.toUpperCase() });
     if (!course) {
       return res.status(404).json({
@@ -423,17 +377,14 @@ exports.getCourseProfileData = async (req, res) => {
       });
     }
 
-    // Get all course outcomes for this course
     let courseOutcomes = await CourseOutcome.find({ 
       course: course._id,
       is_deleted: false 
     }).sort({ co_code: 1 });
 
-    // When ownOnly=true is passed (e.g. for the Course Profile tab), skip merging
     const ownOnly = req.query.ownOnly === 'true';
 
     if (!ownOnly) {
-      // Merge with theory/lab paired course COs (for calculation sheets like COAttainment)
       const codeMatch = courseCode.match(/^([A-Z]+)\s*(\d+)$/i);
 
       if (codeMatch) {
@@ -456,11 +407,9 @@ exports.getCourseProfileData = async (req, res) => {
               is_deleted: false
             }).sort({ co_code: 1 });
 
-            // Track which CO codes belong to which source
             const ownCoCodes = new Set(courseOutcomes.map(co => co.co_code.toUpperCase()));
             const relatedCoCodes = new Set(relatedOutcomes.map(co => co.co_code.toUpperCase()));
 
-            // Merge outcomes (union) - remove duplicates by CO code
             const coMap = new Map();
             [...courseOutcomes, ...relatedOutcomes].forEach(co => {
               const coCode = co.co_code.toUpperCase();
@@ -469,12 +418,9 @@ exports.getCourseProfileData = async (req, res) => {
               }
             });
 
-            // Determine sourceType: current course is theory (odd) or lab (even)
-            // ownCoCodes → current course type, relatedCoCodes → opposite type
             const currentType = isLab ? 'lab' : 'theory';
             const relatedType = isLab ? 'theory' : 'lab';
 
-            // Attach sourceType directly on the outcome object (non-persisted property)
             coMap.forEach((co, coCode) => {
               const inOwn = ownCoCodes.has(coCode);
               const inRelated = relatedCoCodes.has(coCode);
@@ -492,31 +438,25 @@ exports.getCourseProfileData = async (req, res) => {
             );
           }
         } catch (err) {
-          // Related course not found, returning current course COs only
         }
       }
     }
 
-    // Determine current course type for fallback sourceType
     const codeMatchForType = courseCode.match(/^([A-Z]+)\s*(\d+)$/i);
     const currentCourseType = (codeMatchForType && parseInt(codeMatchForType[2]) % 2 === 0) ? 'lab' : 'theory';
 
-    // Get CO-PO mappings for all COs
     const coIds = courseOutcomes.map(co => co._id);
     const copoMappings = await COPOMapping.find({ 
       course_outcome: { $in: coIds } 
     });
 
-    // Map PO codes to numbers (PO_A=1, PO_B=2, etc.)
     const poCodeToNumber = {
       'PO_A': 1, 'PO_B': 2, 'PO_C': 3, 'PO_D': 4,
       'PO_E': 5, 'PO_F': 6, 'PO_G': 7, 'PO_H': 8,
       'PO_I': 9, 'PO_J': 10, 'PO_K': 11, 'PO_L': 12
     };
 
-    // Transform data for course profile
     const profileData = courseOutcomes.map(co => {
-      // Extract Bloom's levels from taxonomy_levels array
       const bloomLevels = {
         cognitive: '',
         affective: '',
@@ -534,12 +474,10 @@ exports.getCourseProfileData = async (req, res) => {
         else if (prefix === 'S') bloomLevels.social = number;
       });
 
-      // Get PO mappings for this CO
       const coMappings = copoMappings.filter(
         m => m.course_outcome.toString() === co._id.toString()
       );
 
-      // Get list of mapped POs as numbers
       const mappedPos = coMappings
         .filter(m => m.level === 1)
         .map(m => poCodeToNumber[m.program_outcome_code])

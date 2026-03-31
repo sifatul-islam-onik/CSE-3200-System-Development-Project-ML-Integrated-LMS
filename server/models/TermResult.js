@@ -31,7 +31,6 @@ const termResultSchema = new mongoose.Schema({
   publishedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 
-// One result record per student per term (year+term)
 termResultSchema.index({ student: 1, yearLevel: 1, term: 1 }, { unique: true });
 termResultSchema.index({ batch: 1, deptCode: 1, yearLevel: 1, term: 1 });
 termResultSchema.index({ isPublished: 1 });

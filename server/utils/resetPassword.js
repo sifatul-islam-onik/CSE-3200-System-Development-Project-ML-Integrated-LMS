@@ -16,11 +16,9 @@ const question = (query) => {
   });
 };
 
-// VULN-14: Hidden input — suppresses terminal echo for sensitive password entry
 const getHiddenInput = (prompt) => {
   return new Promise((resolve) => {
     process.stdout.write(prompt);
-    // output:null prevents readline from echoing characters back to stdout
     const rlHidden = readline.createInterface({ input: process.stdin, output: null });
     rlHidden.question('', (answer) => {
       process.stdout.write('\n');
@@ -36,7 +34,7 @@ const resetPassword = async () => {
     console.log('Connected to MongoDB\n');
 
     const email = await question('Enter user email to reset password: ');
-    const newPassword = await getHiddenInput('Enter new password: '); // VULN-14: hidden
+    const newPassword = await getHiddenInput('Enter new password: ');
 
     const user = await User.findOne({ email });
     

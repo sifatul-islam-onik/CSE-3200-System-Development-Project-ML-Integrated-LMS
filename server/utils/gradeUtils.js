@@ -1,11 +1,4 @@
-/**
- * gradeUtils.js — server-side replication of COCalcSheet.js grade computation logic.
- * All functions mirror the frontend AttainmentView.js / COCalcSheet.js implementations exactly.
- */
 
-// ---------------------------------------------------------------------------
-// Grade scale (absolute marks thresholds, replicating COCalcSheet.js)
-// ---------------------------------------------------------------------------
 const GRADE_BOUNDARIES = [
   { threshold: 119, grade: 'F',  point: 0.00 },
   { threshold: 134, grade: 'D',  point: 2.00 },
@@ -24,10 +17,6 @@ const GRADE_POINT_MAP = {
   'C+': 2.50, 'C': 2.25, 'D': 2.00, 'F': 0.00,
 };
 
-/**
- * Returns the letter grade for a total score.
- * Matches getLetterGrade() in COCalcSheet.js exactly.
- */
 const getLetterGrade = (total) => {
   for (const b of GRADE_BOUNDARIES) {
     if (total < b.threshold) return b.grade;
@@ -35,18 +24,9 @@ const getLetterGrade = (total) => {
   return 'A+';
 };
 
-/**
- * Returns the grade point for a letter grade.
- */
 const getGradePoint = (letterGrade) => GRADE_POINT_MAP[letterGrade] ?? 0.00;
 
-// ---------------------------------------------------------------------------
-// CT factor computation (replicates calculateAutoFactor in AttainmentView.js)
-// ---------------------------------------------------------------------------
 
-/**
- * Returns active CT field names based on ctTaken (e.g. ['CT1_Q1','CT1_Q2','CT1_Q3','CT2_Q1',...])
- */
 const getActiveCTFields = (ctSummary) => {
   const ctTaken = (ctSummary && ctSummary.ctTaken) || 3;
   const allFields = [
@@ -57,9 +37,6 @@ const getActiveCTFields = (ctSummary) => {
   return allFields.slice(0, ctTaken * 3);
 };
 
-/**
- * Returns active assignment field names based on assignTaken.
- */
 const getActiveAssignmentFields = (assignmentSummary) => {
   const assignTaken = (assignmentSummary && assignmentSummary.assignTaken) || 3;
   const allFields = [
@@ -70,11 +47,6 @@ const getActiveAssignmentFields = (assignmentSummary) => {
   return allFields.slice(0, assignTaken * 3);
 };
 
-/**
- * Compute CT column totals (sum of each Q field across all CO rows, mirrorring ctSums()).
- * @param {Array} ctRows  - ctRows from CTAttainment document
- * @returns {{ CT1: number, CT2: number, CT3: number }}
- */
 const computeCTColumnTotals = (ctRows) => {
   let ct1 = 0, ct2 = 0, ct3 = 0;
   (ctRows || []).forEach(r => {
@@ -85,10 +57,6 @@ const computeCTColumnTotals = (ctRows) => {
   return { CT1: ct1, CT2: ct2, CT3: ct3 };
 };
 
-/**
- * Compute auto Eq. Wt per CT (mirrors calculateAutoEqWt()).
- * autoEqWt.CTx = coMappedMarks60 / ctTaken  (if CTx sum > 0, else 0)
- */
 const computeAutoEqWt = (ctRows, ctSummary) => {
   const ctTotals = computeCTColumnTotals(ctRows);
   const coMappedMarks = (ctSummary && ctSummary.coMappedMarks60) || 0;
@@ -100,13 +68,6 @@ const computeAutoEqWt = (ctRows, ctSummary) => {
   };
 };
 
-/**
- * Compute CT factors per CT key (mirrors calculateAutoFactor()).
- * factor.CTx = autoEqWt.CTx / ctTotals.CTx  (if useEqWt != 0)
- *            = ctManualWts.CTx / ctTotals.CTx (if useEqWt == 0)
- * @param {Object} ctData - { ctRows, ctManualWts, ctSummary }
- * @returns {{ CT1: number, CT2: number, CT3: number }}
- */
 const computeCTFactors = (ctData) => {
   const { ctRows = [], ctManualWts = {}, ctSummary = {} } = ctData;
   const ctTotals = computeCTColumnTotals(ctRows);
@@ -129,13 +90,7 @@ const computeCTFactors = (ctData) => {
   return result;
 };
 
-// ---------------------------------------------------------------------------
-// Assignment factor computation (replicates calculateAutoAssignmentFactor())
-// ---------------------------------------------------------------------------
 
-/**
- * Compute assignment column totals (sum of each Q field across all CO rows).
- */
 const computeAssignmentColumnTotals = (assignmentRows) => {
   let a1 = 0, a2 = 0, a3 = 0;
   (assignmentRows || []).forEach(r => {
@@ -146,9 +101,6 @@ const computeAssignmentColumnTotals = (assignmentRows) => {
   return { Assgn1: a1, Assgn2: a2, Assgn3: a3 };
 };
 
-/**
- * Compute auto Eq. Wt per assignment.
- */
 const computeAssignmentAutoEqWt = (assignmentRows, assignmentSummary) => {
   const totals = computeAssignmentColumnTotals(assignmentRows);
   const assignmentMarks = (assignmentSummary && assignmentSummary.assignmentMarks30) || 0;
@@ -160,11 +112,6 @@ const computeAssignmentAutoEqWt = (assignmentRows, assignmentSummary) => {
   };
 };
 
-/**
- * Compute assignment factors (mirrors calculateAutoAssignmentFactor()).
- * @param {Object} assignData - { assignmentRows, assignmentManualWts, assignmentSummary }
- * @returns {{ Assgn1: number, Assgn2: number, Assgn3: number }}
- */
 const computeAssignmentFactors = (assignData) => {
   const { assignmentRows = [], assignmentManualWts = {}, assignmentSummary = {} } = assignData;
   const totals = computeAssignmentColumnTotals(assignmentRows);
@@ -187,21 +134,9 @@ const computeAssignmentFactors = (assignData) => {
   return result;
 };
 
-// ---------------------------------------------------------------------------
-// Per-student per-CO mark helpers (replicates getStudentCTFactoredMarks / getStudentAssignmentFactoredMarks)
-// ---------------------------------------------------------------------------
 
 const normaliseRoll = (r) => String(r || '').trim().toLowerCase();
 
-/**
- * Factored CT marks for a student for a specific CO.
- * Mirrors getStudentCTFactoredMarks() in AttainmentView.js.
- *
- * @param {string} rollNumber
- * @param {string} coNumber  e.g. "CO1"
- * @param {Object} ctData    { ctRows, ctObtainedRows, ctManualWts, ctSummary }
- * @returns {number}
- */
 const getStudentCTFactoredMarks = (rollNumber, coNumber, ctData) => {
   const { ctRows = [], ctObtainedRows = [], ctManualWts = {}, ctSummary = {} } = ctData;
 
@@ -230,15 +165,6 @@ const getStudentCTFactoredMarks = (rollNumber, coNumber, ctData) => {
   }, 0);
 };
 
-/**
- * Factored assignment marks for a student for a specific CO.
- * Mirrors getStudentAssignmentFactoredMarks() in AttainmentView.js.
- *
- * @param {string} rollNumber
- * @param {string} coNumber   e.g. "CO1"
- * @param {Object} assignData { assignmentRows, attnAssignObtainedRows, assignmentManualWts, assignmentSummary }
- * @returns {number}
- */
 const getStudentAssignmentFactoredMarks = (rollNumber, coNumber, assignData) => {
   const {
     assignmentRows = [],
@@ -271,21 +197,10 @@ const getStudentAssignmentFactoredMarks = (rollNumber, coNumber, assignData) => 
   }, 0);
 };
 
-// ---------------------------------------------------------------------------
-// Section A/B obtained marks per CO
-// ---------------------------------------------------------------------------
 
 const SECTION_Q_PARTS = ['a', 'b', 'c', 'd'];
 const SECTION_Q_NUMS  = [1, 2, 3, 4];
 
-/**
- * Compute section A (or B) obtained marks for a given CO row for a student.
- * Only sub-parts where the CO row allocates a non-zero value are counted.
- *
- * @param {Object} studentObtained  - sectionAObtainedRows entry for the student
- * @param {Object} coAllocationRow  - sectionARows entry for the CO
- * @returns {number}
- */
 const computeSectionCOMarks = (studentObtained, coAllocationRow) => {
   if (!studentObtained || !coAllocationRow) return 0;
   let total = 0;
@@ -301,28 +216,12 @@ const computeSectionCOMarks = (studentObtained, coAllocationRow) => {
   return total;
 };
 
-// ---------------------------------------------------------------------------
-// Master per-student total computation (replicates computeStudentTheoryTotal)
-// ---------------------------------------------------------------------------
 
-/**
- * Compute the theory total marks for a single student across all COs.
- * Mirrors computeStudentTheoryTotal() in COCalcSheet.js.
- *
- * @param {string} rollNumber
- * @param {string[]} coNumbers   Array of CO numbers, e.g. ["CO1","CO2","CO3"]
- * @param {Object}  sectionAData { sectionARows, sectionAObtainedRows }
- * @param {Object}  sectionBData { sectionBRows, sectionBObtainedRows }
- * @param {Object}  ctData       { ctRows, ctObtainedRows, ctManualWts, ctSummary }
- * @param {Object}  assignData   { assignmentRows, attnAssignObtainedRows, assignmentManualWts, assignmentSummary }
- * @returns {number}
- */
 const computeStudentTotal = (rollNumber, coNumbers, sectionAData, sectionBData, ctData, assignData) => {
   const { sectionARows = [], sectionAObtainedRows = [] } = sectionAData;
   const { sectionBRows = [], sectionBObtainedRows = [] } = sectionBData;
   const { attnAssignObtainedRows = [] } = assignData;
 
-  // Attendance
   const attnRow = attnAssignObtainedRows.find(r =>
     normaliseRoll(r.rollNumber) === normaliseRoll(rollNumber)
   );
@@ -355,17 +254,7 @@ const computeStudentTotal = (rollNumber, coNumbers, sectionAData, sectionBData, 
   return marksTotal + attendance;
 };
 
-// ---------------------------------------------------------------------------
-// GPA helpers
-// ---------------------------------------------------------------------------
 
-/**
- * Compute term GPA (credit-weighted average grade point).
- * Only courses with grade != 'F' and credit > 0 contribute — but all credits are summed for denominator.
- *
- * @param {Array} courseResults  Array of { credit, gradePoint, letterGrade }
- * @returns {number} rounded to 2 dp
- */
 const computeTermGPA = (courseResults) => {
   let totalCreditPoints = 0;
   let totalCredits = 0;
@@ -379,12 +268,6 @@ const computeTermGPA = (courseResults) => {
   return Math.round((totalCreditPoints / totalCredits) * 100) / 100;
 };
 
-/**
- * Compute CGPA from all published TermResult documents for a student.
- *
- * @param {Array} allTermResults  Array of TermResult docs (current term included)
- * @returns {number} rounded to 2 dp
- */
 const computeCGPA = (allTermResults) => {
   let totalCreditPoints = 0;
   let totalCredits = 0;
@@ -400,10 +283,6 @@ const computeCGPA = (allTermResults) => {
   return Math.round((totalCreditPoints / totalCredits) * 100) / 100;
 };
 
-// ---------------------------------------------------------------------------
-// Lab (SESSIONAL) grade scale — mirrors AttainmentView.js getLetterGrade for lab
-// Input: absolute total marks (typically 0–100 range based on lab setup)
-// ---------------------------------------------------------------------------
 const getLetterGradeForLab = (total) => {
   if (total >= 80) return 'A+';
   if (total >= 75) return 'A';
@@ -417,10 +296,6 @@ const getLetterGradeForLab = (total) => {
   return 'F';
 };
 
-/**
- * Compute activity column totals (sum of Q1+Q2+Q3 per activity across all CO rows).
- * Mirrors labActivityColumnTotals() + labActivityActivityTotals() in AttainmentView.js.
- */
 const computeLabActivityColumnTotals = (labActivityRows, activityTaken) => {
   const result = {};
   for (let i = 1; i <= (activityTaken || 5); i++) {
@@ -431,19 +306,6 @@ const computeLabActivityColumnTotals = (labActivityRows, activityTaken) => {
   return result;
 };
 
-/**
- * Compute total marks for a single lab student.
- * Mirrors getLabActivityStudentTotalMarks() in AttainmentView.js exactly.
- *
- * @param {string} rollNumber
- * @param {Object} labData  {
- *   labActivityRows, labActivityObtainedRows,
- *   labAttendanceMarks, labQuizMarks, labVivaMarks,
- *   activityTaken, useEqWtActivity, coMappedActivityMarks,
- *   labActivityManualWts, otherActivityRemaining
- * }
- * @returns {number}
- */
 const computeLabStudentTotal = (rollNumber, labData) => {
   const {
     labActivityRows = [],
@@ -470,7 +332,6 @@ const computeLabStudentTotal = (rollNumber, labData) => {
 
   const activityTotals = computeLabActivityColumnTotals(labActivityRows, activityTaken);
 
-  // Other activity (factored) — mirrors the otherMeasured/other logic in AttainmentView.js
   const rawOther = parseFloat(studentRow.otherMeasured) || 0;
   if (rawOther > 0 && otherActivityRemaining > 0) {
     let measuredTotal = (labAttendanceMarks || 0) + (labQuizMarks || 0) + (labVivaMarks || 0);
@@ -480,7 +341,6 @@ const computeLabStudentTotal = (rollNumber, labData) => {
     total += parseFloat(studentRow.other) || 0;
   }
 
-  // CO-mapped activity marks (factored, summed across all CO rows)
   labActivityRows.forEach(coRow => {
     for (let i = 1; i <= (activityTaken || 5); i++) {
       const actTotal = activityTotals[`activity${i}`] || 0;

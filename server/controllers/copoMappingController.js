@@ -4,9 +4,6 @@ const ProgramOutcome = require('../models/ProgramOutcome');
 const Course = require('../models/Course');
 const { validationResult } = require('express-validator');
 
-// @desc    Create or update CO-PO mappings for a course outcome
-// @route   POST /api/course-outcomes/:coId/po-mappings
-// @access  Admin only
 exports.setCOPOMappings = async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -27,7 +24,6 @@ exports.setCOPOMappings = async (req, res) => {
     const { coId } = req.params;
     const { mappings } = req.body; // Array of { program_outcome_code, level }
 
-    // Verify course outcome exists
     const courseOutcome = await CourseOutcome.findById(coId);
     if (!courseOutcome) {
       return res.status(404).json({
@@ -36,7 +32,6 @@ exports.setCOPOMappings = async (req, res) => {
       });
     }
 
-    // Validate mappings array
     if (!Array.isArray(mappings) || mappings.length === 0) {
       return res.status(400).json({
         success: false,
@@ -44,7 +39,6 @@ exports.setCOPOMappings = async (req, res) => {
       });
     }
 
-    // Validate each mapping
     const validPOCodes = ['PO_A', 'PO_B', 'PO_C', 'PO_D', 'PO_E', 'PO_F', 'PO_G', 'PO_H', 'PO_I', 'PO_J', 'PO_K', 'PO_L'];
     const processedMappings = [];
     const seenPOs = new Set();
@@ -53,7 +47,6 @@ exports.setCOPOMappings = async (req, res) => {
     for (const mapping of mappings) {
       const { program_outcome_code, level } = mapping;
 
-      // Validate PO code
       if (!program_outcome_code || !validPOCodes.includes(program_outcome_code.toUpperCase())) {
         return res.status(400).json({
           success: false,
@@ -61,7 +54,6 @@ exports.setCOPOMappings = async (req, res) => {
         });
       }
 
-      // Validate level
       if (level === undefined || level === null) {
         return res.status(400).json({
           success: false,
@@ -77,7 +69,6 @@ exports.setCOPOMappings = async (req, res) => {
         });
       }
 
-      // Check for duplicates in request
       const poCodeUpper = program_outcome_code.toUpperCase();
       if (seenPOs.has(poCodeUpper)) {
         return res.status(400).json({
@@ -94,7 +85,6 @@ exports.setCOPOMappings = async (req, res) => {
       });
     }
 
-    // Verify POs exist in database
     const existingPOs = await ProgramOutcome.find({ po_code: { $in: Array.from(poCodesToQuery) } }).select('po_code').lean();
     const existingPOCodes = new Set(existingPOs.map(po => po.po_code));
 
@@ -107,10 +97,8 @@ exports.setCOPOMappings = async (req, res) => {
       }
     }
 
-    // Delete existing mappings for this CO
     await COPOMapping.deleteMany({ course_outcome: coId });
 
-    // Create new mappings
     const mappingsToInsert = processedMappings.map(mapping => ({
       course_outcome: coId,
       program_outcome_code: mapping.program_outcome_code,
@@ -135,14 +123,10 @@ exports.setCOPOMappings = async (req, res) => {
   }
 };
 
-// @desc    Get CO-PO mappings for a course outcome
-// @route   GET /api/course-outcomes/:coId/po-mappings
-// @access  Public
 exports.getCOPOMappings = async (req, res) => {
   try {
     const { coId } = req.params;
 
-    // Verify course outcome exists
     const courseOutcome = await CourseOutcome.findById(coId);
     if (!courseOutcome) {
       return res.status(404).json({
@@ -171,14 +155,10 @@ exports.getCOPOMappings = async (req, res) => {
   }
 };
 
-// @desc    Get CO-PO matrix for a course
-// @route   GET /api/courses/:courseId/co-po-matrix
-// @access  Public
 exports.getCOPOMatrixForCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
 
-    // Get the course
     const course = await Course.findById(courseId);
     if (!course) {
       return res.status(404).json({
@@ -187,7 +167,6 @@ exports.getCOPOMatrixForCourse = async (req, res) => {
       });
     }
 
-    // Get all COs for this course only
     const courseOutcomes = await CourseOutcome.find({ course: courseId })
       .sort({ co_code: 1 });
 
@@ -198,30 +177,25 @@ exports.getCOPOMatrixForCourse = async (req, res) => {
       });
     }
 
-    // Get all mappings for these COs
     const coIds = courseOutcomes.map(co => co._id);
     const mappings = await COPOMapping.find({ 
       course_outcome: { $in: coIds } 
     }).populate('course_outcome', 'co_code description');
 
-    // Build matrix structure
     const matrix = {};
     const poList = ['PO_A', 'PO_B', 'PO_C', 'PO_D', 'PO_E', 'PO_F', 'PO_G', 'PO_H', 'PO_I', 'PO_J', 'PO_K', 'PO_L'];
     
-    // Initialize matrix
     courseOutcomes.forEach(co => {
       matrix[co.co_code] = {
         co_id: co._id,
         description: co.description,
         mappings: {}
       };
-      // Initialize all POs to 0
       poList.forEach(po => {
         matrix[co.co_code].mappings[po] = 0;
       });
     });
 
-    // Fill in actual mappings
     mappings.forEach(mapping => {
       const coCode = mapping.course_outcome.co_code;
       if (matrix[coCode]) {
@@ -229,7 +203,6 @@ exports.getCOPOMatrixForCourse = async (req, res) => {
       }
     });
 
-    // Calculate PO-wise totals and averages
     const poSummary = {};
     const poTotals = {};
     const averages = {};
@@ -255,7 +228,6 @@ exports.getCOPOMatrixForCourse = async (req, res) => {
       averages[po] = count > 0 ? (total / count).toFixed(2) : '0.00';
     });
 
-    // Convert matrix object to array format for frontend
     const matrixArray = courseOutcomes.map(co => {
       const row = {
         coNumber: co.co_code,
@@ -263,7 +235,6 @@ exports.getCOPOMatrixForCourse = async (req, res) => {
         taxonomy_levels: co.taxonomy_levels || []
       };
       
-      // Add PO mapping levels to the row
       poList.forEach(po => {
         row[po] = matrix[co.co_code].mappings[po];
       });
@@ -294,9 +265,6 @@ exports.getCOPOMatrixForCourse = async (req, res) => {
   }
 };
 
-// @desc    Delete a specific CO-PO mapping
-// @route   DELETE /api/course-outcomes/:coId/po-mappings/:poCode
-// @access  Admin only
 exports.deleteCOPOMapping = async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -308,7 +276,6 @@ exports.deleteCOPOMapping = async (req, res) => {
 
     const { coId, poCode } = req.params;
 
-    // Check remaining mappings count
     const remainingCount = await COPOMapping.countDocuments({ 
       course_outcome: coId 
     });
@@ -347,14 +314,10 @@ exports.deleteCOPOMapping = async (req, res) => {
   }
 };
 
-// @desc    Get PO attainment across all courses
-// @route   GET /api/co-po-mappings/po-attainment
-// @access  Public
 exports.getPOAttainment = async (req, res) => {
   try {
     const { course_offered_to } = req.query;
 
-    // Build query to get courses
     let courseQuery = {};
     if (course_offered_to) {
       courseQuery.course_offered_to = course_offered_to.toUpperCase();
@@ -364,18 +327,15 @@ exports.getPOAttainment = async (req, res) => {
     const courses = await Course.find(courseQuery);
     const courseIds = courses.map(c => c._id);
 
-    // Get all COs for these courses
     const courseOutcomes = await CourseOutcome.find({ 
       course: { $in: courseIds } 
     });
     const coIds = courseOutcomes.map(co => co._id);
 
-    // Get all mappings
     const mappings = await COPOMapping.find({ 
       course_outcome: { $in: coIds } 
     });
 
-    // Calculate attainment per PO
     const poList = ['PO_A', 'PO_B', 'PO_C', 'PO_D', 'PO_E', 'PO_F', 'PO_G', 'PO_H', 'PO_I', 'PO_J', 'PO_K', 'PO_L'];
     const attainment = {};
 

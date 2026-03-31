@@ -1,11 +1,5 @@
 const redisClient = require('../config/redisClient');
 
-/*
- * Redis-backed store for OCR jobs.
- * Fixes scaling issues by using Redis Hash mappings instead of local Node memory.
- * Job Key: `ocr_job:{jobId}`
- * User Index: `ocr_user:{userId}:jobs` (Set of jobIds)
- */
 
 class OCRJobStore {
   constructor() {
@@ -14,7 +8,6 @@ class OCRJobStore {
     this.CLEANUP_AGE = 24 * 60 * 60; // 24 hours in seconds
   }
 
-  // Create a new job
   async createJob(jobData) {
     const job = {
       jobId: jobData.jobId,
@@ -40,10 +33,8 @@ class OCRJobStore {
     const jobKey = `${this.JOB_PREFIX}${job.jobId}`;
     await redisClient.hset(jobKey, job);
     
-    // Set expiry so we don't need a setInterval cleanup interval anymore
     await redisClient.expire(jobKey, this.CLEANUP_AGE);
 
-    // Track user's jobs in a sorted set by time to maintain order and simplify cleanup
     const userKey = `${this.USER_PREFIX}${job.userId}:jobs`;
     await redisClient.zadd(userKey, Date.now(), job.jobId);
     await redisClient.expire(userKey, this.CLEANUP_AGE); // reset expiry for the user index
@@ -53,7 +44,6 @@ class OCRJobStore {
     return this._parseJob(job);
   }
 
-  // Get job by ID
   async getJob(jobId) {
     const jobKey = `${this.JOB_PREFIX}${jobId}`;
     const job = await redisClient.hgetall(jobKey);
@@ -61,14 +51,11 @@ class OCRJobStore {
     return this._parseJob(job);
   }
 
-  // Get all jobs for a user
   async getUserJobs(userId, filters = {}) {
     const userKey = `${this.USER_PREFIX}${userId}:jobs`;
-    // Get newest 100 jobs
     const jobIds = await redisClient.zrevrange(userKey, 0, 99);
     if (!jobIds || jobIds.length === 0) return [];
 
-    // Pipeline to fetch all jobs simultaneously
     const pipeline = redisClient.pipeline();
     jobIds.forEach(jobId => {
        pipeline.hgetall(`${this.JOB_PREFIX}${jobId}`);
@@ -80,7 +67,6 @@ class OCRJobStore {
       .filter(([err, job]) => !err && job && Object.keys(job).length > 0)
       .map(([err, job]) => this._parseJob(job));
 
-    // Apply filters
     if (filters.courseId) {
       jobs = jobs.filter(job => job.courseId === filters.courseId);
     }
@@ -94,13 +80,11 @@ class OCRJobStore {
     return jobs;
   }
 
-  // Update job
   async updateJob(jobId, updates) {
     const jobKey = `${this.JOB_PREFIX}${jobId}`;
     const exists = await redisClient.exists(jobKey);
     if (!exists) return null;
 
-    // Stringify objects/arrays before storing in flat hash
     const formattedUpdates = { ...updates };
     if (formattedUpdates.student && typeof formattedUpdates.student === 'object') {
        formattedUpdates.student = JSON.stringify(formattedUpdates.student);
@@ -120,11 +104,9 @@ class OCRJobStore {
 
     await redisClient.hset(jobKey, formattedUpdates);
     
-    // Fetch and return the updated job
     return this.getJob(jobId);
   }
 
-  // Delete job
   async deleteJob(jobId) {
     const jobData = await this.getJob(jobId);
     if (!jobData) return false;
@@ -138,31 +120,26 @@ class OCRJobStore {
     return true;
   }
 
-  // Helper to safely parse strings back to original types
   _parseJob(rawJob) {
     const parsed = { ...rawJob };
     try { if (parsed.student && typeof parsed.student === 'string') parsed.student = JSON.parse(parsed.student); } catch(e){}
     try { if (parsed.marks && typeof parsed.marks === 'string') parsed.marks = JSON.parse(parsed.marks); } catch(e){}
     try { if (parsed.rawTable && typeof parsed.rawTable === 'string') parsed.rawTable = JSON.parse(parsed.rawTable); } catch(e){}
     
-    // Parse numeric fields
     if (parsed.progress !== undefined) parsed.progress = Number(parsed.progress);
     if (parsed.sequence !== undefined && parsed.sequence !== null && parsed.sequence !== 'null') parsed.sequence = Number(parsed.sequence);
     if (parsed.confidence !== undefined && parsed.confidence !== null && parsed.confidence !== 'null') parsed.confidence = Number(parsed.confidence);
     if (parsed.attemptNumber !== undefined && parsed.attemptNumber !== null && parsed.attemptNumber !== 'null') parsed.attemptNumber = Number(parsed.attemptNumber);
     if (parsed.maxAttempts !== undefined && parsed.maxAttempts !== null && parsed.maxAttempts !== 'null') parsed.maxAttempts = Number(parsed.maxAttempts);
     
-    // Parse booleans
     if (parsed.isRetry !== undefined) parsed.isRetry = parsed.isRetry === 'true';
     
-    // Fix null strings
     if (parsed.courseId === 'null') parsed.courseId = null;
     if (parsed.section === 'null') parsed.section = null;
     if (parsed.error === 'null') parsed.error = null;
     if (parsed.marks === 'null') parsed.marks = null;
     if (parsed.rawTable === 'null') parsed.rawTable = null;
 
-    // Fix dates
     if (parsed.createdAt) parsed.createdAt = new Date(parsed.createdAt);
     if (parsed.startedAt && parsed.startedAt !== 'null') parsed.startedAt = new Date(parsed.startedAt);
     if (parsed.completedAt && parsed.completedAt !== 'null') parsed.completedAt = new Date(parsed.completedAt);
@@ -172,13 +149,9 @@ class OCRJobStore {
   }
 
   clearAll() {
-    // Stub for testing
   }
 
-  // Backward compatibility signatures, returning counts via redis keyspace
   async getStats() {
-    // Redis equivalent for getStats requires keyspace scanning which is expensive.
-    // For now we just return a stub for backward compatibility with the frontend.
     return { 
       total: 0, 
       totalUsers: 0, 

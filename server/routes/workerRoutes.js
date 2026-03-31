@@ -14,11 +14,9 @@ const {
 const { authenticateUser } = require('../middlewares/authMiddleware');
 const { authorizeAdmin } = require('../middlewares/roleMiddleware');
 
-// All routes require authentication and admin role
 router.use(authenticateUser);
 router.use(authorizeAdmin);
 
-// Worker management routes
 router.route('/')
   .get(getAllWorkers)
   .post(addWorker);

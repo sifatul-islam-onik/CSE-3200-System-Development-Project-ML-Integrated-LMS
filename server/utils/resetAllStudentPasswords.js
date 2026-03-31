@@ -1,13 +1,3 @@
-/**
- * resetAllStudentPasswords.js
- * ----------------------------
- * One-time utility: generates a fresh random password for every student,
- * stores it (plaintext) in `initialPassword` and (hashed) in `password`,
- * then exports a credentials spreadsheet to  server/data/student_credentials_reset.xlsx
- *
- * Usage (from the server/ directory):
- *   node utils/resetAllStudentPasswords.js
- */
 
 const mongoose = require('mongoose');
 const crypto   = require('crypto');
@@ -21,7 +11,6 @@ dotenv.config();
 
 const User = require('../models/User');
 
-// ── password generator (same logic as adminController) ───────────────────────
 const generateRandomPassword = () => {
   const upper   = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const lower   = 'abcdefghijklmnopqrstuvwxyz';
@@ -34,7 +23,6 @@ const generateRandomPassword = () => {
   pwd += digits[crypto.randomInt(digits.length)];
   for (let i = 0; i < 5; i++) pwd += all[crypto.randomInt(all.length)];
 
-  // Fisher-Yates shuffle
   const arr = pwd.split('');
   for (let i = arr.length - 1; i > 0; i--) {
     const j = crypto.randomInt(i + 1);
@@ -43,7 +31,6 @@ const generateRandomPassword = () => {
   return arr.join('');
 };
 
-// ── main ─────────────────────────────────────────────────────────────────────
 const run = async () => {
   await mongoose.connect(process.env.MONGO_URI);
   console.log('Connected to MongoDB');
@@ -60,8 +47,6 @@ const run = async () => {
   for (const student of students) {
     const newPassword = generateRandomPassword();
 
-    // Setting `password` triggers the pre-save bcrypt hash hook.
-    // Setting `initialPassword` stores the plaintext for future exports.
     student.password        = newPassword;
     student.initialPassword = newPassword;
 
@@ -79,7 +64,6 @@ const run = async () => {
     if (done % 50 === 0) console.log(`  ${done} / ${students.length} done…`);
   }
 
-  // ── write Excel ────────────────────────────────────────────────────────────
   const outDir  = path.join(__dirname, '..', 'data');
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 

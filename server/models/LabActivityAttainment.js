@@ -108,7 +108,6 @@ const labActivityAttainmentSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Add compound index for common query patterns
 labActivityAttainmentSchema.index({ course: 1, updatedAt: -1 });
 
 module.exports = mongoose.model('LabActivityAttainment', labActivityAttainmentSchema);

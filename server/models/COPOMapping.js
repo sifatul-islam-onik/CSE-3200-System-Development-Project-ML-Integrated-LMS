@@ -31,13 +31,10 @@ const copoMappingSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Compound unique index: one CO can map to one PO only once
 copoMappingSchema.index({ course_outcome: 1, program_outcome_code: 1 }, { unique: true });
 
-// Index for querying by PO
 copoMappingSchema.index({ program_outcome_code: 1 });
 
-// Virtual to get level description
 copoMappingSchema.virtual('level_description').get(function() {
   const levels = {
     0: 'Not Mapped',
@@ -46,7 +43,6 @@ copoMappingSchema.virtual('level_description').get(function() {
   return levels[this.level] || 'Unknown';
 });
 
-// Cascade delete: Remove mappings when CO is deleted
 copoMappingSchema.pre('deleteMany', function(next) {
   console.log('Deleting CO-PO mappings for course outcome');
   next();

@@ -11,33 +11,27 @@ async function initializeCourseProfile() {
     
     let worksheet = workbook.getWorksheet(SHEET_NAME);
     
-    // Create sheet if it doesn't exist
     if (!worksheet) {
       worksheet = workbook.addWorksheet(SHEET_NAME);
     }
 
-    // Set up headers - Row 1
     worksheet.getCell('A1').value = 'CLOs';
     worksheet.getCell('B1').value = 'CLO Description';
     worksheet.getCell('C1').value = "Bloom's Learning Levels";
     
-    // Try to merge cells, but skip if already merged
     try {
       worksheet.mergeCells('C1:F1'); // Merge C1 to F1
     } catch (e) {
-      // Already merged, skip
     }
     
     worksheet.getCell('G1').value = 'PLO Assessed';
     worksheet.getCell('H1').value = 'CLO-PLO Correlation';
 
-    // Set up sub-headers - Row 2
     worksheet.getCell('C2').value = 'C';
     worksheet.getCell('D2').value = 'A';
     worksheet.getCell('E2').value = 'P';
     worksheet.getCell('F2').value = 'S';
 
-    // Style headers
     const headerStyle = {
       font: { bold: true, size: 11 },
       alignment: { vertical: 'middle', horizontal: 'center' },
@@ -58,7 +52,6 @@ async function initializeCourseProfile() {
       Object.assign(worksheet.getCell(cell), headerStyle);
     });
 
-    // Add CLO1-CLO5 in column A (rows 3-7)
     for (let i = 1; i <= 5; i++) {
       const row = 2 + i; // Row 3-7
       const cell = worksheet.getCell(`A${row}`);
@@ -72,7 +65,6 @@ async function initializeCourseProfile() {
       };
     }
 
-    // Set column widths
     worksheet.getColumn('A').width = 10;
     worksheet.getColumn('B').width = 50;
     worksheet.getColumn('C').width = 8;
@@ -82,7 +74,6 @@ async function initializeCourseProfile() {
     worksheet.getColumn('G').width = 15;
     worksheet.getColumn('H').width = 20;
 
-    // Add borders to all cells in the table (rows 3-7, columns A-H)
     for (let row = 3; row <= 7; row++) {
       for (let col = 1; col <= 8; col++) {
         const cell = worksheet.getCell(row, col);

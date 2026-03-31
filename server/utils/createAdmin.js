@@ -3,7 +3,6 @@ const dotenv = require('dotenv');
 const readline = require('readline');
 const User = require('../models/User');
 
-// Load environment variables
 dotenv.config();
 
 const rl = readline.createInterface({
@@ -19,7 +18,6 @@ const question = (query) => {
 
 const createAdmin = async () => {
   try {
-    // Connect to database
     await mongoose.connect(process.env.MONGO_URI);
     console.log('Connected to MongoDB');
 
@@ -29,14 +27,12 @@ const createAdmin = async () => {
     const email = await question('Enter admin email: ');
     const password = await question('Enter admin password: ');
 
-    // Check if admin already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       console.error('\nError: User with this email already exists');
       process.exit(1);
     }
 
-    // Create admin user
     const admin = await User.create({
       name,
       email,

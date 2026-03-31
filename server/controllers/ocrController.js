@@ -3,9 +3,6 @@ const ocrQueue = require('../config/queue');
 const workerRegistry = require('../utils/workerRegistry');
 const { v4: uuidv4 } = require('uuid');
 
-// @desc    Submit OCR job
-// @route   POST /api/ocr/submit
-// @access  Private (Teacher)
 exports.submitOCRJob = async (req, res) => {
   try {
     const { studentId, courseId, section, imageUrl, student } = req.body;
@@ -17,14 +14,12 @@ exports.submitOCRJob = async (req, res) => {
       });
     }
 
-    // VULN-04: Only accept base64 data-URIs to prevent SSRF via external URLs
     if (!imageUrl.startsWith('data:image/')) {
       return res.status(400).json({
         success: false,
         message: 'imageUrl must be a base64 data URI (data:image/...)'
       });
     }
-    // Enforce a 20 MB cap on the base64 payload (~15 MB decoded)
     if (imageUrl.length > 20 * 1024 * 1024) {
       return res.status(400).json({
         success: false,
@@ -32,10 +27,8 @@ exports.submitOCRJob = async (req, res) => {
       });
     }
 
-    // Generate unique job ID
     const jobId = uuidv4();
 
-    // Create OCR job in memory store
     const ocrJob = await ocrJobStore.createJob({
       jobId,
       userId: req.user._id.toString(),
@@ -46,9 +39,6 @@ exports.submitOCRJob = async (req, res) => {
       imageUrl
     });
 
-    // Add job to Bull queue FIRST with strict FIFO ordering
-    // CRITICAL: Let Bull auto-generate job IDs to prevent conflicts/replacements
-    // Use sequence number for tracking only
     const sequence = ocrQueue.getNextSequence();
     let bullJob; // Declare outside try-catch for access in response
     
@@ -60,23 +50,16 @@ exports.submitOCRJob = async (req, res) => {
           submittedAt: Date.now(),
           sequence: sequence // For tracking and verification
         }
-        // DO NOT specify jobId in options - let Bull auto-generate
-        // DO NOT use named jobs - use default unnamed queue
-        // This ensures true FIFO behavior
       );
-      // IMMEDIATELY update job store BEFORE job can be picked up by worker
-      // This prevents race condition where worker tries to access incomplete job data
       await ocrJobStore.updateJob(ocrJob.jobId, {
         queuedAt: new Date(),
         sequence: sequence,
         bullJobId: bullJob.id // Store Bull's auto-generated ID for later reference
       });
       
-      // Log after store update to ensure consistency
       console.log(`📥 Job ${ocrJob.jobId} queued (seq: ${sequence}, bullId: ${bullJob.id})`);
       
     } catch (queueError) {
-      // If queue add fails, mark job as failed and throw error
       console.error(`❌ Failed to add job ${ocrJob.jobId} to queue:`, queueError);
       await ocrJobStore.updateJob(ocrJob.jobId, {
         status: 'failed',
@@ -85,7 +68,6 @@ exports.submitOCRJob = async (req, res) => {
       throw new Error(`Failed to add job to queue: ${queueError.message}`);
     }
 
-    // Return job ID to client after successful queue addition
     res.status(202).json({
       success: true,
       message: 'OCR job submitted successfully and queued',
@@ -109,9 +91,6 @@ exports.submitOCRJob = async (req, res) => {
   }
 };
 
-// @desc    Get all OCR jobs for logged-in user
-// @route   GET /api/ocr/jobs
-// @access  Private
 exports.getUserOCRJobs = async (req, res) => {
   try {
     const { courseId, studentId, status } = req.query;
@@ -138,9 +117,6 @@ exports.getUserOCRJobs = async (req, res) => {
   }
 };
 
-// @desc    Get specific OCR job status
-// @route   GET /api/ocr/status/:jobId
-// @access  Private
 exports.getOCRJobStatus = async (req, res) => {
   try {
     const { jobId } = req.params;
@@ -168,9 +144,6 @@ exports.getOCRJobStatus = async (req, res) => {
   }
 };
 
-// @desc    Delete OCR job
-// @route   DELETE /api/ocr/jobs/:jobId
-// @access  Private
 exports.deleteOCRJob = async (req, res) => {
   try {
     const { jobId } = req.params;
@@ -184,11 +157,9 @@ exports.deleteOCRJob = async (req, res) => {
       });
     }
 
-    // Remove from memory store first
     const bullJobId = job.bullJobId; // Get Bull's auto-generated ID
     await ocrJobStore.deleteJob(jobId);
 
-    // Remove from Bull queue if it's there (using Bull's ID)
     if (bullJobId) {
       try {
         const bullJob = await ocrQueue.getJob(bullJobId);
@@ -215,23 +186,16 @@ exports.deleteOCRJob = async (req, res) => {
   }
 };
 
-// @desc    Get OCR server status (free/busy based on worker availability and queue)
-// @route   GET /api/ocr/queue-status
-// @access  Private
 exports.getQueueStatus = async (req, res) => {
   try {
     const healthyWorkers = workerRegistry.getHealthyWorkers();
     
-    // Get queue counts for detailed status
     const waitingCount = await ocrQueue.getWaitingCount();
     const activeCount = await ocrQueue.getActiveCount();
     const completedCount = await ocrQueue.getCompletedCount();
     const failedCount = await ocrQueue.getFailedCount();
     const delayedCount = await ocrQueue.getDelayedCount();
     
-    // Status logic: 
-    // - busy: if there are waiting jobs (workers are at capacity)
-    // - free: if no waiting jobs (workers are ready)
     const status = waitingCount > 0 ? 'busy' : 'free';
     
     res.status(200).json({

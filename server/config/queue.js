@@ -1,12 +1,9 @@
 const Bull = require('bull');
 
-// Redis configuration
 const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
-// Job sequence counter for strict FIFO ordering
 let jobSequence = 0;
 
-// Create OCR processing queue with STRICT FIFO enforcement
 const ocrQueue = new Bull('ocr-processing', REDIS_URL, {
   defaultJobOptions: {
     attempts: 3, // 3 attempts max
@@ -26,12 +23,10 @@ const ocrQueue = new Bull('ocr-processing', REDIS_URL, {
   }
 });
 
-// Helper to get next sequence number for FIFO ordering
 function getNextSequence() {
   return ++jobSequence;
 }
 
-// Monitor Redis connection health
 ocrQueue.on('ready', () => {
   console.log('✅ OCR Queue connected to Redis and ready');
 });
@@ -44,7 +39,6 @@ ocrQueue.on('reconnected', () => {
   console.log('🔄 OCR Queue reconnected to Redis');
 });
 
-// Queue event listeners for better tracking
 ocrQueue.on('error', (error) => {
   console.error('❌ OCR Queue Error:', error);
 });
@@ -69,14 +63,11 @@ ocrQueue.on('stalled', (job) => {
   console.warn(`⚠️  Job ${job.id} (${job.data.jobId}) stalled - will be retried`);
 });
 
-// Track queue health
 ocrQueue.on('cleaned', (jobs, type) => {
   console.log(`🧹 Cleaned ${jobs.length} ${type} jobs from queue`);
 });
 
-// Log queue readiness
 console.log('📋 OCR Queue initialized with STRICT FIFO ordering');
 
-// Export both queue and sequence helper
 module.exports = ocrQueue;
 module.exports.getNextSequence = getNextSequence;

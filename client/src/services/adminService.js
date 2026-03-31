@@ -37,36 +37,6 @@ const handleError = (error) => {
   throw err;
 };
 
-// Get pending users (email verified but not approved)
-export const getPendingUsers = async () => {
-  try {
-    const response = await axios.get(`${API_URL}/admin/pending-users`, getAuthHeader());
-    return response.data;
-  } catch (error) {
-    return handleError(error);
-  }
-};
-
-// Approve a user
-export const approveUser = async (userId) => {
-  try {
-    const response = await axios.put(`${API_URL}/admin/approve-user/${userId}`, {}, getAuthHeader());
-    return response.data;
-  } catch (error) {
-    return handleError(error);
-  }
-};
-
-// Reject a user
-export const rejectUser = async (userId) => {
-  try {
-    const response = await axios.put(`${API_URL}/admin/reject-user/${userId}`, {}, getAuthHeader());
-    return response.data;
-  } catch (error) {
-    return handleError(error);
-  }
-};
-
 // Get user metadata
 export const getUsersMetadata = async () => {
   try {

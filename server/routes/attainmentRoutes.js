@@ -25,16 +25,13 @@ const ctUpload = multer({
   }
 });
 
-// Protect all routes with authentication
 router.use(authenticateUser);
 
-// Get list of all sheet names (must come before /:sheetName? route)
 router.get('/sheets',
   cacheMiddleware(CACHE_DURATION.MEDIUM, (req) => `sheets_${req.user._id}`),
   attainmentController.getSheets
 );
 
-// Parse CT Excel/CSV upload and return structured data (teacher only)
 router.post(
   '/ct/:courseId/parse-upload',
   authorizeRoles('teacher', 'admin'),
@@ -42,7 +39,6 @@ router.post(
   attainmentController.parseCTUpload
 );
 
-// Save CT attainment data (teacher only)
 router.post(
   '/ct/:courseId',
   authorizeRoles('teacher', 'admin'),
@@ -50,14 +46,12 @@ router.post(
   attainmentController.saveCTData
 );
 
-// Get CT attainment data
 router.get(
   '/ct/:courseId',
   cacheMiddleware(CACHE_DURATION.SHORT, (req) => `ct_${req.params.courseId}`),
   attainmentController.getCTData
 );
 
-// Parse Assignment Excel/CSV upload (teacher only)
 router.post(
   '/assignment/:courseId/parse-upload',
   authorizeRoles('teacher', 'admin'),
@@ -65,7 +59,6 @@ router.post(
   attainmentController.parseAssignUpload
 );
 
-// Save Assignment/Attendance attainment data (teacher only)
 router.post(
   '/assignment/:courseId',
   authorizeRoles('teacher', 'admin'),
@@ -73,14 +66,12 @@ router.post(
   attainmentController.saveAssignmentData
 );
 
-// Get Assignment/Attendance attainment data
 router.get(
   '/assignment/:courseId',
   cacheMiddleware(CACHE_DURATION.SHORT, (req) => `assignment_${req.params.courseId}`),
   attainmentController.getAssignmentData
 );
 
-// Parse Lab Activity Excel/CSV upload (teacher only)
 router.post(
   '/labactivity/:courseId/parse-upload',
   authorizeRoles('teacher', 'admin'),
@@ -88,7 +79,6 @@ router.post(
   attainmentController.parseLabUpload
 );
 
-// Save Lab Activity attainment data (teacher only)
 router.post(
   '/labactivity/:courseId',
   authorizeRoles('teacher', 'admin'),
@@ -96,14 +86,12 @@ router.post(
   attainmentController.saveLabActivityData
 );
 
-// Get Lab Activity attainment data
 router.get(
   '/labactivity/:courseId',
   cacheMiddleware(CACHE_DURATION.SHORT, (req) => `labactivity_${req.params.courseId}`),
   attainmentController.getLabActivityData
 );
 
-// Save Section A attainment data (teacher only)
 router.post(
   '/section-a/:courseId',
   authorizeRoles('teacher', 'admin'),
@@ -111,21 +99,18 @@ router.post(
   attainmentController.saveSectionAData
 );
 
-// Get Section A attainment data
 router.get(
   '/section-a/:courseId',
   cacheMiddleware(CACHE_DURATION.SHORT, (req) => `section-a_${req.params.courseId}`),
   attainmentController.getSectionAData
 );
 
-// Get term exam marks for attainment
 router.get(
   '/term/:courseId',
   cacheMiddleware(CACHE_DURATION.SHORT, (req) => `term_${req.params.courseId}_${req.query.section || 'all'}`),
   attainmentController.getTermExamMarks
 );
 
-// Reset all attainment data for a course (teacher/admin only)
 router.delete(
   '/reset/:courseId',
   authorizeRoles('teacher', 'admin'),
@@ -135,7 +120,6 @@ router.delete(
   attainmentController.resetAttainmentData
 );
 
-// Get attainment data (default sheet or specific sheet) - must come last
 router.get('/:sheetName?', attainmentController.getAttainmentData);
 
 module.exports = router;
