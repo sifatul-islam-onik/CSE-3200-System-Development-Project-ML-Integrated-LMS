@@ -4,16 +4,12 @@ const path = require('path');
 const EXCEL_FILE_PATH = path.join(__dirname, '../data/attainment.xlsx');
 const SHEET_NAME = 'CourseProfile';
 
-// Fixed cell mappings for CourseProfile sheet - EXACT structure from user's table
 const CELL_MAP = {
-  // Header rows (row 1 and 2)
   HEADER_ROW_1: 1,
   HEADER_ROW_2: 2,
   
-  // CLO table starting row (after headers)
   CLO_START_ROW: 3,
   
-  // Column mappings
   COLUMNS: {
     CLO_NUMBER: 'A',      // CLO1, CLO2, etc.
     CLO_DESC: 'B',        // CLO Description
@@ -26,9 +22,6 @@ const CELL_MAP = {
   }
 };
 
-/**
- * Read CourseProfile data - Read exactly 5 CLOs (CLO1-CLO5) as shown in user's table
- */
 const readCourseProfile = async () => {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile(EXCEL_FILE_PATH);
@@ -48,7 +41,6 @@ const readCourseProfile = async () => {
 
   const clos = [];
   
-  // Read exactly 5 CLOs (CLO1 to CLO5) - matching user's table structure
   for (let i = 0; i < 5; i++) {
     const rowIndex = CELL_MAP.CLO_START_ROW + i;
     const cloNumber = `CLO${i + 1}`;
@@ -71,9 +63,6 @@ const readCourseProfile = async () => {
   return clos;
 };
 
-/**
- * Update a specific CLO field
- */
 const updateCLOField = async (cloNumber, field, value) => {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile(EXCEL_FILE_PATH);
@@ -83,7 +72,6 @@ const updateCLOField = async (cloNumber, field, value) => {
     throw new Error(`Sheet "${SHEET_NAME}" not found`);
   }
 
-  // Calculate row index directly from CLO number (CLO1->row 3, CLO2->row 4, etc.)
   const cloNum = parseInt(cloNumber.replace('CLO', ''));
   if (isNaN(cloNum) || cloNum < 1 || cloNum > 5) {
     throw new Error(`Invalid CLO number: ${cloNumber}. Must be CLO1-CLO5`);
@@ -91,7 +79,6 @@ const updateCLOField = async (cloNumber, field, value) => {
   
   const rowIndex = CELL_MAP.CLO_START_ROW + (cloNum - 1);
 
-  // Update the appropriate field
   let column;
   switch (field) {
     case 'description':

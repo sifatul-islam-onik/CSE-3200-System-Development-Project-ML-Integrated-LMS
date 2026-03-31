@@ -3,10 +3,6 @@ const {
   updateCLOField
 } = require('../utils/courseProfileExcelUtil');
 
-/**
- * Get CourseProfile CLO data
- * GET /api/course-profile
- */
 exports.getCourseProfile = async (req, res) => {
   try {
     const clos = await readCourseProfile();
@@ -24,10 +20,6 @@ exports.getCourseProfile = async (req, res) => {
   }
 };
 
-/**
- * Update CLO field
- * PUT /api/course-profile/update
- */
 exports.updateCLO = async (req, res) => {
   try {
     const { cloNumber, field, value } = req.body;

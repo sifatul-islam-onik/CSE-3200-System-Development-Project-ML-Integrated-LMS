@@ -1,8 +1,5 @@
 const ProgramOutcome = require('../models/ProgramOutcome');
 
-// @desc    Get all program outcomes
-// @route   GET /api/program-outcomes
-// @access  Public
 exports.getAllProgramOutcomes = async (req, res) => {
   try {
     const programOutcomes = await ProgramOutcome.find()
@@ -24,9 +21,6 @@ exports.getAllProgramOutcomes = async (req, res) => {
   }
 };
 
-// @desc    Get single program outcome by code
-// @route   GET /api/program-outcomes/:code
-// @access  Public
 exports.getProgramOutcomeByCode = async (req, res) => {
   try {
     const { code } = req.params;
@@ -56,9 +50,6 @@ exports.getProgramOutcomeByCode = async (req, res) => {
   }
 };
 
-// @desc    Update program outcome (admin only, limited fields)
-// @route   PUT /api/program-outcomes/:code
-// @access  Admin only
 exports.updateProgramOutcome = async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -82,7 +73,6 @@ exports.updateProgramOutcome = async (req, res) => {
       });
     }
 
-    // Only allow updating title and description
     if (title) programOutcome.title = title;
     if (description) programOutcome.description = description;
 
@@ -103,5 +93,3 @@ exports.updateProgramOutcome = async (req, res) => {
   }
 };
 
-// Note: Delete operations are intentionally NOT provided
-// Program Outcomes are reference data and should not be deleted

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faHourglass, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye, faExclamationTriangle, faGraduationCap } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye, faExclamationTriangle, faGraduationCap } from '@fortawesome/free-solid-svg-icons';
 import { getUser, logout } from '../components/ProtectedRoute';
-import { getPendingUsers, approveUser, rejectUser, getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, setDepartmentHead, removeDepartmentHead, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers, updateUserProfile, assignBatchToCourse, unassignBatchFromCourse, getAssignedBatches, getStudentBatches, getUsersMetadata } from '../services/adminService';
+import { getAllUsers, importStudentsFromExcel, setUserStatus, deleteUser, exportStudentCredentials, importTeachersFromExcel, exportTeacherCredentials, setUserDesignation, setDepartmentHead, removeDepartmentHead, assignTeacherToCourse, unassignTeacherFromCourse, getAssignedTeachers, updateUserProfile, assignBatchToCourse, unassignBatchFromCourse, getAssignedBatches, getStudentBatches, getUsersMetadata } from '../services/adminService';
 import { createCourse, getAllCourses, getCourse, updateCourse, deleteCourse } from '../services/courseService';
 import { getAllProposals, getProposalById, approveProposal, rejectProposal, deleteProposal } from '../services/courseProposalService';
 import { computeResults, publishResults, unpublishResults, getBatchResults, getBatchCOAttainments } from '../services/resultService';
@@ -19,7 +19,7 @@ import { SkeletonTable } from '../components/attainment/LoadingSpinner';
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  const [activeSection, setActiveSection] = useState('pending');
+  const [activeSection, setActiveSection] = useState('proposals');
   // Results section state
   const [resultBatch, setResultBatch] = useState('');
   const [resultDeptCode, setResultDeptCode] = useState('');
@@ -34,7 +34,6 @@ const AdminDashboard = () => {
   const [resultsMsg, setResultsMsg] = useState('');
   const [resultsMsgType, setResultsMsgType] = useState('success');
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 1024);
-  const [pendingUsers, setPendingUsers] = useState([]);
   const [users, setUsers] = useState([]);
   const [systemUsersMeta, setSystemUsersMeta] = useState({ teachers: [], students: [] });
   const [hasQueriedUsers, setHasQueriedUsers] = useState(false);
@@ -197,7 +196,6 @@ const AdminDashboard = () => {
       });
     }
     // Fetch initial data for badge counts
-    fetchPendingUsers();
     fetchProposals();
 
     // Handle window resize for sidebar behavior
@@ -214,9 +212,7 @@ const AdminDashboard = () => {
   }, []);
 
   useEffect(() => {
-    if (activeSection === 'pending') {
-      fetchPendingUsers();
-    } else if (activeSection === 'courses') {
+    if (activeSection === 'courses') {
       fetchCourses();
     } else if (activeSection === 'proposals') {
       fetchProposals();
@@ -224,19 +220,6 @@ const AdminDashboard = () => {
       fetchAllUsers();
     }
   }, [activeSection]);
-
-  const fetchPendingUsers = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await getPendingUsers();
-      setPendingUsers(response.data || []);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to fetch pending users');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchCourses = async () => {
     setLoading(true);
@@ -583,30 +566,6 @@ const AdminDashboard = () => {
     // Close sidebar on mobile after selecting a section
     if (window.innerWidth <= 1024) {
       setSidebarOpen(false);
-    }
-  };
-
-  const handleApprove = async (userId) => {
-    try {
-      await approveUser(userId);
-      setSuccessMessage('User approved successfully');
-      setPendingUsers(pendingUsers.filter(u => u._id !== userId));
-      setTimeout(() => setSuccessMessage(''), 3000);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to approve user');
-      setTimeout(() => setError(''), 3000);
-    }
-  };
-
-  const handleReject = async (userId) => {
-    try {
-      await rejectUser(userId);
-      setSuccessMessage('User rejected successfully');
-      setPendingUsers(pendingUsers.filter(u => u._id !== userId));
-      setTimeout(() => setSuccessMessage(''), 3000);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to reject user');
-      setTimeout(() => setError(''), 3000);
     }
   };
 
@@ -1616,87 +1575,6 @@ const AdminDashboard = () => {
 
   const renderSection = () => {
     switch (activeSection) {
-      case 'pending':
-        return (
-          <div className="section-container">
-            <div className="section-header">
-              <h2>Pending User Approvals</h2>
-              <p>Review and approve new user registrations</p>
-            </div>
-            <div className="section-body">
-              {successMessage && (
-                <div className="alert alert-success">
-                  {successMessage}
-                </div>
-              )}
-
-              {error && (
-                <div className="alert alert-error">
-                  {error}
-                </div>
-              )}
-
-              {loading ? (
-                <div className="loading-container">
-                  <div className="spinner spinner-large"></div>
-                  <p>Loading pending users...</p>
-                </div>
-              ) : pendingUsers.length === 0 ? (
-                <div className="empty-state">
-                  <div className="empty-icon"><FontAwesomeIcon icon={faCheck} /></div>
-                  <h3>No Pending Approvals</h3>
-                  <p>All user registrations have been processed</p>
-                </div>
-              ) : (
-                <div className="users-grid">
-                  {pendingUsers.map((pendingUser) => (
-                    <div key={pendingUser._id} className="user-card">
-                      <div className="user-card-header">
-                        <div className="user-avatar">
-                          {pendingUser.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="user-info">
-                          <h3>{pendingUser.name}</h3>
-                          <p className="user-email">{pendingUser.email}</p>
-                        </div>
-                      </div>
-                      <div className="user-card-body">
-                        <div className="user-meta">
-                          <span className={`role-badge ${pendingUser.role}`}>
-                            {pendingUser.role}
-                          </span>
-                          <span className="user-date">
-                            Registered: {new Date(pendingUser.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="user-status">
-                          <span className={`status-badge ${pendingUser.isEmailVerified ? 'verified' : 'unverified'}`}>
-                            Email: {pendingUser.isEmailVerified ? 'Verified' : 'Not Verified'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="user-card-actions">
-                        <button 
-                          className="btn btn-approve"
-                          onClick={() => handleApprove(pendingUser._id)}
-                        >
-                          Approve
-                        </button>
-                        <button 
-                          className="btn btn-reject"
-                          onClick={() => handleReject(pendingUser._id)}
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-
       case 'proposals':
         return (
           <div className="section-container">
@@ -3260,17 +3138,6 @@ const AdminDashboard = () => {
         </div>
 
         <nav className="sidebar-nav">
-          <button
-            className={`nav-item ${activeSection === 'pending' ? 'active' : ''}`}
-            onClick={() => handleSectionChange('pending')}
-          >
-            <span className="nav-icon"><FontAwesomeIcon icon={faHourglass} /></span>
-            {sidebarOpen && <span className="nav-label">Pending Approvals</span>}
-            {sidebarOpen && pendingUsers.length > 0 && (
-              <span className="badge-count">{pendingUsers.length}</span>
-            )}
-          </button>
-
           <button
             className={`nav-item ${activeSection === 'proposals' ? 'active' : ''}`}
             onClick={() => handleSectionChange('proposals')}

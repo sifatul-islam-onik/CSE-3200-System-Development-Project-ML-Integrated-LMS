@@ -2,14 +2,10 @@ const TermExamMarks = require('../models/TermExamMarks');
 const Course = require('../models/Course');
 const User = require('../models/User');
 
-// @desc    Save or update term exam marks for a student
-// @route   POST /api/term-exam-marks
-// @access  Teacher
 exports.saveTermExamMarks = async (req, res) => {
   try {
     const { studentId, courseId, section, marks, totalMarks, imageUrl } = req.body;
 
-    // Validate required fields
     if (!studentId || !courseId || !marks) {
       return res.status(400).json({
         success: false,
@@ -17,7 +13,6 @@ exports.saveTermExamMarks = async (req, res) => {
       });
     }
 
-    // VULN-17: Validate imageUrl to prevent SSRF — only accept base64 data-URIs
     if (imageUrl != null) {
       if (!String(imageUrl).startsWith('data:image/')) {
         return res.status(400).json({
@@ -33,7 +28,6 @@ exports.saveTermExamMarks = async (req, res) => {
       }
     }
 
-    // Verify course exists
     const course = await Course.findById(courseId);
     if (!course) {
       return res.status(404).json({
@@ -42,7 +36,6 @@ exports.saveTermExamMarks = async (req, res) => {
       });
     }
 
-    // For theory courses, section is required
     if (course.course_type === 'THEORY' && !section) {
       return res.status(400).json({
         success: false,
@@ -50,7 +43,6 @@ exports.saveTermExamMarks = async (req, res) => {
       });
     }
 
-    // Validate section value if provided
     if (section && !['A', 'B'].includes(section)) {
       return res.status(400).json({
         success: false,
@@ -58,7 +50,6 @@ exports.saveTermExamMarks = async (req, res) => {
       });
     }
 
-    // Verify student exists
     const student = await User.findById(studentId);
     if (!student || student.role !== 'student') {
       return res.status(404).json({
@@ -67,12 +58,10 @@ exports.saveTermExamMarks = async (req, res) => {
       });
     }
 
-    // For teachers, verify they are assigned to this course
     if (req.user.role === 'teacher') {
       const isAssigned = course.assignedTeachers.some(assignment => {
         const teacherId = assignment.teacher?._id || assignment.teacher;
         const matches = teacherId.toString() === req.user._id.toString();
-        // If section is provided, also check section match
         if (section && matches) {
           return assignment.section === section;
         }
@@ -87,7 +76,6 @@ exports.saveTermExamMarks = async (req, res) => {
       }
     }
 
-    // Upsert (update if exists, create if doesn't)
     const termExamMarks = await TermExamMarks.findOneAndUpdate(
       { 
         student: studentId, 
@@ -117,7 +105,6 @@ exports.saveTermExamMarks = async (req, res) => {
   } catch (error) {
     console.error('Save term exam marks error:', error);
     
-    // Handle duplicate key error
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
@@ -132,15 +119,11 @@ exports.saveTermExamMarks = async (req, res) => {
   }
 };
 
-// @desc    Get term exam marks for a student in a course
-// @route   GET /api/term-exam-marks/:studentId/:courseId
-// @access  Teacher/Student
 exports.getTermExamMarks = async (req, res) => {
   try {
     const { studentId, courseId } = req.params;
     const { section } = req.query;
 
-    // Students can only view their own marks
     if (req.user.role === 'student' && req.user._id.toString() !== studentId) {
       return res.status(403).json({
         success: false,
@@ -148,7 +131,6 @@ exports.getTermExamMarks = async (req, res) => {
       });
     }
 
-    // For teachers, verify they are assigned to this course
     if (req.user.role === 'teacher') {
       const course = await Course.findById(courseId);
       if (!course) {
@@ -205,15 +187,11 @@ exports.getTermExamMarks = async (req, res) => {
   }
 };
 
-// @desc    Get all term exam marks for a course
-// @route   GET /api/term-exam-marks/course/:courseId
-// @access  Teacher
 exports.getCourseTermExamMarks = async (req, res) => {
   try {
     const { courseId } = req.params;
     const { section } = req.query;
 
-    // Verify course exists
     const course = await Course.findById(courseId);
     if (!course) {
       return res.status(404).json({
@@ -222,7 +200,6 @@ exports.getCourseTermExamMarks = async (req, res) => {
       });
     }
 
-    // For teachers, verify they are assigned to this course
     if (req.user.role === 'teacher') {
       const isAssigned = course.assignedTeachers.some(assignment => {
         const teacherId = assignment.teacher?._id || assignment.teacher;
@@ -266,15 +243,11 @@ exports.getCourseTermExamMarks = async (req, res) => {
   }
 };
 
-// @desc    Delete term exam marks for a student
-// @route   DELETE /api/term-exam-marks/:studentId/:courseId
-// @access  Teacher/Admin
 exports.deleteTermExamMarks = async (req, res) => {
   try {
     const { studentId, courseId } = req.params;
     const { section } = req.query;
 
-    // Verify course exists
     const course = await Course.findById(courseId);
     if (!course) {
       return res.status(404).json({
@@ -283,7 +256,6 @@ exports.deleteTermExamMarks = async (req, res) => {
       });
     }
 
-    // For teachers, verify they are assigned to this course
     if (req.user.role === 'teacher') {
       const isAssigned = course.assignedTeachers.some(assignment => {
         const teacherId = assignment.teacher?._id || assignment.teacher;

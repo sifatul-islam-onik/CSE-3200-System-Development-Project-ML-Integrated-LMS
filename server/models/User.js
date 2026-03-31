@@ -27,7 +27,6 @@ const userSchema = new mongoose.Schema({
     minlength: [6, 'Password must be at least 6 characters'],
     select: false
   },
-  // Stores the original password set during registration/import (plaintext)
   initialPassword: {
     type: String,
     select: false,
@@ -109,12 +108,10 @@ const userSchema = new mongoose.Schema({
     },
     default: 'Others'
   },
-  // Designation for teachers (fixed default)
   designation: {
     type: String,
     default: 'Lecturer'
   },
-  // Whether this teacher is the head of their department (can only be a Professor)
   isDepartmentHead: {
     type: Boolean,
     default: false
@@ -145,9 +142,7 @@ const userSchema = new mongoose.Schema({
   }
 });
 
-// Hash password before saving
 userSchema.pre('save', async function(next) {
-  // Only hash the password if it has been modified (or is new)
   if (!this.isModified('password')) {
     return next();
   }
@@ -161,7 +156,6 @@ userSchema.pre('save', async function(next) {
   }
 });
 
-// Method to compare password for authentication
 userSchema.methods.comparePassword = async function(candidatePassword) {
   try {
     return await bcrypt.compare(candidatePassword, this.password);
@@ -170,7 +164,6 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   }
 };
 
-// Method to check if user can access system
 userSchema.methods.canAccessSystem = function() {
   if (this.role === 'admin') {
     return this.isActive;

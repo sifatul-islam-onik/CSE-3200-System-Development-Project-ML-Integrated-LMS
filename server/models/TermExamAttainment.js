@@ -8,7 +8,6 @@ const termExamAttainmentSchema = new mongoose.Schema({
     unique: true,
     index: true
   },
-  // Section A: CO allocation for questions 1-4, sub-parts a,b,c,d
   sectionARows: [{
     coNumber: String,
     Q1a: { type: Number, default: 0 },
@@ -28,7 +27,6 @@ const termExamAttainmentSchema = new mongoose.Schema({
     Q4c: { type: Number, default: 0 },
     Q4d: { type: Number, default: 0 }
   }],
-  // Section A: Student obtained marks (auto-populated from term marks, stored for reference)
   sectionAObtainedRows: [{
     rollNumber: String,
     name: String,
@@ -49,7 +47,6 @@ const termExamAttainmentSchema = new mongoose.Schema({
     Q4c: { type: Number, default: 0 },
     Q4d: { type: Number, default: 0 }
   }],
-  // Section B: CO allocation for questions 1-4, sub-parts a,b,c,d
   sectionBRows: [{
     coNumber: String,
     Q1a: { type: Number, default: 0 },
@@ -69,7 +66,6 @@ const termExamAttainmentSchema = new mongoose.Schema({
     Q4c: { type: Number, default: 0 },
     Q4d: { type: Number, default: 0 }
   }],
-  // Section B: Student obtained marks (auto-populated from term marks, stored for reference)
   sectionBObtainedRows: [{
     rollNumber: String,
     name: String,
@@ -98,7 +94,6 @@ const termExamAttainmentSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Add compound index for common query patterns
 termExamAttainmentSchema.index({ course: 1, updatedAt: -1 });
 
 module.exports = mongoose.model('TermExamAttainment', termExamAttainmentSchema);

@@ -63,19 +63,16 @@ const courseSchema = new mongoose.Schema({
     },
     default: 'ACTIVE'
   },
-  // Attendance marks for OBE
   attendanceMarks: {
     type: Number,
     default: 0
   },
-  // OBE: Curriculum details
   academicYear: {
     type: String,
     trim: true,
     validate: {
       validator: function(v) {
         if (!v) return true; // Allow empty (optional field)
-        // Accept either YYYY format (will be converted by pre-save hook) or YYYY-YY format
         return /^\d{4}$/.test(v) || /^\d{4}-\d{2}$/.test(v);
       },
       message: 'Academic year must be a 4-digit year (e.g., 2024) or YYYY-YY format (e.g., 2024-25)'
@@ -97,7 +94,6 @@ const courseSchema = new mongoose.Schema({
         if (v === undefined || v === null) return true; // Allow undefined/null
         if (!Number.isInteger(v)) return false;
         if (v < 1) return false;
-        // ARCH department allows 1-5, others allow 1-4
         const maxYear = this.course_offered_to === 'ARCH' ? 5 : 4;
         return v <= maxYear;
       },
@@ -112,12 +108,10 @@ const courseSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  // OBE: Prerequisites
   prerequisites: [{
     type: String,
     trim: true
   }],
-  // OBE: Required prerequisite knowledge
   knowledge_required: {
     type: [{
       type: String,
@@ -126,17 +120,14 @@ const courseSchema = new mongoose.Schema({
     default: [],
     validate: {
       validator: function(v) {
-        // If array is provided, ensure no empty items
         if (v && v.length > 0) {
           return v.every(knowledge => knowledge && knowledge.trim() !== '');
         }
-        // Empty array is allowed
         return true;
       },
       message: 'All knowledge required entries must be non-empty'
     }
   },
-  // OBE: Course objectives
   course_objectives: {
     type: [{
       type: String,
@@ -145,13 +136,11 @@ const courseSchema = new mongoose.Schema({
     validate: {
       validator: function(v) {
         if (!v || v.length === 0) return false;
-        // Ensure no empty objectives
         return v.every(obj => obj && obj.trim() !== '');
       },
       message: 'Course objectives must contain at least one non-empty objective'
     }
   },
-  // OBE: Course content concepts
   course_content: {
     type: [{
       concept_name: {
@@ -167,7 +156,6 @@ const courseSchema = new mongoose.Schema({
     validate: {
       validator: function(v) {
         if (!v || v.length === 0) return false;
-        // Ensure no empty concepts - only description is required
         return v.every(concept => 
           concept.concept_description && concept.concept_description.trim() !== ''
         );
@@ -175,7 +163,6 @@ const courseSchema = new mongoose.Schema({
       message: 'Course content must contain at least one concept with valid description'
     }
   },
-  // OBE: Lecture plan (week-by-week plan)
   lecture_plan: {
     type: [{
       week: {
@@ -210,9 +197,7 @@ const courseSchema = new mongoose.Schema({
       {
         validator: function(v) {
           if (!v || v.length === 0) return true;
-          // Week is only required if there are multiple entries
           if (v.length > 1) {
-            // Check all entries have week numbers
             return v.every(item => item.week !== undefined && item.week !== null);
           }
           return true; // Single entry doesn't require week
@@ -222,7 +207,6 @@ const courseSchema = new mongoose.Schema({
       {
         validator: function(v) {
           if (!v || v.length === 0) return true;
-          // Check for duplicate week values
           const weeks = v.map(item => item.week);
           const uniqueWeeks = new Set(weeks);
           return weeks.length === uniqueWeeks.size;
@@ -232,20 +216,17 @@ const courseSchema = new mongoose.Schema({
       {
         validator: function(v) {
           if (!v || v.length === 0) return true;
-          // Ensure no empty plan descriptions
           return v.every(item => item.plan && item.plan.trim() !== '');
         },
         message: 'All lecture plan entries must have a non-empty plan description'
       }
     ]
   },
-  // OBE: References (books/learning resources)
   references: {
     type: [String],
     validate: {
       validator: function(v) {
         if (!v || v.length === 0) return true; // Allow empty
-        // Ensure no empty references if array has items
         return v.every(ref => ref && ref.trim() !== '');
       },
       message: 'References must contain only non-empty items'
@@ -256,7 +237,6 @@ const courseSchema = new mongoose.Schema({
     ref: 'User',
     required: [true, 'Creator is required']
   },
-  // Assigned teachers who can access this course
   assignedTeachers: [{
     teacher: {
       type: mongoose.Schema.Types.ObjectId,
@@ -269,7 +249,6 @@ const courseSchema = new mongoose.Schema({
       default: null
     }
   }],
-  // Assigned batches (students) who can access this course
   assignedBatches: [{
     batch: {
       type: String,
@@ -287,7 +266,6 @@ const courseSchema = new mongoose.Schema({
       message: 'Department code must be valid'
     }
   }],
-  // OBE: Accreditation tracking
   lastReviewed: {
     type: Date
   },
@@ -334,7 +312,6 @@ const courseSchema = new mongoose.Schema({
   }
 });
 
-// Custom validation: elective_group is required when category is OPTIONAL
 courseSchema.pre('save', function(next) {
   if (this.category === 'OPTIONAL' && !this.elective_group) {
     return next(new Error('Elective group is required when category is OPTIONAL'));
@@ -343,19 +320,16 @@ courseSchema.pre('save', function(next) {
     this.elective_group = null; // Clear elective_group for COMPULSORY courses
   }
   
-  // Format academicYear: if it's a 4-digit year, convert to YYYY-YY format
   if (this.academicYear && /^\d{4}$/.test(this.academicYear)) {
     const year = parseInt(this.academicYear);
     const nextYear = (year + 1).toString().slice(-2);
     this.academicYear = `${year}-${nextYear}`;
   }
   
-  // Sort lecture_plan by week number
   if (this.lecture_plan && this.lecture_plan.length > 0) {
     this.lecture_plan.sort((a, b) => a.week - b.week);
   }
 
-  // Enforce: only one batch assignment per course
   if (Array.isArray(this.assignedBatches) && this.assignedBatches.length > 1) {
     this.assignedBatches = [this.assignedBatches[this.assignedBatches.length - 1]];
   }
@@ -363,13 +337,11 @@ courseSchema.pre('save', function(next) {
   next();
 });
 
-// Middleware to update updatedAt on save
 courseSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
 
-// Middleware to cascade delete course outcomes when course is deleted
 courseSchema.pre('deleteOne', { document: true, query: false }, async function(next) {
   try {
     const CourseOutcome = require('./CourseOutcome');
@@ -393,7 +365,6 @@ courseSchema.pre('findOneAndDelete', async function(next) {
   }
 });
 
-// Index for faster queries
 courseSchema.index({ courseCode: 1 }, { unique: true });
 courseSchema.index({ course_offered_to: 1 });
 courseSchema.index({ semester: 1 });

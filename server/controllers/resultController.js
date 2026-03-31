@@ -19,10 +19,6 @@ const {
   computeCGPA,
 } = require('../utils/gradeUtils');
 
-// ---------------------------------------------------------------------------
-// Helper: safely read a value from a nested Mongoose Map (or plain object)
-// Mirrors the getSectionAData getMark logic exactly.
-// ---------------------------------------------------------------------------
 const getMark = (marksObj, row, question) => {
   try {
     let marks = marksObj;
@@ -46,7 +42,6 @@ const getMark = (marksObj, row, question) => {
   }
 };
 
-// Build sectionAObtainedRow from a TermExamMarks doc (section='A', questions 1-4)
 const buildSectionARow = (examMark) => ({
   rollNumber: examMark.student?.roll || '',
   name: examMark.student?.name || '',
@@ -60,7 +55,6 @@ const buildSectionARow = (examMark) => ({
   Q4c: getMark(examMark.marks, 'c', '4'), Q4d: getMark(examMark.marks, 'd', '4'),
 });
 
-// Build sectionBObtainedRow from a TermExamMarks doc (section='B', questions 5-8 → UI Q1-Q4)
 const buildSectionBRow = (examMark) => ({
   rollNumber: examMark.student?.roll || '',
   name: examMark.student?.name || '',
@@ -74,9 +68,6 @@ const buildSectionBRow = (examMark) => ({
   Q4c: getMark(examMark.marks, 'c', '8'), Q4d: getMark(examMark.marks, 'd', '8'),
 });
 
-// ---------------------------------------------------------------------------
-// Helper: extract CO numbers for a course
-// ---------------------------------------------------------------------------
 const extractCONumbers = (sectionARows, courseOutcomes) => {
   if (courseOutcomes && courseOutcomes.length > 0) {
     return courseOutcomes
@@ -93,9 +84,6 @@ const extractCONumbers = (sectionARows, courseOutcomes) => {
   });
 };
 
-// ---------------------------------------------------------------------------
-// Helper: pre-fetch all attainment data for a course (called once per course)
-// ---------------------------------------------------------------------------
 const loadCourseAttainmentData = async (courseId) => {
   const [termExamDoc, ctDoc, assignDoc, courseOutcomes, termMarksA, termMarksB] = await Promise.all([
     TermExamAttainment.findOne({ course: courseId }).lean(),
@@ -106,7 +94,6 @@ const loadCourseAttainmentData = async (courseId) => {
     TermExamMarks.find({ course: courseId, section: 'B' }).populate('student', 'roll name').lean(),
   ]);
 
-  // Dynamically build obtained rows from TermExamMarks (same as getSectionAData endpoint)
   const sectionAObtainedRows = (termMarksA || []).map(buildSectionARow);
   const sectionBObtainedRows = (termMarksB || []).map(buildSectionBRow);
 
@@ -139,9 +126,6 @@ const loadCourseAttainmentData = async (courseId) => {
   };
 };
 
-// ---------------------------------------------------------------------------
-// Helper: pre-fetch lab attainment data for a SESSIONAL course
-// ---------------------------------------------------------------------------
 const loadLabCourseAttainmentData = async (courseId) => {
   const labDoc = await LabActivityAttainment.findOne({ course: courseId }).lean();
   if (!labDoc) return null;
@@ -173,9 +157,6 @@ const loadLabCourseAttainmentData = async (courseId) => {
     };
 };
 
-// ---------------------------------------------------------------------------
-// Helper: find all courses for a specific batch+dept+yearLevel+term
-// ---------------------------------------------------------------------------
 const findCoursesForBatchTerm = async (batch, deptCode, yearLevel, term) => {
   return Course.find({
     yearLevel: Number(yearLevel),
@@ -186,13 +167,7 @@ const findCoursesForBatchTerm = async (batch, deptCode, yearLevel, term) => {
   }).lean();
 };
 
-// ---------------------------------------------------------------------------
-// Helper: find students for a batch+deptCode
-// Roll number convention: first 2 chars = batch year, chars 3-4 = deptCode
-// e.g. "2107016" → batch "21", deptCode "07"
-// ---------------------------------------------------------------------------
 const findStudentsForBatch = async (batch, deptCode) => {
-  // Students whose roll starts with batch+deptCode (e.g. "2107")
   const rollPrefix = `${batch}${deptCode}`;
   return User.find({
     role: 'student',
@@ -201,11 +176,6 @@ const findStudentsForBatch = async (batch, deptCode) => {
   }).lean();
 };
 
-// ============================================================================
-// Controller: POST /api/results/compute
-// Compute (or recompute) draft TermResults for a batch+term combination.
-// Body: { batch, deptCode, yearLevel, term, academicYear? }
-// ============================================================================
 exports.computeResults = async (req, res) => {
   try {
     const { batch, deptCode, yearLevel, term } = req.body;
@@ -225,7 +195,6 @@ exports.computeResults = async (req, res) => {
 
     const semester = (Number(yearLevel) - 1) * 2 + Number(term);
 
-    // Pre-load attainment data for each course once
     const courseAttainmentMap = new Map();
     await Promise.all(
       courses.map(async (course) => {
@@ -237,7 +206,6 @@ exports.computeResults = async (req, res) => {
       })
     );
 
-    // PRE-FETCH PRIOR RESULTS FOR ALL STUDENTS
     const studentIds = students.map(s => s._id);
     const allPriorResults = await TermResult.find({
       student: { $in: studentIds },
@@ -295,14 +263,11 @@ exports.computeResults = async (req, res) => {
         .reduce((s, cr) => s + (cr.credit || 0), 0);
       const termGPA = computeTermGPA(courseResults);
 
-      // Fetch pre-grouped prior results
       const priorResults = priorResultsByStudent.get(String(student._id)) || [];
 
-      // Compute totalCreditCompleted across all prior published terms + this term
       const priorCreditCompleted = priorResults.reduce((s, tr) => s + (tr.creditCompleted || 0), 0);
       const totalCreditCompleted = priorCreditCompleted + creditCompleted;
 
-      // Build a synthetic array for CGPA that includes current term results
       const allTermResultsForCGPA = [
         ...priorResults,
         { courses: courseResults },
@@ -339,7 +304,6 @@ exports.computeResults = async (req, res) => {
       await TermResult.bulkWrite(bulkOps);
     }
 
-    // Compute and save CO Attainments per course blindly during the batch result generation
     const coAttainmentBulkOps = [];
     for (const course of courses) {
       const { data: attainment, isLab } = courseAttainmentMap.get(String(course._id)) || {};
@@ -371,7 +335,6 @@ exports.computeResults = async (req, res) => {
       await CourseCOAttainment.bulkWrite(coAttainmentBulkOps);
     }
 
-    // Retrieve the saved documents to return
     const savedResults = await TermResult.find({
       student: { $in: studentIds },
       yearLevel: Number(yearLevel),
@@ -389,11 +352,6 @@ exports.computeResults = async (req, res) => {
   }
 };
 
-// ============================================================================
-// Controller: POST /api/results/publish
-// Publish all computed (draft) TermResults for a batch+term.
-// Body: { batch, deptCode, yearLevel, term }
-// ============================================================================
 exports.publishResults = async (req, res) => {
   try {
     const { batch, deptCode, yearLevel, term } = req.body;
@@ -418,7 +376,6 @@ exports.publishResults = async (req, res) => {
       }
     );
 
-    // Also publish the aggregated CO Attainments
     await CourseCOAttainment.updateMany(
       {
         batch,
@@ -446,11 +403,6 @@ exports.publishResults = async (req, res) => {
   }
 };
 
-// ============================================================================
-// Controller: POST /api/results/unpublish
-// Revert published results back to draft for a batch+term.
-// Body: { batch, deptCode, yearLevel, term }
-// ============================================================================
 exports.unpublishResults = async (req, res) => {
   try {
     const { batch, deptCode, yearLevel, term } = req.body;
@@ -475,7 +427,6 @@ exports.unpublishResults = async (req, res) => {
       }
     );
 
-    // Also unpublish the aggregated CO Attainments
     await CourseCOAttainment.updateMany(
       {
         batch,
@@ -503,11 +454,6 @@ exports.unpublishResults = async (req, res) => {
   }
 };
 
-// ============================================================================
-// Controller: GET /api/results/batch
-// Get all TermResults for a batch+term (admin use).
-// Query: ?batch=21&deptCode=07&yearLevel=1&term=1&publishedOnly=false
-// ============================================================================
 exports.getBatchResults = async (req, res) => {
   try {
     const { batch, deptCode, yearLevel, term, publishedOnly } = req.query;
@@ -534,10 +480,6 @@ exports.getBatchResults = async (req, res) => {
   }
 };
 
-// ============================================================================
-// Get computed CO attainments for a specific batch+term
-// Admin/Teacher: get all CO stats for the batch (includes drafts)
-// ============================================================================
 exports.getBatchCOAttainments = async (req, res) => {
   try {
     const { batch, deptCode, yearLevel, term, publishedOnly } = req.query;
@@ -563,10 +505,6 @@ exports.getBatchCOAttainments = async (req, res) => {
   }
 };
 
-// ============================================================================
-// Controller: GET /api/results/student
-// Get all published TermResults for the authenticated student.
-// ============================================================================
 exports.getStudentResults = async (req, res) => {
   try {
     const studentId = req.user._id;
@@ -585,10 +523,6 @@ exports.getStudentResults = async (req, res) => {
   }
 };
 
-// ============================================================================
-// Controller: GET /api/results/student/:studentId
-// Get all TermResults for a specific student (admin use — includes unpublished).
-// ============================================================================
 exports.getStudentResultsByAdmin = async (req, res) => {
   try {
     const { studentId } = req.params;

@@ -57,7 +57,6 @@ const assignmentAttainmentSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Add compound index for common query patterns
 assignmentAttainmentSchema.index({ course: 1, updatedAt: -1 });
 
 module.exports = mongoose.model('AssignmentAttainment', assignmentAttainmentSchema);

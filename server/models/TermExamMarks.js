@@ -15,7 +15,6 @@ const termExamMarksSchema = new mongoose.Schema({
     type: String,
     default: null
   },
-  // New marks structure: rows a-g with questions 1-8 (Section A: 1-4, Section B: 5-8)
   marks: {
     type: Map,
     of: {
@@ -32,17 +31,14 @@ const termExamMarksSchema = new mongoose.Schema({
       g: { '1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '7': '', '8': '' }
     }
   },
-  // Total marks
   totalMarks: {
     type: Number,
     default: 0
   },
-  // Image URL of the answer sheet
   imageUrl: {
     type: String,
     default: null
   },
-  // Entry metadata
   enteredBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
@@ -55,7 +51,6 @@ const termExamMarksSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster queries
 termExamMarksSchema.index({ courseId: 1, studentId: 1, examType: 1 });
 termExamMarksSchema.index({ courseId: 1, year: 1, semester: 1, section: 1 });
 

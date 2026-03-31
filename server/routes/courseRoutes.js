@@ -6,7 +6,6 @@ const { authorizeAdmin } = require('../middlewares/roleMiddleware');
 const courseController = require('../controllers/courseController');
 const Department = require('../models/Department');
 
-// Validation middleware for course creation/update
 const courseValidation = [
   body('courseCode')
     .trim()
@@ -81,21 +80,17 @@ const courseValidation = [
     .withMessage('Reference must not be empty')
 ];
 
-// All routes require authentication
 router.use(authenticateUser);
 
-// Course CRUD routes
 router.post('/', authorizeAdmin, courseValidation, courseController.createCourse);
 router.get('/', courseController.getAllCourses); // Available to all authenticated users
 router.get('/:id', courseController.getCourse); // Available to all authenticated users
 router.put('/:id', authorizeAdmin, courseValidation, courseController.updateCourse);
 router.delete('/:id', authorizeAdmin, courseController.deleteCourse);
 
-// OBE-specific routes (available to all authenticated users)
 router.get('/:id/validate-obe', courseController.validateCourseOBE);
 router.get('/curriculum/semester/:semester', courseController.getCurriculumBySemester);
 
-// Student management routes
 router.get('/:courseId/students', courseController.getCourseStudents); // Teachers can view students in their assigned courses
 
 module.exports = router;

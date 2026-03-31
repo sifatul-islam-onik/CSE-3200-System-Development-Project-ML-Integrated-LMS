@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 
 const courseProposalSchema = new mongoose.Schema({
-  // Proposal metadata
   proposalType: {
     type: String,
     required: true,
@@ -15,7 +14,6 @@ const courseProposalSchema = new mongoose.Schema({
     default: 'PENDING'
   },
   
-  // Reference to existing course (for UPDATE proposals)
   existingCourse: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Course',
@@ -24,7 +22,6 @@ const courseProposalSchema = new mongoose.Schema({
     }
   },
   
-  // Proposed course data (same structure as Course model)
   proposedData: {
     courseCode: {
       type: String,
@@ -106,7 +103,6 @@ const courseProposalSchema = new mongoose.Schema({
     }],
     kpa_mapping: [String],
     accreditationStatus: String,
-    // Course Outcomes data
     courseOutcomes: [{
       co_code: String,
       description: String,
@@ -118,7 +114,6 @@ const courseProposalSchema = new mongoose.Schema({
     }]
   },
   
-  // Proposal tracking
   proposedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -129,7 +124,6 @@ const courseProposalSchema = new mongoose.Schema({
     default: Date.now
   },
   
-  // Review tracking
   reviewedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
@@ -137,7 +131,6 @@ const courseProposalSchema = new mongoose.Schema({
   reviewedAt: Date,
   reviewComment: String,
   
-  // Change description
   changeDescription: {
     type: String,
     trim: true
@@ -146,7 +139,6 @@ const courseProposalSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster queries
 courseProposalSchema.index({ status: 1 });
 courseProposalSchema.index({ proposalType: 1 });
 courseProposalSchema.index({ proposedBy: 1 });

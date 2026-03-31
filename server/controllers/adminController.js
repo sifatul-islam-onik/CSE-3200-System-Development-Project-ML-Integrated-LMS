@@ -10,7 +10,6 @@ const LabActivityAttainment = require('../models/LabActivityAttainment');
 const TermExamMarks = require('../models/TermExamMarks');
 const { clearCache } = require('../middlewares/cacheMiddleware');
 
-// Helper function to generate random password
 const generateRandomPassword = () => {
   const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const lowercase = 'abcdefghijklmnopqrstuvwxyz';
@@ -18,164 +17,17 @@ const generateRandomPassword = () => {
   const allChars = uppercase + lowercase + numbers;
 
   let password = '';
-  // Ensure at least one character from each category
   password += uppercase[Math.floor(Math.random() * uppercase.length)];
   password += lowercase[Math.floor(Math.random() * lowercase.length)];
   password += numbers[Math.floor(Math.random() * numbers.length)];
 
-  // Fill the rest randomly (5 more chars to make 8 total)
   for (let i = 0; i < 5; i++) {
     password += allChars[Math.floor(Math.random() * allChars.length)];
   }
 
-  // Shuffle the password
   return password.split('').sort(() => Math.random() - 0.5).join('');
 };
 
-// @desc    Get all pending users (email verified but not approved)
-// @route   GET /api/admin/pending-users
-// @access  Admin only
-exports.getPendingUsers = async (req, res) => {
-  try {
-    // Additional security check - verify admin role from req.user
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Admin privileges required.'
-      });
-    }
-
-    const pendingUsers = await User.find({
-      role: { $ne: 'admin' },
-      isEmailVerified: true,
-      isApprovedByAdmin: false
-    }).select('-password');
-
-    res.status(200).json({
-      success: true,
-      count: pendingUsers.length,
-      data: pendingUsers
-    });
-
-  } catch (error) {
-    console.error('Get pending users error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error fetching pending users'
-    });
-  }
-};
-
-// @desc    Approve a user
-// @route   PUT /api/admin/approve-user/:userId
-// @access  Admin only
-exports.approveUser = async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    if (user.role === 'admin') {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot modify admin users'
-      });
-    }
-
-    if (user.isApprovedByAdmin) {
-      return res.status(400).json({
-        success: false,
-        message: 'User is already approved'
-      });
-    }
-
-    if (!user.isEmailVerified) {
-      return res.status(400).json({
-        success: false,
-        message: 'User email must be verified before approval'
-      });
-    }
-
-    user.isApprovedByAdmin = true;
-    await user.save();
-
-    // Send approval email
-    try {
-      await sendApprovalEmail(user.email, user.name);
-    } catch (emailError) {
-      console.error('Failed to send approval email:', emailError);
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'User approved successfully',
-      data: {
-        userId: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isApprovedByAdmin: user.isApprovedByAdmin
-      }
-    });
-
-  } catch (error) {
-    console.error('Approve user error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error approving user'
-    });
-  }
-};
-
-// @desc    Reject/delete a user
-// @route   PUT /api/admin/reject-user/:userId
-// @access  Admin only
-exports.rejectUser = async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    if (user.role === 'admin') {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot reject admin users'
-      });
-    }
-
-    await User.findByIdAndDelete(userId);
-
-    res.status(200).json({
-      success: true,
-      message: 'User rejected and removed from system'
-    });
-
-  } catch (error) {
-    console.error('Reject user error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error rejecting user'
-    });
-  }
-};
-
-// @desc    Get all users
-// @route   GET /api/admin/users
-// @access  Admin only
 exports.getAllUsers = async (req, res) => {
   try {
     const { role, department, designation, search, batch } = req.query;
@@ -223,9 +75,6 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-// @desc    Get user metadata (departments, batches)
-// @route   GET /api/admin/users/metadata
-// @access  Admin only
 exports.getUsersMetadata = async (req, res) => {
   try {
     const teachers = await User.find({ role: 'teacher' }).select('department email -_id').lean();
@@ -247,9 +96,6 @@ exports.getUsersMetadata = async (req, res) => {
   }
 };
 
-// @desc    Bulk import students from Excel
-// @route   POST /api/admin/users/import
-// @access  Admin only
 exports.importStudentsFromExcel = async (req, res) => {
   try {
     const bcrypt = require('bcryptjs');
@@ -257,7 +103,6 @@ exports.importStudentsFromExcel = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
-    // VULN-21: Magic byte validation — reject files that are not genuine Excel workbooks
     const fileBuf = req.file.buffer;
     const isXLSX = fileBuf[0] === 0x50 && fileBuf[1] === 0x4B && fileBuf[2] === 0x03 && fileBuf[3] === 0x04;
     const isXLS  = fileBuf[0] === 0xD0 && fileBuf[1] === 0xCF && fileBuf[2] === 0x11 && fileBuf[3] === 0xE0;
@@ -300,7 +145,6 @@ exports.importStudentsFromExcel = async (req, res) => {
       return '';
     };
 
-    // PASS 1: Extract all needed emails, rolls, and dept codes
     const emailsToQuery = [];
     const rollsToQuery = [];
     const deptCodesToQuery = new Set();
@@ -342,7 +186,6 @@ exports.importStudentsFromExcel = async (req, res) => {
       });
     }
 
-    // PRE-FETCH
     const Department = require('../models/Department');
     const existingUsers = await User.find({ 
       $or: [
@@ -418,9 +261,6 @@ exports.importStudentsFromExcel = async (req, res) => {
   }
 };
 
-// @desc    Get distinct student batches (derived from roll: dynamic century + first two digits)
-// @route   GET /api/admin/students/batches
-// @access  Admin only
 exports.getStudentBatches = async (req, res) => {
   try {
     const students = await User.find({ role: 'student' }).select('roll').lean();
@@ -449,9 +289,6 @@ exports.getStudentBatches = async (req, res) => {
   }
 };
 
-// @desc    Get students for a course's assigned batch
-// @route   GET /api/admin/courses/:courseId/students
-// @access  Admin/Teacher
 exports.getStudentsForCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
@@ -470,11 +307,9 @@ exports.getStudentsForCourse = async (req, res) => {
       });
     }
 
-    // Get the assigned batch (should be only one due to constraints)
     const assignment = course.assignedBatches[0];
     const { batch, deptCode } = assignment;
 
-    // Find all students whose roll starts with batch+deptCode
     const prefix = `${batch}${deptCode}`;
     const students = await User.find({ 
       role: 'student',
@@ -495,9 +330,6 @@ exports.getStudentsForCourse = async (req, res) => {
   }
 };
 
-// @desc    Toggle user active status
-// @route   PUT /api/admin/users/:userId/toggle-status
-// @access  Admin only
 exports.toggleUserStatus = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -541,9 +373,6 @@ exports.toggleUserStatus = async (req, res) => {
   }
 };
 
-// @desc    Update user active status explicitly
-// @route   PUT /api/admin/users/:userId/status
-// @access  Admin only
 exports.setUserStatus = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -595,9 +424,6 @@ exports.setUserStatus = async (req, res) => {
   }
 };
 
-// @desc    Delete a user account
-// @route   DELETE /api/admin/users/:userId
-// @access  Admin only
 exports.deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -634,17 +460,12 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
-// @desc    Export student credentials by batch and department
-//          Regenerates passwords for selected students and exports them
-// @route   POST /api/admin/users/export-credentials
-// @access  Admin only
 exports.exportStudentCredentials = async (req, res) => {
   try {
     const { batchYear, deptCode } = req.body;
 
     const allowedDeptCodes = ['07','03','05','01','09','11','13','15','17','19','27','31','23','25','21','29'];
 
-    // Validate inputs
     if (!batchYear || !deptCode) {
       return res.status(400).json({ 
         success: false, 
@@ -652,7 +473,6 @@ exports.exportStudentCredentials = async (req, res) => {
       });
     }
 
-    // Validate batch year (4 digits)
     if (!/^\d{4}$/.test(batchYear)) {
       return res.status(400).json({ 
         success: false, 
@@ -667,11 +487,9 @@ exports.exportStudentCredentials = async (req, res) => {
       });
     }
 
-    // Get last 2 digits of batch year
     const batchPrefix = batchYear.slice(-2);
     const rollPrefix = `${batchPrefix}${deptCode}`;
 
-    // Find students with matching roll prefix
     const students = await User.find({
       role: 'student',
       roll: { $regex: `^${rollPrefix}`, $options: 'i' }
@@ -684,7 +502,6 @@ exports.exportStudentCredentials = async (req, res) => {
       });
     }
 
-    // VULN-16: Read initialPassword stored at creation time — do NOT reset user passwords
     const exportData = students.map(s => ({
       Roll: s.roll,
       Name: s.name,
@@ -692,15 +509,12 @@ exports.exportStudentCredentials = async (req, res) => {
       Password: s.initialPassword || '[Not Available]'
     }));
 
-    // Create Excel workbook
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Credentials');
 
-    // Generate Excel buffer
     const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-    // Set response headers for file download
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=students_${batchYear}_${deptCode}.xlsx`);
     
@@ -715,16 +529,12 @@ exports.exportStudentCredentials = async (req, res) => {
   }
 };
 
-// @desc    Bulk import teachers from Excel
-// @route   POST /api/admin/teachers/import
-// @access  Admin only
 exports.importTeachersFromExcel = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
-    // VULN-21: Magic byte validation — reject files that are not genuine Excel workbooks
     const teacherFileBuf = req.file.buffer;
     const isTeacherXLSX = teacherFileBuf[0] === 0x50 && teacherFileBuf[1] === 0x4B && teacherFileBuf[2] === 0x03 && teacherFileBuf[3] === 0x04;
     const isTeacherXLS  = teacherFileBuf[0] === 0xD0 && teacherFileBuf[1] === 0xCF && teacherFileBuf[2] === 0x11 && teacherFileBuf[3] === 0xE0;
@@ -745,10 +555,8 @@ exports.importTeachersFromExcel = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Sheet is empty' });
     }
 
-    // Import teachers
     const results = await bulkImportTeachers(rows);
 
-    // Return results with created teachers' credentials
     res.status(200).json({
       success: results.errors.length === 0,
       message: `Teachers import completed: ${results.created} created, ${results.skipped.length} skipped`,
@@ -776,22 +584,17 @@ exports.exportTeacherCredentials = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Department is required' });
     }
 
-    // Get all teachers in the department, matching either the department field
-    // or the email subdomain (format: name@DEPT.kuet.ac.bd)
     const deptRegex = new RegExp(`@${department}\\.kuet\\.ac\\.bd$`, 'i');
     const teachers = await User.find({
       role: 'teacher',
       $or: [
-        // Match department field case-insensitively
         { department: { $regex: new RegExp(`^${department}$`, 'i') } },
-        // Or infer from email domain sub-part
         { email: { $regex: deptRegex } }
       ]
     })
     .select('name email department +initialPassword')
     .lean();
 
-    // If no teachers found, return an error as JSON
     if (teachers.length === 0) {
       return res.status(404).json({
         success: false,
@@ -799,14 +602,11 @@ exports.exportTeacherCredentials = async (req, res) => {
       });
     }
 
-    // Create workbook
     const workbook = XLSX.utils.book_new();
     
-    // Count how many teachers have initialPassword set
     const withPassword = teachers.filter(t => t.initialPassword).length;
     const withoutPassword = teachers.length - withPassword;
     
-    // Prepare data with current passwords (initialPassword is updated when users change passwords)
     const exportData = teachers.map(t => ({
       'Full Name': t.name || '',
       'Email': t.email || '',
@@ -816,7 +616,6 @@ exports.exportTeacherCredentials = async (req, res) => {
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     
-    // Add a note at the top if some passwords are missing
     if (withoutPassword > 0) {
       XLSX.utils.sheet_add_aoa(worksheet, [[
         'Note:', 
@@ -826,7 +625,6 @@ exports.exportTeacherCredentials = async (req, res) => {
       ]], { origin: -1 });
     }
     
-    // Set column widths
     worksheet['!cols'] = [
       { wch: 25 },  // Full Name
       { wch: 30 },  // Email
@@ -836,7 +634,6 @@ exports.exportTeacherCredentials = async (req, res) => {
 
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Teacher Credentials');
     
-    // Generate file and send
     const timestamp = new Date().toISOString().split('T')[0];
     const filename = `teacher_credentials_${department}_${timestamp}.xlsx`;
     
@@ -863,9 +660,6 @@ exports.exportTeacherCredentials = async (req, res) => {
   }
 };
 
-// @desc    Set a teacher's designation
-// @route   PUT /api/admin/users/:userId/designation
-// @access  Admin only
 exports.setUserDesignation = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -875,7 +669,6 @@ exports.setUserDesignation = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Designation is required' });
     }
 
-    // Normalize and validate designation
     const allowed = ['Professor', 'Assistant Professor', 'Lecturer'];
     const normalized = String(designation).trim();
     if (!allowed.includes(normalized)) {
@@ -915,9 +708,6 @@ exports.setUserDesignation = async (req, res) => {
   }
 };
 
-// @desc    Set a teacher as department head (must be Professor)
-// @route   PUT /api/admin/users/:userId/department-head
-// @access  Admin only
 exports.setDepartmentHead = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -939,7 +729,6 @@ exports.setDepartmentHead = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Teacher must have a department assigned' });
     }
 
-    // Remove department head status from any other teacher in the same department
     await User.updateMany(
       { 
         department: user.department, 
@@ -949,7 +738,6 @@ exports.setDepartmentHead = async (req, res) => {
       { isDepartmentHead: false }
     );
 
-    // Set this teacher as department head
     user.isDepartmentHead = true;
     await user.save();
 
@@ -976,9 +764,6 @@ exports.setDepartmentHead = async (req, res) => {
   }
 };
 
-// @desc    Remove department head status from a teacher
-// @route   DELETE /api/admin/users/:userId/department-head
-// @access  Admin only
 exports.removeDepartmentHead = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -1018,9 +803,6 @@ exports.removeDepartmentHead = async (req, res) => {
   }
 };
 
-// @desc    Assign a teacher to a course
-// @route   POST /api/admin/courses/:courseId/assign-teacher
-// @access  Admin only
 exports.assignTeacherToCourse = async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -1040,7 +822,6 @@ exports.assignTeacherToCourse = async (req, res) => {
       });
     }
 
-    // Validate course exists first (need to check course type)
     const Course = require('../models/Course');
     const course = await Course.findById(courseId);
     if (!course) {
@@ -1050,9 +831,6 @@ exports.assignTeacherToCourse = async (req, res) => {
       });
     }
 
-    // Validate section based on course type
-    // For THEORY courses, section is required and must be A or B
-    // For other course types (SESSIONAL, PROJECT/THESIS), section can be null
     if (course.course_type === 'THEORY') {
       if (!section) {
         return res.status(400).json({
@@ -1067,7 +845,6 @@ exports.assignTeacherToCourse = async (req, res) => {
         });
       }
     } else {
-      // For non-THEORY courses, section should be null
       if (section && section !== null) {
         return res.status(400).json({
           success: false,
@@ -1076,7 +853,6 @@ exports.assignTeacherToCourse = async (req, res) => {
       }
     }
 
-    // Validate teacher exists and is a teacher
     const teacher = await User.findById(teacherId);
     if (!teacher) {
       return res.status(404).json({
@@ -1092,21 +868,17 @@ exports.assignTeacherToCourse = async (req, res) => {
       });
     }
 
-    // Initialize assignedTeachers if needed
     if (!course.assignedTeachers) {
       course.assignedTeachers = [];
     }
 
-    // Normalize assignedTeachers to new format if needed (handle legacy data)
     course.assignedTeachers = course.assignedTeachers.map(item => {
-      // If item doesn't have a 'teacher' property, it's in old format (just an ObjectId)
       if (!item.teacher) {
         return { teacher: item, section: null };
       }
       return item;
     });
 
-    // Check if teacher is already assigned (regardless of section)
     const existingAssignment = course.assignedTeachers.find(
       a => {
         const teacherId_item = a.teacher?._id || a.teacher;
@@ -1122,7 +894,6 @@ exports.assignTeacherToCourse = async (req, res) => {
       });
     }
 
-    // Check if maximum 2 teachers already assigned
     if (course.assignedTeachers.length >= 2) {
       return res.status(400).json({
         success: false,
@@ -1130,7 +901,6 @@ exports.assignTeacherToCourse = async (req, res) => {
       });
     }
 
-    // Check if section is already assigned to another teacher (only for THEORY courses)
     if (course.course_type === 'THEORY' && section) {
       const sectionAlreadyAssigned = course.assignedTeachers.find(
         a => a.section === section
@@ -1144,17 +914,14 @@ exports.assignTeacherToCourse = async (req, res) => {
       }
     }
 
-    // Add teacher to assignedTeachers array
     course.assignedTeachers.push({
       teacher: teacherId,
       section: course.course_type === 'THEORY' ? section : null
     });
     await course.save();
 
-    // Populate teacher info for response
     await course.populate('assignedTeachers.teacher', 'name email designation');
 
-    // Ensure section field is preserved in response
     const assignedTeachersWithSection = course.assignedTeachers.map(assignment => ({
       teacher: assignment.teacher,
       section: assignment.section,
@@ -1181,9 +948,6 @@ exports.assignTeacherToCourse = async (req, res) => {
   }
 };
 
-// @desc    Unassign a teacher from a course
-// @route   DELETE /api/admin/courses/:courseId/unassign-teacher/:teacherId
-// @access  Admin only
 exports.unassignTeacherFromCourse = async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -1195,7 +959,6 @@ exports.unassignTeacherFromCourse = async (req, res) => {
 
     const { courseId, teacherId } = req.params;
 
-    // Validate course exists
     const Course = require('../models/Course');
     const course = await Course.findById(courseId);
     if (!course) {
@@ -1205,7 +968,6 @@ exports.unassignTeacherFromCourse = async (req, res) => {
       });
     }
 
-    // Check if teacher is assigned
     if (!course.assignedTeachers || course.assignedTeachers.length === 0) {
       return res.status(400).json({
         success: false,
@@ -1213,16 +975,13 @@ exports.unassignTeacherFromCourse = async (req, res) => {
       });
     }
 
-    // Normalize assignedTeachers to new format if needed (handle legacy data)
     course.assignedTeachers = course.assignedTeachers.map(item => {
-      // If item doesn't have a 'teacher' property, it's in old format (just an ObjectId)
       if (!item.teacher) {
         return { teacher: item, section: null };
       }
       return item;
     });
 
-    // Find and remove the assignment
     const initialLength = course.assignedTeachers.length;
     course.assignedTeachers = course.assignedTeachers.filter(
       a => {
@@ -1241,7 +1000,6 @@ exports.unassignTeacherFromCourse = async (req, res) => {
 
     await course.save();
 
-    // Populate teacher info for response
     await course.populate('assignedTeachers.teacher', 'name email designation');
 
     res.status(200).json({
@@ -1264,9 +1022,6 @@ exports.unassignTeacherFromCourse = async (req, res) => {
   }
 };
 
-// @desc    Get all teachers assigned to a course
-// @route   GET /api/admin/courses/:courseId/assigned-teachers
-// @access  Admin only
 exports.getAssignedTeachers = async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -1278,7 +1033,6 @@ exports.getAssignedTeachers = async (req, res) => {
 
     const { courseId } = req.params;
 
-    // Validate course exists
     const Course = require('../models/Course');
     const course = await Course.findById(courseId)
       .populate('assignedTeachers.teacher', 'name email designation isActive');
@@ -1290,7 +1044,6 @@ exports.getAssignedTeachers = async (req, res) => {
       });
     }
 
-    // Sanitize: ensure only one batch assignment is reported
     const sanitizedBatches = Array.isArray(course.assignedBatches) && course.assignedBatches.length > 1
       ? [course.assignedBatches[course.assignedBatches.length - 1]]
       : (course.assignedBatches || []);
@@ -1316,12 +1069,8 @@ exports.getAssignedTeachers = async (req, res) => {
   }
 };
 
-// @desc    Update user profile
-// @route   PUT /api/admin/users/:userId/profile
-// @access  Admin only
 exports.updateUserProfile = async (req, res) => {
   try {
-    // Verify admin role
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -1332,7 +1081,6 @@ exports.updateUserProfile = async (req, res) => {
     const { userId } = req.params;
     const updateData = req.body;
 
-    // Validate user exists
     const user = await User.findById(userId).select('-password');
     if (!user) {
       return res.status(404).json({
@@ -1341,7 +1089,6 @@ exports.updateUserProfile = async (req, res) => {
       });
     }
 
-    // Prevent updating admin users
     if (user.role === 'admin') {
       return res.status(400).json({
         success: false,
@@ -1349,14 +1096,12 @@ exports.updateUserProfile = async (req, res) => {
       });
     }
 
-    // Fields allowed to update
     const allowedFields = [
       'name', 'email', 'roll', 'father', 'mother', 'advisor',
       'phone', 'address', 'hall', 'scholarship', 'gender',
       'bloodGroup', 'religion', 'designation'
     ];
 
-    // Filter and update only allowed fields
     const updates = {};
     allowedFields.forEach(field => {
       if (updateData[field] !== undefined) {
@@ -1364,7 +1109,6 @@ exports.updateUserProfile = async (req, res) => {
       }
     });
 
-    // Update user
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: updates },
@@ -1386,12 +1130,8 @@ exports.updateUserProfile = async (req, res) => {
   }
 };
 
-// @desc    Assign batch to a course
-// @route   POST /api/admin/courses/:courseId/assign-batch
-// @access  Admin only
 exports.assignBatchToCourse = async (req, res) => {
   try {
-    // Verify admin role
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -1402,7 +1142,6 @@ exports.assignBatchToCourse = async (req, res) => {
     const { courseId } = req.params;
     const { batch, deptCode } = req.body;
 
-    // Validate inputs
     if (!batch || !deptCode) {
       return res.status(400).json({
         success: false,
@@ -1410,7 +1149,6 @@ exports.assignBatchToCourse = async (req, res) => {
       });
     }
 
-    // Validate batch format (2 digits)
     if (!/^\d{2}$/.test(batch)) {
       return res.status(400).json({
         success: false,
@@ -1418,7 +1156,6 @@ exports.assignBatchToCourse = async (req, res) => {
       });
     }
 
-    // Validate department code dynamically
     const Department = require('../models/Department');
     const isValidDept = await Department.exists({ numericCode: deptCode });
     
@@ -1429,7 +1166,6 @@ exports.assignBatchToCourse = async (req, res) => {
       });
     }
 
-    // Validate course exists
     const Course = require('../models/Course');
     const course = await Course.findById(courseId);
     
@@ -1440,7 +1176,6 @@ exports.assignBatchToCourse = async (req, res) => {
       });
     }
 
-    // Auto-assign year/semester/term from request (for group assignments like 1-1, 1-2, etc.)
     const { yearLevel: reqYearLevel, semester: reqSemester, term: reqTerm } = req.body;
     const reqYearLevelNum = (reqYearLevel !== undefined && reqYearLevel !== null) ? parseInt(reqYearLevel, 10) : undefined;
     const reqSemesterNum = (reqSemester !== undefined && reqSemester !== null) ? parseInt(reqSemester, 10) : undefined;
@@ -1451,7 +1186,6 @@ exports.assignBatchToCourse = async (req, res) => {
     let t = course.term;
     let needsSave = false;
 
-    // ALWAYS use request values when provided (for automatic group assignments)
     if (Number.isInteger(reqYearLevelNum) && (Number.isInteger(reqSemesterNum) || Number.isInteger(reqTermNum))) {
       y = reqYearLevelNum;
       s = Number.isInteger(reqSemesterNum) ? reqSemesterNum : ((reqYearLevelNum - 1) * 2) + reqTermNum;
@@ -1462,13 +1196,11 @@ exports.assignBatchToCourse = async (req, res) => {
       course.term = t;
       needsSave = true;
     }
-    // Fallback 1: course has term and year but not semester
     else if (Number.isInteger(y) && Number.isInteger(t) && !Number.isInteger(s)) {
       s = ((y - 1) * 2) + t;
       course.semester = s;
       needsSave = true;
     }
-    // Fallback 2: course has semester but not year/term
     else if (!Number.isInteger(y) && Number.isInteger(s)) {
       y = Math.ceil(s / 2);
       t = s % 2 === 0 ? 2 : 1;
@@ -1481,7 +1213,6 @@ exports.assignBatchToCourse = async (req, res) => {
       await course.save();
     }
 
-    // Final check
     if (!Number.isInteger(y) || !Number.isInteger(s)) {
       console.error('[assignBatchToCourse] MISSING year/semester:', {
         courseCode: course.courseCode,
@@ -1495,7 +1226,6 @@ exports.assignBatchToCourse = async (req, res) => {
       });
     }
 
-    // Check if this batch+dept combination is already assigned
     const alreadyAssigned = course.assignedBatches.some(
       ab => ab.batch === batch && ab.deptCode === deptCode
     );
@@ -1507,13 +1237,8 @@ exports.assignBatchToCourse = async (req, res) => {
       });
     }
 
-    // Enforce constraints:
-    // 1) A batch (batch+dept) can be assigned only one semester (year-sem) across the system
-    // 2) A semester (year-sem) can be taught to only one batch at a time for a department
 
-    // y and s are ensured above
 
-    // 1) Find any existing assignments for this batch+dept across all courses
     const existingForBatch = await Course.find({
       'assignedBatches.batch': batch,
       'assignedBatches.deptCode': deptCode
@@ -1530,7 +1255,6 @@ exports.assignBatchToCourse = async (req, res) => {
       });
     }
 
-    // 2) Ensure no other batch (same department) is assigned to this semester (year-sem)
     const coursesInSem = await Course.find({ yearLevel: y, semester: s, 'assignedBatches.deptCode': deptCode })
       .select('assignedBatches courseCode');
 
@@ -1545,9 +1269,6 @@ exports.assignBatchToCourse = async (req, res) => {
       });
     }
 
-    // If the batch is changing (or no batch was previously set because it was
-    // unassigned), clear all attainment data so the previous batch's exam
-    // structure and student data do not bleed into the new batch's attainment views.
     const oldAssignment = (course.assignedBatches || [])[0];
     const isBatchChange =
       !oldAssignment || // no prior batch — may still have leftover data from an unassign
@@ -1608,11 +1329,9 @@ exports.assignBatchToCourse = async (req, res) => {
       ]);
     }
 
-    // Replace any existing assignment: a course can be assigned to only one batch
     course.assignedBatches = [{ batch, deptCode }];
     await course.save();
 
-    // Bust the attainment cache so the teacher immediately gets fresh (reset) data
     if (isBatchChange) {
       clearCache(`ct_${courseId}`);
       clearCache(`assignment_${courseId}`);
@@ -1621,7 +1340,6 @@ exports.assignBatchToCourse = async (req, res) => {
       clearCache(`term_${courseId}`);
     }
 
-    // Populate and return updated course
     const updatedCourse = await Course.findById(courseId)
       .populate('assignedTeachers.teacher', 'name email designation');
 
@@ -1645,12 +1363,8 @@ exports.assignBatchToCourse = async (req, res) => {
   }
 };
 
-// @desc    Unassign batch from a course
-// @route   DELETE /api/admin/courses/:courseId/unassign-batch
-// @access  Admin only
 exports.unassignBatchFromCourse = async (req, res) => {
   try {
-    // Verify admin role
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -1661,7 +1375,6 @@ exports.unassignBatchFromCourse = async (req, res) => {
     const { courseId } = req.params;
     const { batch, deptCode } = req.body;
 
-    // Validate inputs
     if (!batch || !deptCode) {
       return res.status(400).json({
         success: false,
@@ -1669,7 +1382,6 @@ exports.unassignBatchFromCourse = async (req, res) => {
       });
     }
 
-    // Validate course exists
     const Course = require('../models/Course');
     const course = await Course.findById(courseId);
     
@@ -1680,16 +1392,12 @@ exports.unassignBatchFromCourse = async (req, res) => {
       });
     }
 
-    // Remove the batch assignment
     course.assignedBatches = course.assignedBatches.filter(
       ab => !(ab.batch === batch && ab.deptCode === deptCode)
     );
 
     await course.save();
 
-    // Clear ALL attainment data for this course now that the batch has been
-    // unassigned, so neither allocation rows nor student data carries over
-    // when the course is later assigned to a different batch.
     await Promise.all([
       CTAttainment.updateOne(
         { course: courseId },
@@ -1743,14 +1451,12 @@ exports.unassignBatchFromCourse = async (req, res) => {
       TermExamMarks.deleteMany({ course: courseId }),
     ]);
 
-    // Bust the attainment cache so the teacher immediately gets fresh (reset) data
     clearCache(`ct_${courseId}`);
     clearCache(`assignment_${courseId}`);
     clearCache(`labactivity_${courseId}`);
     clearCache(`section-a_${courseId}`);
     clearCache(`term_${courseId}`);
 
-    // Populate and return updated course
     const updatedCourse = await Course.findById(courseId)
       .populate('assignedTeachers.teacher', 'name email designation');
 
@@ -1774,12 +1480,8 @@ exports.unassignBatchFromCourse = async (req, res) => {
   }
 };
 
-// @desc    Get assigned batches for a course
-// @route   GET /api/admin/courses/:courseId/assigned-batches
-// @access  Admin only
 exports.getAssignedBatches = async (req, res) => {
   try {
-    // Verify admin role
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -1789,7 +1491,6 @@ exports.getAssignedBatches = async (req, res) => {
 
     const { courseId } = req.params;
 
-    // Validate course exists
     const Course = require('../models/Course');
     const course = await Course.findById(courseId);
     
@@ -1800,7 +1501,6 @@ exports.getAssignedBatches = async (req, res) => {
       });
     }
 
-    // Sanitize: ensure only one batch assignment is reported
     const sanitizedBatches = Array.isArray(course.assignedBatches) && course.assignedBatches.length > 1
       ? [course.assignedBatches[course.assignedBatches.length - 1]]
       : (course.assignedBatches || []);
@@ -1824,12 +1524,8 @@ exports.getAssignedBatches = async (req, res) => {
   }
 };
 
-// @desc    Normalize batch assignments across all courses (keep latest only)
-// @route   POST /api/admin/courses/normalize-batches
-// @access  Admin only
 exports.normalizeBatchAssignments = async (req, res) => {
   try {
-    // Verify admin role
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,

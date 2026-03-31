@@ -1,6 +1,5 @@
 const nodemailer = require('nodemailer');
 
-// Create reusable transporter
 const createTransporter = () => {
   return nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
@@ -13,7 +12,6 @@ const createTransporter = () => {
   });
 };
 
-// Send email verification with OTP
 exports.sendVerificationEmail = async (email, name, otp) => {
   try {
     const transporter = createTransporter();
@@ -62,7 +60,6 @@ exports.sendVerificationEmail = async (email, name, otp) => {
   }
 };
 
-// Send approval notification
 exports.sendApprovalEmail = async (email, name) => {
   try {
     const transporter = createTransporter();
@@ -96,7 +93,6 @@ exports.sendApprovalEmail = async (email, name) => {
   }
 };
 
-// Send password reset OTP email
 exports.sendPasswordResetEmail = async (email, name, otp) => {
   try {
     const transporter = createTransporter();

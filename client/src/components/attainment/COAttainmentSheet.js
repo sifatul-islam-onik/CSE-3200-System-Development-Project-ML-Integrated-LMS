@@ -2,7 +2,6 @@ import React from 'react';
 import * as XLSX from 'xlsx';
 import { SkeletonTable } from './LoadingSpinner';
 
-// ── Summary tables: CO measured & Wt ─────────────────────────────────────────
 const COSummaryTables = ({ clos, theoryCoAttainmentData, labCoAttainmentData }) => {
   if (!clos.length) return null;
 

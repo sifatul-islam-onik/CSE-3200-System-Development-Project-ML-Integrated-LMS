@@ -11,10 +11,8 @@ const {
 const { authenticateUser } = require('../middlewares/authMiddleware');
 const { authorizeAdmin } = require('../middlewares/roleMiddleware');
 
-// Course profile route (must be before /:courseId routes)
 router.get('/profile/:courseCode', getCourseProfileData);
 
-// Course outcome routes
 router.post('/:courseId/outcomes', authenticateUser, authorizeAdmin, createCourseOutcomes);
 router.get('/:courseId/outcomes', getCourseOutcomes);
 router.put('/:courseId/outcomes/:outcomeId', authenticateUser, updateCourseOutcome);

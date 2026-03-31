@@ -1,6 +1,5 @@
 const { computeStudentTotal, computeLabStudentTotal, computeCTColumnTotals, computeAssignmentColumnTotals, getStudentCTFactoredMarks, getStudentAssignmentFactoredMarks, computeSectionCOMarks, computeLabActivityColumnTotals } = require('./gradeUtils');
 
-// Helper to determine the factored mapped marks distribution per CO
 const calculateFactoredCOTotals = (ctData, activeCTFields, coNumbers) => {
   const { ctRows = [], ctSummary = {}, ctManualWts = {} } = ctData;
   const useEqWt = ctSummary.useEqWt || 0;
@@ -11,7 +10,6 @@ const calculateFactoredCOTotals = (ctData, activeCTFields, coNumbers) => {
   const factoredTotals = {};
 
   coNumbers.forEach(coKey => {
-    // Find the CO row
     const row = ctRows.find(r => (r.coNumber || '').toString().replace('CLO', 'CO') === coKey);
     if (!row) {
       factoredTotals[coKey] = 0;
@@ -90,9 +88,6 @@ const calculateFactoredAssignmentCOTotals = (assignData, activeAssignFields, coN
   return factoredTotals;
 };
 
-/**
- * Calculates CO percentage statistics for a particular theory course.
- */
 const calculateTheoryCOAttainment = (students, coNumbers, attainmentData) => {
   const { sectionAData, sectionBData, ctData, assignData } = attainmentData;
   const { sectionARows = [], sectionAObtainedRows = [] } = sectionAData;
@@ -122,7 +117,6 @@ const calculateTheoryCOAttainment = (students, coNumbers, attainmentData) => {
     const studentObtB = sectionBObtainedRows.find(r => String(r.rollNumber || '').trim().toLowerCase() === String(student.roll || '').trim().toLowerCase());
 
     coNumbers.forEach(coNumber => {
-      // 1. Calculate section allocated marks
       const coRowA = sectionARows.find(r => String(r.coNumber || '').replace('CLO', 'CO') === coNumber);
       const coRowB = sectionBRows.find(r => String(r.coNumber || '').replace('CLO', 'CO') === coNumber);
 
@@ -134,17 +128,14 @@ const calculateTheoryCOAttainment = (students, coNumbers, attainmentData) => {
         ['Q5a','Q5b','Q5c','Q5d','Q6a','Q6b','Q6c','Q6d','Q7a','Q7b','Q7c','Q7d','Q8a','Q8b','Q8c','Q8d'].forEach(f => distB += (parseFloat(coRowB[f]) || 0));
       }
 
-      // 2. Computed distributed (total allocated marks for this CO)
       const totalDist = distA + distB + (factoredCTTotals[coNumber] || 0) + (factoredAssignTotals[coNumber] || 0);
 
-      // 3. Computed obtained total marks for this CO
       const obtA = computeSectionCOMarks(studentObtA, coRowA);
       const obtB = computeSectionCOMarks(studentObtB, coRowB);
       const obtCT = getStudentCTFactoredMarks(student.roll, coNumber, ctData);
       const obtAssign = getStudentAssignmentFactoredMarks(student.roll, coNumber, assignData);
       const totalObt = obtA + obtB + obtCT + obtAssign;
 
-      // 4. Calculate Percentage
       if (totalDist > 0) {
         coStats[coNumber].attempted += 1;
         const percentage = (totalObt / totalDist) * 100;
@@ -158,15 +149,11 @@ const calculateTheoryCOAttainment = (students, coNumbers, attainmentData) => {
   return generateFinalStats(coStats);
 };
 
-/**
- * Transforms intermediate count into formatted array for db
- */
 const generateFinalStats = (coStats) => {
   return Object.keys(coStats).map(coKey => {
     const stat = coStats[coKey];
     const passPercentage = stat.attempted > 0 ? (stat.passedThreshold / stat.attempted) * 100 : 0;
     
-    // Example target rules: > 60% = Level 3, > 50% = Level 2, > 40% = Level 1
     let attainmentLevel = 0;
     if (passPercentage >= 60) attainmentLevel = 3;
     else if (passPercentage >= 50) attainmentLevel = 2;
@@ -244,9 +231,6 @@ const getLabActivityStudentCOMappedMarks = (studentObtainedRow, coRow, activityT
   return total;
 };
 
-/**
- * Calculates CO percentage statistics for a particular lab course.
- */
 const calculateLabCOAttainment = (students, coNumbers, attainmentData) => {
   const { labActivityRows = [], labActivityObtainedRows = [] } = attainmentData;
   const activityTotals = computeLabActivityColumnTotals(labActivityRows, attainmentData.activityTaken || 5);
@@ -288,9 +272,6 @@ const calculateLabCOAttainment = (students, coNumbers, attainmentData) => {
   return generateFinalStats(coStats);
 };
 
-/**
- * Main export for server side CO Attainment Calculation
- */
 const calculateCourseCOAttainment = (courseType, students, coNumbers, attainmentData) => {
   const isLab = courseType === 'SESSIONAL' || courseType === 'PROJECT/THESIS';
   if (isLab) {

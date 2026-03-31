@@ -1,17 +1,12 @@
 const User = require('../models/User');
 const { hashToken } = require('../utils/tokenUtils');
 
-// @desc    Verify email with token
-// @route   GET /api/auth/verify-email/:token
-// @access  Public
 exports.verifyEmail = async (req, res) => {
   try {
     const { token } = req.params;
 
-    // Hash the token from URL
     const hashedToken = hashToken(token);
 
-    // Find user with valid token
     const user = await User.findOne({
       emailVerificationToken: hashedToken,
       emailVerificationExpires: { $gt: Date.now() }
@@ -24,7 +19,6 @@ exports.verifyEmail = async (req, res) => {
       });
     }
 
-    // Already verified
     if (user.isEmailVerified) {
       return res.status(400).json({
         success: false,
@@ -32,7 +26,6 @@ exports.verifyEmail = async (req, res) => {
       });
     }
 
-    // Update user
     user.isEmailVerified = true;
     user.emailVerificationToken = undefined;
     user.emailVerificationExpires = undefined;

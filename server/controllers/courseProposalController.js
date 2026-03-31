@@ -4,9 +4,6 @@ const CourseOutcome = require('../models/CourseOutcome');
 const COPOMapping = require('../models/COPOMapping');
 const mongoose = require('mongoose');
 
-// @desc    Create a new course proposal
-// @route   POST /api/course-proposals
-// @access  Teacher
 exports.createCourseProposal = async (req, res) => {
   try {
     const {
@@ -16,7 +13,6 @@ exports.createCourseProposal = async (req, res) => {
       changeDescription
     } = req.body;
 
-    // Validate proposal type
     if (!proposalType || !['CREATE', 'UPDATE'].includes(proposalType)) {
       return res.status(400).json({
         success: false,
@@ -24,7 +20,6 @@ exports.createCourseProposal = async (req, res) => {
       });
     }
 
-    // If UPDATE, validate existing course
     if (proposalType === 'UPDATE') {
       if (!existingCourseId) {
         return res.status(400).json({
@@ -42,7 +37,6 @@ exports.createCourseProposal = async (req, res) => {
       }
     }
 
-    // Check for duplicate course code in CREATE proposals
     if (proposalType === 'CREATE') {
       const existingCourse = await Course.findOne({ 
         courseCode: courseData.courseCode.toUpperCase() 
@@ -54,7 +48,6 @@ exports.createCourseProposal = async (req, res) => {
         });
       }
 
-      // Check for pending proposals with same course code
       const pendingProposal = await CourseProposal.findOne({
         'proposedData.courseCode': courseData.courseCode.toUpperCase(),
         status: 'PENDING',
@@ -68,7 +61,6 @@ exports.createCourseProposal = async (req, res) => {
       }
     }
 
-    // Check for existing pending proposal for UPDATE
     if (proposalType === 'UPDATE') {
       const pendingProposal = await CourseProposal.findOne({
         existingCourse: existingCourseId,
@@ -83,7 +75,6 @@ exports.createCourseProposal = async (req, res) => {
       }
     }
 
-    // Create proposal
     const proposal = await CourseProposal.create({
       proposalType,
       existingCourse: proposalType === 'UPDATE' ? existingCourseId : undefined,
@@ -112,9 +103,6 @@ exports.createCourseProposal = async (req, res) => {
   }
 };
 
-// @desc    Get all course proposals
-// @route   GET /api/course-proposals
-// @access  Admin
 exports.getAllProposals = async (req, res) => {
   try {
     const { status, proposalType, proposedBy } = req.query;
@@ -145,9 +133,6 @@ exports.getAllProposals = async (req, res) => {
   }
 };
 
-// @desc    Get teacher's own proposals
-// @route   GET /api/course-proposals/my-proposals
-// @access  Teacher
 exports.getMyProposals = async (req, res) => {
   try {
     const { status } = req.query;
@@ -175,9 +160,6 @@ exports.getMyProposals = async (req, res) => {
   }
 };
 
-// @desc    Get single proposal
-// @route   GET /api/course-proposals/:id
-// @access  Admin/Teacher (own)
 exports.getProposalById = async (req, res) => {
   try {
     const proposal = await CourseProposal.findById(req.params.id)
@@ -192,7 +174,6 @@ exports.getProposalById = async (req, res) => {
       });
     }
 
-    // Teachers can only view their own proposals
     if (req.user.role === 'teacher' && proposal.proposedBy._id.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
@@ -200,7 +181,6 @@ exports.getProposalById = async (req, res) => {
       });
     }
 
-    // For UPDATE proposals, attach courseOutcomes to existingCourse (they are in a separate collection)
     let proposalData = proposal.toObject();
     if (proposalData.proposalType === 'UPDATE' && proposalData.existingCourse && proposalData.existingCourse._id) {
       const existingCourseId = proposalData.existingCourse._id;
@@ -228,9 +208,6 @@ exports.getProposalById = async (req, res) => {
   }
 };
 
-// @desc    Approve course proposal
-// @route   PUT /api/course-proposals/:id/approve
-// @access  Admin only
 exports.approveProposal = async (req, res) => {
   try {
     const { reviewComments } = req.body;
@@ -251,47 +228,38 @@ exports.approveProposal = async (req, res) => {
       });
     }
 
-    // Normalize helper to align proposed data with Course schema expectations
     const normalizeCourseData = (raw) => {
       const data = { ...(raw || {}) };
-      // Ensure uppercase enums/strings where applicable
       if (typeof data.course_type === 'string') data.course_type = data.course_type.toUpperCase();
       if (typeof data.category === 'string') data.category = data.category.toUpperCase();
       if (typeof data.course_offered_to === 'string') data.course_offered_to = data.course_offered_to.toUpperCase();
-      // Elective group should be null for COMPULSORY
       if (data.category === 'COMPULSORY') {
         data.elective_group = null;
       }
-      // Academic year should be a string; Course model will format YYYY -> YYYY-YY
       if (typeof data.academicYear === 'number') data.academicYear = String(data.academicYear);
-      // Trim arrays of strings
       const trimArray = (arr) => Array.isArray(arr) ? arr.map(v => (typeof v === 'string' ? v.trim() : v)).filter(v => !(typeof v === 'string' && v === '')) : arr;
       data.prerequisites = trimArray(data.prerequisites);
       data.knowledge_required = trimArray(data.knowledge_required);
       data.course_objectives = trimArray(data.course_objectives);
       data.references = trimArray(data.references);
-      // Ensure course_content items have trimmed strings
       if (Array.isArray(data.course_content)) {
         data.course_content = data.course_content.map(item => ({
           concept_name: item?.concept_name?.trim(),
           concept_description: item?.concept_description?.trim()
         }));
       }
-      // Sort lecture_plan by week and coerce week to number
       if (Array.isArray(data.lecture_plan)) {
         data.lecture_plan = data.lecture_plan.map(lp => ({
           week: typeof lp.week === 'string' ? parseInt(lp.week, 10) : lp.week,
           plan: lp?.plan?.trim()
         })).sort((a, b) => (a.week || 0) - (b.week || 0));
       }
-      // Uppercase kpa_mapping entries
       if (Array.isArray(data.kpa_mapping)) {
         data.kpa_mapping = data.kpa_mapping.map(k => (typeof k === 'string' ? k.toUpperCase() : k));
       }
       return data;
     };
 
-    // Attempt to start a transaction (optional)
     let session = null;
     let useSession = false;
     try {
@@ -304,13 +272,11 @@ exports.approveProposal = async (req, res) => {
 
     try {
       if (proposal.proposalType === 'CREATE') {
-        // Create new course
         const courseData = {
           ...normalizeCourseData(proposal.proposedData),
           createdBy: proposal.proposedBy
         };
 
-        // Extract courseOutcomes if present
         const courseOutcomes = courseData.courseOutcomes;
         delete courseData.courseOutcomes;
 
@@ -322,7 +288,6 @@ exports.approveProposal = async (req, res) => {
           course = await Course.create(courseData);
         }
 
-        // Create course outcomes if provided
         if (courseOutcomes && courseOutcomes.length > 0) {
           for (const coData of courseOutcomes) {
             let courseOutcome;
@@ -343,7 +308,6 @@ exports.approveProposal = async (req, res) => {
               });
             }
 
-            // Create CO-PO mappings
             if (coData.po_mappings && coData.po_mappings.length > 0) {
               const mappingsToCreate = coData.po_mappings.map(mapping => ({
                 course_outcome: courseOutcome._id,
@@ -361,7 +325,6 @@ exports.approveProposal = async (req, res) => {
         }
 
       } else if (proposal.proposalType === 'UPDATE') {
-        // Update existing course
         const course = useSession
           ? await Course.findById(proposal.existingCourse).session(session)
           : await Course.findById(proposal.existingCourse);
@@ -375,7 +338,6 @@ exports.approveProposal = async (req, res) => {
         const courseOutcomes = updateData.courseOutcomes;
         delete updateData.courseOutcomes;
 
-        // Update course fields
         Object.assign(course, updateData);
         course.lastReviewed = Date.now();
         course.reviewedBy = req.user._id;
@@ -385,9 +347,7 @@ exports.approveProposal = async (req, res) => {
           await course.save();
         }
 
-        // Handle course outcomes if the field was provided (including empty array to clear)
         if (hasCourseOutcomes) {
-          // Delete existing outcomes and mappings
           const existingCOs = useSession
             ? await CourseOutcome.find({ course: course._id }).session(session)
             : await CourseOutcome.find({ course: course._id });
@@ -404,7 +364,6 @@ exports.approveProposal = async (req, res) => {
             await CourseOutcome.deleteMany({ course: course._id });
           }
 
-          // Re-create outcomes only when the array is non-empty
           if (Array.isArray(courseOutcomes) && courseOutcomes.length > 0) {
             for (const coData of courseOutcomes) {
               let courseOutcome;
@@ -442,7 +401,6 @@ exports.approveProposal = async (req, res) => {
         }
       }
 
-      // Update proposal status
       proposal.status = 'APPROVED';
       proposal.reviewedBy = req.user._id;
       proposal.reviewedAt = Date.now();
@@ -480,7 +438,6 @@ exports.approveProposal = async (req, res) => {
     console.error('Error message:', error.message);
     console.error('Error stack:', error.stack);
     console.error('Full error:', error);
-    // Surface validation and duplicate key errors clearly to client
     if (error && (error.name === 'ValidationError' || error.errors)) {
       const errors = {};
       for (const key in (error.errors || {})) {
@@ -493,7 +450,6 @@ exports.approveProposal = async (req, res) => {
       });
     }
     if (error && error.code === 11000) {
-      // Duplicate key (likely courseCode unique index)
       return res.status(400).json({
         success: false,
         message: 'Duplicate value detected. A course with this code may already exist.',
@@ -508,9 +464,6 @@ exports.approveProposal = async (req, res) => {
   }
 };
 
-// @desc    Reject course proposal
-// @route   PUT /api/course-proposals/:id/reject
-// @access  Admin only
 exports.rejectProposal = async (req, res) => {
   try {
     const { reviewComments } = req.body;
@@ -555,11 +508,6 @@ exports.rejectProposal = async (req, res) => {
   }
 };
 
-// @desc    Delete proposal
-//         - Admin: can delete any responded (APPROVED/REJECTED) proposal
-//         - Teacher: can delete their own proposals of any status
-// @route   DELETE /api/course-proposals/:id
-// @access  Teacher (own) / Admin (responded only)
 exports.deleteProposal = async (req, res) => {
   try {
     const proposal = await CourseProposal.findById(req.params.id);
@@ -576,7 +524,6 @@ exports.deleteProposal = async (req, res) => {
     const isResponded = ['APPROVED', 'REJECTED'].includes(proposal.status);
 
     if (isAdmin) {
-      // Admin can only delete responded proposals (not pending ones which are awaiting review)
       if (!isResponded) {
         return res.status(400).json({
           success: false,
@@ -584,7 +531,6 @@ exports.deleteProposal = async (req, res) => {
         });
       }
     } else {
-      // Teachers can only delete their own proposals
       if (!isOwner) {
         return res.status(403).json({
           success: false,

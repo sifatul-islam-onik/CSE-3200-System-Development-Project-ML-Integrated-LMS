@@ -1,17 +1,14 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Verify JWT and attach user to request
 exports.authenticateUser = async (req, res, next) => {
   try {
-    // Get token from header
     let token;
     
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
     }
 
-    // Check if token exists
     if (!token) {
       return res.status(401).json({
         success: false,
@@ -19,11 +16,9 @@ exports.authenticateUser = async (req, res, next) => {
       });
     }
 
-    // Verify token
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Get user from database (exclude password)
       const user = await User.findById(decoded.id);
 
       if (!user) {
@@ -33,7 +28,6 @@ exports.authenticateUser = async (req, res, next) => {
         });
       }
 
-      // Verify that JWT role matches database role (prevent role tampering)
       if (decoded.role !== user.role) {
         return res.status(403).json({
           success: false,
@@ -41,7 +35,6 @@ exports.authenticateUser = async (req, res, next) => {
         });
       }
 
-      // Check if user account is active
       if (!user.isActive) {
         return res.status(403).json({
           success: false,
@@ -49,7 +42,6 @@ exports.authenticateUser = async (req, res, next) => {
         });
       }
 
-      // For non-admin users, check verification and approval
       if (user.role !== 'admin') {
         if (!user.isEmailVerified) {
           return res.status(403).json({
@@ -66,7 +58,6 @@ exports.authenticateUser = async (req, res, next) => {
         }
       }
 
-      // Attach user to request
       req.user = user;
       next();
 

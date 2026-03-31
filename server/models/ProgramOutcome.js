@@ -25,7 +25,6 @@ const programOutcomeSchema = new mongoose.Schema({
     required: [true, 'Description is required'],
     trim: true
   },
-  // Flag to prevent accidental deletion
   is_system: {
     type: Boolean,
     default: true
@@ -34,10 +33,8 @@ const programOutcomeSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster queries (unique index on po_code is already defined via the schema field)
 programOutcomeSchema.index({ po_number: 1 });
 
-// Prevent deletion of system POs
 programOutcomeSchema.pre('deleteOne', { document: true, query: false }, function(next) {
   if (this.is_system) {
     return next(new Error('Cannot delete system Program Outcomes'));

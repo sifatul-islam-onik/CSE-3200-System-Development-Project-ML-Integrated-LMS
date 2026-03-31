@@ -6,12 +6,8 @@ const mongoose = require('mongoose');
 const { validationResult } = require('express-validator');
 const { validateOBECompliance, generateCOPOMatrix } = require('../utils/curriculumValidation');
 
-// @desc    Create a new course
-// @route   POST /api/courses
-// @access  Admin only
 exports.createCourse = async (req, res) => {
   try {
-    // Security check - verify admin role
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -33,13 +29,11 @@ exports.createCourse = async (req, res) => {
       course_type,
       credit, 
       course_offered_to, 
-      // OBE classification fields
       category,
       elective_group,
       kpa_mapping,
       term,
       status,
-      // OBE fields
       contactHours,
       academicYear,
       semester,
@@ -50,12 +44,10 @@ exports.createCourse = async (req, res) => {
       course_content,
       lecture_plan,
       references,
-      // New OBE data (optional)
       courseOutcomes,  // Array of { co_code, description, po_mappings }
       withOBEData      // Flag to enable transaction mode
     } = req.body;
 
-    // Check if course code already exists
     const existingCourse = await Course.findOne({ courseCode: courseCode.toUpperCase() });
     if (existingCourse) {
       return res.status(400).json({
@@ -64,7 +56,6 @@ exports.createCourse = async (req, res) => {
       });
     }
 
-    // Validate all required fields
     const validationErrors = [];
 
     if (!courseCode || !courseCode.trim()) {
@@ -97,7 +88,6 @@ exports.createCourse = async (req, res) => {
     if (!course_content || !Array.isArray(course_content) || course_content.length === 0) {
       validationErrors.push({ field: 'course_content', message: 'Course content is required (at least one concept)' });
     } else {
-      // Validate course_content structure
       course_content.forEach((concept, index) => {
         if (!concept.concept_description || !concept.concept_description.trim()) {
           validationErrors.push({ field: `course_content[${index}].concept_description`, message: 'Concept description is required' });
@@ -105,7 +95,6 @@ exports.createCourse = async (req, res) => {
       });
     }
 
-    // Parity rule for course code last digit vs course type
     if (courseCode && course_type) {
       const digits = (courseCode.match(/\d+/g) || []).join('');
       if (digits.length > 0) {
@@ -118,7 +107,6 @@ exports.createCourse = async (req, res) => {
       }
     }
 
-    // Validate lecture_plan
     if (!lecture_plan || !Array.isArray(lecture_plan) || lecture_plan.length === 0) {
       validationErrors.push({ field: 'lecture_plan', message: 'Lecture plan is required (at least one entry)' });
     } else {
@@ -126,16 +114,12 @@ exports.createCourse = async (req, res) => {
         validationErrors.push({ field: 'lecture_plan', message: 'Maximum 13 lecture plan entries allowed' });
       }
       
-      // Track weeks to find duplicates
       const weeksSeen = new Set();
       const duplicateWeeks = [];
       
-      // Week is only required if there are multiple entries
       const isWeekRequired = lecture_plan.length > 1;
       
-      // Validate each lecture plan entry
       lecture_plan.forEach((item, index) => {
-        // Check if week field exists (only required for multiple entries)
         if (isWeekRequired) {
           if (item.week === undefined || item.week === null) {
             validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week is missing' });
@@ -144,14 +128,12 @@ exports.createCourse = async (req, res) => {
           } else if (item.week < 1 || item.week > 13) {
             validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be between 1 and 13' });
           } else {
-            // Check for duplicate weeks
             if (weeksSeen.has(item.week)) {
               duplicateWeeks.push(item.week);
             }
             weeksSeen.add(item.week);
           }
         } else if (item.week !== undefined && item.week !== null) {
-          // If week is provided for single entry, still validate it
           if (!Number.isInteger(item.week)) {
             validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be an integer' });
           } else if (item.week < 1 || item.week > 13) {
@@ -159,7 +141,6 @@ exports.createCourse = async (req, res) => {
           }
         }
         
-        // Check if plan field exists
         if (item.plan === undefined || item.plan === null) {
           validationErrors.push({ field: `lecture_plan[${index}].plan`, message: 'Plan description is missing' });
         } else if (typeof item.plan !== 'string' || !item.plan.trim()) {
@@ -167,7 +148,6 @@ exports.createCourse = async (req, res) => {
         }
       });
       
-      // Report duplicate weeks (only relevant for multiple entries)
       if (isWeekRequired && duplicateWeeks.length > 0) {
         const uniqueDuplicates = [...new Set(duplicateWeeks)];
         validationErrors.push({ 
@@ -177,17 +157,14 @@ exports.createCourse = async (req, res) => {
       }
     }
 
-    // Validate references (optional, but if provided should not be empty)
     if (references !== undefined && references !== null) {
       if (!Array.isArray(references)) {
         validationErrors.push({ field: 'references', message: 'References must be an array' });
       } else if (references.length > 0) {
-        // Filter out empty or whitespace-only entries
         const cleanedReferences = references
           .filter(ref => ref && typeof ref === 'string' && ref.trim())
           .map(ref => ref.trim());
         
-        // Update the references array with cleaned values
         req.body.references = cleanedReferences;
       }
     }
@@ -200,7 +177,6 @@ exports.createCourse = async (req, res) => {
       });
     }
 
-    // Validate category and elective_group relationship
     if (category === 'OPTIONAL' && !elective_group) {
       return res.status(400).json({
         success: false,
@@ -208,7 +184,6 @@ exports.createCourse = async (req, res) => {
       });
     }
 
-    // Validate semester if provided
     if (semester !== undefined) {
       const semesterNum = Number(semester);
       if (!Number.isInteger(semesterNum) || semesterNum < 1 || semesterNum > 8) {
@@ -219,7 +194,6 @@ exports.createCourse = async (req, res) => {
       }
     }
 
-    // Validate yearLevel if provided (conditional based on department)
     if (yearLevel !== undefined) {
       const yearLevelNum = Number(yearLevel);
       const maxYear = course_offered_to === 'ARCH' ? 5 : 4;
@@ -231,9 +205,7 @@ exports.createCourse = async (req, res) => {
       }
     }
 
-    // Validate OBE data if provided
     if (courseOutcomes && Array.isArray(courseOutcomes) && courseOutcomes.length > 0) {
-      // Validate CO structure
       for (const co of courseOutcomes) {
         if (!co.co_code || !co.description) {
           return res.status(400).json({
@@ -242,7 +214,6 @@ exports.createCourse = async (req, res) => {
           });
         }
 
-        // Validate PO mappings if provided
         if (co.po_mappings && Array.isArray(co.po_mappings)) {
           if (co.po_mappings.length === 0) {
             return res.status(400).json({
@@ -257,7 +228,6 @@ exports.createCourse = async (req, res) => {
           for (const mapping of co.po_mappings) {
             const { program_outcome_code, level } = mapping;
 
-            // Validate PO code
             if (!program_outcome_code || !validPOCodes.includes(program_outcome_code.toUpperCase())) {
               return res.status(400).json({
                 success: false,
@@ -265,7 +235,6 @@ exports.createCourse = async (req, res) => {
               });
             }
 
-            // Validate level
             const levelNum = Number(level);
             if (isNaN(levelNum) || levelNum < 1 || levelNum > 3) {
               return res.status(400).json({
@@ -274,7 +243,6 @@ exports.createCourse = async (req, res) => {
               });
             }
 
-            // Check for duplicate POs
             const poCodeUpper = program_outcome_code.toUpperCase();
             if (seenPOs.has(poCodeUpper)) {
               return res.status(400).json({
@@ -288,7 +256,6 @@ exports.createCourse = async (req, res) => {
       }
     }
 
-    // Prepare course data
     const courseData = {
       courseCode,
       courseTitle,
@@ -305,31 +272,25 @@ exports.createCourse = async (req, res) => {
       createdBy: req.user._id
     };
 
-    // Add optional classification fields if provided
     if (elective_group !== undefined) courseData.elective_group = elective_group;
     if (term !== undefined) courseData.term = term;
     if (status) courseData.status = status;
 
-    // Add OBE fields if provided
     if (contactHours !== undefined) courseData.contactHours = contactHours;
     if (academicYear) {
-      // Accept year as number, schema will format to YYYY-YY
       courseData.academicYear = academicYear.toString();
     }
     if (semester !== undefined) courseData.semester = semester;
     if (yearLevel !== undefined) courseData.yearLevel = yearLevel;
     if (prerequisites) courseData.prerequisites = prerequisites;
 
-    // Use transaction if OBE data is provided
     if (courseOutcomes && Array.isArray(courseOutcomes) && courseOutcomes.length > 0) {
       const session = await mongoose.startSession();
       session.startTransaction();
 
       try {
-        // Step 1: Create course
         const [course] = await Course.create([courseData], { session });
 
-        // Step 2: Create course outcomes (deduplicate by co_code within request)
         const createdCOs = [];
         const seenCOCodes = new Set();
         for (const coData of courseOutcomes) {
@@ -352,7 +313,6 @@ exports.createCourse = async (req, res) => {
           });
         }
 
-        // Step 3: Create CO-PO mappings
         let totalMappings = 0;
         for (const co of createdCOs) {
           if (co.po_mappings && Array.isArray(co.po_mappings) && co.po_mappings.length > 0) {
@@ -367,11 +327,9 @@ exports.createCourse = async (req, res) => {
           }
         }
 
-        // Commit transaction
         await session.commitTransaction();
         session.endSession();
 
-        // Populate creator details
         await course.populate('createdBy', 'name email');
 
         res.status(201).json({
@@ -385,7 +343,6 @@ exports.createCourse = async (req, res) => {
         });
 
       } catch (error) {
-        // Rollback transaction on error
         await session.abortTransaction();
         session.endSession();
 
@@ -393,7 +350,6 @@ exports.createCourse = async (req, res) => {
         console.error('Error message:', error.message);
         console.error('Error stack:', error.stack);
         
-        // Extract validation errors if available
         let errorDetails = [];
         if (error.errors) {
           errorDetails = Object.entries(error.errors).map(([key, err]) => {
@@ -401,7 +357,6 @@ exports.createCourse = async (req, res) => {
           });
         }
         
-        // If it's a validation error with specific field info
         let userFriendlyMessage = error.message;
         if (error.errors) {
           userFriendlyMessage = Object.values(error.errors)
@@ -417,10 +372,8 @@ exports.createCourse = async (req, res) => {
         });
       }
     } else {
-      // No OBE data - use existing simple creation (backward compatible)
       const course = await Course.create(courseData);
 
-      // Populate creator details
       await course.populate('createdBy', 'name email');
 
       res.status(201).json({
@@ -439,9 +392,6 @@ exports.createCourse = async (req, res) => {
   }
 };
 
-// @desc    Get all courses
-// @route   GET /api/courses
-// @access  Admin only
 exports.getAllCourses = async (req, res) => {
   try {
     const { 
@@ -453,7 +403,6 @@ exports.getAllCourses = async (req, res) => {
       status
     } = req.query;
 
-    // Build filter
     const filter = {};
     if (course_offered_to) filter.course_offered_to = course_offered_to.toUpperCase();
     if (course_type) filter.course_type = course_type;
@@ -462,20 +411,15 @@ exports.getAllCourses = async (req, res) => {
     if (term) filter.term = parseInt(term);
     if (status) filter.status = status;
 
-    // If user is a teacher, filter by assigned courses only
     if (req.user && req.user.role === 'teacher') {
       filter['assignedTeachers.teacher'] = req.user._id;
     }
 
-    // If user is a student, filter by assigned batches
     if (req.user && req.user.role === 'student') {
-      // Extract batch and deptCode from student's roll number
-      // Format: BBDDRRR (e.g., 2107016 -> batch: 21, deptCode: 07)
       if (req.user.roll && req.user.roll.length >= 4) {
         const batch = req.user.roll.substring(0, 2);
         const deptCode = req.user.roll.substring(2, 4);
         
-        // Filter courses where assignedBatches contains this batch+dept combination
         filter['assignedBatches'] = {
           $elemMatch: {
             batch: batch,
@@ -483,7 +427,6 @@ exports.getAllCourses = async (req, res) => {
           }
         };
       } else {
-        // If roll format is invalid, return no courses
         return res.status(200).json({
           success: true,
           count: 0,
@@ -497,7 +440,6 @@ exports.getAllCourses = async (req, res) => {
       .populate('assignedTeachers.teacher', 'name email designation')
       .sort({ createdAt: -1 });
 
-    // ── Lean mode: skip expensive CO/PO N+1 queries for list views ──────────────
     if (req.query.lean === 'true') {
       const leanData = courses.map(course => {
         const obj = course.toObject();
@@ -515,18 +457,14 @@ exports.getAllCourses = async (req, res) => {
       });
       return res.status(200).json({ success: true, count: leanData.length, data: leanData });
     }
-    // ──────────────────────────────────────────────────────────────────
 
-    // Populate course outcomes with their PO mappings for each course
     const coursesWithOutcomes = await Promise.all(
       courses.map(async (course) => {
-        // Exclude soft-deleted COs so removals are reflected in the UI
         const courseOutcomes = await CourseOutcome.find({ 
           course: course._id, 
           is_deleted: { $ne: true }
         });
 
-        // For each CO, fetch its PO mappings
         const outcomesWithMappings = await Promise.all(
           courseOutcomes.map(async (co) => {
             const poMappings = await COPOMapping.find({ course_outcome: co._id });
@@ -543,12 +481,10 @@ exports.getAllCourses = async (req, res) => {
         );
         
         const courseObj = course.toObject();
-        // Sanitize: only one batch assignment per course (take the last as current)
         if (Array.isArray(courseObj.assignedBatches) && courseObj.assignedBatches.length > 1) {
           courseObj.assignedBatches = [courseObj.assignedBatches[courseObj.assignedBatches.length - 1]];
         }
         
-        // Ensure section field is preserved in assignedTeachers
         if (courseObj.assignedTeachers) {
           courseObj.assignedTeachers = courseObj.assignedTeachers.map(assignment => ({
             teacher: assignment.teacher,
@@ -579,9 +515,6 @@ exports.getAllCourses = async (req, res) => {
   }
 };
 
-// @desc    Get single course
-// @route   GET /api/courses/:id
-// @access  Admin only
 exports.getCourse = async (req, res) => {
   try {
     const course = await Course.findById(req.params.id)
@@ -600,7 +533,6 @@ exports.getCourse = async (req, res) => {
       courseObj.assignedBatches = [courseObj.assignedBatches[courseObj.assignedBatches.length - 1]];
     }
     
-    // Ensure section field is preserved in assignedTeachers
     if (courseObj.assignedTeachers) {
       courseObj.assignedTeachers = courseObj.assignedTeachers.map(assignment => ({
         teacher: assignment.teacher,
@@ -609,7 +541,6 @@ exports.getCourse = async (req, res) => {
       }));
     }
 
-    // Fetch course outcomes with their PO mappings
     const courseOutcomes = await CourseOutcome.find({
       course: course._id,
       is_deleted: { $ne: true }
@@ -643,9 +574,6 @@ exports.getCourse = async (req, res) => {
   }
 };
 
-// @desc    Update course
-// @route   PUT /api/courses/:id
-// @access  Admin only
 exports.updateCourse = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -665,13 +593,11 @@ exports.updateCourse = async (req, res) => {
       course_type,
       credit, 
       course_offered_to, 
-      // OBE classification fields
       category,
       elective_group,
       kpa_mapping,
       term,
       status,
-      // OBE fields
       contactHours,
       academicYear,
       semester,
@@ -682,7 +608,6 @@ exports.updateCourse = async (req, res) => {
       references,
       knowledge_required,
       course_objectives,
-      // New OBE update fields
       courseOutcomes,  // Array of { _id?, co_code, description, po_mappings, _action? }
       deletedCOIds     // Array of CO IDs to delete/soft-delete
     } = req.body;
@@ -696,7 +621,6 @@ exports.updateCourse = async (req, res) => {
       });
     }
 
-    // Check if new course code conflicts with existing course
     if (courseCode && courseCode.toUpperCase() !== course.courseCode) {
       const existingCourse = await Course.findOne({ courseCode: courseCode.toUpperCase() });
       if (existingCourse) {
@@ -708,7 +632,6 @@ exports.updateCourse = async (req, res) => {
       course.courseCode = courseCode;
     }
 
-    // Parity rule: validate last digit of course code against course type
     {
       const effectiveCode = courseCode || course.courseCode;
       const effectiveType = (course_type !== undefined && course_type !== null) ? course_type : course.course_type;
@@ -733,7 +656,6 @@ exports.updateCourse = async (req, res) => {
       }
     }
 
-    // Validate category and elective_group relationship
     const finalCategory = category !== undefined ? category : course.category;
     const finalElectiveGroup = elective_group !== undefined ? elective_group : course.elective_group;
     
@@ -744,7 +666,6 @@ exports.updateCourse = async (req, res) => {
       });
     }
 
-    // Validate semester if provided
     if (semester !== undefined) {
       const semesterNum = Number(semester);
       if (!Number.isInteger(semesterNum) || semesterNum < 1 || semesterNum > 8) {
@@ -755,7 +676,6 @@ exports.updateCourse = async (req, res) => {
       }
     }
 
-    // Validate yearLevel if provided (conditional based on department)
     if (yearLevel !== undefined) {
       const yearLevelNum = Number(yearLevel);
       const finalDepartment = course_offered_to || course.course_offered_to;
@@ -768,7 +688,6 @@ exports.updateCourse = async (req, res) => {
       }
     }
 
-    // Validate lecture_plan if provided
     if (lecture_plan !== undefined) {
       const validationErrors = [];
       
@@ -783,16 +702,12 @@ exports.updateCourse = async (req, res) => {
         validationErrors.push({ field: 'lecture_plan', message: 'Maximum 13 lecture plan entries allowed' });
       }
       
-      // Track weeks to find duplicates
       const weeksSeen = new Set();
       const duplicateWeeks = [];
       
-      // Week is only required if there are multiple entries
       const isWeekRequired = lecture_plan.length > 1;
       
-      // Validate each lecture plan entry
       lecture_plan.forEach((item, index) => {
-        // Check if week field exists (only required for multiple entries)
         if (isWeekRequired) {
           if (item.week === undefined || item.week === null) {
             validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week is missing' });
@@ -801,14 +716,12 @@ exports.updateCourse = async (req, res) => {
           } else if (item.week < 1 || item.week > 13) {
             validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be between 1 and 13' });
           } else {
-            // Check for duplicate weeks
             if (weeksSeen.has(item.week)) {
               duplicateWeeks.push(item.week);
             }
             weeksSeen.add(item.week);
           }
         } else if (item.week !== undefined && item.week !== null) {
-          // If week is provided for single entry, still validate it
           if (!Number.isInteger(item.week)) {
             validationErrors.push({ field: `lecture_plan[${index}].week`, message: 'Week must be an integer' });
           } else if (item.week < 1 || item.week > 13) {
@@ -816,7 +729,6 @@ exports.updateCourse = async (req, res) => {
           }
         }
         
-        // Check if plan field exists
         if (item.plan === undefined || item.plan === null) {
           validationErrors.push({ field: `lecture_plan[${index}].plan`, message: 'Plan description is missing' });
         } else if (typeof item.plan !== 'string' || !item.plan.trim()) {
@@ -824,7 +736,6 @@ exports.updateCourse = async (req, res) => {
         }
       });
       
-      // Report duplicate weeks (only relevant for multiple entries)
       if (isWeekRequired && duplicateWeeks.length > 0) {
         const uniqueDuplicates = [...new Set(duplicateWeeks)];
         validationErrors.push({ 
@@ -842,7 +753,6 @@ exports.updateCourse = async (req, res) => {
       }
     }
 
-    // Validate references if provided (optional)
     if (references !== undefined && references !== null) {
       if (!Array.isArray(references)) {
         return res.status(400).json({
@@ -852,17 +762,14 @@ exports.updateCourse = async (req, res) => {
       }
       
       if (references.length > 0) {
-        // Filter out empty or whitespace-only entries
         const cleanedReferences = references
           .filter(ref => ref && typeof ref === 'string' && ref.trim())
           .map(ref => ref.trim());
         
-        // Update the references array with cleaned values
         req.body.references = cleanedReferences;
       }
     }
 
-    // Validate OBE data if provided
     if (courseOutcomes && Array.isArray(courseOutcomes) && courseOutcomes.length > 0) {
       for (const co of courseOutcomes) {
         if (!co.co_code || !co.description) {
@@ -872,7 +779,6 @@ exports.updateCourse = async (req, res) => {
           });
         }
 
-        // Validate PO mappings if provided
         if (co.po_mappings && Array.isArray(co.po_mappings) && co.po_mappings.length > 0) {
           const validPOCodes = ['PO_A', 'PO_B', 'PO_C', 'PO_D', 'PO_E', 'PO_F', 'PO_G', 'PO_H', 'PO_I', 'PO_J', 'PO_K', 'PO_L'];
           const seenPOs = new Set();
@@ -908,30 +814,25 @@ exports.updateCourse = async (req, res) => {
       }
     }
 
-    // Use transaction if OBE data is being updated
     if ((courseOutcomes && courseOutcomes.length > 0) || (deletedCOIds && deletedCOIds.length > 0)) {
       const session = await mongoose.startSession();
       session.startTransaction();
 
       try {
-        // Update basic course fields
         if (courseCode) course.courseCode = courseCode;
         if (courseTitle) course.courseTitle = courseTitle;
         if (course_type !== undefined) course.course_type = course_type;
         if (credit !== undefined) course.credit = credit;
         if (course_offered_to) course.course_offered_to = course_offered_to;
 
-        // Update optional classification fields
         if (category !== undefined) course.category = category;
         if (elective_group !== undefined) course.elective_group = elective_group;
         if (kpa_mapping !== undefined) course.kpa_mapping = kpa_mapping;
         if (term !== undefined) course.term = term;
         if (status !== undefined) course.status = status;
 
-        // Update OBE fields
         if (contactHours !== undefined) course.contactHours = contactHours;
         if (academicYear !== undefined) {
-          // Accept year as number, schema will format to YYYY-YY
           course.academicYear = academicYear.toString();
         }
         if (semester !== undefined) course.semester = semester;
@@ -943,7 +844,6 @@ exports.updateCourse = async (req, res) => {
         if (lecture_plan !== undefined) course.lecture_plan = lecture_plan;
         if (references !== undefined) course.references = references;
 
-        // Track review
         course.lastReviewed = Date.now();
         course.reviewedBy = req.user._id;
 
@@ -952,25 +852,21 @@ exports.updateCourse = async (req, res) => {
         let coStats = { added: 0, updated: 0, deleted: 0, softDeleted: 0 };
         let mappingStats = { added: 0, updated: 0, deleted: 0 };
 
-        // Handle deleted COs (soft-delete if has historical data)
         if (deletedCOIds && Array.isArray(deletedCOIds) && deletedCOIds.length > 0) {
           for (const coId of deletedCOIds) {
             const co = await CourseOutcome.findById(coId).session(session);
             if (co) {
-              // Check if CO has mappings (historical data)
               const mappingCount = await COPOMapping.countDocuments({ 
                 course_outcome: coId 
               }).session(session);
 
               if (mappingCount > 0) {
-                // Soft delete - preserve historical data
                 co.is_deleted = true;
                 co.deleted_at = new Date();
                 co.deleted_reason = 'Removed during course update';
                 await co.save({ session });
                 coStats.softDeleted++;
               } else {
-                // Hard delete - no historical data
                 await CourseOutcome.findByIdAndDelete(coId, { session });
                 await COPOMapping.deleteMany({ course_outcome: coId }, { session });
                 coStats.deleted++;
@@ -979,17 +875,14 @@ exports.updateCourse = async (req, res) => {
           }
         }
 
-        // Handle course outcomes updates/additions
         if (courseOutcomes && Array.isArray(courseOutcomes)) {
           for (const coData of courseOutcomes) {
             let targetCO = null;
 
             if (coData._id) {
-              // Update existing CO by _id
               targetCO = await CourseOutcome.findById(coData._id).session(session);
               if (targetCO) {
                 const newCode = (coData.co_code || '').toUpperCase();
-                // If co_code is being renamed, remove any soft-deleted doc occupying the new code
                 if (targetCO.co_code !== newCode) {
                   await CourseOutcome.deleteOne({
                     course: course._id,
@@ -1008,18 +901,14 @@ exports.updateCourse = async (req, res) => {
             }
 
             if (!targetCO) {
-              // No _id supplied (new CO) or _id lookup failed – upsert by co_code
               const coCodeNorm = (coData.co_code || '').toUpperCase();
 
-              // Hard-delete any soft-deleted stub with the same co_code so the
-              // unique index won't block the insert.
               await CourseOutcome.deleteOne({
                 course: course._id,
                 co_code: coCodeNorm,
                 is_deleted: true
               }, { session });
 
-              // Check if an active CO with this code already exists
               targetCO = await CourseOutcome.findOne({
                 course: course._id,
                 co_code: coCodeNorm,
@@ -1027,14 +916,12 @@ exports.updateCourse = async (req, res) => {
               }).session(session);
 
               if (targetCO) {
-                // Active CO exists – update in place
                 targetCO.description = coData.description;
                 targetCO.co_po_correlation = coData.co_po_correlation || '';
                 targetCO.taxonomy_levels = coData.taxonomy_levels || [];
                 await targetCO.save({ session });
                 coStats.updated++;
               } else {
-                // Truly new CO
                 const [newCO] = await CourseOutcome.create([{
                   course: course._id,
                   co_code: coCodeNorm,
@@ -1047,7 +934,6 @@ exports.updateCourse = async (req, res) => {
               }
             }
 
-            // Sync PO mappings for this CO
             if (targetCO && coData.po_mappings && Array.isArray(coData.po_mappings)) {
               const deletedMappings = await COPOMapping.deleteMany({
                 course_outcome: targetCO._id
@@ -1067,11 +953,9 @@ exports.updateCourse = async (req, res) => {
           }
         }
 
-        // Commit transaction
         await session.commitTransaction();
         session.endSession();
 
-        // Populate creator details
         await course.populate('createdBy', 'name email');
 
         res.status(200).json({
@@ -1096,24 +980,20 @@ exports.updateCourse = async (req, res) => {
         });
       }
     } else {
-      // No OBE data updates - simple course update (backward compatible)
       
       if (courseTitle) course.courseTitle = courseTitle;
       if (course_type !== undefined) course.course_type = course_type;
       if (credit !== undefined) course.credit = credit;
       if (course_offered_to) course.course_offered_to = course_offered_to;
 
-      // Update optional classification fields
       if (category !== undefined) course.category = category;
       if (elective_group !== undefined) course.elective_group = elective_group;
       if (kpa_mapping !== undefined) course.kpa_mapping = kpa_mapping;
       if (term !== undefined) course.term = term;
       if (status !== undefined) course.status = status;
 
-      // Update OBE fields
       if (contactHours !== undefined) course.contactHours = contactHours;
       if (academicYear !== undefined) {
-        // Accept year as number, schema will format to YYYY-YY
         course.academicYear = academicYear.toString();
       }
       if (semester !== undefined) course.semester = semester;
@@ -1125,7 +1005,6 @@ exports.updateCourse = async (req, res) => {
       if (lecture_plan !== undefined) course.lecture_plan = lecture_plan;
       if (references !== undefined) course.references = references;
 
-      // Track review
       course.lastReviewed = Date.now();
       course.reviewedBy = req.user._id;
 
@@ -1144,7 +1023,6 @@ exports.updateCourse = async (req, res) => {
     console.error('Error message:', error.message);
     console.error('Error stack:', error.stack);
     
-    // Extract validation errors if available
     let errorDetails = [];
     if (error.errors) {
       errorDetails = Object.entries(error.errors).map(([key, err]) => {
@@ -1152,7 +1030,6 @@ exports.updateCourse = async (req, res) => {
       });
     }
     
-    // If it's a validation error with specific field info
     let userFriendlyMessage = error.message;
     if (error.errors) {
       userFriendlyMessage = Object.values(error.errors)
@@ -1169,9 +1046,6 @@ exports.updateCourse = async (req, res) => {
   }
 };
 
-// @desc    Delete course
-// @route   DELETE /api/courses/:id
-// @access  Admin only
 exports.deleteCourse = async (req, res) => {
   try {
     const course = await Course.findById(req.params.id);
@@ -1183,19 +1057,15 @@ exports.deleteCourse = async (req, res) => {
       });
     }
 
-    // First, find all course outcomes for this course
     const courseOutcomes = await CourseOutcome.find({ course: course._id });
     const coIds = courseOutcomes.map(co => co._id);
     
-    // Delete all CO-PO mappings for these course outcomes
     if (coIds.length > 0) {
       await COPOMapping.deleteMany({ course_outcome: { $in: coIds } });
     }
 
-    // Delete all course outcomes
     await CourseOutcome.deleteMany({ course: course._id });
 
-    // Finally, delete the course
     await Course.findByIdAndDelete(req.params.id);
 
     res.status(200).json({
@@ -1213,12 +1083,7 @@ exports.deleteCourse = async (req, res) => {
   }
 };
 
-// Note: CO-PO matrix and OBE validation endpoints removed
-// These features can be reimplemented using the separate CourseOutcome model
 
-// @desc    Validate course OBE compliance
-// @route   GET /api/courses/:id/validate-obe
-// @access  Admin/Teacher
 exports.validateCourseOBE = async (req, res) => {
   try {
     const course = await Course.findById(req.params.id);
@@ -1230,13 +1095,11 @@ exports.validateCourseOBE = async (req, res) => {
       });
     }
 
-    // Fetch this course's own outcomes only (no theory/lab merging)
     let courseOutcomes = await CourseOutcome.find({
       course: course._id,
       is_deleted: { $ne: true }
     });
     
-    // For each CO, fetch its PO mappings
     const outcomesWithMappings = await Promise.all(
       courseOutcomes.map(async (co) => {
         const poMappings = await COPOMapping.find({ course_outcome: co._id });
@@ -1251,13 +1114,10 @@ exports.validateCourseOBE = async (req, res) => {
       })
     );
     
-    // Transform courseOutcomes to match validation function format
     const transformedOutcomes = outcomesWithMappings.map(co => {
-      // Convert po_mappings array to poMapping object
       const poMapping = {};
       if (co.po_mappings && co.po_mappings.length > 0) {
         co.po_mappings.forEach(mapping => {
-          // Convert PO_A to PO1, PO_B to PO2, etc.
           const poNumber = mapping.program_outcome_code.replace('PO_', 'PO');
           const poIndex = mapping.program_outcome_code.charCodeAt(3) - 64; // A=1, B=2, etc.
           poMapping[`PO${poIndex}`] = mapping.level;
@@ -1271,7 +1131,6 @@ exports.validateCourseOBE = async (req, res) => {
       };
     });
     
-    // Add courseOutcomes to course object for validation
     const courseWithOutcomes = {
       ...course.toObject(),
       courseOutcomes: transformedOutcomes
@@ -1297,9 +1156,6 @@ exports.validateCourseOBE = async (req, res) => {
   }
 };
 
-// @desc    Get curriculum summary by semester
-// @route   GET /api/courses/curriculum/semester/:semester
-// @access  Admin
 exports.getCurriculumBySemester = async (req, res) => {
   try {
     const semester = parseInt(req.params.semester);
@@ -1317,7 +1173,6 @@ exports.getCurriculumBySemester = async (req, res) => {
       .populate('createdBy', 'name email')
       .sort({ courseCode: 1 });
 
-    // Calculate semester statistics
     const stats = {
       totalCourses: courses.length,
       totalCredits: courses.reduce((sum, c) => sum + c.credit, 0),
@@ -1344,17 +1199,12 @@ exports.getCurriculumBySemester = async (req, res) => {
   }
 };
 
-// Note: PO attainment summary removed - can be reimplemented using CourseOutcome model
 
-// @desc    Get students enrolled in a course
-// @route   GET /api/courses/:courseId/students
-// @access  Teacher (for assigned courses)
 exports.getCourseStudents = async (req, res) => {
   try {
     const { courseId } = req.params;
     const { section } = req.query; // Optional section filter for theory courses
 
-    // Verify course exists
     const course = await Course.findById(courseId);
     if (!course) {
       return res.status(404).json({
@@ -1363,12 +1213,10 @@ exports.getCourseStudents = async (req, res) => {
       });
     }
 
-    // For teachers, verify they are assigned to this course
     if (req.user.role === 'teacher') {
       const isAssigned = course.assignedTeachers.some(assignment => {
         const teacherId = assignment.teacher?._id || assignment.teacher;
         const matches = teacherId.toString() === req.user._id.toString();
-        // If section is provided, also check section match
         if (section && matches) {
           return assignment.section === section;
         }
@@ -1383,7 +1231,6 @@ exports.getCourseStudents = async (req, res) => {
       }
     }
 
-    // Get all students assigned to batches for this course
     const User = require('../models/User');
     const assignedBatches = course.assignedBatches || [];
     
@@ -1395,7 +1242,6 @@ exports.getCourseStudents = async (req, res) => {
       });
     }
 
-    // Find students whose roll numbers match the assigned batches
     const students = await User.find({
       role: 'student',
       isActive: true,
@@ -1403,12 +1249,9 @@ exports.getCourseStudents = async (req, res) => {
       isApprovedByAdmin: true
     }).select('name roll email department');
     
-    // Filter students based on roll number format (BBDDRRR)
     const enrolledStudents = students.filter(student => {
-      // Extract roll number from student.roll or email
       let roll = student.roll;
       if (!roll && student.email) {
-        // Extract digits from email (e.g., 2101001@student.kuet.ac.bd -> 2101001)
         const match = student.email.match(/^(\d+)/);
         if (match) {
           roll = match[1];
@@ -1429,7 +1272,6 @@ exports.getCourseStudents = async (req, res) => {
       return matches;
     });
 
-    // Map students to include extracted roll number and sort
     const studentsWithRoll = enrolledStudents.map(student => {
       let roll = student.roll;
       if (!roll && student.email) {
@@ -1444,7 +1286,6 @@ exports.getCourseStudents = async (req, res) => {
       };
     });
 
-    // Sort by roll number
     studentsWithRoll.sort((a, b) => {
       if (!a.roll) return 1;
       if (!b.roll) return -1;

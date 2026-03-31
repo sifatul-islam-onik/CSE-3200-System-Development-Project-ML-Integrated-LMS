@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 const ProgramOutcome = require('../models/ProgramOutcome');
 require('dotenv').config();
 
-// KUET CSE Program Outcomes based on OBE (April 2024)
 const programOutcomes = [
   {
     po_code: 'PO_A',
@@ -80,11 +79,9 @@ const programOutcomes = [
 
 const seedProgramOutcomes = async () => {
   try {
-    // Connect to MongoDB
     await mongoose.connect(process.env.MONGO_URI);
     console.log('MongoDB connected successfully');
 
-    // Check if POs already exist
     const existingCount = await ProgramOutcome.countDocuments();
     
     if (existingCount > 0) {
@@ -93,13 +90,11 @@ const seedProgramOutcomes = async () => {
       process.exit(0);
     }
 
-    // Insert program outcomes
     const result = await ProgramOutcome.insertMany(programOutcomes);
     
     console.log('✓ Program Outcomes seeded successfully!');
     console.log(`✓ Inserted ${result.length} Program Outcomes (PO_A to PO_L)`);
     
-    // Display seeded data
     result.forEach(po => {
       console.log(`  - ${po.po_code} (PO${po.po_number}): ${po.title}`);
     });
@@ -111,7 +106,6 @@ const seedProgramOutcomes = async () => {
   }
 };
 
-// Run if executed directly
 if (require.main === module) {
   seedProgramOutcomes();
 }

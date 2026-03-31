@@ -1,52 +1,40 @@
 const User = require('../models/User');
 const crypto = require('crypto');
 
-// Generate random 8-character password with uppercase, lowercase, and numbers
 const generatePassword = () => {
   const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const lowercase = 'abcdefghijklmnopqrstuvwxyz';
   const numbers = '0123456789';
   
   let password = '';
-  // Ensure at least one of each
   password += uppercase[Math.floor(Math.random() * uppercase.length)];
   password += lowercase[Math.floor(Math.random() * lowercase.length)];
   password += numbers[Math.floor(Math.random() * numbers.length)];
   
-  // Fill remaining 5 characters
   const allChars = uppercase + lowercase + numbers;
   for (let i = 0; i < 5; i++) {
     password += allChars[Math.floor(Math.random() * allChars.length)];
   }
   
-  // Shuffle the password
   return password.split('').sort(() => Math.random() - 0.5).join('');
 };
 
-// Normalize field value from different possible column names (case/spacing/punctuation tolerant)
-// Returns: { found: boolean, value: string }
-// found: true if column was found (even if empty)
-// value: the trimmed value or empty string
 const normalizeVal = (row, keys) => {
   const norm = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const entries = Object.entries(row || {});
   
-  // Try exact matches first
   for (const key of keys) {
     for (const [rk, rv] of entries) {
       if (rk === key) {
-        // Exact match found; return value (may be empty)
         return { found: true, value: String(rv || '').trim() };
       }
     }
   }
   
-  // If no exact match, try normalized matching
   const targetNorms = keys.map(norm);
   for (const [rk, rv] of entries) {
     const rkNorm = norm(rk);
     if (targetNorms.includes(rkNorm)) {
-      // Normalized match found; return value (may be empty)
       return { found: true, value: String(rv || '').trim() };
     }
   }
@@ -54,7 +42,6 @@ const normalizeVal = (row, keys) => {
   return { found: false, value: '' };
 };
 
-// Validate teacher data
 const validateTeacherData = (row, index) => {
   const errors = [];
   const rowRef = `Row ${index + 2}`;
@@ -76,7 +63,6 @@ const validateTeacherData = (row, index) => {
   return errors;
 };
 
-// Bulk import teachers
 const bulkImportTeachers = async (data) => {
   const bcrypt = require('bcryptjs');
   const results = {
@@ -91,7 +77,6 @@ const bulkImportTeachers = async (data) => {
     return results;
   }
 
-  // First pass: extract and normalize values, gather all emails to query
   const processedRows = [];
   const emailsToQuery = [];
 
@@ -99,13 +84,11 @@ const bulkImportTeachers = async (data) => {
     const row = data[idx];
     const rowRef = 'Row ' + (idx + 2);
 
-    // Get values from different possible column names
     const fullNameResult = normalizeVal(row, ['Full Name', 'full name', 'FullName', 'fullName']);
     const nameForEmailResult = normalizeVal(row, ['Name', 'name']);
     const deptResult = normalizeVal(row, ['Dept', 'dept', 'Department', 'department']);
     const designationResult = normalizeVal(row, ['Designation', 'designation']);
 
-    // Validate required fields
     const validationErrors = validateTeacherData(row, idx);
     if (validationErrors.length > 0) {
       results.errors.push(...validationErrors);
@@ -117,14 +100,11 @@ const bulkImportTeachers = async (data) => {
     const dept = deptResult.value;
     const designationRaw = designationResult.value; // May be empty if column exists but cell is empty
 
-    // Extract first word from nameForEmail for email creation
     const emailPrefix = nameForEmail.split(/\s+/)[0].toLowerCase().replace(/[^a-z0-9]/g, '');
     const deptLower = dept.toLowerCase().replace(/[^a-z]/g, '');
 
-    // Generate email: name@dept.kuet.ac.bd
     const email = emailPrefix + '@' + deptLower + '.kuet.ac.bd';
 
-    // Resolve designation (default to Lecturer if empty/invalid)
     let designation = 'Lecturer';
     if (designationRaw && designationRaw.trim()) {
       const norm = designationRaw.trim().toLowerCase();
@@ -137,12 +117,10 @@ const bulkImportTeachers = async (data) => {
     emailsToQuery.push(email);
   }
 
-  // Pre-fetch existing emails efficiently
   const existingUsers = await User.find({ email: { $in: emailsToQuery } }).select('email').lean();
   const existingEmailsSet = new Set(existingUsers.map(u => u.email));
 
   const teachersToInsert = [];
-  // Track emails we're inserting in this batch to prevent intra-sheet duplicates
   const seenEmailsInMatch = new Set();
 
   for (const rowData of processedRows) {
@@ -160,11 +138,9 @@ const bulkImportTeachers = async (data) => {
 
     seenEmailsInMatch.add(email);
 
-    // Generate random password
     const password = generatePassword();
     console.log('Preparing teacher: ' + fullName + ' (' + email + ') with designation: ' + designation);
 
-    // Pre-hash password because insertMany bypasses Mongoose pre-save hooks
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -184,7 +160,6 @@ const bulkImportTeachers = async (data) => {
 
   if (teachersToInsert.length > 0) {
     try {
-      // Create imported teachers in bulk
       await User.insertMany(teachersToInsert);
 
       for (const t of teachersToInsert) {
