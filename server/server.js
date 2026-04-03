@@ -23,6 +23,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 const connectDB = async () => {
+  if (process.env.NODE_ENV === 'test') return;
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('MongoDB connected successfully');
@@ -35,44 +36,47 @@ const connectDB = async () => {
 connectDB();
 
 const workerRegistry = require('./utils/workerRegistry');
-workerRegistry.initializeFromEnv();
-console.log('Worker Registry initialized');
-
 const ocrWorker = require('./workers/ocrWorker');
-console.log('OCR Worker initialized');
-
 const ocrJobStore = require('./utils/ocrJobStore');
-ocrJobStore.startPeriodicCleanup(); // Clean up old jobs every hour
-console.log('OCR Job Store cleanup initialized');
 
-setInterval(() => {
-  const pendingCount = ocrJobStore.getPendingCount();
-  const processingCount = ocrJobStore.getProcessingCount();
-  
-  if (pendingCount > 0 || processingCount > 0) {
-    console.log(`📊 Job Status: ${pendingCount} pending, ${processingCount} processing`);
-  }
-  
-  ocrJobStore.checkStuckJobs();
-}, 2 * 60 * 1000); // Every 2 minutes
+if (process.env.NODE_ENV !== 'test') {
+  workerRegistry.initializeFromEnv();
+  console.log('Worker Registry initialized');
+  console.log('OCR Worker initialized');
+  ocrJobStore.startPeriodicCleanup(); // Clean up old jobs every hour
+  console.log('OCR Job Store cleanup initialized');
 
-(async () => {
-  try {
-    const Course = require('./models/Course');
-    const toFix = await Course.find({ 'assignedBatches.1': { $exists: true } }).select('assignedBatches courseCode');
-    if (toFix.length > 0) {
-      console.log(`Normalizing batch assignments for ${toFix.length} course(s)...`);
-      for (const c of toFix) {
-        const latest = c.assignedBatches[c.assignedBatches.length - 1];
-        c.assignedBatches = latest ? [latest] : [];
-        await c.save();
-      }
-      console.log('Batch assignment normalization complete.');
+  setInterval(() => {
+    const pendingCount = ocrJobStore.getPendingCount();
+    const processingCount = ocrJobStore.getProcessingCount();
+    
+    if (pendingCount > 0 || processingCount > 0) {
+      console.log(`📊 Job Status: ${pendingCount} pending, ${processingCount} processing`);
     }
-  } catch (err) {
-    console.error('Batch normalization error (startup):', err.message);
-  }
-})();
+    
+    ocrJobStore.checkStuckJobs();
+  }, 2 * 60 * 1000); // Every 2 minutes
+}
+
+if (process.env.NODE_ENV !== 'test') {
+  (async () => {
+    try {
+      const Course = require('./models/Course');
+      const toFix = await Course.find({ 'assignedBatches.1': { $exists: true } }).select('assignedBatches courseCode');
+      if (toFix.length > 0) {
+        console.log(`Normalizing batch assignments for ${toFix.length} course(s)...`);
+        for (const c of toFix) {
+          const latest = c.assignedBatches[c.assignedBatches.length - 1];
+          c.assignedBatches = latest ? [latest] : [];
+          await c.save();
+        }
+        console.log('Batch assignment normalization complete.');
+      }
+    } catch (err) {
+      console.error('Batch normalization error (startup):', err.message);
+    }
+  })();
+}
 
 app.get('/', (req, res) => {
   res.json({ message: 'LMS API Server' });
@@ -122,16 +126,24 @@ process.on('uncaughtException', (err) => {
 });
 
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+let server;
+
+if (process.env.NODE_ENV !== 'test') {
+  server = app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
 
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down gracefully');
   
   workerRegistry.stopHealthChecks();
-  
-  server.close(() => {
-    console.log('Process terminated');
-  });
+
+  if (server) {
+    server.close(() => {
+      console.log('Process terminated');
+    });
+  }
 });
+
+module.exports = app;
