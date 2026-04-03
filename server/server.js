@@ -6,6 +6,34 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
+const parseAllowedOrigins = (value) =>
+  (value || '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+const isAllowedOrigin = (origin, allowedOrigins) => {
+  if (!origin) {
+    return true;
+  }
+
+  try {
+    const originUrl = new URL(origin);
+
+    if (originUrl.hostname === 'localhost' || originUrl.hostname === '127.0.0.1') {
+      return true;
+    }
+
+    if (originUrl.hostname.includes('.ngrok.') || /\.ngrok-(free|app|dev)$/.test(originUrl.hostname)) {
+      return true;
+    }
+
+    return allowedOrigins.includes(origin);
+  } catch (_error) {
+    return allowedOrigins.includes(origin);
+  }
+};
+
 if (process.env.NODE_ENV === 'production') {
   const _consoleError = console.error.bind(console);
   console.error = (...args) =>
@@ -15,8 +43,22 @@ if (process.env.NODE_ENV === 'production') {
 const app = express();
 
 app.use(helmet());
+
+const allowedOrigins = [
+  ...parseAllowedOrigins(process.env.CLIENT_URLS),
+  process.env.CLIENT_URL || 'http://localhost:3000',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+];
+
 app.use(cors({
-  origin: process.env.REACT_APP_API_URL || process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    if (isAllowedOrigin(origin, allowedOrigins)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS blocked origin: ${origin}`));
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
