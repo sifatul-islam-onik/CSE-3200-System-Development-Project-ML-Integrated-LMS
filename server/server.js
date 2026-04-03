@@ -24,7 +24,13 @@ const isAllowedOrigin = (origin, allowedOrigins) => {
       return true;
     }
 
-    if (originUrl.hostname.includes('.ngrok.') || /\.ngrok-(free|app|dev)$/.test(originUrl.hostname)) {
+    if (
+      /\.ngrok\.io$/.test(originUrl.hostname) ||
+      /\.ngrok\.app$/.test(originUrl.hostname) ||
+      /\.ngrok\.dev$/.test(originUrl.hostname) ||
+      /\.ngrok-free\.app$/.test(originUrl.hostname) ||
+      /\.ngrok-free\.dev$/.test(originUrl.hostname)
+    ) {
       return true;
     }
 
