@@ -26,6 +26,7 @@ The system supports regular LMS workflows (courses, users, outcomes, marks, resu
 - [Data Model Highlights (`server/models`)](#data-model-highlights-servermodels)
 - [Configuration](#configuration)
 - [Running Locally](#running-locally)
+- [Testing](#testing)
 - [Scripts](#scripts)
 - [Security Notes](#security-notes)
 - [Project Structure](#project-structure)
@@ -259,6 +260,34 @@ npm run dev
 cd client
 npm install
 npm start
+```
+
+---
+
+## Testing
+
+The project includes an automated testing suite focused on backend stability and core LMS workflows. The test environment is isolated to prevent unintended side effects on local development or production data.
+
+### Backend Testing (`server/`)
+
+The backend test suite uses **Jest** and **Supertest** to validate API endpoints, middleware, and Mongoose models without requiring a live database or external services.
+
+- **In-Memory Database:** Tests use `mongodb-memory-server` (`__tests__/setup/db.js`), ensuring a clean database state for each test suite without mutating the real MongoDB instance.
+- **Service Mocking:** External connections like Redis (`ioredis`) and Bull queues are manually mocked in `server/__mocks__/` to prevent hanging processes, open handles, or unwanted background jobs during test execution. 
+- **Execution:** Operations like `app.listen`, scheduled cleanup jobs, and background workers are dynamically bypassed when running with `NODE_ENV=test`.
+
+#### Current Test Suites & Coverage
+The backend tests are designed to cover both base models and integration behavior for core features:
+
+- **User Model Tests (`models/User.test.js`):** Used to validate schema constraints, require role designations, verify data encryptions, and assure no invalid entries can be saved to the database.
+- **Authentication Integration (`controllers/authController.test.js`):** Used to verify the system login flows. It ensures passwords are valid, correct JWT tokens are generated, and role-based metadata is assigned directly upon login.
+- **Attainment Integration (`controllers/attainmentController.test.js`):** Used to test the most complex module: Core OBE Business Logic. It verifies that Teachers have proper role permissions, evaluates saving structures for Continuous Assessment (CT/Assignments) marks, and successfully intercepts/purges data cache pipelines during resets.
+- **Course Integration (`controllers/courseController.test.js`):** Used to validate curriculum creation. Ensures that only System Admins can create courses, parses specific course codes (e.g. Sessional/Theory odd-even digit constraints), processes KPA arrays, and enforces appropriate reading roles.
+
+To run the backend tests and generate a coverage report:
+```bash
+cd server
+npm test
 ```
 
 ---
