@@ -1,17 +1,36 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 
+const clearStoredAuth = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+};
+
+const safeParseUser = () => {
+  const user = localStorage.getItem('user');
+
+  if (!user) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(user);
+  } catch (_error) {
+    clearStoredAuth();
+    return null;
+  }
+};
+
 // Check if user is authenticated
 export const isAuthenticated = () => {
   const token = localStorage.getItem('token');
-  const user = localStorage.getItem('user');
-  return token && user;
+  const user = safeParseUser();
+  return !!token && !!user;
 };
 
 // Get user data from localStorage
 export const getUser = () => {
-  const user = localStorage.getItem('user');
-  return user ? JSON.parse(user) : null;
+  return safeParseUser();
 };
 
 // Get user role
@@ -22,8 +41,7 @@ export const getUserRole = () => {
 
 // Logout function
 export const logout = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
+  clearStoredAuth();
 };
 
 // Protected Route Component
