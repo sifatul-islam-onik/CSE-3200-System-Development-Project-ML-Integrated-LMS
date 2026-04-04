@@ -168,6 +168,10 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
+.cobalt-btn-submit .spinner {
+  margin-right: 0.5rem;
+}
+
 .cobalt-btn-submit:hover:not(:disabled) {
   background: #1e293b;
   transform: translateY(-1px);
@@ -237,6 +241,49 @@
   }
 
   .cobalt-login-header h2 {
-    font-size: 1.65rem;
+    font-size: 1.5rem;
+  }
+
+  .cobalt-login-box {
+    padding: 1.5rem 1rem;
+  }
+
+  .cobalt-form-group label {
+    font-size: 0.8rem;
+  }
+
+  .cobalt-form-group input {
+    font-size: 0.9rem;
+    padding: 0.8rem 0.9rem;
+  }
+
+  .cobalt-btn-submit {
+    font-size: 0.9rem;
+    padding: 0.95rem 1rem;
+    min-height: 48px;
+  }
+
+  .cobalt-link-button {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .cobalt-branding h1 {
+    font-size: 1.8rem;
+  }
+
+  .cobalt-login-header h2 {
+    font-size: 1.35rem;
+  }
+
+  .cobalt-btn-submit {
+    font-size: 0.85rem;
+    padding: 0.9rem 0.95rem;
+    min-height: 50px;
+  }
+
+  .cobalt-link-button {
+    font-size: 0.75rem;
   }
 }
