@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = '/api/ocr';
+const API_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/ocr` : '/api/ocr';
 
 // Submit OCR job
 export const submitOCRJob = async (studentId, courseId, section, imageUrl, student = null) => {
