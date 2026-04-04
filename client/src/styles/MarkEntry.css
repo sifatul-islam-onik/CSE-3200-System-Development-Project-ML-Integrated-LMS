@@ -47,6 +47,14 @@
   gap: 6px;
 }
 
+.mark-entry-modal,
+.mark-entry-modal button,
+.mark-entry-modal input,
+.mark-entry-modal select,
+.mark-entry-modal textarea {
+  font-family: inherit;
+}
+
 .student-info-card {
   display: flex;
   justify-content: space-between;
@@ -249,6 +257,14 @@
   font-size: 18px;
 }
 
+.marks-form-section label,
+.marks-form-section button,
+.marks-form-section input,
+.marks-form-section select,
+.marks-form-section textarea {
+  font-size: inherit;
+}
+
 .marks-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -438,6 +454,29 @@
 
   .mark-entry-modal .modal-header {
     padding: 16px 20px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .mark-entry-modal .modal-header h3 {
+    font-size: 1.1rem;
+  }
+
+  .mark-entry-modal .modal-header > div {
+    width: 100%;
+  }
+
+  .mark-entry-modal .modal-header > div:last-child {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .mark-entry-modal .modal-header > div:last-child button {
+    white-space: normal;
   }
 
   .mark-entry-body {
@@ -460,7 +499,7 @@
     flex: 1;
     min-width: 100px;
     padding: 10px 16px;
-    font-size: 14px;
+    font-size: 0.9rem;
   }
 
   .marks-grid {
@@ -512,6 +551,23 @@
     gap: 12px;
   }
 
+  .student-info-card h4 {
+    font-size: 16px;
+  }
+
+  .student-info-card p {
+    font-size: 13px;
+  }
+
+  .student-progress {
+    font-size: 17px;
+    padding: 7px 14px;
+  }
+
+  .student-selector {
+    font-size: 12px;
+  }
+
   .student-navigation {
     align-items: center;
     width: 100%;
@@ -524,6 +580,20 @@
 
   .camera-section video {
     max-height: 300px;
+  }
+
+  .marks-form-section h4 {
+    font-size: 16px;
+  }
+
+  .marks-table th,
+  .marks-table td,
+  .marks-table .mark-input,
+  .marks-table .row-label,
+  .mark-input-group label,
+  .mark-input-group input,
+  .total-marks {
+    font-size: 0.85rem;
   }
 }
 
@@ -539,7 +609,7 @@
 
   .mark-entry-footer button {
     padding: 10px 12px;
-    font-size: 13px;
+    font-size: 0.82rem;
   }
 
   .marks-form-section {
@@ -547,7 +617,7 @@
   }
 
   .marks-form-section h4 {
-    font-size: 16px;
+    font-size: 15px;
     margin-bottom: 12px;
   }
 
@@ -559,7 +629,7 @@
 
   .marks-table th {
     padding: 8px 10px;
-    font-size: 13px;
+    font-size: 0.8rem;
   }
 
   .marks-table td {
@@ -567,7 +637,7 @@
   }
 
   .marks-table .row-label {
-    font-size: 14px;
+    font-size: 0.82rem;
     width: 45px;
     min-width: 40px;
     padding: 6px 8px;
@@ -575,9 +645,16 @@
 
   .marks-table .mark-input {
     padding: 6px 8px;
-    font-size: 13px;
+    font-size: 0.8rem;
     max-width: 65px;
     min-width: 55px;
+  }
+
+  .question-marks h5,
+  .student-info-card h4,
+  .marks-form-section h4,
+  .mark-input-group label {
+    font-size: 0.9rem;
   }
 
   .question-marks {
@@ -590,16 +667,16 @@
 
   .mark-input-group input {
     padding: 6px;
-    font-size: 13px;
+    font-size: 0.8rem;
   }
 
   /* Total marks section */
   .total-marks {
-    font-size: 14px;
+    font-size: 0.88rem;
   }
 
   .total-value {
-    font-size: 18px;
+    font-size: 1.05rem;
   }
 }
 
@@ -612,11 +689,11 @@
 
   .marks-table th {
     padding: 6px 8px;
-    font-size: 12px;
+    font-size: 0.75rem;
   }
 
   .marks-table .row-label {
-    font-size: 13px;
+    font-size: 0.76rem;
     width: 38px;
     min-width: 35px;
     padding: 5px 6px;
@@ -624,8 +701,18 @@
 
   .marks-table .mark-input {
     padding: 5px 6px;
-    font-size: 12px;
+    font-size: 0.74rem;
     max-width: 55px;
     min-width: 50px;
+  }
+
+  .marks-form-section h4,
+  .question-marks h5,
+  .mark-input-group label,
+  .student-info-card h4,
+  .student-info-card p,
+  .student-selector,
+  .total-marks {
+    font-size: 0.8rem;
   }
 }
