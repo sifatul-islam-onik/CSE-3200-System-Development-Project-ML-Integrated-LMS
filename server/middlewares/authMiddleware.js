@@ -3,6 +3,10 @@ const User = require('../models/User');
 
 exports.authenticateUser = async (req, res, next) => {
   try {
+    if (req.method === 'OPTIONS') {
+      return next();
+    }
+
     let token;
     
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {

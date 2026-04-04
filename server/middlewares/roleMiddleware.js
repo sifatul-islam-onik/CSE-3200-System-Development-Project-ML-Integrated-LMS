@@ -1,4 +1,8 @@
 exports.authorizeAdmin = (req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
   if (!req.user) {
     return res.status(401).json({
       success: false,
@@ -18,6 +22,10 @@ exports.authorizeAdmin = (req, res, next) => {
 
 exports.authorizeRoles = (...roles) => {
   return (req, res, next) => {
+    if (req.method === 'OPTIONS') {
+      return next();
+    }
+
     if (!req.user) {
       return res.status(401).json({
         success: false,
@@ -37,6 +45,10 @@ exports.authorizeRoles = (...roles) => {
 };
 
 exports.teacherOrAdmin = (req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
   if (!req.user) {
     return res.status(401).json({
       success: false,
@@ -55,6 +67,10 @@ exports.teacherOrAdmin = (req, res, next) => {
 };
 
 exports.adminOnly = (req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
   if (!req.user) {
     return res.status(401).json({
       success: false,
