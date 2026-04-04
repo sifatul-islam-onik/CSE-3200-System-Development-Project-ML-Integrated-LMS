@@ -34,7 +34,7 @@ const isAllowedOrigin = (origin, allowedOrigins) => {
       return true;
     }
 
-    if (process.env.NODE_ENV === 'production' && originUrl.hostname.endsWith('.onrender.com')) {
+    if (originUrl.hostname.endsWith('.onrender.com')) {
       return true;
     }
 
