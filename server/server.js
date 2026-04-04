@@ -34,10 +34,6 @@ const isAllowedOrigin = (origin, allowedOrigins) => {
       return true;
     }
 
-    if (originUrl.hostname.endsWith('.onrender.com')) {
-      return true;
-    }
-
     return allowedOrigins.includes(origin);
   } catch (_error) {
     return allowedOrigins.includes(origin);
