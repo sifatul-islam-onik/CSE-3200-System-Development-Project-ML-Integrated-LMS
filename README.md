@@ -262,6 +262,28 @@ npm install
 npm start
 ```
 
+### 5) Run with Docker (Client and Server Separately)
+
+Start backend:
+
+```bash
+cd server
+docker compose up -d
+```
+
+Start frontend:
+
+```bash
+cd client
+docker compose up -d
+```
+
+Notes:
+
+- The first run will build images automatically from each service Dockerfile.
+- Keep Redis and MongoDB running and reachable from the backend container.
+- If backend is not exposed on `localhost:5000` from your browser context, update `REACT_APP_API_URL` accordingly.
+
 ---
 
 ## Testing
