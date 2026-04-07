@@ -1,0 +1,13 @@
+services:
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lms-client
+    ports:
+      - "3000:3000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      REACT_APP_API_URL: http://localhost:5000/api
+    restart: unless-stopped
