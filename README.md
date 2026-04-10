@@ -305,10 +305,32 @@ The backend tests are designed to cover both base models and integration behavio
 - **Authentication Integration (`controllers/authController.test.js`):** Used to verify the system login flows. It ensures passwords are valid, correct JWT tokens are generated, and role-based metadata is assigned directly upon login.
 - **Attainment Integration (`controllers/attainmentController.test.js`):** Used to test the most complex module: Core OBE Business Logic. It verifies that Teachers have proper role permissions, evaluates saving structures for Continuous Assessment (CT/Assignments) marks, and successfully intercepts/purges data cache pipelines during resets.
 - **Course Integration (`controllers/courseController.test.js`):** Used to validate curriculum creation. Ensures that only System Admins can create courses, parses specific course codes (e.g. Sessional/Theory odd-even digit constraints), processes KPA arrays, and enforces appropriate reading roles.
+- **Curriculum Validation Unit Tests (`utils/curriculumValidation.test.js`):** Used to validate OBE consistency helpers (CO validation, PO coverage aggregation, semester-year consistency, assessment plan checks, and CO-PO matrix generation).
+- **Token Utility Unit Tests (`utils/tokenUtils.test.js`):** Used to validate secure token generation and deterministic SHA-256 hashing behavior for auth/password-reset flows.
 
 To run the backend tests and generate a coverage report:
 ```bash
 cd server
+npm test
+```
+
+To run only utility unit tests:
+```bash
+cd server
+npx jest __tests__/utils
+```
+
+### Frontend Testing (`client/`)
+
+The frontend test suite uses the default Create React App Jest setup (`react-scripts test`) and currently covers core client-side utilities and auth guard helpers.
+
+- **Helpers Utility Tests (`src/__tests__/utils/helpers.js`):** Validates retry behavior, debounce/throttle timing logic, safe JSON parsing fallback, and async batch processing.
+- **Token Storage Utility Tests (`src/__tests__/utils/tokenUtils.js`):** Validates token save/read/clear behavior in `localStorage`.
+- **Protected Route Helper Tests (`src/__tests__/components/ProtectedRoute.js`):** Validates authentication checks, user parsing, role extraction, and logout cleanup behavior.
+
+To run frontend tests:
+```bash
+cd client
 npm test
 ```
 
