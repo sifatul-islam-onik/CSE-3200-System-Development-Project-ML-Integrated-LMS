@@ -124,7 +124,7 @@
 
 .badge-core {
   background: #dbeafe;
-  color: #1e3a8a;
+  color: #047857;
 }
 
 .badge-optional {
@@ -236,7 +236,7 @@
 .bloom-badge {
   padding: 2px 8px;
   background: #e0e7ff;
-  color: #3730a3;
+  color: #065f46;
   border-radius: var(--radius-sm);
   font-size: 0.75rem;
   font-weight: 600;
@@ -310,17 +310,17 @@
 
 .mapping-cell.level-1 {
   background: #dbeafe;
-  color: #1e40af;
+  color: #10b981;
 }
 
 .mapping-cell.level-2 {
   background: #bfdbfe;
-  color: #1e3a8a;
+  color: #047857;
 }
 
 .mapping-cell.level-3 {
   background: #93c5fd;
-  color: #1e3a8a;
+  color: #047857;
   font-weight: 700;
 }
 
