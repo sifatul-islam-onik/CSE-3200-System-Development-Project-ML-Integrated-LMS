@@ -92,13 +92,14 @@ const ForgotPassword = () => {
   return (
     <div className="reset-page OBESynK-reset-page">
       <div className="OBESynK-auth-banner">
-          <div className="OBESynK-auth-banner-content">
-            <div className="OBESynK-auth-back-nav">
+          <div className="OBESynK-auth-brand-logo">
+            <Link to="/" className="OBESynK-auth-logo-text">OBESynK</Link>
+          </div>
+          <div className="OBESynK-auth-back-nav">
             <Link to="/" className="OBESynK-auth-back-btn">Back to website &rarr;</Link>
           </div>
-          <h1>OBESynK</h1>
-            <h2>Empowering Academic Excellence</h2>
-            <p>Seamlessly integrating outcome-based education workflows for your institution.</p>
+          <div className="OBESynK-auth-motto">
+            <p>Empowering Academic Excellence</p>
           </div>
         </div>
       <main className="OBESynK-reset-main">
