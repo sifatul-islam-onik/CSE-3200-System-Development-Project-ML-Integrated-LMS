@@ -2,7 +2,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: row;
-  background: #ffffff;
+  background: #f8fafc;
   color: #0f172a;
   font-family: "Inter", "Roboto", sans-serif;
 }
@@ -14,6 +14,8 @@
   align-items: center;
   padding: 3rem 1.5rem;
   background-color: #ffffff;
+  border-top-left-radius: 60px;
+  border-bottom-left-radius: 60px;
 }
 
 .OBESynK-login-container {
@@ -247,8 +249,6 @@
   justify-content: center;
   align-items: center;
   background: linear-gradient(135deg, rgba(4, 120, 87, 0.5), rgba(6, 95, 70, 0.6)), url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') center/cover no-repeat;
-  border-top-right-radius: 60px;
-  border-bottom-right-radius: 60px;
   color: white;
   padding: 3rem;
   /* Make sure it's at least half the screen on desktop */
