@@ -1055,9 +1055,9 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
               </div>
 
               {formData.kpa_mapping.length > 0 && (
-                <div style={{marginTop: '10px', padding: '10px', backgroundColor: '#f0f9ff', borderRadius: '4px', border: '1px solid #bfdbfe', textAlign: 'left'}}>
-                  <strong style={{color: '#1e40af'}}>Selected: </strong>
-                  <span style={{color: '#1e40af'}}>{formData.kpa_mapping.join(', ')}</span>
+                <div style={{marginTop: '10px', padding: '10px', backgroundColor: '#ecfdf5', borderRadius: '4px', border: '1px solid #a7f3d0', textAlign: 'left'}}>
+                  <strong style={{color: '#10b981'}}>Selected: </strong>
+                  <span style={{color: '#10b981'}}>{formData.kpa_mapping.join(', ')}</span>
                 </div>
               )}
             </div>
