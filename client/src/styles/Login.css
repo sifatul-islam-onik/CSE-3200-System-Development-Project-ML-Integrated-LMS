@@ -8,7 +8,7 @@
 }
 
 .OBESynK-login-main {
-  flex: 1.15;
+  flex: 1.05;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -219,7 +219,7 @@
 
 
 .OBESynK-auth-banner {
-  flex: 0.85;
+  flex: 0.95;
   display: flex;
   flex-direction: column;
   justify-content: center;
