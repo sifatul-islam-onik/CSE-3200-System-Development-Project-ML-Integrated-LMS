@@ -58,7 +58,6 @@ exports.sendVerificationEmail = async (email, name, otp) => {
       console.log(`Subject: ${mailOptions.subject}`);
       console.log(`Verification OTP: ${otp}`);
       console.log('--------------------------------------------');
-      return true;
     }
 
     try {
@@ -104,7 +103,6 @@ exports.sendApprovalEmail = async (email, name) => {
       console.log(`To: ${email}`);
       console.log(`Subject: ${mailOptions.subject}`);
       console.log('--------------------------------------------');
-      return true;
     }
 
     try {
@@ -162,7 +160,6 @@ exports.sendPasswordResetEmail = async (email, name, otp) => {
       console.log(`Subject: ${mailOptions.subject}`);
       console.log(`Password Reset OTP: ${otp}`);
       console.log('--------------------------------------------');
-      return true;
     }
 
     try {
