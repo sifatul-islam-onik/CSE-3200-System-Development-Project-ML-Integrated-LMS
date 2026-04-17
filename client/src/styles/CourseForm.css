@@ -576,7 +576,7 @@ textarea:disabled {
 }
 
 .po-mapping-item select.mapped {
-  background: #e3f2fd;
+  background: #ecfdf5;
   border-color: var(--color-primary);
   font-weight: 600;
 }
@@ -733,7 +733,7 @@ textarea:disabled {
 }
 
 .checkbox-label:hover {
-  background: #e3f2fd;
+  background: #ecfdf5;
   border-color: var(--color-primary);
 }
 

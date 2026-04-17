@@ -143,7 +143,7 @@ const SectionBModals = ({
                     <td colSpan="16" style={{ textAlign: 'center', border: 'none' }}></td>
                     <td className="footer-label" colSpan="2" style={{ textAlign: 'center' }}>StDev</td>
                     {['q123','q124','q134','q234'].map(comb => (
-                      <td key={comb} style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd' }}>
+                      <td key={comb} style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#ecfdf5' }}>
                         {formatNumber(calculateStDevPB(comb))}
                       </td>
                     ))}
@@ -152,7 +152,7 @@ const SectionBModals = ({
                     <td colSpan="16" style={{ textAlign: 'center', border: 'none' }}></td>
                     <td className="footer-label" colSpan="2" style={{ textAlign: 'center', borderTop: 'none' }}>Dist</td>
                     {['q123','q124','q134','q234'].map(comb => (
-                      <td key={comb} style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e3f2fd', borderTop: 'none' }}>
+                      <td key={comb} style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#ecfdf5', borderTop: 'none' }}>
                         {formatNumber(Math.sqrt(calculateDistB(comb)))}
                       </td>
                     ))}
@@ -211,7 +211,7 @@ const SectionBModals = ({
                         </td>
                       ))}
                       {[1,2,3,4].map(q => (
-                        <td key={q} style={{ textAlign: 'center', backgroundColor: '#e3f2fd' }}>
+                        <td key={q} style={{ textAlign: 'center', backgroundColor: '#ecfdf5' }}>
                           {formatNumber(getStudentQuestionTotalB(studentRow, q))}
                         </td>
                       ))}
