@@ -32,6 +32,8 @@
   font-weight: 700;
   color: #047857;
   letter-spacing: -0.02em;
+  cursor: default;
+  pointer-events: none;
 }
 
 .OBESynK-brand-link {
@@ -239,6 +241,8 @@
   font-weight: 800;
   margin-bottom: 2rem;
   letter-spacing: -0.02em;
+  cursor: default;
+  pointer-events: none;
 }
 
 .OBESynK-auth-banner-content h2 {
@@ -267,6 +271,8 @@
   font-weight: 700;
   color: #047857;
   letter-spacing: -0.02em;
+  cursor: default;
+  pointer-events: none;
 }
 
 .OBESynK-branding-mobile p {
@@ -324,12 +330,11 @@
   text-decoration: none;
   font-family: "Inter", "Roboto", sans-serif;
   letter-spacing: -0.02em;
+  cursor: default;
+  pointer-events: none;
 }
 
-.OBESynK-auth-logo-text:hover {
-  text-decoration: none;
-  color: #d1fae5;
-}
+
 
 .OBESynK-auth-motto {
   position: absolute;
