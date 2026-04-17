@@ -139,7 +139,7 @@ const ChartCard = ({ children, tight = false }) => (
 let _gradId = 0;
 
 // Single-series bar chart
-const SingleBarChart = ({ title, labels, values, color = '#2563eb', yLabel = 'Achieved (%)', wide = false }) => {
+const SingleBarChart = ({ title, labels, values, color = '#059669', yLabel = 'Achieved (%)', wide = false }) => {
   const n      = labels.length;
   if (n === 0) return null;
   const pad    = DEFAULT_PAD;
@@ -247,8 +247,8 @@ const SingleBarChart = ({ title, labels, values, color = '#2563eb', yLabel = 'Ac
 };
 
 // Multi-series grouped bar chart
-const SERIES_COLORS       = ['#2563eb', '#16a34a', '#d97706'];
-const SERIES_COLORS_LIGHT = ['#3b82f6', '#22c55e', '#f59e0b'];
+const SERIES_COLORS       = ['#059669', '#16a34a', '#d97706'];
+const SERIES_COLORS_LIGHT = ['#10b981', '#22c55e', '#f59e0b'];
 
 const GroupedBarChart = ({ title, labels, series, yLabel, wide = false, hideBarText = false }) => {
   const n = labels.length;
@@ -481,7 +481,7 @@ const ChartsSheet = ({
       // Add a decorative underline
       const titleHeight = headingLines.length * 24; // approx line height
       const lineWidth = 400; // width of the underline - increased for visibility
-      pdf.setDrawColor(37, 99, 235); // blue underline #2563eb
+      pdf.setDrawColor(4, 120, 87); // blue underline #059669
       pdf.setLineWidth(2.5); // thicker line
       pdf.line((pageW - lineWidth) / 2, currentY + titleHeight, (pageW + lineWidth) / 2, currentY + titleHeight);
       
@@ -588,7 +588,7 @@ const ChartsSheet = ({
         title={`CO Attainment \u2014 ${pairLabel}`}
         labels={coNames}
         values={coAchievedVals}
-        color="#2563eb"
+        color="#059669"
         yLabel="Achieved (%)"
       />
       <SingleBarChart
@@ -644,7 +644,7 @@ const ChartsSheet = ({
         title={`PO Attainment \u2014 ${pairLabel}`}
         labels={poNames}
         values={poAchievedVals}
-        color="#2563eb"
+        color="#059669"
         yLabel="Achieved (%)"
       />
       <SingleBarChart
