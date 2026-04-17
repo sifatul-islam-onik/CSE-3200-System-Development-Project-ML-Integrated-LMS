@@ -76,7 +76,7 @@ const Login = () => {
   };
 
   return (
-    <div className="login-page OBESynK-login-page">
+    <div className="OBESynK-login-page">
       <div className="OBESynK-auth-banner">
           <div className="OBESynK-auth-brand-logo">
             <Link to="/" className="OBESynK-auth-logo-text">OBESynK</Link>
@@ -88,8 +88,8 @@ const Login = () => {
             <p>Empowering Academic<br />Excellence</p>
           </div>
         </div>
-      <main className="login-main OBESynK-login-main">
-        <div className="login-container OBESynK-login-container">
+      <main className="OBESynK-login-main">
+        <div className="OBESynK-login-container">
           <div className="OBESynK-branding-mobile">
             <h1>
               <Link className="OBESynK-brand-link" to="/">OBESynK</Link>
@@ -97,7 +97,7 @@ const Login = () => {
             <p>Academic Portal</p>
           </div>
 
-          <div className="login-box OBESynK-login-box">
+          <div className="OBESynK-login-box">
             <header className="OBESynK-login-header">
               <h2>Sign In</h2>
             </header>
@@ -108,9 +108,9 @@ const Login = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="login-form OBESynK-login-form">
-              <div className="form-group OBESynK-form-group">
-                <label htmlFor="identifier">Email or Roll Number</label>
+            <form onSubmit={handleSubmit} className="OBESynK-login-form">
+              <div className="OBESynK-form-group">
+
                 <input
                   type="text"
                   id="identifier"
@@ -122,8 +122,7 @@ const Login = () => {
                 />
               </div>
 
-              <div className="form-group OBESynK-form-group">
-                <label htmlFor="password">Password</label>
+              <div className="OBESynK-form-group">
                 <div className="OBESynK-password-input-wrapper">
                   <input
                     type={showPassword ? "text" : "password"}
@@ -149,10 +148,10 @@ const Login = () => {
                 </div>
               </div>
 
-              <div className="forgot-password-row OBESynK-forgot-row">
+              <div className="OBESynK-forgot-row">
                 <button
                   type="button"
-                  className="link-button OBESynK-link-button"
+                  className="OBESynK-link-button"
                   onClick={() => navigate('/forgot-password')}
                   disabled={loading}
                 >
