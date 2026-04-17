@@ -75,18 +75,18 @@ const Login = () => {
   };
 
   return (
-    <div className="login-page cobalt-login-page">
-      <main className="login-main cobalt-login-main">
-        <div className="login-container cobalt-login-container">
-          <div className="cobalt-branding">
+    <div className="login-page OBESynK-login-page">
+      <main className="login-main OBESynK-login-main">
+        <div className="login-container OBESynK-login-container">
+          <div className="OBESynK-branding">
             <h1>
-              <Link className="cobalt-brand-link" to="/">COBALT</Link>
+              <Link className="OBESynK-brand-link" to="/">OBESynK</Link>
             </h1>
             <p>Academic Portal</p>
           </div>
 
-          <div className="login-box cobalt-login-box">
-            <header className="cobalt-login-header">
+          <div className="login-box OBESynK-login-box">
+            <header className="OBESynK-login-header">
               <h2>Login</h2>
             </header>
 
@@ -96,8 +96,8 @@ const Login = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="login-form cobalt-login-form">
-              <div className="form-group cobalt-form-group">
+            <form onSubmit={handleSubmit} className="login-form OBESynK-login-form">
+              <div className="form-group OBESynK-form-group">
                 <label htmlFor="identifier">Email or Roll Number</label>
                 <input
                   type="text"
@@ -110,7 +110,7 @@ const Login = () => {
                 />
               </div>
 
-              <div className="form-group cobalt-form-group">
+              <div className="form-group OBESynK-form-group">
                 <label htmlFor="password">Password</label>
                 <input
                   type="password"
@@ -123,10 +123,10 @@ const Login = () => {
                 />
               </div>
 
-              <div className="forgot-password-row cobalt-forgot-row">
+              <div className="forgot-password-row OBESynK-forgot-row">
                 <button
                   type="button"
-                  className="link-button cobalt-link-button"
+                  className="link-button OBESynK-link-button"
                   onClick={() => navigate('/forgot-password')}
                   disabled={loading}
                 >
@@ -136,7 +136,7 @@ const Login = () => {
 
               <button
                 type="submit"
-                className={`btn-submit cobalt-btn-submit ${loading ? 'loading' : ''}`}
+                className={`btn-submit OBESynK-btn-submit ${loading ? 'loading' : ''}`}
                 disabled={loading}
               >
                 {loading && <span className="spinner"></span>}
