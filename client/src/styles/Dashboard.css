@@ -214,13 +214,13 @@
 .breadcrumb-nav {
   margin-bottom: 1rem;
   padding-bottom: 1rem;
-  border-bottom: 2px solid #c4c6cd;
+  border-bottom: 2px solid #cbd5e1;
 }
 
 .breadcrumb-btn {
-  background-color: #eff3ff;
-  border: 1px solid #c4c6cd;
-  color: #0b1c31;
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
   padding: 0.5rem 1rem;
   border-radius: 4px;
   font-size: 0.9rem;
@@ -231,8 +231,8 @@
 }
 
 .breadcrumb-btn:hover {
-  background-color: #dde9ff;
-  border-color: #75777d;
+  background-color: #d1fae5;
+  border-color: #94a3b8;
 }
 
 .tree-group {
@@ -268,23 +268,23 @@
 }
 
 .tree-year-header {
-  background-color: #e6eeff;
-  border-left: 4px solid #04152b;
-  color: #04152b;
+  background-color: #ecfdf5;
+  border-left: 4px solid #047857;
+  color: #047857;
 }
 
 .tree-year-header:hover {
-  background-color: #dde9ff;
+  background-color: #d1fae5;
 }
 
 .tree-sem-header {
-  background-color: #eff3ff;
-  border-left: 4px solid #505f78;
-  color: #38485f;
+  background-color: #f1f5f9;
+  border-left: 4px solid #10b981;
+  color: #065f46;
 }
 
 .tree-sem-header:hover {
-  background-color: #e6eeff;
+  background-color: #ecfdf5;
 }
 
 .tree-type-header {
@@ -328,15 +328,15 @@
   align-items: center;
   padding: 0.75rem 1rem;
   background-color: #ffffff;
-  border: 1px solid #c4c6cd;
+  border: 1px solid #cbd5e1;
   border-radius: 4px;
   transition: all 0.2s ease;
   margin-left: 1rem;
 }
 
 .course-item:hover {
-  background-color: #eff3ff;
-  border-color: #04152b;
+  background-color: #f1f5f9;
+  border-color: #047857;
   box-shadow: 0 1px 3px rgba(4, 21, 43, 0.12);
 }
 
@@ -355,7 +355,7 @@
 
 .course-code {
   font-weight: 700;
-  color: #04152b;
+  color: #047857;
   font-size: 0.95rem;
 }
 

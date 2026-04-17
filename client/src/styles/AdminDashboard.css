@@ -8,7 +8,7 @@
 /* ===== Sidebar ===== */
 .sidebar {
   width: 260px;
-  background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%);
+  background: linear-gradient(180deg, #047857 0%, #065f46 100%);
   color: white;
   display: flex;
   flex-direction: column;
@@ -260,7 +260,7 @@
   height: 40px;
   border-radius: 50%;
   background: #fbbf24;
-  color: #1e3a8a;
+  color: #047857;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -425,7 +425,7 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #047857 100%);
   color: white;
 }
 
@@ -581,8 +581,8 @@
 }
 
 .role-badge.teacher {
-  background: #dbeafe;
-  color: #1e40af;
+  background: #d1fae5;
+  color: #065f46;
 }
 
 .role-badge.student {
@@ -721,8 +721,8 @@
 .course-code {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #1e40af;
-  background: #dbeafe;
+  color: #065f46;
+  background: #d1fae5;
   padding: 0.4rem 0.875rem;
   border-radius: 6px;
   letter-spacing: 0.5px;
@@ -911,8 +911,8 @@
   display: inline-block;
   font-size: 0.85rem;
   font-weight: 700;
-  color: #1e40af;
-  background: #dbeafe;
+  color: #065f46;
+  background: #d1fae5;
   padding: 0.4rem 0.875rem;
   border-radius: 6px;
   letter-spacing: 0.5px;
@@ -974,7 +974,7 @@
   top: 1rem;
   left: 1rem;
   z-index: 1100;
-  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
   color: white;
   border: none;
   width: 48px;
@@ -1321,7 +1321,7 @@
 }
 
 .delete-modal .warning-text strong {
-  color: #1e40af;
+  color: #065f46;
   font-weight: 600;
 }
 
@@ -1519,7 +1519,7 @@
 }
 
 .proposal-type-badge.update {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #047857 100%);
   color: white;
 }
 
@@ -1991,7 +1991,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #047857 100%);
   color: white;
 }
 
@@ -2260,7 +2260,7 @@
 }
 
 .sidebar {
-  background: linear-gradient(180deg, #04152b 0%, #1a2a40 100%);
+  background: linear-gradient(180deg, #047857 0%, #065f46 100%);
 }
 
 .nav-submenu {
@@ -2289,22 +2289,22 @@
 }
 
 .section-header {
-  border-bottom-color: #c4c6cd;
+  border-bottom-color: #cbd5e1;
 }
 
 .header-content h2,
 .import-box h3,
 .export-section h3 {
-  color: #0b1c31;
+  color: #0f172a;
 }
 
 .header-subtitle,
 .import-info {
-  color: #44474d;
+  color: #475569;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #04152b 0%, #1a2a40 100%);
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
 }
 
 .btn-primary:hover {
@@ -2312,11 +2312,11 @@
 }
 
 .btn-outline {
-  color: #04152b;
-  border-color: #04152b;
+  color: #047857;
+  border-color: #047857;
 }
 
 .btn-outline:hover {
-  background: #eff3ff;
+  background: #f1f5f9;
 }
 
