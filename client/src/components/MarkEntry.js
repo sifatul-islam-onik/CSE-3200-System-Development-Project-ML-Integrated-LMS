@@ -940,7 +940,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                   <button
                     onClick={handleSaveDistribution}
                     disabled={distSaveStatus === 'saving'}
-                    style={{ padding: '8px 16px', backgroundColor: distSaveStatus === 'saving' ? '#95a5a6' : '#2563eb', color: 'white', border: 'none', borderRadius: '6px', cursor: distSaveStatus === 'saving' ? 'not-allowed' : 'pointer', fontWeight: '600' }}
+                    style={{ padding: '8px 16px', backgroundColor: distSaveStatus === 'saving' ? '#95a5a6' : '#059669', color: 'white', border: 'none', borderRadius: '6px', cursor: distSaveStatus === 'saving' ? 'not-allowed' : 'pointer', fontWeight: '600' }}
                   >
                     {distSaveStatus === 'saving' ? 'Saving...' : 'Save Distribution'}
                   </button>
@@ -987,7 +987,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
               textAlign: 'center',
               zIndex: 10
             }}>
-              <FontAwesomeIcon icon={faSpinner} spin size="2x" style={{ color: '#2563eb', marginBottom: '8px' }} />
+              <FontAwesomeIcon icon={faSpinner} spin size="2x" style={{ color: '#059669', marginBottom: '8px' }} />
               <p style={{ color: '#6b7280', fontSize: '14px' }}>Loading student data...</p>
             </div>
           )}
@@ -1061,9 +1061,9 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                     {job.status === 'processing' && (
                       <>
                         <div style={{ width: '80px', height: '4px', background: '#e5e7eb', borderRadius: '2px', overflow: 'hidden' }}>
-                          <div style={{ width: `${job.progress}%`, height: '100%', background: '#3b82f6', transition: 'width 0.3s' }} />
+                          <div style={{ width: `${job.progress}%`, height: '100%', background: '#10b981', transition: 'width 0.3s' }} />
                         </div>
-                        <span style={{ fontSize: '12px', color: '#3b82f6' }}>
+                        <span style={{ fontSize: '12px', color: '#10b981' }}>
                           <FontAwesomeIcon icon={faHourglassHalf} /> {job.progress}%
                           {job.isRetry && ` (Retry ${job.attemptNumber}/${job.maxAttempts})`}
                         </span>
@@ -1135,7 +1135,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                          ocrJobs.get(currentStudent._id).status === 'retrying' ? '#fef3c7' : '#dbeafe',
               border: '1px solid',
               borderColor: ocrJobs.get(currentStudent._id).status === 'failed' ? '#ef4444' : 
-                          ocrJobs.get(currentStudent._id).status === 'retrying' ? '#f59e0b' : '#3b82f6',
+                          ocrJobs.get(currentStudent._id).status === 'retrying' ? '#f59e0b' : '#10b981',
               borderRadius: '8px',
               padding: '12px',
               marginBottom: '16px',
@@ -1384,7 +1384,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           <div className="modal-body mark-entry-body" style={{ overflowY: 'auto' }}>
           {distLoading ? (
             <div style={{ textAlign: 'center', padding: '40px' }}>
-              <FontAwesomeIcon icon={faSpinner} spin size="2x" style={{ color: '#2563eb' }} />
+              <FontAwesomeIcon icon={faSpinner} spin size="2x" style={{ color: '#059669' }} />
               <p style={{ color: '#6b7280', marginTop: '8px' }}>Loading...</p>
             </div>
           ) : (
