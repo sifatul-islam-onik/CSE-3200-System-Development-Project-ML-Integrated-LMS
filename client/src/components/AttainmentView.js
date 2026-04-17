@@ -3344,7 +3344,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       case 'C':  return '#ff3300'; // red-orange
       case 'D':  return '#cc0000'; // dark red
       case 'F':  return '#e00000'; // danger red
-      default:   return '#2c3e50';
+      default:   return '#065f46';
     }
   };
 
