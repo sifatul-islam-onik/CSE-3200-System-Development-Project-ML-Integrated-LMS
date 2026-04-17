@@ -41,7 +41,7 @@ exports.sendVerificationEmail = async (email, name, otp) => {
               <strong>Note:</strong> After email verification, your account will need to be approved by an administrator before you can access the system.
             </p>
             <p style="color: #999; font-size: 12px; margin-top: 30px;">
-              ⏰ This code will expire in <strong>15 minutes</strong>.
+              This code will expire in <strong>15 minutes</strong>.
             </p>
             <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
             <p style="color: #999; font-size: 12px;">
@@ -143,7 +143,7 @@ exports.sendPasswordResetEmail = async (email, name, otp) => {
               </h1>
             </div>
             <p style="color: #999; font-size: 12px; margin-top: 30px;">
-              ⏰ This code will expire in <strong>15 minutes</strong>.
+              This code will expire in <strong>15 minutes</strong>.
             </p>
             <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
             <p style="color: #999; font-size: 12px;">
