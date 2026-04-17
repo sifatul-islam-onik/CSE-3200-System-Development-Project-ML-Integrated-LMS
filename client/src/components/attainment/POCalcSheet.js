@@ -89,14 +89,14 @@ const computePOValuesNormalizedCombined = (coAttainmentData, combinedCOPOMatrix,
 // ── Placeholder table (not yet implemented) ──────────────────────────────────
 const POTablePlaceholder = ({ title, programOutcomes, poCalcStudents }) => (
   <div style={{ marginTop: '20px' }}>
-    <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>{title}</h4>
+    <h4 style={{ marginBottom: '15px', color: '#065f46' }}>{title}</h4>
     <div style={{ overflowX: 'auto' }}>
     <table className="co-po-map-table" style={{ minWidth: 'max-content', borderCollapse: 'separate', borderSpacing: 0, overflow: 'visible' }}>
       <thead>
         <tr>
-          <th style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>Roll</th>
+          <th style={{ backgroundColor: '#047857', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>Roll</th>
           {programOutcomes.map((po, idx) => (
-            <th key={idx} style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>
+            <th key={idx} style={{ backgroundColor: '#047857', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>
               {po.poCode || `PO${idx + 1}`}
             </th>
           ))}
@@ -124,21 +124,21 @@ const POTableComputed = ({ title, programOutcomes, computedRows }) => {
   if (!computedRows || computedRows.length === 0) {
     return (
       <div className="table-container" style={{ marginTop: '20px' }}>
-        <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>{title}</h4>
+        <h4 style={{ marginBottom: '15px', color: '#065f46' }}>{title}</h4>
         <p style={{ padding: '20px', color: '#7f8c8d' }}>No attainment data available.</p>
       </div>
     );
   }
   return (
     <div style={{ marginTop: '20px' }}>
-      <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>{title}</h4>
+      <h4 style={{ marginBottom: '15px', color: '#065f46' }}>{title}</h4>
       <div style={{ overflowX: 'auto' }}>
       <table className="co-po-map-table" style={{ minWidth: 'max-content', borderCollapse: 'separate', borderSpacing: 0, overflow: 'visible' }}>
         <thead>
           <tr>
-            <th style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>Roll</th>
+            <th style={{ backgroundColor: '#047857', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>Roll</th>
             {programOutcomes.map((po, idx) => (
-              <th key={idx} style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>
+              <th key={idx} style={{ backgroundColor: '#047857', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>
                 {po.poCode || `PO${idx + 1}`}
               </th>
             ))}

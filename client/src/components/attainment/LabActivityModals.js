@@ -42,9 +42,9 @@ const LabActivityModals = ({
   const tabBtnStyle = (active) => ({
     padding: '12px 24px',
     backgroundColor: 'transparent',
-    color: active ? '#2c3e50' : '#7f8c8d',
+    color: active ? '#065f46' : '#7f8c8d',
     border: 'none',
-    borderBottom: active ? '3px solid #3498db' : '3px solid transparent',
+    borderBottom: active ? '3px solid #10b981' : '3px solid transparent',
     cursor: 'pointer',
     fontWeight: active ? '600' : 'normal',
     fontSize: '14px',
@@ -234,12 +234,12 @@ const LabActivityModals = ({
                     </tr>
                     <tr>
                       {labActivityRows.map((row, idx) => (
-                        <th key={`co1-t-${idx}`} style={{ fontSize: '13px', fontWeight: '600', backgroundColor: '#e8f4f8', color: '#2c3e50', padding: '8px' }}>
+                        <th key={`co1-t-${idx}`} style={{ fontSize: '13px', fontWeight: '600', backgroundColor: '#e8f4f8', color: '#065f46', padding: '8px' }}>
                           out of {formatNumber(computeLabActivityCOTotal(row))}
                         </th>
                       ))}
                       {labActivityRows.map((row, idx) => (
-                        <th key={`co2-t-${idx}`} style={{ fontSize: '13px', fontWeight: '600', backgroundColor: '#e8f4f8', color: '#2c3e50', padding: '8px' }}>
+                        <th key={`co2-t-${idx}`} style={{ fontSize: '13px', fontWeight: '600', backgroundColor: '#e8f4f8', color: '#065f46', padding: '8px' }}>
                           out of {formatNumber(getLabActivityGeneratedCOTotal(row))}
                         </th>
                       ))}

@@ -228,7 +228,7 @@ const AssignmentSheet = ({
                   <td><strong>{formatNumber(sumAssignmentManualWtTotal())}</strong></td>
                 </tr>
                 <tr>
-                  <td className="footer-label" style={{ fontWeight: 'bold', color: '#2c3e50' }}>Status</td>
+                  <td className="footer-label" style={{ fontWeight: 'bold', color: '#065f46' }}>Status</td>
                   {(() => {
                     const manualTotal = sumAssignmentManualWtTotal();
                     const assignmentMarks = assignmentSummary.assignmentMarks30 || 0;
@@ -242,7 +242,7 @@ const AssignmentSheet = ({
                       messageColor = '#e74c3c';
                     } else {
                       message = `Sum should be ${assignmentMarks}, you can ignore as Eq. wt=1`;
-                      messageColor = '#138d75';
+                      messageColor = '#059669';
                     }
                     return (
                       <td colSpan={1 + getActiveAssignments().length * 3 + 1} style={{ textAlign: 'center', fontWeight: 'bold', color: messageColor }}>

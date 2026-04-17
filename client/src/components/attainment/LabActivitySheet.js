@@ -367,7 +367,7 @@ const LabActivitySheet = ({
                       const ab9 = useEqWtActivity;
                       if (u16 === ab8) return <span style={{ color: '#27ae60' }}>ok</span>;
                       if (!ab9) return <span style={{ color: '#e74c3c' }}>Sum should be {ab8}</span>;
-                      return <span style={{ color: '#138d75' }}>Sum should be {ab8}, you can ignore as Eq. wt=1</span>;
+                      return <span style={{ color: '#059669' }}>Sum should be {ab8}, you can ignore as Eq. wt=1</span>;
                     })()}
                   </td>
                   <td colSpan="2"></td>
