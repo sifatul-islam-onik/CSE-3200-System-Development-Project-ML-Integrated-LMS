@@ -14,11 +14,6 @@
   align-items: center;
   padding: 3rem 1.5rem;
   background-color: #ffffff;
-  border-top-left-radius: 2.5rem;
-  border-bottom-left-radius: 2.5rem;
-  margin-left: -2.5rem;
-  z-index: 10;
-  position: relative;
 }
 
 .OBESynK-login-container {
@@ -96,17 +91,22 @@
 .OBESynK-login-form {
   display: flex;
   flex-direction: column;
-  gap: 1.2rem;
+  gap: 0.8rem;
 }
 
 .OBESynK-form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  position: relative;
 }
 
 .OBESynK-form-group label {
   display: none;
+}
+
+.OBESynK-password-input-wrapper {
+  position: relative;
+  width: 100%;
 }
 
 .OBESynK-form-group input {
@@ -133,13 +133,33 @@
 }
 
 .OBESynK-form-group input::placeholder {
+  color: #888;
+}
+
+.OBESynK-password-toggle {
+  position: absolute;
+  right: 1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
   color: #adb5bd;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: color 0.2s ease;
+}
+
+.OBESynK-password-toggle:hover {
+  color: #64748b;
 }
 
 .OBESynK-forgot-row {
   display: flex;
   justify-content: flex-start;
-  margin-top: -0.2rem;
+  margin-top: 0.4rem;
   padding-left: 1.5rem;
 }
 
@@ -202,8 +222,6 @@
 
   .OBESynK-login-main {
     padding: 2rem 1rem;
-    border-radius: 0;
-    margin-left: 0;
   }
   .OBESynK-branding {
     margin-bottom: 2rem;
