@@ -14,6 +14,11 @@
   align-items: center;
   padding: 3rem 1.5rem;
   background-color: #ffffff;
+  border-top-left-radius: 2.5rem;
+  border-bottom-left-radius: 2.5rem;
+  margin-left: -2.5rem;
+  z-index: 10;
+  position: relative;
 }
 
 .OBESynK-login-container {
@@ -197,6 +202,8 @@
 
   .OBESynK-login-main {
     padding: 2rem 1rem;
+    border-radius: 0;
+    margin-left: 0;
   }
   .OBESynK-branding {
     margin-bottom: 2rem;
