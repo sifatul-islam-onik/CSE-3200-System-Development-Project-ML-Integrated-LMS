@@ -76,9 +76,19 @@ const Login = () => {
 
   return (
     <div className="login-page OBESynK-login-page">
+      <div className="OBESynK-auth-banner">
+          <div className="OBESynK-auth-banner-content">
+            <div className="OBESynK-auth-back-nav">
+            <Link to="/" className="OBESynK-auth-back-btn">Back to website &rarr;</Link>
+          </div>
+          <h1>OBESynK</h1>
+            <h2>Empowering Academic Excellence</h2>
+            <p>Seamlessly integrating outcome-based education workflows for your institution.</p>
+          </div>
+        </div>
       <main className="login-main OBESynK-login-main">
         <div className="login-container OBESynK-login-container">
-          <div className="OBESynK-branding">
+          <div className="OBESynK-branding-mobile">
             <h1>
               <Link className="OBESynK-brand-link" to="/">OBESynK</Link>
             </h1>
