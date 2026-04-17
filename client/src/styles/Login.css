@@ -1,12 +1,13 @@
-.cobalt-login-page {
+﻿.OBESynK-login-page {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f9f9ff;
-  color: #0b1c31;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: "Inter", "Roboto", sans-serif;
 }
 
-.cobalt-login-main {
+.OBESynK-login-main {
   flex: 1;
   display: flex;
   justify-content: center;
@@ -14,276 +15,197 @@
   padding: 3rem 1.5rem;
 }
 
-.cobalt-login-container {
+.OBESynK-login-container {
   width: 100%;
-  max-width: 520px;
+  max-width: 480px;
 }
 
-.cobalt-branding {
-  margin-bottom: 2.8rem;
+.OBESynK-branding {
+  margin-bottom: 2.5rem;
   text-align: center;
 }
 
-.cobalt-branding h1 {
+.OBESynK-branding h1 {
   margin: 0;
-  font-family: 'Newsreader', serif;
-  font-size: 2.7rem;
-  font-weight: 400;
-  color: #04152b;
-  letter-spacing: -0.05em;
+  font-family: "Inter", "Roboto", sans-serif;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #047857;
+  letter-spacing: -0.02em;
 }
 
-.cobalt-brand-link {
+.OBESynK-brand-link {
   color: inherit;
   text-decoration: none;
 }
 
-.cobalt-brand-link:hover {
+.OBESynK-brand-link:hover {
   text-decoration: none;
 }
 
-.cobalt-branding p {
+.OBESynK-branding p {
   margin: 0.5rem 0 0;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.85rem;
-  color: #64748b;
-  letter-spacing: normal;
-  text-transform: none !important;
+  font-family: "Inter", "Roboto", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #475569;
 }
 
-.cobalt-login-box {
+.OBESynK-login-box {
   background: #ffffff;
-  border-radius: 4px;
-  padding: 3.5rem 2.75rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.01);
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  padding: 3rem 2.5rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.cobalt-login-header {
-  margin-bottom: 2.5rem;
+.OBESynK-login-header {
+  margin-bottom: 2rem;
 }
 
-.cobalt-login-header h2 {
+.OBESynK-login-header h2 {
   margin: 0;
   text-align: center;
-  font-family: 'Newsreader', serif;
-  font-size: 2.2rem;
-  font-weight: 500;
-  color: #0b1c31;
-  letter-spacing: -0.01em;
+  font-family: "Inter", "Roboto", sans-serif;
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #0f172a;
 }
 
 /* Alerts */
 .alert {
-  padding: 0.8rem;
-  border-radius: 0;
-  margin-bottom: 1.1rem;
-  font-size: 0.9rem;
+  padding: 1rem;
+  border-radius: 6px;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
 }
 
 .alert-error {
-  background-color: rgba(185, 28, 28, 0.1);
-  color: #ba1a1a;
-  border: 1px solid #ffdad6;
+  background-color: #f8d7da;
+  color: #842029;
+  border: 1px solid #f5c2c7;
 }
 
 /* Form */
-.cobalt-login-form {
+.OBESynK-login-form {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 
-.cobalt-form-group {
+.OBESynK-form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
+  gap: 0.5rem;
 }
 
-.cobalt-form-group label {
+.OBESynK-form-group label {
   display: block;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.875rem;
-  font-weight: 500;
-  margin-bottom: 0.5rem;
+  font-family: "Inter", "Roboto", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
   color: #475569;
-  text-transform: none !important;
-  letter-spacing: normal;
 }
 
-.cobalt-form-group input {
+.OBESynK-form-group input {
   width: 100%;
-  padding: 0.85rem 1rem;
-  font-size: 0.95rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 4px;
+  padding: 0.8rem 1rem;
+  font-size: 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
   background-color: #ffffff;
-  font-family: 'Inter', sans-serif;
-  transition: all 0.2s ease;
-  color: #1e293b;
+  font-family: "Inter", "Roboto", sans-serif;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  color: #0f172a;
 }
 
-.cobalt-form-group input:focus {
+.OBESynK-form-group input:focus {
   outline: none;
-  border-color: #04152b;
-  background-color: #ffffff;
-  box-shadow: 0 0 0 1px #04152b;
+  border-color: #065f46;
+  box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.2);
 }
 
-.cobalt-form-group input:disabled {
-  background: #eff3ff;
+.OBESynK-form-group input:disabled {
+  background: #e2e8f0;
   cursor: not-allowed;
-  opacity: 0.75;
 }
 
-.cobalt-form-group input::placeholder {
-  color: rgba(68, 71, 77, 0.55);
+.OBESynK-form-group input::placeholder {
+  color: #adb5bd;
 }
 
-.cobalt-forgot-row {
+.OBESynK-forgot-row {
   display: flex;
   justify-content: flex-end;
-  margin-top: 0.1rem;
+  margin-top: -0.5rem;
 }
 
 /* Submit Button */
-.cobalt-btn-submit {
-  display: inline-flex;
+.OBESynK-btn-submit {
+  display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  padding: 0.95rem;
-  font-size: 0.95rem;
-  font-weight: 500;
-  text-transform: none !important;
-  letter-spacing: normal;
+  padding: 0.9rem;
+  font-size: 1rem;
+  font-weight: 600;
   color: #ffffff;
-  background: #04152b;
+  background: #047857;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: 'Inter', sans-serif;
-  margin-top: 1.75rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: background-color 0.2s ease;
+  font-family: "Inter", "Roboto", sans-serif;
+  margin-top: 1rem;
 }
 
-.cobalt-btn-submit .spinner {
+.OBESynK-btn-submit .spinner {
   margin-right: 0.5rem;
 }
 
-.cobalt-btn-submit:hover:not(:disabled) {
-  background: #1e293b;
-  transform: translateY(-1px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+.OBESynK-btn-submit:hover:not(:disabled) {
+  background: #065f46;
 }
 
-.cobalt-btn-submit:disabled {
-  opacity: 0.5;
+.OBESynK-btn-submit:disabled {
+  opacity: 0.65;
   cursor: not-allowed;
 }
 
-.cobalt-link-button {
+.OBESynK-link-button {
   background: none;
   border: none;
-  color: #334155;
-  font-weight: 500;
+  color: #047857;
+  font-weight: 600;
   cursor: pointer;
   padding: 0;
-  font-size: 0.875rem;
-  letter-spacing: normal;
-  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-family: "Inter", "Roboto", sans-serif;
   text-decoration: none;
   transition: color 0.2s ease;
 }
 
-.cobalt-link-button:hover {
-  color: #04152b;
+.OBESynK-link-button:hover {
+  color: #065f46;
   text-decoration: underline;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .cobalt-login-main {
+  .OBESynK-login-main {
     padding: 2rem 1rem;
   }
-
-  .cobalt-branding {
+  .OBESynK-branding {
     margin-bottom: 2rem;
   }
-
-  .cobalt-branding h1 {
+  .OBESynK-branding h1 {
     font-size: 2.25rem;
   }
-
-  .cobalt-login-box {
-    padding: 2rem 1.2rem;
+  .OBESynK-login-box {
+    padding: 2rem 1.5rem;
   }
-
-  .cobalt-login-header h2 {
-    font-size: 1.8rem;
+  .OBESynK-login-header h2 {
+    font-size: 1.6rem;
   }
 }
 
-@media (max-width: 480px) {
-  .cobalt-login-main {
-    align-items: flex-start;
-    padding-top: 2.8rem;
-  }
-
-  .cobalt-branding h1 {
-    font-size: 2rem;
-  }
-
-  .cobalt-branding p {
-    font-size: 0.66rem;
-    letter-spacing: 0.18em;
-  }
-
-  .cobalt-login-header h2 {
-    font-size: 1.5rem;
-  }
-
-  .cobalt-login-box {
-    padding: 1.5rem 1rem;
-  }
-
-  .cobalt-form-group label {
-    font-size: 0.8rem;
-  }
-
-  .cobalt-form-group input {
-    font-size: 0.9rem;
-    padding: 0.8rem 0.9rem;
-  }
-
-  .cobalt-btn-submit {
-    font-size: 0.9rem;
-    padding: 0.95rem 1rem;
-    min-height: 48px;
-  }
-
-  .cobalt-link-button {
-    font-size: 0.8rem;
-  }
-}
-
-@media (max-width: 360px) {
-  .cobalt-branding h1 {
-    font-size: 1.8rem;
-  }
-
-  .cobalt-login-header h2 {
-    font-size: 1.35rem;
-  }
-
-  .cobalt-btn-submit {
-    font-size: 0.85rem;
-    padding: 0.9rem 0.95rem;
-    min-height: 50px;
-  }
-
-  .cobalt-link-button {
-    font-size: 0.75rem;
-  }
-}
