@@ -91,7 +91,7 @@ const ResultView = () => {
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 padding: '14px 20px',
-                background: '#1e3a5f',
+                background: '#047857',
                 color: '#fff',
                 border: 'none',
                 cursor: 'pointer',
@@ -134,11 +134,11 @@ const ResultView = () => {
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr style={{ background: '#f0f4ff', borderTop: '2px solid #c7d2fe', fontWeight: 600 }}>
+                    <tr style={{ background: '#ecfdf5', borderTop: '2px solid #a7f3d0', fontWeight: 600 }}>
                       <td colSpan={2} style={{ padding: '10px 12px', textAlign: 'right', color: '#374151' }}>
                         Credit Taken:
                       </td>
-                      <td style={{ padding: '10px 12px', color: '#1e3a5f' }}>{termResult.creditTaken}</td>
+                      <td style={{ padding: '10px 12px', color: '#047857' }}>{termResult.creditTaken}</td>
                       <td style={{ padding: '10px 12px', textAlign: 'center', color: '#374151' }}>
                         Completed: <strong>{termResult.creditCompleted}</strong>
                       </td>
@@ -147,14 +147,14 @@ const ResultView = () => {
                       </td>
                       <td style={{ padding: '10px 12px', textAlign: 'center', color: '#374151' }}></td>
                     </tr>
-                    <tr style={{ background: '#e0f2fe', borderTop: '1px solid #bae6fd', fontWeight: 700 }}>
-                      <td colSpan={3} style={{ padding: '10px 12px', textAlign: 'right', color: '#0c4a6e' }}>
+                    <tr style={{ background: '#d1fae5', borderTop: '1px solid #6ee7b7', fontWeight: 700 }}>
+                      <td colSpan={3} style={{ padding: '10px 12px', textAlign: 'right', color: '#065f46' }}>
                         Term GPA:
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: '16px', color: '#0c4a6e' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: '16px', color: '#065f46' }}>
                         {termResult.termGPA?.toFixed(2)}
                       </td>
-                      <td colSpan={2} style={{ padding: '10px 12px', textAlign: 'center', color: '#0c4a6e' }}>
+                      <td colSpan={2} style={{ padding: '10px 12px', textAlign: 'center', color: '#065f46' }}>
                         CGPA: <span style={{ fontSize: '16px' }}>{termResult.cgpa?.toFixed(2)}</span>
                       </td>
                     </tr>
