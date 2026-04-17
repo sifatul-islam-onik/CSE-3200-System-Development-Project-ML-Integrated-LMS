@@ -1215,10 +1215,7 @@ section {
   background-color: #95a5a6;
 }
 
-.btn-primary {
-  background-color: #10b981;
-  color: white;
-}
+.btn-primary { background-color: #047857; color: white; }
 
 .btn-primary:hover:not(:disabled) {
   background-color: #047857;
@@ -1359,3 +1356,6 @@ section {
   font-weight: 700;
 }
 
+
+.btn-success { background-color: #10b981; color: white; }
+.btn-success:hover:not(:disabled) { background-color: #059669; }
