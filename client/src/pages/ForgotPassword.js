@@ -99,7 +99,7 @@ const ForgotPassword = () => {
             <Link to="/" className="OBESynK-auth-back-btn">Back to website &rarr;</Link>
           </div>
           <div className="OBESynK-auth-motto">
-            <p>Automating CO-PO Mapping<br />& Attainment Tracking</p>
+            <p>Empowering Minds,<br />Shaping Futures</p>
           </div>
         </div>
       <main className="OBESynK-reset-main">
