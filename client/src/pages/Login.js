@@ -84,7 +84,7 @@ const Login = () => {
             <Link to="/" className="OBESynK-auth-back-btn">Back to website &rarr;</Link>
           </div>
           <div className="OBESynK-auth-motto">
-            <p>Empowering Academic<br />Excellence</p>
+            <p>Automating CO-PO Mapping<br />& Attainment Tracking</p>
           </div>
         </div>
       <main className="login-main OBESynK-login-main">
