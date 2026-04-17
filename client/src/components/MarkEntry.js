@@ -1396,16 +1396,16 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ borderCollapse: 'collapse', width: '100%' }}>
                     <thead>
-                      <tr style={{ background: '#1e3a5f', color: 'white' }}>
-                        <th rowSpan="2" style={{ padding: '12px 16px', border: '1px solid #334' }}>CO</th>
+                      <tr style={{ background: '#047857', color: 'white' }}>
+                        <th rowSpan="2" style={{ padding: '12px 16px', border: '1px solid #6ee7b7' }}>CO</th>
                         {qLabels.map((q, qi) => (
-                          <th key={q} colSpan="4" style={{ padding: '12px 16px', border: '1px solid #334', borderLeft: qi > 0 ? '3px solid #aaa' : undefined }}>{q}</th>
+                          <th key={q} colSpan="4" style={{ padding: '12px 16px', border: '1px solid #6ee7b7', borderLeft: qi > 0 ? '3px solid #aaa' : undefined }}>{q}</th>
                         ))}
                       </tr>
-                      <tr style={{ background: '#2b4c7e', color: 'white' }}>
+                      <tr style={{ background: '#059669', color: 'white' }}>
                         {qLabels.map((q, qi) => (
                           ['a','b','c','d'].map((l, li) => (
-                            <th key={`${q}${l}`} style={{ padding: '10px 12px', border: '1px solid #334', borderLeft: li === 0 && qi > 0 ? '3px solid #aaa' : undefined }}>{l}</th>
+                            <th key={`${q}${l}`} style={{ padding: '10px 12px', border: '1px solid #6ee7b7', borderLeft: li === 0 && qi > 0 ? '3px solid #aaa' : undefined }}>{l}</th>
                           ))
                         ))}
                       </tr>
