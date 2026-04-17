@@ -21,7 +21,7 @@ const SectionASheet = ({
             onClick={() => setShowSectionAGeneratedModal(true)}
             style={{
               padding: '8px 16px',
-              backgroundColor: '#3498db',
+              backgroundColor: '#10b981',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
@@ -104,7 +104,7 @@ const SectionASheet = ({
                 onClick={() => setShowSectionAObtainedModal(true)}
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: '#3498db',
+                  backgroundColor: '#10b981',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',

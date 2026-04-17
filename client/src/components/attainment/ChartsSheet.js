@@ -221,7 +221,7 @@ const SingleBarChart = ({ title, labels, values, color = '#2563eb', yLabel = 'Ac
   if (wide) {
     return (
       <div style={{ marginTop: '30px' }}>
-        <h4 style={{ marginBottom: '8px', color: '#2c3e50', textAlign: 'center' }}>{title}</h4>
+        <h4 style={{ marginBottom: '8px', color: '#065f46', textAlign: 'center' }}>{title}</h4>
         {inner}
       </div>
     );
@@ -355,7 +355,7 @@ const GroupedBarChart = ({ title, labels, series, yLabel, wide = false, hideBarT
   if (wide) {
     return (
       <div style={{ marginTop: '30px' }}>
-        <h4 style={{ marginBottom: '8px', color: '#2c3e50', textAlign: 'center' }}>{title}</h4>
+        <h4 style={{ marginBottom: '8px', color: '#065f46', textAlign: 'center' }}>{title}</h4>
         {legend}
         {inner}
       </div>
@@ -448,7 +448,7 @@ const ChartsSheet = ({
   const poUnnormVals   = poUnnorm.map(v   => parseFloat((v * 100).toFixed(2)));
   const poEqWtVals     = poEqWt.map(v     => parseFloat((v * 100).toFixed(2)));
 
-  const thStyle = { backgroundColor: '#2980b9', color: 'white' };
+  const thStyle = { backgroundColor: '#047857', color: 'white' };
   const labelStyle = { textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8', whiteSpace: 'nowrap' };
   const cellStyle  = { textAlign: 'center' };
 
@@ -539,7 +539,7 @@ const ChartsSheet = ({
   return (
     <section className="charts-section" ref={sectionRef}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#2c3e50', margin: 0 }}>Charts</h3>
+        <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#065f46', margin: 0 }}>Charts</h3>
         <button
           onClick={handleExportToPDF}
           disabled={isExporting}
@@ -559,7 +559,7 @@ const ChartsSheet = ({
 
       {/* CO Attainment Table */}
       <div className="table-container" style={{ marginTop: '20px', overflowX: 'auto' }}>
-        <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>
+        <h4 style={{ marginBottom: '15px', color: '#065f46' }}>
           CO Attainment of {pairLabel}
         </h4>
         <table className="co-po-map-table">
@@ -616,7 +616,7 @@ const ChartsSheet = ({
       />
       {/* PO Attainment Table */}
       <div className="table-container" style={{ marginTop: '30px', overflowX: 'auto' }}>
-        <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>
+        <h4 style={{ marginBottom: '15px', color: '#065f46' }}>
           PO Attainment of {pairLabel}
         </h4>
         <table className="co-po-map-table">
