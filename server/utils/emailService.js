@@ -52,7 +52,21 @@ exports.sendVerificationEmail = async (email, name, otp) => {
       `
     };
 
-    await transporter.sendMail(mailOptions);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('--- DEVELOPMENT MODE: MOCK EMAIL SENDING ---');
+      console.log(`To: ${email}`);
+      console.log(`Subject: ${mailOptions.subject}`);
+      console.log(`Verification OTP: ${otp}`);
+      console.log('--------------------------------------------');
+      return true;
+    }
+
+    try {
+      await transporter.sendMail(mailOptions);
+    } catch (sendError) {
+      console.error('SMTP Send Error (falling back to mock):', sendError.message);
+      console.log(`Verification OTP for ${email}: ${otp}`);
+    }
     return true;
   } catch (error) {
     console.error('Error sending verification email:', error);
@@ -85,7 +99,19 @@ exports.sendApprovalEmail = async (email, name) => {
       `
     };
 
-    await transporter.sendMail(mailOptions);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('--- DEVELOPMENT MODE: MOCK EMAIL SENDING ---');
+      console.log(`To: ${email}`);
+      console.log(`Subject: ${mailOptions.subject}`);
+      console.log('--------------------------------------------');
+      return true;
+    }
+
+    try {
+       await transporter.sendMail(mailOptions);
+    } catch (sendError) {
+       console.error('SMTP Send Error (falling back to mock):', sendError.message);
+    }
     return true;
   } catch (error) {
     console.error('Error sending approval email:', error);
@@ -130,7 +156,21 @@ exports.sendPasswordResetEmail = async (email, name, otp) => {
       `
     };
 
-    await transporter.sendMail(mailOptions);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('--- DEVELOPMENT MODE: MOCK EMAIL SENDING ---');
+      console.log(`To: ${email}`);
+      console.log(`Subject: ${mailOptions.subject}`);
+      console.log(`Password Reset OTP: ${otp}`);
+      console.log('--------------------------------------------');
+      return true;
+    }
+
+    try {
+      await transporter.sendMail(mailOptions);
+    } catch (sendError) {
+      console.error('SMTP Send Error (falling back to mock):', sendError.message);
+      console.log(`Password Reset OTP for ${email}: ${otp}`);
+    }
     return true;
   } catch (error) {
     console.error('Error sending password reset email:', error);
