@@ -1,5 +1,6 @@
-﻿.OBESynK-login-page {
-  min-height: 100vh;
+.OBESynK-login-page {
+  height: 100vh;
+  overflow: hidden;
   display: flex;
   flex-direction: row;
   background: #f8fafc;
@@ -8,17 +9,17 @@
 }
 
 .OBESynK-login-main {
-  flex: 1.05;
+  height: 100vh;
+  overflow-y: auto;
+  flex: 0.85;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   padding: 3rem 1.5rem;
-  background-color: #ffffff;
-  border-top-left-radius: 60px;
-  border-bottom-left-radius: 60px;
 }
 
 .OBESynK-login-container {
+  margin: auto 0;
   width: 100%;
   max-width: 480px;
 }
@@ -57,8 +58,12 @@
 }
 
 .OBESynK-login-box {
+  background: #fff;
+  border-radius: 8px;
   padding: 3rem 2.5rem;
   width: 100%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .OBESynK-login-header {
@@ -177,7 +182,7 @@
   color: #ffffff;
   background: #047857;
   border: none;
-  border-radius: 9999px;
+  border-radius:  9999px !important;
   cursor: pointer;
   transition: background-color 0.2s ease;
   font-family: "Inter", "Roboto", sans-serif;
@@ -223,8 +228,10 @@
   .OBESynK-branding-mobile { display: block; }
 
   .OBESynK-login-main {
-    padding: 2rem 1rem;
-  }
+      padding: 2rem 1rem;
+      margin-left: 0;
+      border-radius: 0;
+    }
   .OBESynK-branding {
     margin-bottom: 2rem;
   }
@@ -243,16 +250,19 @@
 
 
 .OBESynK-auth-banner {
-  flex: 0.95;
+  flex: 1.15;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, rgba(4, 120, 87, 0.5), rgba(6, 95, 70, 0.6)), url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') center/cover no-repeat;
+  background-image: linear-gradient(135deg, rgba(4, 120, 87, 0.5), rgba(6, 95, 70, 0.6)), url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80');
+  background-position: center, 20% center;
+  background-size: cover, cover;
+  background-repeat: no-repeat, no-repeat;
   color: white;
   padding: 3rem;
   /* Make sure it's at least half the screen on desktop */
-  min-height: 100vh;
+  height: 100vh;
 }
 
 .OBESynK-auth-banner-content {
@@ -315,7 +325,7 @@
 .OBESynK-auth-back-nav {
   position: absolute;
   top: 2.5rem;
-  right: 2.5rem;
+  right: 5.5rem;
 }
 
 .OBESynK-auth-back-btn {
@@ -379,7 +389,8 @@
   left: 0;
   width: 100%;
   text-align: center;
-  padding: 0 2rem;
+  padding-right: 5.5rem;
+  padding-left: 2rem;
 }
 
 .OBESynK-auth-motto p {
@@ -389,4 +400,11 @@
   color: rgba(255, 255, 255, 0.95);
   margin: 0;
   letter-spacing: 0.02em;
+}
+
+
+/* Hide native browser password reveal */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
 }
