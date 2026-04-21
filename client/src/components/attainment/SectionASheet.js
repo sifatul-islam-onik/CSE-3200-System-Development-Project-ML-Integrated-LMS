@@ -19,15 +19,7 @@ const SectionASheet = ({
           <span style={{ fontSize: '13px', color: '#7f8c8d', fontStyle: 'italic' }}>Edit via "Marks Distribution" in Enter Term Marks</span>
           <button
             onClick={() => setShowSectionAGeneratedModal(true)}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#10b981',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
+            className="btn-professional btn-primary"
           >
             View Generated Table
           </button>
@@ -102,15 +94,7 @@ const SectionASheet = ({
               <h3 style={{ margin: 0 }}>Obtained marks for Section-A</h3>
               <button
                 onClick={() => setShowSectionAObtainedModal(true)}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#10b981',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
+                className="btn-professional btn-primary"
               >
                 View Generated Table
               </button>

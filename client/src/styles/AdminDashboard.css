@@ -46,8 +46,23 @@
   flex: 1;
 }
 
+/* Show logo and hide toggle by default when sidebar is closed */
 .sidebar.closed .logo-section {
+  display: flex;
+  margin: 0; /* Remove gap offset */
+}
+
+.sidebar.closed .sidebar-toggle {
   display: none;
+}
+
+/* On hover, hide logo and show toggle */
+.sidebar.closed .sidebar-header:hover .logo-section {
+  display: none;
+}
+
+.sidebar.closed .sidebar-header:hover .sidebar-toggle {
+  display: flex;
 }
 
 .logo-icon {
@@ -78,22 +93,25 @@
 }
 
 .sidebar-toggle {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.15);
   border: none;
   color: white;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  cursor: ew-resize;
   transition: all 0.2s ease;
   font-size: 1.2rem;
+  padding: 0;
+  flex-shrink: 0;
 }
 
 .sidebar-toggle:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.25);
+  opacity: 1;
 }
 
 /* ===== Sidebar Navigation ===== */
@@ -412,7 +430,7 @@
 .btn {
   padding: 0.625rem 1.25rem;
   border: none;
-  border-radius: 8px;
+  border-radius: 4px;
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -422,6 +440,35 @@
   align-items: center;
   justify-content: flex-start;
   gap: 0.5rem;
+}
+
+.btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ===== Form Inputs ===== */
+.form-input {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background-color: #ffffff;
+  font-family: "Inter", "Roboto", sans-serif;
+  transition: all 0.2s ease;
+  color: #0f172a;
+  outline: none;
+}
+
+.form-input:focus {
+  border-color: #047857;
+  box-shadow: 0 0 0 3px rgba(4, 120, 87, 0.15);
+}
+
+.form-input:disabled {
+  background-color: #e2e8f0;
+  cursor: not-allowed;
 }
 
 .btn-primary {
@@ -441,6 +488,17 @@
 
 .btn-secondary:hover {
   background: #4b5563;
+}
+
+.btn-success {
+  background: #10b981;
+  color: white;
+}
+
+.btn-success:hover {
+  background: #059669;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
 .btn-outline {
@@ -1849,90 +1907,6 @@
   margin-top: 2rem;
   padding-top: 2rem;
   border-top: 2px solid #e2e8f0;
-}
-
-/* Proposal Modal Wrapper for CourseForm */
-.proposal-modal-wrapper {
-  position: relative;
-}
-
-/* Position change description to appear inside the modal */
-.change-description-wrapper {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  padding: 0;
-  border-radius: 12px 12px 0 0;
-  max-width: 700px;
-  width: calc(100% - 2rem);
-  z-index: 1001;
-  pointer-events: none;
-  margin-top: -250px;
-}
-
-.modal-close-button {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #e2e8f0;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  color: #64748b;
-  cursor: pointer;
-  pointer-events: auto;
-  transition: all 0.2s ease;
-  z-index: 1002;
-  padding: 0;
-  line-height: 1;
-}
-
-.modal-close-button:hover {
-  background: #ef4444;
-  color: white;
-  border-color: #ef4444;
-  transform: rotate(90deg);
-}
-
-.proposal-modal-title {
-  margin: 0;
-  padding: 1.5rem 1.5rem 1rem 1.5rem;
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #1e293b;
-  text-align: center;
-  background: linear-gradient(to bottom, #f8fafc, #ffffff);
-  border-bottom: 2px solid #e2e8f0;
-  border-radius: 12px 12px 0 0;
-  pointer-events: none;
-  letter-spacing: -0.025em;
-}
-
-.change-description-wrapper .change-description-section {
-  margin: 0 !important;
-  padding: 1.5rem 2rem !important;
-  background: white !important;
-  pointer-events: auto;
-  border-radius: 0 0 12px 12px;
-}
-
-/* Adjust CourseForm container */
-.proposal-modal-wrapper .course-form-container {
-  max-width: 700px !important;
-  padding-top: 180px !important;
-  margin-top: 60px !important;
-}
-
-/* Hide the default CourseForm header */
-.proposal-modal-wrapper .course-form-header {
-  display: none !important;
 }
 
 

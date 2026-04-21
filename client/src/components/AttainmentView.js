@@ -78,6 +78,37 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
   const [sectionASaveStatus, setSectionASaveStatus] = useState(''); // 'saving', 'saved', 'error' for Section A section
   const [sectionBSaveStatus, setSectionBSaveStatus] = useState(''); // 'saving', 'saved', 'error' for Section B section
   const saveTimeoutRef = useRef(null);
+  const activeManualSaveRef = useRef(null);
+  const ctPersistedRef = useRef({
+    ctRows: [],
+    ctFactors: {},
+    ctManualWts: {},
+    ctEqWts: {},
+    ctSummary: { ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 },
+    ctObtainedRows: []
+  });
+  const assignmentPersistedRef = useRef({
+    assignmentRows: [],
+    assignmentManualWts: {},
+    assignmentSummary: { assignTaken: 0, assignmentMarks30: 0, useEqWt: 0, attendancePerformance: 0 },
+    attendanceMarks: 0,
+    attnAssignObtainedRows: []
+  });
+  const labPersistedRef = useRef({
+    labActivityRows: [],
+    labActivityFactors: {},
+    labActivityEqWts: {},
+    labActivityManualWts: {},
+    labAttendanceMarks: 0,
+    labQuizMarks: 0,
+    labVivaMarks: 0,
+    activityTaken: 0,
+    otherActivityRemaining: 0,
+    otherActivityMeasured: 0,
+    coMappedActivityMarks: 0,
+    useEqWtActivity: 0,
+    labActivityObtainedRows: []
+  });
   const assignmentDataLoadedRef = useRef(false);
   const ctDataLoadedRef = useRef(false);
   const labActivityDataLoadedRef = useRef(false);
@@ -1432,12 +1463,16 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
   }, []);
 
   // Manual save function (saves immediately without debounce)
-  const handleManualSave = async () => {
+  const handleManualSave = async (scope = 'all') => {
+    if (selectedSheet !== 'CT') return;
+    if (activeManualSaveRef.current && activeManualSaveRef.current !== 'CT') return;
+    if (activeManualSaveRef.current === 'CT') return;
     if (!selectedCourse || !selectedCourse._id) {
       setSaveStatus('error');
       setTimeout(() => setSaveStatus(''), 3000);
       return;
     }
+    activeManualSaveRef.current = 'CT';
 
     // Clear any pending autosave
     if (saveTimeoutRef.current) {
@@ -1447,16 +1482,28 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     setSaveStatus('saving');
 
     try {
+      const saveTopOnly = scope === 'top';
+      const saveBottomOnly = scope === 'bottom';
+      const persisted = ctPersistedRef.current || {};
       const dataToSave = {
-        ctRows,
-        ctFactors,
-        ctManualWts,
-        ctEqWts,
-        ctSummary,
-        ctObtainedRows
+        ctRows: saveBottomOnly ? (persisted.ctRows || []) : ctRows,
+        ctFactors: saveBottomOnly ? (persisted.ctFactors || {}) : ctFactors,
+        ctManualWts: saveBottomOnly ? (persisted.ctManualWts || {}) : ctManualWts,
+        ctEqWts: saveBottomOnly ? (persisted.ctEqWts || {}) : ctEqWts,
+        ctSummary: saveBottomOnly ? (persisted.ctSummary || { ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 }) : ctSummary,
+        ctObtainedRows: saveTopOnly ? (persisted.ctObtainedRows || []) : ctObtainedRows
       };
 
       const response = await saveCTData(selectedCourse._id, dataToSave);
+
+      ctPersistedRef.current = {
+        ctRows: dataToSave.ctRows,
+        ctFactors: dataToSave.ctFactors,
+        ctManualWts: dataToSave.ctManualWts,
+        ctEqWts: dataToSave.ctEqWts,
+        ctSummary: dataToSave.ctSummary,
+        ctObtainedRows: dataToSave.ctObtainedRows
+      };
 
       setSaveStatus('saved');
 
@@ -1467,16 +1514,22 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       logger.error('[Manual Save] Error:', error);
       setSaveStatus('error');
       setTimeout(() => setSaveStatus(''), 3000);
+    } finally {
+      activeManualSaveRef.current = null;
     }
   };
 
   // Manual save function for Assignment/Attendance (saves immediately without debounce)
-  const handleManualSaveAssignment = async () => {
+  const handleManualSaveAssignment = async (scope = 'all') => {
+    if (selectedSheet !== 'Attn_Assign') return;
+    if (activeManualSaveRef.current && activeManualSaveRef.current !== 'ASSIGNMENT') return;
+    if (activeManualSaveRef.current === 'ASSIGNMENT') return;
     if (!selectedCourse || !selectedCourse._id) {
       setSaveStatus('error');
       setTimeout(() => setSaveStatus(''), 3000);
       return;
     }
+    activeManualSaveRef.current = 'ASSIGNMENT';
 
     // Clear any pending autosave
     if (saveTimeoutRef.current) {
@@ -1486,15 +1539,26 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     setSaveStatus('saving');
 
     try {
+      const saveTopOnly = scope === 'top';
+      const saveBottomOnly = scope === 'bottom';
+      const persisted = assignmentPersistedRef.current || {};
       const dataToSave = {
-        assignmentRows,
-        assignmentManualWts,
-        assignmentSummary,
-        attendanceMarks,
-        attnAssignObtainedRows
+        assignmentRows: saveBottomOnly ? (persisted.assignmentRows || []) : assignmentRows,
+        assignmentManualWts: saveBottomOnly ? (persisted.assignmentManualWts || {}) : assignmentManualWts,
+        assignmentSummary: saveBottomOnly ? (persisted.assignmentSummary || { assignTaken: 0, assignmentMarks30: 0, useEqWt: 0, attendancePerformance: 0 }) : assignmentSummary,
+        attendanceMarks: saveBottomOnly ? (persisted.attendanceMarks ?? 0) : attendanceMarks,
+        attnAssignObtainedRows: saveTopOnly ? (persisted.attnAssignObtainedRows || []) : attnAssignObtainedRows
       };
 
       const response = await saveAssignmentData(selectedCourse._id, dataToSave);
+
+      assignmentPersistedRef.current = {
+        assignmentRows: dataToSave.assignmentRows,
+        assignmentManualWts: dataToSave.assignmentManualWts,
+        assignmentSummary: dataToSave.assignmentSummary,
+        attendanceMarks: dataToSave.attendanceMarks,
+        attnAssignObtainedRows: dataToSave.attnAssignObtainedRows
+      };
 
       setSaveStatus('saved');
 
@@ -1505,17 +1569,23 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       logger.error('[Manual Save Assignment] Error:', error);
       setSaveStatus('error');
       setTimeout(() => setSaveStatus(''), 3000);
+    } finally {
+      activeManualSaveRef.current = null;
     }
   };
 
   // Manual save function for Lab Activity (saves immediately without debounce)
-  const handleManualSaveLabActivity = async () => {
+  const handleManualSaveLabActivity = async (scope = 'all') => {
+    if (selectedSheet !== 'LabActivity') return;
+    if (activeManualSaveRef.current && activeManualSaveRef.current !== 'LAB') return;
+    if (activeManualSaveRef.current === 'LAB') return;
     if (!selectedCourse || !selectedCourse._id) {
       console.warn('Lab Activity Save: Please select a course first');
       setLabActivitySaveStatus('error');
       setTimeout(() => setLabActivitySaveStatus(''), 3000);
       return;
     }
+    activeManualSaveRef.current = 'LAB';
 
     // Clear any pending autosave
     if (saveTimeoutRef.current) {
@@ -1525,6 +1595,10 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     setLabActivitySaveStatus('saving');
 
     try {
+      const saveTopOnly = scope === 'top';
+      const saveBottomOnly = scope === 'bottom';
+      const persisted = labPersistedRef.current || {};
+
       // Calculate the 'other' field for each student row before saving
       const totals = labActivityActivityTotals();
       let totalMeasuredTotal = (labAttendanceMarks || 0) + (labQuizMarks || 0) + (labVivaMarks || 0);
@@ -1545,22 +1619,38 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       });
 
       const dataToSave = {
-        labActivityRows,
-        labActivityFactors,
-        labActivityEqWts,
-        labActivityManualWts,
-        labAttendanceMarks,
-        labQuizMarks,
-        labVivaMarks,
-        activityTaken,
-        otherActivityRemaining,
-        otherActivityMeasured,
-        coMappedActivityMarks,
-        useEqWtActivity,
-        labActivityObtainedRows: rowsWithCalculatedOther
+        labActivityRows: saveBottomOnly ? (persisted.labActivityRows || []) : labActivityRows,
+        labActivityFactors: saveBottomOnly ? (persisted.labActivityFactors || {}) : labActivityFactors,
+        labActivityEqWts: saveBottomOnly ? (persisted.labActivityEqWts || {}) : labActivityEqWts,
+        labActivityManualWts: saveBottomOnly ? (persisted.labActivityManualWts || {}) : labActivityManualWts,
+        labAttendanceMarks: saveBottomOnly ? (persisted.labAttendanceMarks ?? 0) : labAttendanceMarks,
+        labQuizMarks: saveBottomOnly ? (persisted.labQuizMarks ?? 0) : labQuizMarks,
+        labVivaMarks: saveBottomOnly ? (persisted.labVivaMarks ?? 0) : labVivaMarks,
+        activityTaken: saveBottomOnly ? (persisted.activityTaken ?? 0) : activityTaken,
+        otherActivityRemaining: saveBottomOnly ? (persisted.otherActivityRemaining ?? 0) : otherActivityRemaining,
+        otherActivityMeasured: saveBottomOnly ? (persisted.otherActivityMeasured ?? 0) : otherActivityMeasured,
+        coMappedActivityMarks: saveBottomOnly ? (persisted.coMappedActivityMarks ?? 0) : coMappedActivityMarks,
+        useEqWtActivity: saveBottomOnly ? (persisted.useEqWtActivity ?? 0) : useEqWtActivity,
+        labActivityObtainedRows: saveTopOnly ? (persisted.labActivityObtainedRows || []) : rowsWithCalculatedOther
       };
 
       const response = await saveLabActivityData(selectedCourse._id, dataToSave);
+
+      labPersistedRef.current = {
+        labActivityRows: dataToSave.labActivityRows,
+        labActivityFactors: dataToSave.labActivityFactors,
+        labActivityEqWts: dataToSave.labActivityEqWts,
+        labActivityManualWts: dataToSave.labActivityManualWts,
+        labAttendanceMarks: dataToSave.labAttendanceMarks,
+        labQuizMarks: dataToSave.labQuizMarks,
+        labVivaMarks: dataToSave.labVivaMarks,
+        activityTaken: dataToSave.activityTaken,
+        otherActivityRemaining: dataToSave.otherActivityRemaining,
+        otherActivityMeasured: dataToSave.otherActivityMeasured,
+        coMappedActivityMarks: dataToSave.coMappedActivityMarks,
+        useEqWtActivity: dataToSave.useEqWtActivity,
+        labActivityObtainedRows: dataToSave.labActivityObtainedRows
+      };
 
       console.log('Lab Activity data saved successfully!');
       setLabActivitySaveStatus('saved');
@@ -1578,6 +1668,8 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       logger.error('[Manual Save Lab Activity] Error:', error);
       setLabActivitySaveStatus('error');
       setTimeout(() => setLabActivitySaveStatus(''), 3000);
+    } finally {
+      activeManualSaveRef.current = null;
     }
   };
 
@@ -1671,6 +1763,14 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       if (currentCourseId !== previousCourseIdRef.current) {
         ctDataLoadedRef.current = false;
         previousCourseIdRef.current = currentCourseId;
+        ctPersistedRef.current = {
+          ctRows: [],
+          ctFactors: {},
+          ctManualWts: {},
+          ctEqWts: {},
+          ctSummary: { ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 },
+          ctObtainedRows: []
+        };
       }
 
       if (selectedCourse && selectedCourse._id && (selectedSheet === 'CT' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax' || selectedSheet === 'POCalc' || selectedSheet === 'CheckPO' || selectedSheet === 'Charts')) {
@@ -1694,6 +1794,15 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
           if (response.success && response.data) {
             const { ctRows: savedRows, ctFactors: savedFactors, ctManualWts: savedManual,
               ctEqWts: savedEq, ctSummary: savedSummary, ctObtainedRows: savedObtained } = response.data;
+
+            ctPersistedRef.current = {
+              ctRows: savedRows || [],
+              ctFactors: savedFactors || {},
+              ctManualWts: savedManual || {},
+              ctEqWts: savedEq || {},
+              ctSummary: savedSummary || { ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 },
+              ctObtainedRows: savedObtained || []
+            };
 
             setCtRows(() => {
               if (!savedRows || savedRows.length === 0) {
@@ -1787,6 +1896,13 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       if (courseActuallyChanged) {
         assignmentDataLoadedRef.current = false;
         previousCourseIdForAssignmentRef.current = currentCourseId;
+        assignmentPersistedRef.current = {
+          assignmentRows: [],
+          assignmentManualWts: {},
+          assignmentSummary: { assignTaken: 0, assignmentMarks30: 0, useEqWt: 0, attendancePerformance: 0 },
+          attendanceMarks: 0,
+          attnAssignObtainedRows: []
+        };
       }
 
       if (selectedCourse && selectedCourse._id && (selectedSheet === 'Attn_Assign' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax' || selectedSheet === 'POCalc' || selectedSheet === 'CheckPO' || selectedSheet === 'Charts')) {
@@ -1811,6 +1927,14 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             const { assignmentRows: savedRows, assignmentManualWts: savedManual,
               assignmentSummary: savedSummary, attendanceMarks: savedAttendance,
               attnAssignObtainedRows: savedObtained } = response.data;
+
+            assignmentPersistedRef.current = {
+              assignmentRows: savedRows || [],
+              assignmentManualWts: savedManual || {},
+              assignmentSummary: savedSummary || { assignTaken: 0, assignmentMarks30: 0, useEqWt: 0, attendancePerformance: 0 },
+              attendanceMarks: savedAttendance ?? 0,
+              attnAssignObtainedRows: savedObtained || []
+            };
 
             setAssignmentRows(() => {
               if (!savedRows || savedRows.length === 0) {
@@ -1942,6 +2066,21 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       if (currentCourseId !== previousCourseIdForLabActivityRef.current) {
         labActivityDataLoadedRef.current = false;
         previousCourseIdForLabActivityRef.current = currentCourseId;
+        labPersistedRef.current = {
+          labActivityRows: [],
+          labActivityFactors: {},
+          labActivityEqWts: {},
+          labActivityManualWts: {},
+          labAttendanceMarks: 0,
+          labQuizMarks: 0,
+          labVivaMarks: 0,
+          activityTaken: 0,
+          otherActivityRemaining: 0,
+          otherActivityMeasured: 0,
+          coMappedActivityMarks: 0,
+          useEqWtActivity: 0,
+          labActivityObtainedRows: []
+        };
       }
       // Force reload when refresh key changes (e.g. lab settings saved from TeacherDashboard)
       if (labDataRefreshKey !== lastLabDataRefreshKeyRef.current) {
@@ -1983,6 +2122,22 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
               useEqWtActivity: savedUseEqWt,
               labActivityObtainedRows: savedObtained
             } = response.data;
+
+            labPersistedRef.current = {
+              labActivityRows: savedRows || [],
+              labActivityFactors: savedFactors || {},
+              labActivityEqWts: savedEqWts || {},
+              labActivityManualWts: savedManualWts || {},
+              labAttendanceMarks: savedLabAttendance ?? 0,
+              labQuizMarks: savedLabQuiz ?? 0,
+              labVivaMarks: savedLabViva ?? 0,
+              activityTaken: savedActivityTaken ?? 0,
+              otherActivityRemaining: savedOtherRemaining ?? 0,
+              otherActivityMeasured: savedOtherMeasured ?? 0,
+              coMappedActivityMarks: savedCoMapped ?? 0,
+              useEqWtActivity: savedUseEqWt ?? 0,
+              labActivityObtainedRows: savedObtained || []
+            };
 
             setLabActivityRows(() => {
               if (!savedRows || savedRows.length === 0) {

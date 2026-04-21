@@ -1215,10 +1215,10 @@ section {
   background-color: #95a5a6;
 }
 
-.btn-primary { background-color: #047857; color: white; }
+.btn-primary { background-color: #1e40af; color: white; }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: #047857;
+  background-color: #3b82f6;
 }
 
 .btn-secondary {
@@ -1357,5 +1357,19 @@ section {
 }
 
 
-.btn-success { background-color: #10b981; color: white; }
-.btn-success:hover:not(:disabled) { background-color: #059669; }
+.attainment-container .btn-success { background-color: #007F00 !important; color: white; }
+.attainment-container .btn-success:hover:not(:disabled) { background-color: #006400 !important; }
+.attainment-container .btn-primary { background-color: #1e40af !important; color: white; }
+.attainment-container .btn-primary:hover:not(:disabled) { background-color: #3b82f6 !important; }
+.attainment-container .btn-success,
+.attainment-container .btn-primary {
+  font-family: inherit;
+  font-weight: 500;
+  letter-spacing: 0;
+  padding: 10px 20px;
+  font-size: 14px;
+  line-height: 1.2;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+}
