@@ -31,7 +31,7 @@ const deriveCourseMeta = (rawCode = '') => {
   };
 };
 
-const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMode = false, error = '', onErrorChange }) => {
+const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMode = false, error = '', onErrorChange, showBottomCancel = true, customTitle, topContent }) => {
   const [formData, setFormData] = useState(() => {
     const baseState = initialData ? {
       courseCode: initialData.courseCode || '',
@@ -682,12 +682,12 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
     <div className="course-form-overlay">
       <div className="course-form-container">
         <div className="course-form-header">
-          <h3>{isEditMode ? 'Edit Course' : 'Create New Course'}</h3>
-          <button className="close-btn" onClick={onCancel} disabled={loading}>
+          <h3>{customTitle || (isEditMode ? 'Edit Course' : 'Create New Course')}</h3>
+          <button className="close-btn" onClick={onCancel} disabled={loading} type="button" aria-label="Close form">
             ✕
           </button>
         </div>
-
+        {topContent}
         <form onSubmit={handleSubmit} className="course-form">
           {error && (
             <div className="form-error-alert" style={{
@@ -1290,14 +1290,16 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
           />
 
           <div className="form-actions">
-            <button
-              type="button"
-              className="btn-cancel"
-              onClick={onCancel}
-              disabled={loading}
-            >
-              Cancel
-            </button>
+            {showBottomCancel && (
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={onCancel}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+            )}
             <button
               type="submit"
               className={`btn-submit ${loading ? 'loading' : ''}`}

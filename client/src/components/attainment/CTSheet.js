@@ -82,18 +82,26 @@ const CTSheet = ({
 }) => {
   injectCTStyles();
   const [saving, setSaving] = useState(false);
+  const [activeSaveButton, setActiveSaveButton] = useState(null);
   const [saveMsg, setSaveMsg] = useState('');
 
-  const handleSave = async () => {
+  const handleSave = async (buttonId, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (saving) return;
     setSaving(true);
+    setActiveSaveButton(buttonId);
     setSaveMsg('');
     try {
-      await handleManualSaveCT();
+      await handleManualSaveCT(buttonId);
       setSaveMsg('Saved!');
     } catch (e) {
       setSaveMsg('Save failed');
     } finally {
       setSaving(false);
+      setActiveSaveButton(null);
       setTimeout(() => setSaveMsg(''), 3000);
     }
   };
@@ -105,10 +113,16 @@ const CTSheet = ({
 
   const handleObtainedCell = (rowIdx, field, raw) => {
     const trimmed = raw.trim();
-    const val = trimmed.toLowerCase() === 'a' ? 'A'
+    let val = trimmed.toLowerCase() === 'a' ? 'A'
       : trimmed === '' ? 0
       : isNaN(parseFloat(trimmed)) ? 0
       : parseFloat(trimmed);
+
+    if (typeof val === 'number') {
+      const qCO_total = ctRows.reduce((sum, r) => sum + (parseFloat(r[field]) || 0), 0);
+      if (qCO_total > 0 && val > qCO_total) return;
+    }
+
     setCtObtainedRows(prev => prev.map((r, i) => i === rowIdx ? { ...r, [field]: val } : r));
   };
 
@@ -117,11 +131,70 @@ const CTSheet = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
         <h2 style={{ margin: 0 }}>CO mapping of Class Test Marks</h2>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {saveMsg && <span style={{ fontSize: '13px', color: saveMsg === 'Saved!' ? '#27ae60' : '#e74c3c', fontWeight: 600 }}>{saveMsg}</span>}
-          <button onClick={handleSave} disabled={saving} className="btn-professional btn-success">
-            {saving ? 'Saving...' : 'Save'}
+          {saveMsg && (
+  <div style={{
+    position: 'fixed',
+    bottom: '40px',
+    right: '40px',
+    backgroundColor: '#ffffff',
+    color: '#1e293b',
+    padding: '16px 24px',
+    borderRadius: '8px',
+    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+    border: '1px solid #e2e8f0',
+    fontSize: '14.5px',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    zIndex: 9999,
+    minWidth: '250px',
+    letterSpacing: '-0.01em',
+    animation: 'toastSlideInOut 3s ease-in-out forwards',
+    overflow: 'hidden'
+  }}>
+    <style>{`
+      @keyframes toastSlideInOut {
+        0% { transform: translateX(120%); opacity: 0; }
+        10% { transform: translateX(0); opacity: 1; }
+        90% { transform: translateX(0); opacity: 1; }
+        100% { transform: translateX(120%); opacity: 0; }
+      }
+      @keyframes toastProgress {
+        0% { width: 100%; left: 0; right: auto; }
+        100% { width: 0%; left: 0; right: auto; }
+      }
+    `}</style>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '24px',
+      height: '24px',
+      borderRadius: '50%',
+      backgroundColor: saveMsg === 'Saved!' ? '#dcfce7' : '#fee2e2',
+      color: saveMsg === 'Saved!' ? '#16a34a' : '#dc2626',
+      fontSize: '14px',
+      fontWeight: 'bold',
+      zIndex: 1
+    }}>
+      {saveMsg === 'Saved!' ? '✓' : '✕'}
+    </div>
+    <span style={{ fontWeight: 500, zIndex: 1 }}>{saveMsg}</span>
+    <div style={{
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      height: '4px',
+      backgroundColor: saveMsg === 'Saved!' ? '#22c55e' : '#ef4444',
+      animation: 'toastProgress 2.8s linear forwards'
+    }} />
+  </div>
+)}
+          <button type="button" onClick={(e) => handleSave('top', e)} disabled={saving && activeSaveButton === 'top'} className="btn-professional btn-success">
+            {saving && activeSaveButton === 'top' ? 'Saving...' : 'Save'}
           </button>
-          <button onClick={() => setShowGeneratedTableModal(true)} className="btn-professional btn-primary">
+          <button type="button" onClick={() => setShowGeneratedTableModal(true)} className="btn-professional btn-primary">
             View Generated Table
           </button>
         </div>
@@ -286,11 +359,71 @@ const CTSheet = ({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
               <h3 style={{ margin: 0 }}>Obtained Marks for Class Tests</h3>
               <div className="action-buttons-container" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                {saveMsg && <span style={{ fontSize: '13px', color: saveMsg === 'Saved!' ? '#27ae60' : '#e74c3c', fontWeight: 600 }}>{saveMsg}</span>}
-                <button onClick={handleSave} disabled={saving} className="btn-professional btn-success">
-                  {saving ? 'Saving...' : 'Save'}
+                {saveMsg && (
+  <div style={{
+    position: 'fixed',
+    bottom: '40px',
+    right: '40px',
+    backgroundColor: '#ffffff',
+    color: '#1e293b',
+    padding: '16px 24px',
+    borderRadius: '8px',
+    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+    border: '1px solid #e2e8f0',
+    fontSize: '14.5px',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    zIndex: 9999,
+    minWidth: '250px',
+    letterSpacing: '-0.01em',
+    animation: 'toastSlideInOut 3s ease-in-out forwards',
+    overflow: 'hidden'
+  }}>
+    <style>{`
+      @keyframes toastSlideInOut {
+        0% { transform: translateX(120%); opacity: 0; }
+        10% { transform: translateX(0); opacity: 1; }
+        90% { transform: translateX(0); opacity: 1; }
+        100% { transform: translateX(120%); opacity: 0; }
+      }
+      @keyframes toastProgress {
+        0% { width: 100%; left: 0; right: auto; }
+        100% { width: 0%; left: 0; right: auto; }
+      }
+    `}</style>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '24px',
+      height: '24px',
+      borderRadius: '50%',
+      backgroundColor: saveMsg === 'Saved!' ? '#dcfce7' : '#fee2e2',
+      color: saveMsg === 'Saved!' ? '#16a34a' : '#dc2626',
+      fontSize: '14px',
+      fontWeight: 'bold',
+      zIndex: 1
+    }}>
+      {saveMsg === 'Saved!' ? '✓' : '✕'}
+    </div>
+    <span style={{ fontWeight: 500, zIndex: 1 }}>{saveMsg}</span>
+    <div style={{
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      height: '4px',
+      backgroundColor: saveMsg === 'Saved!' ? '#22c55e' : '#ef4444',
+      animation: 'toastProgress 2.8s linear forwards'
+    }} />
+  </div>
+)}
+                <button type="button" onClick={(e) => handleSave('bottom', e)} disabled={saving && activeSaveButton === 'bottom'} className="btn-professional btn-success">
+                  {saving && activeSaveButton === 'bottom' ? 'Saving...' : 'Save'}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setShowObtainedGeneratedModal(true)}
                   className="btn-professional btn-primary"
                 >

@@ -13,7 +13,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   
   // Warn if section is null - this means teacher assignment may not have section set
   if (!section) {
-    console.warn(`⚠️ Section is null for course ${course?.courseCode}. Defaulting to Section A. Please ensure teachers are assigned to specific sections in the course settings.`);
+    console.warn(`Section is null for course ${course?.courseCode}. Defaulting to Section A. Please ensure teachers are assigned to specific sections in the course settings.`);
   }
   
   const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
@@ -630,7 +630,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         const qNum = normalizedSection === 'A' ? question : String(parseInt(question) - 4);
         const distField = `Q${qNum}${row}`;
         const maxAllowed = distRows.reduce((sum, r) => sum + (parseFloat(r[distField]) || 0), 0);
-        if (maxAllowed > 0 && num > maxAllowed) return; // Reject values exceeding distribution
+        if (num > maxAllowed) return; // Reject values exceeding distribution
       }
     }
     
@@ -752,7 +752,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         
       } catch (error) {
         console.error('Error saving marks:', error);
-        alert(`⚠️ Failed to auto-save marks for ${currentStudent.name}: ${error.message}`);
+        alert(`Failed to auto-save marks for ${currentStudent.name}: ${error.message}`);
         // Continue anyway - marks saved in memory
       }
     }
@@ -1179,10 +1179,20 @@ const MarkEntry = ({ course, students, section, onClose }) => {
             <div className="image-upload-section">
               <h4>Upload Answer Sheet</h4>
               <div className="upload-options">
-                <button className="btn btn-primary" onClick={startCamera}>
+                <button 
+                  className="btn btn-primary" 
+                  onClick={startCamera}
+                  disabled={!isDistributionValid}
+                  title={!isDistributionValid ? "Please set marks distribution to 35 before taking pictures" : ""}
+                >
                   <FontAwesomeIcon icon={faCamera} /> Take Picture
                 </button>
-                <button className="btn btn-outline" onClick={() => fileInputRef.current?.click()}>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!isDistributionValid}
+                  title={!isDistributionValid ? "Please set marks distribution to 35 before uploading files" : ""}
+                >
                   <FontAwesomeIcon icon={faUpload} /> Upload File
                 </button>
               </div>
@@ -1259,13 +1269,19 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                 <img src={capturedImage} alt="Answer sheet" className="captured-image" />
               </div>
               <div className="image-actions">
-                <button className="btn btn-outline" onClick={handleRetake}>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={handleRetake}
+                  disabled={!isDistributionValid}
+                  title={!isDistributionValid ? "Please set marks distribution before taking a picture" : ""}
+                >
                   <FontAwesomeIcon icon={faCamera} /> Retake
                 </button>
                 <button 
                   className="btn btn-primary" 
                   onClick={processImage}
-                  disabled={isProcessingImage}
+                  disabled={isProcessingImage || !isDistributionValid}
+                  title={!isDistributionValid ? "Please set marks distribution before processing" : ""}
                 >
                   {isProcessingImage ? (
                     <><FontAwesomeIcon icon={faSpinner} spin /> Submitting...</>
@@ -1285,7 +1301,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                   background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px',
                   padding: '12px 16px', marginBottom: '12px', fontSize: '14px', color: '#92400e'
                 }}>
-                  ⚠️ <strong>Marks Distribution not set.</strong> Click &ldquo;Marks Distribution&rdquo; above and set each question total to <strong>35</strong> before entering marks.
+                  <strong>Marks Distribution not set.</strong> Click &ldquo;Marks Distribution&rdquo; above and set each question total to <strong>35</strong> before entering marks.
                 </div>
               )}
               <h4>Enter Marks - Section {normalizedSection} (Q{normalizedSection === 'A' ? '1-4' : '5-8'})</h4>
