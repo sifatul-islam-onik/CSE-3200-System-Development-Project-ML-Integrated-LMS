@@ -91,25 +91,17 @@ const ForgotPassword = () => {
 
   return (
     <div className="reset-page OBESynK-reset-page">
-      <div className="OBESynK-auth-banner">
+      <div className="OBESynK-auth-banner" style={{ background: "linear-gradient(135deg, rgba(4, 120, 87, 0.4), rgba(2, 44, 34, 0.6)), url('/login-background.jpg') center/cover no-repeat" }}>
           <div className="OBESynK-auth-brand-logo">
             <Link to="/" className="OBESynK-auth-logo-text">OBESynK</Link>
           </div>
           <div className="OBESynK-auth-back-nav">
-            <Link to="/" className="OBESynK-auth-back-btn">Back to website &rarr;</Link>
+            <Link to="/" className="OBESynK-auth-back-btn">&larr; Back to website</Link>
           </div>
-          <div className="OBESynK-auth-motto">
-            <p>Empowering Academic<br />Excellence</p>
-          </div>
+
         </div>
       <main className="OBESynK-reset-main">
         <div className="OBESynK-reset-container">
-          <div className="OBESynK-branding-mobile">
-            <h1>
-              <Link className="OBESynK-reset-logo-link" to="/">OBESynK</Link>
-            </h1>
-            <p>Academic Portal</p>
-          </div>
 
           <div className="OBESynK-reset-card">
             <div className="OBESynK-reset-header">

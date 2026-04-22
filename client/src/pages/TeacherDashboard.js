@@ -522,9 +522,9 @@ const TeacherDashboard = () => {
                           </div>
                         )}
                         <div className="proposal-meta">
-                          <small>📅 Submitted: {new Date(proposal.createdAt).toLocaleDateString()}</small>
+                          <small>Submitted: {new Date(proposal.createdAt).toLocaleDateString()}</small>
                           {proposal.status !== 'PENDING' && (
-                            <small>✓ Reviewed: {new Date(proposal.updatedAt).toLocaleDateString()}</small>
+                            <small>Reviewed: {new Date(proposal.updatedAt).toLocaleDateString()}</small>
                           )}
                         </div>
                         {proposal.status === 'REJECTED' && proposal.reviewComment && (
