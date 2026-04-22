@@ -3,11 +3,11 @@ import '../styles/Home.css';
 
 const Home = () => {
   return (
-    <div className="home-page cobalt-home-page">
+    <div className="home-page OBESynK-home-page">
       <iframe
-        className="cobalt-overview-frame"
+        className="OBESynK-overview-frame"
         src="/overview.html"
-        title="COBALT Responsive Platform Overview"
+        title="OBESynK Responsive Platform Overview"
       />
     </div>
   );

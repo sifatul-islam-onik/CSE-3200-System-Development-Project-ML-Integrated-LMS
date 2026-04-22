@@ -2494,7 +2494,7 @@ const AdminDashboard = () => {
                     <div key={group.role} className="proposal-card">
                       <div className="proposal-header" style={{justifyContent: 'space-between', alignItems: 'center'}}>
                         <span className="proposal-type-badge" style={{textTransform: 'capitalize'}}>{group.role}</span>
-                        <span className="status-badge" style={{backgroundColor: '#38485f'}}>{group.members.length} user{group.members.length !== 1 ? 's' : ''}</span>
+                        <span className="status-badge" style={{backgroundColor: '#38485f', color: '#ffffff', textTransform: 'uppercase'}}>{group.members.length} user{group.members.length !== 1 ? 's' : ''}</span>
                       </div>
                       <div className="proposal-actions">
                         <button

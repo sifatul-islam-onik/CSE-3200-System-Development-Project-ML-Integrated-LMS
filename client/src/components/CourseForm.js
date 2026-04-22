@@ -31,7 +31,7 @@ const deriveCourseMeta = (rawCode = '') => {
   };
 };
 
-const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMode = false, error = '', onErrorChange }) => {
+const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMode = false, error = '', onErrorChange, showBottomCancel = true, customTitle, topContent }) => {
   const [formData, setFormData] = useState(() => {
     const baseState = initialData ? {
       courseCode: initialData.courseCode || '',
@@ -682,12 +682,12 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
     <div className="course-form-overlay">
       <div className="course-form-container">
         <div className="course-form-header">
-          <h3>{isEditMode ? 'Edit Course' : 'Create New Course'}</h3>
-          <button className="close-btn" onClick={onCancel} disabled={loading}>
+          <h3>{customTitle || (isEditMode ? 'Edit Course' : 'Create New Course')}</h3>
+          <button className="close-btn" onClick={onCancel} disabled={loading} type="button" aria-label="Close form">
             ✕
           </button>
         </div>
-
+        {topContent}
         <form onSubmit={handleSubmit} className="course-form">
           {error && (
             <div className="form-error-alert" style={{
@@ -1055,9 +1055,9 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
               </div>
 
               {formData.kpa_mapping.length > 0 && (
-                <div style={{marginTop: '10px', padding: '10px', backgroundColor: '#f0f9ff', borderRadius: '4px', border: '1px solid #bfdbfe', textAlign: 'left'}}>
-                  <strong style={{color: '#1e40af'}}>Selected: </strong>
-                  <span style={{color: '#1e40af'}}>{formData.kpa_mapping.join(', ')}</span>
+                <div style={{marginTop: '10px', padding: '10px', backgroundColor: '#ecfdf5', borderRadius: '4px', border: '1px solid #a7f3d0', textAlign: 'left'}}>
+                  <strong style={{color: '#10b981'}}>Selected: </strong>
+                  <span style={{color: '#10b981'}}>{formData.kpa_mapping.join(', ')}</span>
                 </div>
               )}
             </div>
@@ -1290,14 +1290,16 @@ const CourseForm = ({ onSubmit, onCancel, loading, initialData = null, isEditMod
           />
 
           <div className="form-actions">
-            <button
-              type="button"
-              className="btn-cancel"
-              onClick={onCancel}
-              disabled={loading}
-            >
-              Cancel
-            </button>
+            {showBottomCancel && (
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={onCancel}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+            )}
             <button
               type="submit"
               className={`btn-submit ${loading ? 'loading' : ''}`}

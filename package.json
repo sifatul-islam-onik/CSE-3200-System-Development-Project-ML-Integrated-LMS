@@ -1,5 +1,8 @@
 {
   "dependencies": {
     "http-proxy-middleware": "^3.0.5"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^11.0.1"
   }
 }

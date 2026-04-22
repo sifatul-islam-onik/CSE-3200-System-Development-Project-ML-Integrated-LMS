@@ -8,7 +8,7 @@
 /* ===== Sidebar ===== */
 .sidebar {
   width: 260px;
-  background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%);
+  background: linear-gradient(180deg, #047857 0%, #065f46 100%);
   color: white;
   display: flex;
   flex-direction: column;
@@ -46,8 +46,23 @@
   flex: 1;
 }
 
+/* Show logo and hide toggle by default when sidebar is closed */
 .sidebar.closed .logo-section {
+  display: flex;
+  margin: 0; /* Remove gap offset */
+}
+
+.sidebar.closed .sidebar-toggle {
   display: none;
+}
+
+/* On hover, hide logo and show toggle */
+.sidebar.closed .sidebar-header:hover .logo-section {
+  display: none;
+}
+
+.sidebar.closed .sidebar-header:hover .sidebar-toggle {
+  display: flex;
 }
 
 .logo-icon {
@@ -78,22 +93,25 @@
 }
 
 .sidebar-toggle {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.15);
   border: none;
   color: white;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  cursor: ew-resize;
   transition: all 0.2s ease;
   font-size: 1.2rem;
+  padding: 0;
+  flex-shrink: 0;
 }
 
 .sidebar-toggle:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.25);
+  opacity: 1;
 }
 
 /* ===== Sidebar Navigation ===== */
@@ -260,7 +278,7 @@
   height: 40px;
   border-radius: 50%;
   background: #fbbf24;
-  color: #1e3a8a;
+  color: #047857;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -412,7 +430,7 @@
 .btn {
   padding: 0.625rem 1.25rem;
   border: none;
-  border-radius: 8px;
+  border-radius: 4px;
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -424,8 +442,37 @@
   gap: 0.5rem;
 }
 
+.btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ===== Form Inputs ===== */
+.form-input {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background-color: #ffffff;
+  font-family: "Inter", "Roboto", sans-serif;
+  transition: all 0.2s ease;
+  color: #0f172a;
+  outline: none;
+}
+
+.form-input:focus {
+  border-color: #047857;
+  box-shadow: 0 0 0 3px rgba(4, 120, 87, 0.15);
+}
+
+.form-input:disabled {
+  background-color: #e2e8f0;
+  cursor: not-allowed;
+}
+
 .btn-primary {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background-color: #047857;
   color: white;
 }
 
@@ -441,6 +488,17 @@
 
 .btn-secondary:hover {
   background: #4b5563;
+}
+
+.btn-success {
+  background: #10b981;
+  color: white;
+}
+
+.btn-success:hover {
+  background: #059669;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
 .btn-outline {
@@ -581,8 +639,8 @@
 }
 
 .role-badge.teacher {
-  background: #dbeafe;
-  color: #1e40af;
+  background: #d1fae5;
+  color: #065f46;
 }
 
 .role-badge.student {
@@ -721,8 +779,8 @@
 .course-code {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #1e40af;
-  background: #dbeafe;
+  color: #065f46;
+  background: #d1fae5;
   padding: 0.4rem 0.875rem;
   border-radius: 6px;
   letter-spacing: 0.5px;
@@ -911,8 +969,8 @@
   display: inline-block;
   font-size: 0.85rem;
   font-weight: 700;
-  color: #1e40af;
-  background: #dbeafe;
+  color: #065f46;
+  background: #d1fae5;
   padding: 0.4rem 0.875rem;
   border-radius: 6px;
   letter-spacing: 0.5px;
@@ -974,7 +1032,7 @@
   top: 1rem;
   left: 1rem;
   z-index: 1100;
-  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
   color: white;
   border: none;
   width: 48px;
@@ -1321,7 +1379,7 @@
 }
 
 .delete-modal .warning-text strong {
-  color: #1e40af;
+  color: #065f46;
   font-weight: 600;
 }
 
@@ -1519,7 +1577,7 @@
 }
 
 .proposal-type-badge.update {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #047857 100%);
   color: white;
 }
 
@@ -1851,90 +1909,6 @@
   border-top: 2px solid #e2e8f0;
 }
 
-/* Proposal Modal Wrapper for CourseForm */
-.proposal-modal-wrapper {
-  position: relative;
-}
-
-/* Position change description to appear inside the modal */
-.change-description-wrapper {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  padding: 0;
-  border-radius: 12px 12px 0 0;
-  max-width: 700px;
-  width: calc(100% - 2rem);
-  z-index: 1001;
-  pointer-events: none;
-  margin-top: -250px;
-}
-
-.modal-close-button {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #e2e8f0;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  color: #64748b;
-  cursor: pointer;
-  pointer-events: auto;
-  transition: all 0.2s ease;
-  z-index: 1002;
-  padding: 0;
-  line-height: 1;
-}
-
-.modal-close-button:hover {
-  background: #ef4444;
-  color: white;
-  border-color: #ef4444;
-  transform: rotate(90deg);
-}
-
-.proposal-modal-title {
-  margin: 0;
-  padding: 1.5rem 1.5rem 1rem 1.5rem;
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #1e293b;
-  text-align: center;
-  background: linear-gradient(to bottom, #f8fafc, #ffffff);
-  border-bottom: 2px solid #e2e8f0;
-  border-radius: 12px 12px 0 0;
-  pointer-events: none;
-  letter-spacing: -0.025em;
-}
-
-.change-description-wrapper .change-description-section {
-  margin: 0 !important;
-  padding: 1.5rem 2rem !important;
-  background: white !important;
-  pointer-events: auto;
-  border-radius: 0 0 12px 12px;
-}
-
-/* Adjust CourseForm container */
-.proposal-modal-wrapper .course-form-container {
-  max-width: 700px !important;
-  padding-top: 180px !important;
-  margin-top: 60px !important;
-}
-
-/* Hide the default CourseForm header */
-.proposal-modal-wrapper .course-form-header {
-  display: none !important;
-}
-
 
 /* ===== Teacher Dashboard Proposals List ===== */
 .proposals-list {
@@ -1991,7 +1965,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #047857 100%);
   color: white;
 }
 
@@ -2227,7 +2201,7 @@
 }
 
 .btn-success {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background-color: #10b981;
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
@@ -2254,13 +2228,13 @@
   }
 }
 
-/* ===== COBALT Theme Overrides ===== */
+/* ===== OBESynK Theme Overrides ===== */
 .dashboard-layout {
   background-color: #f9f9ff;
 }
 
 .sidebar {
-  background: linear-gradient(180deg, #04152b 0%, #1a2a40 100%);
+  background: linear-gradient(180deg, #047857 0%, #065f46 100%);
 }
 
 .nav-submenu {
@@ -2289,22 +2263,22 @@
 }
 
 .section-header {
-  border-bottom-color: #c4c6cd;
+  border-bottom-color: #cbd5e1;
 }
 
 .header-content h2,
 .import-box h3,
 .export-section h3 {
-  color: #0b1c31;
+  color: #0f172a;
 }
 
 .header-subtitle,
 .import-info {
-  color: #44474d;
+  color: #475569;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #04152b 0%, #1a2a40 100%);
+  background-color: #047857;
 }
 
 .btn-primary:hover {
@@ -2312,11 +2286,11 @@
 }
 
 .btn-outline {
-  color: #04152b;
-  border-color: #04152b;
+  color: #047857;
+  border-color: #047857;
 }
 
 .btn-outline:hover {
-  background: #eff3ff;
+  background: #f1f5f9;
 }
 

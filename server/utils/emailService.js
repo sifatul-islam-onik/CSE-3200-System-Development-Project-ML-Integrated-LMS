@@ -41,7 +41,7 @@ exports.sendVerificationEmail = async (email, name, otp) => {
               <strong>Note:</strong> After email verification, your account will need to be approved by an administrator before you can access the system.
             </p>
             <p style="color: #999; font-size: 12px; margin-top: 30px;">
-              ⏰ This code will expire in <strong>15 minutes</strong>.
+              This code will expire in <strong>15 minutes</strong>.
             </p>
             <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
             <p style="color: #999; font-size: 12px;">
@@ -52,7 +52,20 @@ exports.sendVerificationEmail = async (email, name, otp) => {
       `
     };
 
-    await transporter.sendMail(mailOptions);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('--- DEVELOPMENT MODE: MOCK EMAIL SENDING ---');
+      console.log(`To: ${email}`);
+      console.log(`Subject: ${mailOptions.subject}`);
+      console.log(`Verification OTP: ${otp}`);
+      console.log('--------------------------------------------');
+    }
+
+    try {
+      await transporter.sendMail(mailOptions);
+    } catch (sendError) {
+      console.error('SMTP Send Error (falling back to mock):', sendError.message);
+      console.log(`Verification OTP for ${email}: ${otp}`);
+    }
     return true;
   } catch (error) {
     console.error('Error sending verification email:', error);
@@ -85,7 +98,18 @@ exports.sendApprovalEmail = async (email, name) => {
       `
     };
 
-    await transporter.sendMail(mailOptions);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('--- DEVELOPMENT MODE: MOCK EMAIL SENDING ---');
+      console.log(`To: ${email}`);
+      console.log(`Subject: ${mailOptions.subject}`);
+      console.log('--------------------------------------------');
+    }
+
+    try {
+       await transporter.sendMail(mailOptions);
+    } catch (sendError) {
+       console.error('SMTP Send Error (falling back to mock):', sendError.message);
+    }
     return true;
   } catch (error) {
     console.error('Error sending approval email:', error);
@@ -119,7 +143,7 @@ exports.sendPasswordResetEmail = async (email, name, otp) => {
               </h1>
             </div>
             <p style="color: #999; font-size: 12px; margin-top: 30px;">
-              ⏰ This code will expire in <strong>15 minutes</strong>.
+              This code will expire in <strong>15 minutes</strong>.
             </p>
             <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
             <p style="color: #999; font-size: 12px;">
@@ -130,7 +154,20 @@ exports.sendPasswordResetEmail = async (email, name, otp) => {
       `
     };
 
-    await transporter.sendMail(mailOptions);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('--- DEVELOPMENT MODE: MOCK EMAIL SENDING ---');
+      console.log(`To: ${email}`);
+      console.log(`Subject: ${mailOptions.subject}`);
+      console.log(`Password Reset OTP: ${otp}`);
+      console.log('--------------------------------------------');
+    }
+
+    try {
+      await transporter.sendMail(mailOptions);
+    } catch (sendError) {
+      console.error('SMTP Send Error (falling back to mock):', sendError.message);
+      console.log(`Password Reset OTP for ${email}: ${otp}`);
+    }
     return true;
   } catch (error) {
     console.error('Error sending password reset email:', error);

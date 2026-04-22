@@ -139,7 +139,7 @@ const ChartCard = ({ children, tight = false }) => (
 let _gradId = 0;
 
 // Single-series bar chart
-const SingleBarChart = ({ title, labels, values, color = '#2563eb', yLabel = 'Achieved (%)', wide = false }) => {
+const SingleBarChart = ({ title, labels, values, color = '#059669', yLabel = 'Achieved (%)', wide = false }) => {
   const n      = labels.length;
   if (n === 0) return null;
   const pad    = DEFAULT_PAD;
@@ -221,7 +221,7 @@ const SingleBarChart = ({ title, labels, values, color = '#2563eb', yLabel = 'Ac
   if (wide) {
     return (
       <div style={{ marginTop: '30px' }}>
-        <h4 style={{ marginBottom: '8px', color: '#2c3e50', textAlign: 'center' }}>{title}</h4>
+        <h4 style={{ marginBottom: '8px', color: '#065f46', textAlign: 'center' }}>{title}</h4>
         {inner}
       </div>
     );
@@ -247,8 +247,8 @@ const SingleBarChart = ({ title, labels, values, color = '#2563eb', yLabel = 'Ac
 };
 
 // Multi-series grouped bar chart
-const SERIES_COLORS       = ['#2563eb', '#16a34a', '#d97706'];
-const SERIES_COLORS_LIGHT = ['#3b82f6', '#22c55e', '#f59e0b'];
+const SERIES_COLORS       = ['#059669', '#16a34a', '#d97706'];
+const SERIES_COLORS_LIGHT = ['#10b981', '#22c55e', '#f59e0b'];
 
 const GroupedBarChart = ({ title, labels, series, yLabel, wide = false, hideBarText = false }) => {
   const n = labels.length;
@@ -355,7 +355,7 @@ const GroupedBarChart = ({ title, labels, series, yLabel, wide = false, hideBarT
   if (wide) {
     return (
       <div style={{ marginTop: '30px' }}>
-        <h4 style={{ marginBottom: '8px', color: '#2c3e50', textAlign: 'center' }}>{title}</h4>
+        <h4 style={{ marginBottom: '8px', color: '#065f46', textAlign: 'center' }}>{title}</h4>
         {legend}
         {inner}
       </div>
@@ -448,7 +448,7 @@ const ChartsSheet = ({
   const poUnnormVals   = poUnnorm.map(v   => parseFloat((v * 100).toFixed(2)));
   const poEqWtVals     = poEqWt.map(v     => parseFloat((v * 100).toFixed(2)));
 
-  const thStyle = { backgroundColor: '#2980b9', color: 'white' };
+  const thStyle = { backgroundColor: '#047857', color: 'white' };
   const labelStyle = { textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e8f4f8', whiteSpace: 'nowrap' };
   const cellStyle  = { textAlign: 'center' };
 
@@ -481,7 +481,7 @@ const ChartsSheet = ({
       // Add a decorative underline
       const titleHeight = headingLines.length * 24; // approx line height
       const lineWidth = 400; // width of the underline - increased for visibility
-      pdf.setDrawColor(37, 99, 235); // blue underline #2563eb
+      pdf.setDrawColor(4, 120, 87); // blue underline #059669
       pdf.setLineWidth(2.5); // thicker line
       pdf.line((pageW - lineWidth) / 2, currentY + titleHeight, (pageW + lineWidth) / 2, currentY + titleHeight);
       
@@ -539,7 +539,7 @@ const ChartsSheet = ({
   return (
     <section className="charts-section" ref={sectionRef}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#2c3e50', margin: 0 }}>Charts</h3>
+        <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#065f46', margin: 0 }}>Charts</h3>
         <button
           onClick={handleExportToPDF}
           disabled={isExporting}
@@ -559,7 +559,7 @@ const ChartsSheet = ({
 
       {/* CO Attainment Table */}
       <div className="table-container" style={{ marginTop: '20px', overflowX: 'auto' }}>
-        <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>
+        <h4 style={{ marginBottom: '15px', color: '#065f46' }}>
           CO Attainment of {pairLabel}
         </h4>
         <table className="co-po-map-table">
@@ -588,7 +588,7 @@ const ChartsSheet = ({
         title={`CO Attainment \u2014 ${pairLabel}`}
         labels={coNames}
         values={coAchievedVals}
-        color="#2563eb"
+        color="#059669"
         yLabel="Achieved (%)"
       />
       <SingleBarChart
@@ -616,7 +616,7 @@ const ChartsSheet = ({
       />
       {/* PO Attainment Table */}
       <div className="table-container" style={{ marginTop: '30px', overflowX: 'auto' }}>
-        <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>
+        <h4 style={{ marginBottom: '15px', color: '#065f46' }}>
           PO Attainment of {pairLabel}
         </h4>
         <table className="co-po-map-table">
@@ -644,7 +644,7 @@ const ChartsSheet = ({
         title={`PO Attainment \u2014 ${pairLabel}`}
         labels={poNames}
         values={poAchievedVals}
-        color="#2563eb"
+        color="#059669"
         yLabel="Achieved (%)"
       />
       <SingleBarChart

@@ -300,7 +300,7 @@ const CTModals = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <button onClick={() => setObtainedModalView(prev => Math.max(0, prev - 1))}
                   disabled={obtainedModalView === 0}
-                  style={{ padding: '6px 12px', backgroundColor: obtainedModalView === 0 ? '#ccc' : '#3498db', color: 'white', border: 'none', borderRadius: '4px', cursor: obtainedModalView === 0 ? 'not-allowed' : 'pointer', fontSize: '14px' }}>
+                  style={{ padding: '6px 12px', backgroundColor: obtainedModalView === 0 ? '#ccc' : '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: obtainedModalView === 0 ? 'not-allowed' : 'pointer', fontSize: '14px' }}>
                   ← Previous
                 </button>
                 <h3>
@@ -309,7 +309,7 @@ const CTModals = ({
                 </h3>
                 <button onClick={() => setObtainedModalView(prev => Math.min(1, prev + 1))}
                   disabled={obtainedModalView === 1}
-                  style={{ padding: '6px 12px', backgroundColor: obtainedModalView === 1 ? '#ccc' : '#3498db', color: 'white', border: 'none', borderRadius: '4px', cursor: obtainedModalView === 1 ? 'not-allowed' : 'pointer', fontSize: '14px' }}>
+                  style={{ padding: '6px 12px', backgroundColor: obtainedModalView === 1 ? '#ccc' : '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: obtainedModalView === 1 ? 'not-allowed' : 'pointer', fontSize: '14px' }}>
                   Next →
                 </button>
               </div>

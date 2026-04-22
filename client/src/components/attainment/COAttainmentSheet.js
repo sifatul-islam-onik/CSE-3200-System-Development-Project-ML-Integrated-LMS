@@ -113,7 +113,7 @@ const AttainmentTable = ({ clos, coAttainmentData, formatNumber, keyPrefix, titl
         <table className="co-attainment-table">
           <thead>
             <tr>
-              <th rowSpan="2" style={{ position: 'sticky', left: 0, top: 0, zIndex: 12, backgroundColor: '#2980b9', color: 'white' }}>Roll</th>
+              <th rowSpan="2" style={{ position: 'sticky', left: 0, top: 0, zIndex: 12, backgroundColor: '#047857', color: 'white' }}>Roll</th>
               <th colSpan={clos.length}>Attainment of COs in %</th>
               <th colSpan={clos.length}>CO Achievement&gt;=55%</th>
               <th colSpan={clos.length}>Binary Achievement&gt;=55%</th>

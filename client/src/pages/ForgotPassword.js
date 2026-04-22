@@ -90,18 +90,29 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="reset-page cobalt-reset-page">
-      <main className="cobalt-reset-main">
-        <div className="cobalt-reset-container">
-          <div className="cobalt-reset-branding">
+    <div className="reset-page OBESynK-reset-page">
+      <div className="OBESynK-auth-banner">
+          <div className="OBESynK-auth-brand-logo">
+            <Link to="/" className="OBESynK-auth-logo-text">OBESynK</Link>
+          </div>
+          <div className="OBESynK-auth-back-nav">
+            <Link to="/" className="OBESynK-auth-back-btn">Back to website &rarr;</Link>
+          </div>
+          <div className="OBESynK-auth-motto">
+            <p>Empowering Academic<br />Excellence</p>
+          </div>
+        </div>
+      <main className="OBESynK-reset-main">
+        <div className="OBESynK-reset-container">
+          <div className="OBESynK-branding-mobile">
             <h1>
-              <Link className="cobalt-reset-logo-link" to="/">COBALT</Link>
+              <Link className="OBESynK-reset-logo-link" to="/">OBESynK</Link>
             </h1>
             <p>Academic Portal</p>
           </div>
 
-          <div className="cobalt-reset-card">
-            <div className="cobalt-reset-header">
+          <div className="OBESynK-reset-card">
+            <div className="OBESynK-reset-header">
               <h1>{step === 1 ? 'Reset Your Password' : 'Set New Password'}</h1>
               <p>
                 {step === 1
@@ -114,8 +125,8 @@ const ForgotPassword = () => {
             {error && <div className="reset-alert reset-alert-error">{error}</div>}
 
             {step === 1 ? (
-              <form onSubmit={handleRequestReset} className="cobalt-reset-form">
-                <div className="cobalt-reset-field">
+              <form onSubmit={handleRequestReset} className="OBESynK-reset-form">
+                <div className="OBESynK-reset-field">
                   <label htmlFor="email">Email</label>
                   <input
                     type="email"
@@ -127,13 +138,13 @@ const ForgotPassword = () => {
                   />
                 </div>
 
-                <button type="submit" className="cobalt-reset-btn" disabled={loading}>
+                <button type="submit" className="OBESynK-reset-btn" disabled={loading}>
                   {loading ? 'Sending...' : 'Send Reset Code'}
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleResetPassword} className="cobalt-reset-form">
-                <div className="cobalt-reset-field">
+              <form onSubmit={handleResetPassword} className="OBESynK-reset-form">
+                <div className="OBESynK-reset-field">
                   <label htmlFor="otp">6-Digit OTP</label>
                   <input
                     type="text"
@@ -146,7 +157,7 @@ const ForgotPassword = () => {
                   />
                 </div>
 
-                <div className="cobalt-reset-field">
+                <div className="OBESynK-reset-field">
                   <label htmlFor="newPassword">New Password</label>
                   <input
                     type="password"
@@ -158,7 +169,7 @@ const ForgotPassword = () => {
                   />
                 </div>
 
-                <div className="cobalt-reset-field">
+                <div className="OBESynK-reset-field">
                   <label htmlFor="confirmPassword">Confirm New Password</label>
                   <input
                     type="password"
@@ -170,16 +181,16 @@ const ForgotPassword = () => {
                   />
                 </div>
 
-                <button type="submit" className="cobalt-reset-btn" disabled={loading}>
+                <button type="submit" className="OBESynK-reset-btn" disabled={loading}>
                   {loading ? 'Resetting...' : 'Reset Password'}
                 </button>
 
-                <div className="cobalt-reset-meta">
+                <div className="OBESynK-reset-meta">
                   <p>Didn't receive the code?</p>
                   <button
                     type="button"
                     onClick={handleResendCode}
-                    className="cobalt-reset-link"
+                    className="OBESynK-reset-link"
                     disabled={resendLoading || loading}
                   >
                     {resendLoading && <span className="spinner spinner-dark"></span>}
@@ -189,13 +200,13 @@ const ForgotPassword = () => {
               </form>
             )}
 
-            <div className="cobalt-reset-nav">
-              <button type="button" className="cobalt-reset-link" onClick={() => navigate('/login')}>
+            <div className="OBESynK-reset-nav">
+              <button type="button" className="OBESynK-reset-link" onClick={() => navigate('/login')}>
                 Back to Login
               </button>
             </div>
 
-            <div className="cobalt-reset-prism">
+            <div className="OBESynK-reset-prism">
               <p>Verification codes are valid for 15 minutes. Please check your institutional spam folder.</p>
             </div>
           </div>

@@ -1058,9 +1058,12 @@ const TeacherDashboard = () => {
           <button 
             className="sidebar-toggle"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
           >
-            {sidebarOpen ? '←' : '→'}
+            <svg width="20" height="20" viewBox="2 2 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="5" ry="5"></rect>
+              <line x1="9" y1="3" x2="9" y2="21"></line>
+            </svg>
           </button>
         </div>
         <nav className="sidebar-nav">
@@ -1082,7 +1085,7 @@ const TeacherDashboard = () => {
               )}
             </button>
             
-            {proposalsOpen && (
+            {sidebarOpen && proposalsOpen && (
               <div className="nav-submenu">
                 <button
                   className={`nav-item nav-subitem ${activeSection === 'create-proposal' ? 'active' : ''}`}
@@ -1157,55 +1160,40 @@ const TeacherDashboard = () => {
       </main>
 
       {showCourseForm && (
-        <>
-          <div className="change-description-wrapper">
-            <button
-              className="modal-close-button"
-              onClick={() => {
-                setShowCourseForm(false);
-                setSelectedCourse(null);
-                setChangeDescription('');
-                if (activeSection === 'create-proposal') {
-                  setActiveSection('proposals');
-                }
-              }}
-              aria-label="Close modal"
-            >
-              ×
-            </button>
-            <h3 className="proposal-modal-title">
-              {proposalType === 'CREATE' ? 'Propose New Course' : 'Propose Course Edit'}
-            </h3>
-            <div className="change-description-section">
-              <label htmlFor="changeDescription">
-                Change Description *
-              </label>
-              <textarea
-                id="changeDescription"
-                value={changeDescription}
-                onChange={(e) => setChangeDescription(e.target.value)}
-                placeholder="Explain the reason for this proposal..."
-                rows="3"
-              />
-            </div>
-          </div>
-          <div className="proposal-modal-wrapper">
-            <CourseForm
-              onSubmit={handleCreateProposal}
-              onCancel={() => {
-                setShowCourseForm(false);
-                setSelectedCourse(null);
-                setChangeDescription('');
-                if (activeSection === 'create-proposal') {
-                  setActiveSection('proposals');
-                }
-              }}
-              loading={courseFormLoading}
-              initialData={proposalType === 'UPDATE' ? selectedCourse : null}
-              isEditMode={proposalType === 'UPDATE'}
-            />
-          </div>
-        </>
+        <div className="proposal-modal-wrapper">
+          <CourseForm
+            customTitle={proposalType === 'CREATE' ? 'Propose New Course' : 'Propose Course Edit'}
+            topContent={
+              <div className="course-form" style={{ paddingBottom: 0 }}>
+                <div className="form-group">
+                  <label htmlFor="changeDescription" style={{ textTransform: 'uppercase' }}>
+                    Change Description *
+                  </label>
+                  <textarea
+                    id="changeDescription"
+                    value={changeDescription}
+                    onChange={(e) => setChangeDescription(e.target.value)}
+                    placeholder="Explain the reason for this proposal..."
+                    rows="3"
+                  />
+                </div>
+              </div>
+            }
+            onSubmit={handleCreateProposal}
+            onCancel={() => {
+              setShowCourseForm(false);
+              setSelectedCourse(null);
+              setChangeDescription('');
+              if (activeSection === 'create-proposal') {
+                setActiveSection('proposals');
+              }
+            }}
+            loading={courseFormLoading}
+            initialData={proposalType === 'UPDATE' ? selectedCourse : null}
+            isEditMode={proposalType === 'UPDATE'}
+            showBottomCancel={false}
+          />
+        </div>
       )}
 
       {showOBEView && selectedCourse && (
@@ -1455,17 +1443,43 @@ const TeacherDashboard = () => {
                           parsedMap[parsed.rollNumber] = parsed;
                         }
                       });
+                      let ignoredValuesCount = 0;
+                      let ignoredRolls = [];
                       // Only update existing enrolled rows — never add rows from Excel
                       const existingObtained = (Array.isArray(existing.ctObtainedRows) ? existing.ctObtainedRows : [])
                         .filter(r => r.rollNumber && r.rollNumber.toLowerCase() !== 'roll')
                         .map(r => {
                           const match = parsedMap[String(r.rollNumber).trim()];
                           if (match) {
+                            let newQ1 = r[q1Field] ?? 0;
+                            let newQ2 = r[q2Field] ?? 0;
+                            let newQ3 = r[q3Field] ?? 0;
+                            if (match.q1 !== null) {
+                              if ((ctUploadParsed.q1Total || 0) > 0 && match.q1 > ctUploadParsed.q1Total) {
+                                ignoredValuesCount++;
+                                ignoredRolls.push(r.rollNumber);
+                              }
+                              else newQ1 = match.q1;
+                            }
+                            if (match.q2 !== null) {
+                              if ((ctUploadParsed.q2Total || 0) > 0 && match.q2 > ctUploadParsed.q2Total) {
+                                ignoredValuesCount++;
+                                ignoredRolls.push(r.rollNumber);
+                              }
+                              else newQ2 = match.q2;
+                            }
+                            if (match.q3 !== null) {
+                              if ((ctUploadParsed.q3Total || 0) > 0 && match.q3 > ctUploadParsed.q3Total) {
+                                ignoredValuesCount++;
+                                ignoredRolls.push(r.rollNumber);
+                              }
+                              else newQ3 = match.q3;
+                            }
                             return {
                               ...r,
-                              [q1Field]: match.q1 !== null ? Math.min(match.q1, ctUploadParsed.q1Total || Infinity) : (r[q1Field] ?? 0),
-                              [q2Field]: match.q2 !== null ? Math.min(match.q2, ctUploadParsed.q2Total || Infinity) : (r[q2Field] ?? 0),
-                              [q3Field]: match.q3 !== null ? Math.min(match.q3, ctUploadParsed.q3Total || Infinity) : (r[q3Field] ?? 0),
+                              [q1Field]: newQ1,
+                              [q2Field]: newQ2,
+                              [q3Field]: newQ3,
                             };
                           }
                           return r;
@@ -1525,9 +1539,13 @@ const TeacherDashboard = () => {
                       };
                       await saveCTData(ctMarksCourse._id, fullData);
                       setCtExistingData(prev => ({ ...(prev || {}), ...fullData }));
-                      const msg = unmatchedRolls.length > 0
+                      let msg = unmatchedRolls.length > 0
                         ? `${ctKey} marks saved. ${unmatchedRolls.length} roll(s) in Excel not found in enrolled list: ${unmatchedRolls.join(', ')}`
                         : `${ctKey} marks saved successfully`;
+                      if (ignoredValuesCount > 0) {
+                        const uniqueRolls = [...new Set(ignoredRolls)].join(', ');
+                        msg += `. Ignored ${ignoredValuesCount} value(s) from Excel that exceeded the maximum allowed marks for rolls: ${uniqueRolls}.`;
+                      }
                       setSuccessMessage(msg);
                       setTimeout(() => setSuccessMessage(''), unmatchedRolls.length > 0 ? 8000 : 3000);
                       setCtUploadParsed(null);
@@ -1877,17 +1895,71 @@ const TeacherDashboard = () => {
                         }
                       } catch (e) { /* use rawObtained as-is */ }
 
+                      let ignoredValuesCount = 0;
+                      let ignoredRolls = [];
                       // Helper to apply Excel marks to a single student row
-                      const applyParsedMarks = (r, match) => ({
-                        ...r,
-                        attn: match.attn !== null ? Math.min(match.attn, labSettings.attnMarks || Infinity) : (r.attn ?? 0),
-                        quiz: match.quiz !== null ? Math.min(match.quiz, labSettings.quizMarks || Infinity) : (r.quiz ?? 0),
-                        viva: match.viva !== null ? Math.min(match.viva, labSettings.vivaMarks || Infinity) : (r.viva ?? 0),
-                        [q1Field]: match.q1 !== null ? Math.min(match.q1, labUploadParsed.q1Total || Infinity) : (r[q1Field] ?? 0),
-                        [q2Field]: match.q2 !== null ? Math.min(match.q2, labUploadParsed.q2Total || Infinity) : (r[q2Field] ?? 0),
-                        [q3Field]: match.q3 !== null ? Math.min(match.q3, labUploadParsed.q3Total || Infinity) : (r[q3Field] ?? 0),
-                        ...(labUploadParsed.hasOther && match.other !== null ? { otherMeasured: match.other } : {}),
-                      });
+                      const applyParsedMarks = (r, match) => {
+                        let newAttn = r.attn ?? 0;
+                        let newQuiz = r.quiz ?? 0;
+                        let newViva = r.viva ?? 0;
+                        let newQ1 = r[q1Field] ?? 0;
+                        let newQ2 = r[q2Field] ?? 0;
+                        let newQ3 = r[q3Field] ?? 0;
+
+                        if (match.attn !== null) {
+                          if ((labSettings.attnMarks || 0) > 0 && match.attn > labSettings.attnMarks) {
+                            ignoredValuesCount++;
+                            ignoredRolls.push(r.rollNumber);
+                          }
+                          else newAttn = match.attn;
+                        }
+                        if (match.quiz !== null) {
+                          if ((labSettings.quizMarks || 0) > 0 && match.quiz > labSettings.quizMarks) {
+                            ignoredValuesCount++;
+                            ignoredRolls.push(r.rollNumber);
+                          }
+                          else newQuiz = match.quiz;
+                        }
+                        if (match.viva !== null) {
+                          if ((labSettings.vivaMarks || 0) > 0 && match.viva > labSettings.vivaMarks) {
+                            ignoredValuesCount++;
+                            ignoredRolls.push(r.rollNumber);
+                          }
+                          else newViva = match.viva;
+                        }
+                        if (match.q1 !== null) {
+                          if ((labUploadParsed.q1Total || 0) > 0 && match.q1 > labUploadParsed.q1Total) {
+                            ignoredValuesCount++;
+                            ignoredRolls.push(r.rollNumber);
+                          }
+                          else newQ1 = match.q1;
+                        }
+                        if (match.q2 !== null) {
+                          if ((labUploadParsed.q2Total || 0) > 0 && match.q2 > labUploadParsed.q2Total) {
+                            ignoredValuesCount++;
+                            ignoredRolls.push(r.rollNumber);
+                          }
+                          else newQ2 = match.q2;
+                        }
+                        if (match.q3 !== null) {
+                          if ((labUploadParsed.q3Total || 0) > 0 && match.q3 > labUploadParsed.q3Total) {
+                            ignoredValuesCount++;
+                            ignoredRolls.push(r.rollNumber);
+                          }
+                          else newQ3 = match.q3;
+                        }
+
+                        return {
+                          ...r,
+                          attn: newAttn,
+                          quiz: newQuiz,
+                          viva: newViva,
+                          [q1Field]: newQ1,
+                          [q2Field]: newQ2,
+                          [q3Field]: newQ3,
+                          ...(labUploadParsed.hasOther && match.other !== null ? { otherMeasured: match.other } : {}),
+                        };
+                      };
 
                       // Update only existing enrolled rows — never add rows from Excel.
                       const existingObtained = Object.keys(parsedMap).length === 0
@@ -1958,9 +2030,13 @@ const TeacherDashboard = () => {
                       await saveLabActivityData(labMarksCourse._id, fullData);
                       setLabExistingData(prev => ({ ...(prev || {}), ...fullData }));
                       setLabDataRefreshKey(k => k + 1);
-                      const msg = unmatchedRolls.length > 0
+                      let msg = unmatchedRolls.length > 0
                         ? `${actKey} marks saved. ${unmatchedRolls.length} roll(s) in Excel not found in enrolled list: ${unmatchedRolls.join(', ')}`
                         : `${actKey} marks saved successfully`;
+                      if (ignoredValuesCount > 0) {
+                        const uniqueRolls = [...new Set(ignoredRolls)].join(', ');
+                        msg += `. Ignored ${ignoredValuesCount} value(s) from Excel that exceeded the maximum allowed marks for rolls: ${uniqueRolls}.`;
+                      }
                       setSuccessMessage(msg);
                       setTimeout(() => setSuccessMessage(''), unmatchedRolls.length > 0 ? 8000 : 3000);
                       setLabUploadParsed(null);
@@ -2260,17 +2336,53 @@ const TeacherDashboard = () => {
                       }
 
                       // Only update enrolled rows — never add rows from Excel
+                      let ignoredValuesCount = 0;
+                      let ignoredRolls = [];
                       const updatedObtained = Object.keys(parsedMap).length === 0
                         ? baseObtained
                         : baseObtained.map(r => {
                             const match = parsedMap[String(r.rollNumber).trim()];
                             if (match) {
+                              let newAttn = r.attendance ?? 0;
+                              let newQ1 = r[q1Field] ?? 0;
+                              let newQ2 = r[q2Field] ?? 0;
+                              let newQ3 = r[q3Field] ?? 0;
+
+                              if (assignUploadParsed.hasAttnPerf && match.attnPerf !== null) {
+                                if (existing.attnAssignMarks && match.attnPerf > existing.attnAssignMarks) {
+                                  ignoredValuesCount++;
+                                  ignoredRolls.push(r.rollNumber);
+                                }
+                                else newAttn = match.attnPerf;
+                              }
+                              if (match.q1 !== null) {
+                                if ((assignUploadParsed.q1Total || 0) > 0 && match.q1 > assignUploadParsed.q1Total) {
+                                  ignoredValuesCount++;
+                                  ignoredRolls.push(r.rollNumber);
+                                }
+                                else newQ1 = match.q1;
+                              }
+                              if (match.q2 !== null) {
+                                if ((assignUploadParsed.q2Total || 0) > 0 && match.q2 > assignUploadParsed.q2Total) {
+                                  ignoredValuesCount++;
+                                  ignoredRolls.push(r.rollNumber);
+                                }
+                                else newQ2 = match.q2;
+                              }
+                              if (match.q3 !== null) {
+                                if ((assignUploadParsed.q3Total || 0) > 0 && match.q3 > assignUploadParsed.q3Total) {
+                                  ignoredValuesCount++;
+                                  ignoredRolls.push(r.rollNumber);
+                                }
+                                else newQ3 = match.q3;
+                              }
+
                               return {
                                 ...r,
-                                ...(assignUploadParsed.hasAttnPerf && match.attnPerf !== null ? { attendance: match.attnPerf } : {}),
-                                [q1Field]: match.q1 !== null ? match.q1 : (r[q1Field] ?? 0),
-                                [q2Field]: match.q2 !== null ? match.q2 : (r[q2Field] ?? 0),
-                                [q3Field]: match.q3 !== null ? match.q3 : (r[q3Field] ?? 0),
+                                ...(assignUploadParsed.hasAttnPerf && match.attnPerf !== null && newAttn === match.attnPerf ? { attendance: newAttn } : {}),
+                                [q1Field]: newQ1,
+                                [q2Field]: newQ2,
+                                [q3Field]: newQ3,
                               };
                             }
                             return r;
@@ -2337,9 +2449,13 @@ const TeacherDashboard = () => {
 
                       await saveAssignmentData(attendanceCourse._id, fullData);
                       setAssignExistingData(prev => ({ ...(prev || {}), ...fullData }));
-                      const msg = unmatchedRolls.length > 0
+                      let msg = unmatchedRolls.length > 0
                         ? `${assgnKey} marks saved. ${unmatchedRolls.length} roll(s) in Excel not found in enrolled list: ${unmatchedRolls.join(', ')}`
                         : `${assgnKey} marks saved successfully`;
+                      if (ignoredValuesCount > 0) {
+                        const uniqueRolls = [...new Set(ignoredRolls)].join(', ');
+                        msg += `. Ignored ${ignoredValuesCount} value(s) from Excel that exceeded the maximum allowed marks for rolls: ${uniqueRolls}.`;
+                      }
                       setSuccessMessage(msg);
                       setTimeout(() => setSuccessMessage(''), unmatchedRolls.length > 0 ? 8000 : 3000);
                       setAssignUploadParsed(null);

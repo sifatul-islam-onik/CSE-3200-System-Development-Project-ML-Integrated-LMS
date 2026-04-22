@@ -32,13 +32,13 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
 
   const headerRow = (
     <tr>
-      <th style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>CO/PO</th>
+      <th style={{ backgroundColor: '#047857', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>CO/PO</th>
       {programOutcomes.map((po, idx) => (
-        <th key={idx} style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>
+        <th key={idx} style={{ backgroundColor: '#047857', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>
           {po.poCode || `PO${idx + 1}`}
         </th>
       ))}
-      <th style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>Total</th>
+      <th style={{ backgroundColor: '#047857', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>Total</th>
     </tr>
   );
 
@@ -62,7 +62,7 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
                     return (
                       <td key={poIdx} style={{
                         textAlign: 'center',
-                        backgroundColor: isMapped ? '#d5f4e6' : 'white',
+                        backgroundColor: isMapped ? '#d1fae5' : 'white',
                         fontWeight: isMapped ? 'bold' : 'normal'
                       }}>
                         {isMapped ? '1' : '-'}
@@ -89,14 +89,14 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
 
       {/* ── Normalized mapping ────────────────────────────────────────────── */}
       <div style={{ marginTop: '30px' }}>
-        <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>Normalized CO-PO Mapping (Contribution per PO)</h4>
+        <h4 style={{ marginBottom: '15px', color: '#065f46' }}>Normalized CO-PO Mapping (Contribution per PO)</h4>
         <div style={{ overflowX: 'auto' }}>
         <table className="co-po-map-table" style={{ minWidth: 'max-content', borderCollapse: 'separate', borderSpacing: 0, overflow: 'visible' }}>
           <thead>
             <tr>
-              <th style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>CO/PO</th>
+              <th style={{ backgroundColor: '#047857', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>CO/PO</th>
               {programOutcomes.map((po, idx) => (
-                <th key={idx} style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>{po.poCode || `PO${idx + 1}`}</th>
+                <th key={idx} style={{ backgroundColor: '#047857', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>{po.poCode || `PO${idx + 1}`}</th>
               ))}
             </tr>
           </thead>
@@ -114,7 +114,7 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
                     return (
                       <td key={poIdx} style={{
                         textAlign: 'center',
-                        backgroundColor: isMapped ? '#d5f4e6' : 'white',
+                        backgroundColor: isMapped ? '#d1fae5' : 'white',
                         fontWeight: isMapped ? 'bold' : 'normal'
                       }}>
                         {norm > 0 ? norm : '-'}
@@ -143,7 +143,7 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
         <>
           {/* Raw combined */}
           <div style={{ marginTop: '30px' }}>
-            <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>
+            <h4 style={{ marginBottom: '15px', color: '#065f46' }}>
               Combined CO-PO Mapping ({selectedCourse.courseCode} + {matchingCourseCode})
             </h4>
             <div style={{ overflowX: 'auto' }}>
@@ -160,7 +160,7 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
                         return (
                           <td key={poIdx} style={{
                             textAlign: 'center',
-                            backgroundColor: isMapped ? '#d5f4e6' : 'white',
+                            backgroundColor: isMapped ? '#d1fae5' : 'white',
                             fontWeight: isMapped ? 'bold' : 'normal'
                           }}>
                             {isMapped ? '1' : '-'}
@@ -187,16 +187,16 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
 
           {/* Normalized combined */}
           <div style={{ marginTop: '30px' }}>
-            <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>
+            <h4 style={{ marginBottom: '15px', color: '#065f46' }}>
               Normalized Combined CO-PO Mapping ({selectedCourse.courseCode} + {matchingCourseCode})
             </h4>
             <div style={{ overflowX: 'auto' }}>
             <table className="co-po-map-table" style={{ minWidth: 'max-content', borderCollapse: 'separate', borderSpacing: 0, overflow: 'visible' }}>
               <thead>
                 <tr>
-                  <th style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>CO/PO</th>
+                  <th style={{ backgroundColor: '#047857', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>CO/PO</th>
                   {programOutcomes.map((po, idx) => (
-                    <th key={idx} style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>{po.poCode || `PO${idx + 1}`}</th>
+                    <th key={idx} style={{ backgroundColor: '#047857', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>{po.poCode || `PO${idx + 1}`}</th>
                   ))}
                 </tr>
               </thead>
@@ -220,7 +220,7 @@ const COPOMapSheet = ({ selectedCourse, clos, programOutcomes, combinedCOPOMatri
                               return (
                                 <td key={poIdx} style={{
                                   textAlign: 'center',
-                                  backgroundColor: isMapped ? '#d5f4e6' : 'white',
+                                  backgroundColor: isMapped ? '#d1fae5' : 'white',
                                   fontWeight: isMapped ? 'bold' : 'normal'
                                 }}>
                                   {isMapped ? norm : '-'}
