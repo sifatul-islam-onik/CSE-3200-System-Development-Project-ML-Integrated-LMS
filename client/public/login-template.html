@@ -1,125 +1,80 @@
-<!DOCTYPE html>
-
-<html class="light" lang="en"><head>
+﻿<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>OBESynK | Login</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
       tailwind.config = {
         darkMode: "class",
         theme: {
           extend: {
             colors: {
-              "secondary-fixed-dim": "#bcc7dd",
-              "secondary-fixed": "#d8e3fa",
-              "primary": "#04152b",
-              "on-secondary-fixed-variant": "#3c475a",
-              "tertiary-fixed": "#ffdea5",
-              "primary-container": "#1a2a40",
-              "on-secondary": "#ffffff",
-              "inverse-on-surface": "#ebf1ff",
-              "background": "#f9f9ff",
-              "surface-container-lowest": "#ffffff",
-              "surface-dim": "#cbdbf8",
-              "outline": "#75777d",
-              "on-primary-fixed": "#0b1c31",
-              "on-primary-container": "#8191ac",
-              "on-background": "#0b1c31",
-              "surface-variant": "#d4e3ff",
+              "primary": "#047857",
+              "primary-container": "#d1fae5",
               "on-primary": "#ffffff",
-              "surface-container-low": "#eff3ff",
-              "surface-bright": "#f9f9ff",
-              "primary-fixed-dim": "#b7c7e4",
-              "secondary": "#545f72",
-              "primary-fixed": "#d4e3ff",
-              "on-surface": "#0b1c31",
-              "on-tertiary": "#ffffff",
-              "on-secondary-container": "#586377",
-              "inverse-surface": "#213147",
-              "secondary-container": "#d5e0f7",
-              "surface-container-highest": "#d4e3ff",
-              "error-container": "#ffdad6",
-              "tertiary-fixed-dim": "#e9c176",
-              "surface-container-high": "#dde9ff",
-              "surface-container": "#e6eeff",
-              "error": "#ba1a1a",
-              "on-tertiary-fixed-variant": "#5d4201",
-              "on-primary-fixed-variant": "#38485f",
-              "outline-variant": "#c4c6cd",
-              "on-secondary-fixed": "#111c2c",
-              "surface-tint": "#505f78",
-              "tertiary-container": "#382600",
-              "on-surface-variant": "#44474d",
-              "on-error": "#ffffff",
-              "on-tertiary-fixed": "#261900",
-              "on-error-container": "#93000a",
-              "on-tertiary-container": "#ae8b46",
-              "tertiary": "#1e1300",
-              "inverse-primary": "#b7c7e4",
-              "surface": "#f9f9ff"
+              "secondary": "#059669",
+              "secondary-container": "#a7f3d0",
+              "surface": "#f8fafc",
+              "on-surface": "#0f172a",
+              "on-surface-variant": "#475569",
+              "outline": "#cbd5e1",
+              "outline-variant": "#e2e8f0"
             },
             fontFamily: {
-              "headline": ["Inter", "sans-serif"],
-              "serif": ["Newsreader", "serif"],
-              "body": ["Inter", "sans-serif"],
-              "label": ["Inter", "sans-serif"]
-            },
-            borderRadius: {"DEFAULT": "0px", "lg": "0px", "xl": "0px", "full": "9999px"},
-          },
-        },
+              "sans": ["Inter", "sans-serif"]
+            }
+          }
+        }
       }
-    </script>
+</script>
 <style>
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-        .editorial-gradient {
-            background: radial-gradient(circle at top left, #04152b 0%, #1a2a40 100%);
-        }
-        .ghost-border {
-            outline: 1px solid rgba(196, 198, 205, 0.2);
-        }
-    </style>
+    body { font-family: "Inter", sans-serif; }
+    .material-symbols-outlined {
+        font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24; 
+    }
+</style>
 </head>
-<body class="bg-background text-on-surface font-body min-h-screen flex flex-col">
-<!-- TopNavBar Suppression Check: Transactional page logic applies -->
-<!-- As per "Shell Visibility & Relevance" rule, navigation is suppressed for Login -->
-<main class="flex-grow flex items-center justify-center px-6 py-20 bg-surface">
-<div class="w-full max-w-md">
-<!-- Branding / Logo Anchor -->
-<div class="mb-12 text-center">
-<h1 class="font-serif text-4xl tracking-tighter text-primary">COBALT</h1>
-<p class="font-label text-[0.8rem] text-on-surface-variant mt-2">Academic Portal</p>
-</div>
-<!-- Login Card: Rational Asymmetry & Tonal Depth -->
-<div class="bg-surface-container-lowest p-10 md:p-12 border-none ring-1 ring-outline-variant/10 shadow-[0_24px_48px_rgba(11,28,49,0.06)] rounded-lg">
-<header class="mb-10"><h2 class="font-headline text-3xl text-on-surface font-bold text-center">Login</h2></header>
-<form class="space-y-8">
-<!-- Email / Roll Number Field -->
-<div class="relative mb-8">
-<label class="block font-label text-sm text-on-surface font-medium mb-2" for="identity">Email or Roll Number</label>
-<input class="w-full bg-transparent border border-outline-variant/30 rounded py-3 px-4 focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-300 font-body text-on-surface placeholder:text-on-surface-variant/40" id="identity" name="identity" placeholder="Email or roll number" type="text"/>
-</div>
-<!-- Password Field -->
-<div class="relative mb-4">
-<label class="block font-label text-sm text-on-surface font-medium mb-2" for="password">Password</label>
-<input class="w-full bg-transparent border border-outline-variant/30 rounded py-3 px-4 focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-300 font-body text-on-surface placeholder:text-on-surface-variant/40" id="password" name="password" placeholder="Password" type="password"/>
-<div class="mt-4 text-right">
-<a class="font-label text-[0.75rem] font-bold text-primary hover:underline transition-colors" href="#">Forgot password?</a>
-</div>
-</div>
-<!-- Actions -->
-<div class="pt-4 space-y-6"><button class="w-full bg-primary-container text-on-primary font-label text-[0.8rem] font-bold py-4 px-6 rounded hover:brightness-110 active:scale-[0.98] transition-all duration-200" type="submit">
-    Login
-</button></div>
-</form>
-</div>
-<!-- Footnote / Redirect -->
-</div>
-</main>
-<!-- Shared Footer Component -->
-<!-- Applying style_shell_layout and style_bg_color from JSON -->
-</body></html>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-md w-full space-y-8">
+    <div class="text-center">
+      <h1 class="text-4xl font-bold tracking-tight text-primary">OBESynK</h1>
+      <p class="mt-2 text-sm text-on-surface-variant font-medium">Academic Portal</p>
+    </div>
+    <div class="bg-white py-10 px-8 shadow rounded-lg border border-outline-variant">
+      <h2 class="text-center text-2xl font-bold text-on-surface mb-8">Login</h2>
+      <form class="space-y-6" action="#" method="POST">
+        <div>
+          <label for="identity" class="block text-sm font-semibold text-on-surface-variant">Email or Roll Number</label>
+          <div class="mt-1">
+            <input id="identity" name="identity" type="text" autocomplete="email" required class="appearance-none block w-full px-4 py-3 border border-outline rounded-md shadow-sm placeholder-outline-variant focus:outline-none focus:ring-primary focus:border-primary sm:text-sm transition-colors text-on-surface">
+          </div>
+        </div>
+
+        <div>
+          <label for="password" class="block text-sm font-semibold text-on-surface-variant">Password</label>
+          <div class="mt-1">
+            <input id="password" name="password" type="password" autocomplete="current-password" required class="appearance-none block w-full px-4 py-3 border border-outline rounded-md shadow-sm placeholder-outline-variant focus:outline-none focus:ring-primary focus:border-primary sm:text-sm transition-colors text-on-surface">
+          </div>
+          <div class="flex items-center justify-end mt-2">
+            <div class="text-sm">
+              <a href="#" class="font-medium text-primary hover:text-[#065f46] transition-colors">
+                Forgot password?
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-semibold text-white bg-primary hover:bg-[#065f46] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors mt-4">
+            Login
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

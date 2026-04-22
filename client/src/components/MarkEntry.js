@@ -13,7 +13,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   
   // Warn if section is null - this means teacher assignment may not have section set
   if (!section) {
-    console.warn(`⚠️ Section is null for course ${course?.courseCode}. Defaulting to Section A. Please ensure teachers are assigned to specific sections in the course settings.`);
+    console.warn(`Section is null for course ${course?.courseCode}. Defaulting to Section A. Please ensure teachers are assigned to specific sections in the course settings.`);
   }
   
   const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
@@ -630,7 +630,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         const qNum = normalizedSection === 'A' ? question : String(parseInt(question) - 4);
         const distField = `Q${qNum}${row}`;
         const maxAllowed = distRows.reduce((sum, r) => sum + (parseFloat(r[distField]) || 0), 0);
-        if (maxAllowed > 0 && num > maxAllowed) return; // Reject values exceeding distribution
+        if (num > maxAllowed) return; // Reject values exceeding distribution
       }
     }
     
@@ -752,7 +752,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
         
       } catch (error) {
         console.error('Error saving marks:', error);
-        alert(`⚠️ Failed to auto-save marks for ${currentStudent.name}: ${error.message}`);
+        alert(`Failed to auto-save marks for ${currentStudent.name}: ${error.message}`);
         // Continue anyway - marks saved in memory
       }
     }
@@ -940,7 +940,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                   <button
                     onClick={handleSaveDistribution}
                     disabled={distSaveStatus === 'saving'}
-                    style={{ padding: '8px 16px', backgroundColor: distSaveStatus === 'saving' ? '#95a5a6' : '#2563eb', color: 'white', border: 'none', borderRadius: '6px', cursor: distSaveStatus === 'saving' ? 'not-allowed' : 'pointer', fontWeight: '600' }}
+                    style={{ padding: '8px 16px', backgroundColor: distSaveStatus === 'saving' ? '#95a5a6' : '#059669', color: 'white', border: 'none', borderRadius: '6px', cursor: distSaveStatus === 'saving' ? 'not-allowed' : 'pointer', fontWeight: '600' }}
                   >
                     {distSaveStatus === 'saving' ? 'Saving...' : 'Save Distribution'}
                   </button>
@@ -987,7 +987,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
               textAlign: 'center',
               zIndex: 10
             }}>
-              <FontAwesomeIcon icon={faSpinner} spin size="2x" style={{ color: '#2563eb', marginBottom: '8px' }} />
+              <FontAwesomeIcon icon={faSpinner} spin size="2x" style={{ color: '#059669', marginBottom: '8px' }} />
               <p style={{ color: '#6b7280', fontSize: '14px' }}>Loading student data...</p>
             </div>
           )}
@@ -1061,9 +1061,9 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                     {job.status === 'processing' && (
                       <>
                         <div style={{ width: '80px', height: '4px', background: '#e5e7eb', borderRadius: '2px', overflow: 'hidden' }}>
-                          <div style={{ width: `${job.progress}%`, height: '100%', background: '#3b82f6', transition: 'width 0.3s' }} />
+                          <div style={{ width: `${job.progress}%`, height: '100%', background: '#10b981', transition: 'width 0.3s' }} />
                         </div>
-                        <span style={{ fontSize: '12px', color: '#3b82f6' }}>
+                        <span style={{ fontSize: '12px', color: '#10b981' }}>
                           <FontAwesomeIcon icon={faHourglassHalf} /> {job.progress}%
                           {job.isRetry && ` (Retry ${job.attemptNumber}/${job.maxAttempts})`}
                         </span>
@@ -1135,7 +1135,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                          ocrJobs.get(currentStudent._id).status === 'retrying' ? '#fef3c7' : '#dbeafe',
               border: '1px solid',
               borderColor: ocrJobs.get(currentStudent._id).status === 'failed' ? '#ef4444' : 
-                          ocrJobs.get(currentStudent._id).status === 'retrying' ? '#f59e0b' : '#3b82f6',
+                          ocrJobs.get(currentStudent._id).status === 'retrying' ? '#f59e0b' : '#10b981',
               borderRadius: '8px',
               padding: '12px',
               marginBottom: '16px',
@@ -1179,10 +1179,20 @@ const MarkEntry = ({ course, students, section, onClose }) => {
             <div className="image-upload-section">
               <h4>Upload Answer Sheet</h4>
               <div className="upload-options">
-                <button className="btn btn-primary" onClick={startCamera}>
+                <button 
+                  className="btn btn-primary" 
+                  onClick={startCamera}
+                  disabled={!isDistributionValid}
+                  title={!isDistributionValid ? "Please set marks distribution to 35 before taking pictures" : ""}
+                >
                   <FontAwesomeIcon icon={faCamera} /> Take Picture
                 </button>
-                <button className="btn btn-outline" onClick={() => fileInputRef.current?.click()}>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!isDistributionValid}
+                  title={!isDistributionValid ? "Please set marks distribution to 35 before uploading files" : ""}
+                >
                   <FontAwesomeIcon icon={faUpload} /> Upload File
                 </button>
               </div>
@@ -1259,13 +1269,19 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                 <img src={capturedImage} alt="Answer sheet" className="captured-image" />
               </div>
               <div className="image-actions">
-                <button className="btn btn-outline" onClick={handleRetake}>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={handleRetake}
+                  disabled={!isDistributionValid}
+                  title={!isDistributionValid ? "Please set marks distribution before taking a picture" : ""}
+                >
                   <FontAwesomeIcon icon={faCamera} /> Retake
                 </button>
                 <button 
                   className="btn btn-primary" 
                   onClick={processImage}
-                  disabled={isProcessingImage}
+                  disabled={isProcessingImage || !isDistributionValid}
+                  title={!isDistributionValid ? "Please set marks distribution before processing" : ""}
                 >
                   {isProcessingImage ? (
                     <><FontAwesomeIcon icon={faSpinner} spin /> Submitting...</>
@@ -1285,7 +1301,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                   background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px',
                   padding: '12px 16px', marginBottom: '12px', fontSize: '14px', color: '#92400e'
                 }}>
-                  ⚠️ <strong>Marks Distribution not set.</strong> Click &ldquo;Marks Distribution&rdquo; above and set each question total to <strong>35</strong> before entering marks.
+                  <strong>Marks Distribution not set.</strong> Click &ldquo;Marks Distribution&rdquo; above and set each question total to <strong>35</strong> before entering marks.
                 </div>
               )}
               <h4>Enter Marks - Section {normalizedSection} (Q{normalizedSection === 'A' ? '1-4' : '5-8'})</h4>
@@ -1384,7 +1400,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
           <div className="modal-body mark-entry-body" style={{ overflowY: 'auto' }}>
           {distLoading ? (
             <div style={{ textAlign: 'center', padding: '40px' }}>
-              <FontAwesomeIcon icon={faSpinner} spin size="2x" style={{ color: '#2563eb' }} />
+              <FontAwesomeIcon icon={faSpinner} spin size="2x" style={{ color: '#059669' }} />
               <p style={{ color: '#6b7280', marginTop: '8px' }}>Loading...</p>
             </div>
           ) : (
@@ -1396,16 +1412,16 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ borderCollapse: 'collapse', width: '100%' }}>
                     <thead>
-                      <tr style={{ background: '#1e3a5f', color: 'white' }}>
-                        <th rowSpan="2" style={{ padding: '12px 16px', border: '1px solid #334' }}>CO</th>
+                      <tr style={{ background: '#047857', color: 'white' }}>
+                        <th rowSpan="2" style={{ padding: '12px 16px', border: '1px solid #6ee7b7' }}>CO</th>
                         {qLabels.map((q, qi) => (
-                          <th key={q} colSpan="4" style={{ padding: '12px 16px', border: '1px solid #334', borderLeft: qi > 0 ? '3px solid #aaa' : undefined }}>{q}</th>
+                          <th key={q} colSpan="4" style={{ padding: '12px 16px', border: '1px solid #6ee7b7', borderLeft: qi > 0 ? '3px solid #aaa' : undefined }}>{q}</th>
                         ))}
                       </tr>
-                      <tr style={{ background: '#2b4c7e', color: 'white' }}>
+                      <tr style={{ background: '#059669', color: 'white' }}>
                         {qLabels.map((q, qi) => (
                           ['a','b','c','d'].map((l, li) => (
-                            <th key={`${q}${l}`} style={{ padding: '10px 12px', border: '1px solid #334', borderLeft: li === 0 && qi > 0 ? '3px solid #aaa' : undefined }}>{l}</th>
+                            <th key={`${q}${l}`} style={{ padding: '10px 12px', border: '1px solid #6ee7b7', borderLeft: li === 0 && qi > 0 ? '3px solid #aaa' : undefined }}>{l}</th>
                           ))
                         ))}
                       </tr>

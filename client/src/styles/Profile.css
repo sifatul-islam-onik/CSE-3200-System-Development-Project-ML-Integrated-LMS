@@ -116,7 +116,7 @@
   display: block;
   margin-bottom: 10px;
   font-weight: 600;
-  color: #2c3e50;
+  color: #065f46;
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -255,7 +255,7 @@
 .profile-field label {
   display: block;
   font-weight: 700;
-  color: #2c3e50;
+  color: #065f46;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -344,14 +344,14 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #495057 0%, #3d444d 100%);
+  background-color: #047857;
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #3d444d 0%, #2d3238 100%);
+  background-color: #059669;
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(73, 80, 87, 0.3);
+  box-shadow: 0 8px 16px rgba(4, 120, 87, 0.3);
 }
 
 .btn-secondary {
@@ -415,7 +415,7 @@
 .profile-image-wrapper label {
   display: block;
   font-weight: 700;
-  color: #2c3e50;
+  color: #065f46;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -497,7 +497,7 @@
 .password-change-section label {
   display: block;
   font-weight: 700;
-  color: #2c3e50;
+  color: #065f46;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.8px;

@@ -132,9 +132,9 @@ const CheckPOSheet = ({ selectedCourse, clos, programOutcomes, poCalcStudents, t
           <table className="co-po-map-table" style={{ minWidth: 'max-content', borderCollapse: 'separate', borderSpacing: 0, overflow: 'visible' }}>
             <thead>
               <tr>
-                <th style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>Roll</th>
+                <th style={{ backgroundColor: '#047857', color: 'white', position: 'sticky', left: 0, top: 0, zIndex: 12 }}>Roll</th>
                 {programOutcomes.map((po, idx) => (
-                  <th key={idx} style={{ backgroundColor: '#2980b9', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>
+                  <th key={idx} style={{ backgroundColor: '#047857', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>
                     {po.poCode || `PO${idx + 1}`}
                   </th>
                 ))}

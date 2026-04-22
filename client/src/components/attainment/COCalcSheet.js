@@ -39,7 +39,7 @@ const getGradeBorder = (total) => {
   if (total < 239) return '2px solid #2e7d32';
   return '2px solid #1b5e20';
 };
-const getGradeColor = (total) => total < 119 ? '#c82333' : '#2c3e50';
+const getGradeColor = (total) => total < 119 ? '#c82333' : '#065f46';
 
 // ─── Per-student theory total helper ─────────────────────────────────────────
 const computeStudentTheoryTotal = (studentRow, clos, attnAssignObtainedRows, getStudentCTFactoredMarks, getStudentAssignmentFactoredMarks) => {
@@ -70,7 +70,7 @@ const SectionABTable = ({ clos, coCalcData, formatNumber }) => (
         <table className="co-calc-table">
           <thead>
             <tr>
-              <th rowSpan="3" style={{ position: 'sticky', left: 0, top: 0, zIndex: 12, backgroundColor: '#2980b9', color: 'white' }}>Roll</th>
+              <th rowSpan="3" style={{ position: 'sticky', left: 0, top: 0, zIndex: 12, backgroundColor: '#047857', color: 'white' }}>Roll</th>
               <th colSpan={clos.length * 2}>Section A</th>
               <th colSpan={clos.length * 2}>Section B</th>
             </tr>
@@ -127,24 +127,24 @@ const TheoryCOPOTable = ({ clos, coCalcData, attnAssignObtainedRows, attendanceM
         <table className="co-po-percentage-table">
           <thead>
             <tr>
-              <th rowSpan="2" style={{ position: 'sticky', left: 0, top: 0, zIndex: 12, backgroundColor: '#2980b9', color: 'white' }}>Roll</th>
+              <th rowSpan="2" style={{ position: 'sticky', left: 0, top: 0, zIndex: 12, backgroundColor: '#047857', color: 'white' }}>Roll</th>
               <th colSpan={clos.length}>Total Mark Obtained</th>
               <th colSpan={clos.length}>Total Marks Distribution</th>
-              <th colSpan={clos.length} style={{ backgroundColor: '#16a085', color: '#fff' }}>CO Attainment (Theory)</th>
-              <th rowSpan="3" style={{ backgroundColor: '#138d75', color: '#fff', fontWeight: '700', fontSize: '14px' }}>Total</th>
-              <th rowSpan="3" style={{ backgroundColor: '#1abc9c', color: '#fff', fontWeight: '700', fontSize: '14px' }}>Ltr Grade</th>
+              <th colSpan={clos.length} style={{ backgroundColor: '#10b981', color: '#fff' }}>CO Attainment (Theory)</th>
+              <th rowSpan="3" style={{ backgroundColor: '#059669', color: '#fff', fontWeight: '700', fontSize: '14px' }}>Total</th>
+              <th rowSpan="3" style={{ backgroundColor: '#34d399', color: '#fff', fontWeight: '700', fontSize: '14px' }}>Ltr Grade</th>
             </tr>
             <tr>
               {clos.map((clo, idx) => <th key={`obt-co-${idx}`}>{(clo.cloNumber || '').toString().replace('CLO', 'CO')}</th>)}
               {clos.map((clo, idx) => <th key={`dist-co-${idx}`}>{(clo.cloNumber || '').toString().replace('CLO', 'CO')}</th>)}
               {clos.map((clo, idx) => (
-                <th key={`th-attain-co-${idx}`} style={{ backgroundColor: '#16a085', color: '#fff' }}>
+                <th key={`th-attain-co-${idx}`} style={{ backgroundColor: '#10b981', color: '#fff' }}>
                   {(clo.cloNumber || '').toString().replace('CLO', 'CO')}
                 </th>
               ))}
             </tr>
             <tr>
-              <th style={{ fontSize: '13px', fontWeight: '600', position: 'sticky', left: 0, zIndex: 12, backgroundColor: '#2980b9', color: 'white' }}>CO msrd</th>
+              <th style={{ fontSize: '13px', fontWeight: '600', position: 'sticky', left: 0, zIndex: 12, backgroundColor: '#047857', color: 'white' }}>CO msrd</th>
               {clos.map((clo, coIdx) => {
                 const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
                 const factoredTotals = calculateFactoredCOTotals();
@@ -160,7 +160,7 @@ const TheoryCOPOTable = ({ clos, coCalcData, attnAssignObtainedRows, attendanceM
                 return <th key={`msrd-${coIdx}`} style={{ fontSize: '13px', fontWeight: '600' }}>{totalDistribution > 0 ? 1 : 0}</th>;
               })}
               {clos.map((clo, coIdx) => <th key={`msrd-empty-${coIdx}`}></th>)}
-              {clos.map((clo, coIdx) => <th key={`th-attain-msrd-${coIdx}`} style={{ backgroundColor: '#16a085', borderLeft: 'none', borderRight: 'none' }}></th>)}
+              {clos.map((clo, coIdx) => <th key={`th-attain-msrd-${coIdx}`} style={{ backgroundColor: '#10b981', borderLeft: 'none', borderRight: 'none' }}></th>)}
             </tr>
           </thead>
           <tbody>
@@ -202,7 +202,7 @@ const TheoryCOPOTable = ({ clos, coCalcData, attnAssignObtainedRows, attendanceM
                     const pct = totalDist > 0 ? parseFloat(((totalObt / totalDist) * 100).toFixed(4)) : 0;
                     return <td key={`th-attain-${coIdx}`} style={{ textAlign: 'center', backgroundColor: '#a8e6d7' }}>{formatNumber(pct)}%</td>;
                   })}
-                  <td style={{ textAlign: 'center', fontWeight: '700', backgroundColor: '#d5f4e6', border: '2px solid #138d75', fontSize: '14px' }}>
+                  <td style={{ textAlign: 'center', fontWeight: '700', backgroundColor: '#d1fae5', border: '2px solid #059669', fontSize: '14px' }}>
                     {formatNumber(studentTotal)}
                   </td>
                   <td style={{
@@ -233,7 +233,7 @@ const CTAssignmentTableV1 = ({ clos, coCalcData, ctRows, assignmentRows, getActi
         <table className="co-po-percentage-table">
           <thead>
             <tr>
-              <th rowSpan="3" style={{ position: 'sticky', left: 0, top: 0, zIndex: 12, backgroundColor: '#2980b9', color: 'white' }}>Roll</th>
+              <th rowSpan="3" style={{ position: 'sticky', left: 0, top: 0, zIndex: 12, backgroundColor: '#047857', color: 'white' }}>Roll</th>
               <th colSpan={clos.length}>CT</th>
               <th colSpan={clos.length}>Assignment</th>
             </tr>
@@ -246,7 +246,7 @@ const CTAssignmentTableV1 = ({ clos, coCalcData, ctRows, assignmentRows, getActi
               {clos.map((clo, idx) => <th key={`asgn-co-${idx}`}>{(clo.cloNumber || '').toString().replace('CLO', 'CO')}</th>)}
             </tr>
             <tr>
-              <th style={{ fontSize: '13px', fontWeight: '600', position: 'sticky', left: 0, zIndex: 12, backgroundColor: '#2980b9', color: 'white' }}>CO msrd</th>
+              <th style={{ fontSize: '13px', fontWeight: '600', position: 'sticky', left: 0, zIndex: 12, backgroundColor: '#047857', color: 'white' }}>CO msrd</th>
               {clos.map((clo, coIdx) => {
                 const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
                 const ctRow = ctRows.find(r => r.coNumber === cn);
@@ -297,7 +297,7 @@ const CTAssignmentTableV2 = ({ clos, coCalcData, attnAssignObtainedRows, calcula
         <table className="ct-assignment-table">
           <thead>
             <tr>
-              <th rowSpan="3" style={{ position: 'sticky', left: 0, top: 0, zIndex: 12, backgroundColor: '#2980b9', color: 'white' }}>Roll</th>
+              <th rowSpan="3" style={{ position: 'sticky', left: 0, top: 0, zIndex: 12, backgroundColor: '#047857', color: 'white' }}>Roll</th>
               <th colSpan={clos.length}>CT</th>
               <th colSpan={clos.length}>Assignment</th>
               <th rowSpan="4">Attn</th>
@@ -311,7 +311,7 @@ const CTAssignmentTableV2 = ({ clos, coCalcData, attnAssignObtainedRows, calcula
               {clos.map((clo, idx) => <th key={`asgn-co-${idx}`}>{(clo.cloNumber || '').toString().replace('CLO', 'CO')}</th>)}
             </tr>
             <tr>
-              <th style={{ fontSize: '13px', fontWeight: '600', position: 'sticky', left: 0, zIndex: 12, backgroundColor: '#2980b9', color: 'white' }}>CO msrd</th>
+              <th style={{ fontSize: '13px', fontWeight: '600', position: 'sticky', left: 0, zIndex: 12, backgroundColor: '#047857', color: 'white' }}>CO msrd</th>
               {clos.map((clo, coIdx) => {
                 const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
                 const coTotal = calculateFactoredCOTotals()[cn] || 0;
@@ -374,7 +374,7 @@ const CombinedCOPOTable = ({
         <table className="co-po-percentage-table">
           <thead>
             <tr>
-              <th rowSpan="2" style={{ position: 'sticky', left: 0, top: 0, zIndex: 12, backgroundColor: '#2980b9', color: 'white' }}>Roll</th>
+              <th rowSpan="2" style={{ position: 'sticky', left: 0, top: 0, zIndex: 12, backgroundColor: '#047857', color: 'white' }}>Roll</th>
               <th colSpan={clos.length}>Total Mark Obtained</th>
               <th colSpan={clos.length}>Total Marks Distribution</th>
             </tr>
@@ -383,7 +383,7 @@ const CombinedCOPOTable = ({
               {clos.map((clo, idx) => <th key={`${tablePrefix}-dist-${idx}`}>{(clo.cloNumber || '').toString().replace('CLO', 'CO')}</th>)}
             </tr>
             <tr>
-              <th style={{ fontSize: '13px', fontWeight: '600', position: 'sticky', left: 0, zIndex: 12, backgroundColor: '#2980b9', color: 'white' }}>CO msrd</th>
+              <th style={{ fontSize: '13px', fontWeight: '600', position: 'sticky', left: 0, zIndex: 12, backgroundColor: '#047857', color: 'white' }}>CO msrd</th>
               {clos.map((clo, coIdx) => {
                 const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
                 const factoredTotals = calculateFactoredCOTotals();
@@ -497,9 +497,9 @@ const COAttainmentCombinedTable = ({
         <table className="co-attainment-table">
           <thead>
             <tr>
-              <th style={{ position: 'sticky', left: 0, top: 0, zIndex: 12, backgroundColor: '#2980b9', color: 'white' }}>Roll</th>
+              <th style={{ position: 'sticky', left: 0, top: 0, zIndex: 12, backgroundColor: '#047857', color: 'white' }}>Roll</th>
               {clos.map((clo, idx) => (
-                <th key={`${tablePrefix}-co-attain-${idx}`} style={{ backgroundColor: '#16a085', color: '#fff' }}>
+                <th key={`${tablePrefix}-co-attain-${idx}`} style={{ backgroundColor: '#10b981', color: '#fff' }}>
                   {(clo.cloNumber || '').toString().replace('CLO', 'CO')}
                 </th>
               ))}

@@ -1,501 +1,309 @@
-<!DOCTYPE html>
-
-<html class="light" lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>COBALT | ML-Integrated Outcome-Based Engineering Education</title>
-<!-- Fonts -->
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<!-- Tailwind CSS -->
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">
+﻿<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>OBESynK | Outcome-Based Education Synchronized at KUET</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
             theme: {
                 extend: {
                     colors: {
-                        "inverse-primary": "#b7c7e4",
-                        "surface": "#f9f9ff",
-                        "on-tertiary-container": "#ae8b46",
-                        "tertiary": "#1e1300",
-                        "on-error": "#ffffff",
-                        "on-tertiary-fixed": "#261900",
-                        "on-error-container": "#93000a",
-                        "tertiary-container": "#382600",
-                        "on-surface-variant": "#44474d",
-                        "outline-variant": "#c4c6cd",
-                        "on-secondary-fixed": "#111c2c",
-                        "surface-tint": "#505f78",
-                        "error-container": "#ffdad6",
-                        "surface-container-highest": "#d4e3ff",
-                        "tertiary-fixed-dim": "#e9c176",
-                        "error": "#ba1a1a",
-                        "surface-container": "#e6eeff",
-                        "surface-container-high": "#dde9ff",
-                        "on-tertiary-fixed-variant": "#5d4201",
-                        "on-primary-fixed-variant": "#38485f",
-                        "inverse-surface": "#213147",
-                        "on-secondary-container": "#586377",
-                        "secondary-container": "#d5e0f7",
-                        "on-tertiary": "#ffffff",
-                        "secondary": "#545f72",
-                        "on-surface": "#0b1c31",
-                        "primary-fixed": "#d4e3ff",
-                        "surface-variant": "#d4e3ff",
+                        "primary": "#047857",
+                        "primary-container": "#d1fae5",
                         "on-primary": "#ffffff",
-                        "surface-container-low": "#eff3ff",
-                        "surface-bright": "#f9f9ff",
-                        "primary-fixed-dim": "#b7c7e4",
-                        "on-primary-container": "#8191ac",
-                        "outline": "#75777d",
-                        "on-primary-fixed": "#0b1c31",
-                        "on-background": "#0b1c31",
-                        "surface-dim": "#cbdbf8",
-                        "surface-container-lowest": "#ffffff",
-                        "on-secondary": "#ffffff",
-                        "primary-container": "#1a2a40",
-                        "inverse-on-surface": "#ebf1ff",
-                        "background": "#f9f9ff",
-                        "primary": "#04152b",
-                        "on-secondary-fixed-variant": "#3c475a",
-                        "tertiary-fixed": "#ffdea5",
-                        "secondary-fixed": "#d8e3fa",
-                        "secondary-fixed-dim": "#bcc7dd"
+                        "secondary": "#059669",
+                        "secondary-container": "#a7f3d0",
+                        "tertiary": "#856404",
+                        "tertiary-container": "#fff3cd",
+                        "surface": "#f8fafc",
+                        "on-surface": "#0f172a",
+                        "on-surface-variant": "#475569",
+                        "outline": "#cbd5e1",
+                        "outline-variant": "#e2e8f0"
                     },
                     fontFamily: {
-                        "headline": ["Inter", "sans-serif"],
-                        "serif": ["Newsreader", "serif"],
-                        "body": ["Inter", "sans-serif"],
-                        "label": ["Inter", "sans-serif"]
-                    },
-                    borderRadius: {
-                        "none": "0px",
-                        "DEFAULT": "0px",
-                        "lg": "0px",
-                        "xl": "0px",
-                        "full": "9999px"
-                    },
-                },
-            },
+                        "sans": ["Inter", "sans-serif"]
+                    }
+                }
+            }
         }
     </script>
-<style>
+    <style>
         html { scroll-behavior: smooth; }
-        body {
-            font-family: 'Inter', sans-serif;
-        }
+        body { font-family: "Inter", sans-serif; }
         @media (min-width: 768px) {
             body { height: 100vh; overflow: hidden; }
         }
-        .serif-text { font-family: 'Newsreader', serif; }
         .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+            font-variation-settings: "FILL" 0, "wght" 300, "GRAD" 0, "opsz" 24; 
         }
         .hero-gradient {
-            background: linear-gradient(135deg, #04152b 0%, #1a2a40 100%);
-        }
-        .insight-prism {
-            border-left: 2px solid #e9c176;
-            background-color: #dde9ff;
-            opacity: 0.95;
+            background: linear-gradient(135deg, #022c22 0%, #047857 100%);      
         }
         .nav-link-active {
-            color: #e9c176;
-            border-bottom: 1px solid #e9c176;
+            color: #d4a373;
+            border-bottom: 2px solid #d4a373;
             padding-bottom: 0.25rem;
         }
-        /* Hide scrollbar but keep functionality for desktop main canvas */
         @media (min-width: 768px) {
             .no-scrollbar::-webkit-scrollbar { display: none; }
-            .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }  
         }
-        
-        .arch-node {
-            border: 1px solid rgba(117, 119, 125, 0.2);
-            background: #ffffff;
-            transition: all 0.3s ease;
-        }
-        .arch-node:hover {
-            border-color: #e9c176;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-        }
-
-        #mobile-menu-toggle:checked ~ #mobile-nav {
-            display: flex;
-        }
-    </style>
+        #mobile-menu-toggle:checked ~ #mobile-nav { display: flex; }
+    
+          .obesynk-wavy-underline {
+              position: relative;
+              display: inline-block;
+          }
+          .obesynk-wavy-underline::after {
+              content: "";
+              position: absolute;
+              bottom: -0.6rem;
+              left: 0;
+              width: 100%;
+              height: 20px;
+              background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 35' preserveAspectRatio='none'%3E%3Cpath d='M1,12 C10,25 20,25 25,15 C28,10 32,8 36,15 C45,30 55,20 65,18 C75,15 85,20 98,18' stroke='%23fba013' fill='transparent' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center;
+              background-size: 100% 100%;
+          }
+      </style>
 </head>
 <body class="bg-surface text-on-surface flex flex-col">
 <!-- TopNavBar -->
-<nav class="flex justify-between items-center w-full px-6 md:px-12 py-6 max-w-none border-none bg-[#04152b] top-0 rounded-none flat no-shadows sticky z-[100] shrink-0">
-<div class="text-2xl font-serif tracking-tighter text-[#f9f9ff]">COBALT</div>
-<!-- Desktop Nav -->
-<div class="hidden md:flex items-center gap-10">
-<a class="nav-link-active uppercase tracking-widest text-[0.75rem] font-medium" href="#features">Features</a>
-<a class="text-[#f9f9ff]/70 hover:text-[#f9f9ff] transition-colors uppercase tracking-widest text-[0.75rem] font-medium" href="#architecture">Architecture</a>
-<a class="text-[#f9f9ff]/70 hover:text-[#f9f9ff] transition-colors uppercase tracking-widest text-[0.75rem] font-medium" href="#ocr-pipeline">OCR Pipeline</a>
-</div>
-<div class="flex items-center gap-4">
-<a class="hidden sm:block bg-[#e9c176] text-[#1e1300] px-6 py-2 text-[0.7rem] uppercase tracking-widest font-bold hover:brightness-110 transition-all" href="/login" target="_top">
-                Login
-            </a>
-<!-- Mobile Menu Toggle -->
-<label class="md:hidden text-[#f9f9ff] cursor-pointer" for="mobile-menu-toggle">
-<span class="material-symbols-outlined">menu</span>
-</label>
-</div>
-<input class="hidden peer" id="mobile-menu-toggle" type="checkbox"/>
-<!-- Mobile Nav Overlay -->
-<div class="hidden absolute top-full left-0 w-full bg-[#04152b] border-t border-white/10 flex-col p-6 gap-6 md:hidden" id="mobile-nav">
-<a class="text-[#f9f9ff] uppercase tracking-widest text-[0.75rem] font-medium" href="#features">Features</a>
-<a class="text-[#f9f9ff]/70 uppercase tracking-widest text-[0.75rem] font-medium" href="#architecture">Architecture</a>
-<a class="text-[#f9f9ff]/70 uppercase tracking-widest text-[0.75rem] font-medium" href="#ocr-pipeline">OCR Pipeline</a>
-<a class="bg-[#e9c176] text-[#1e1300] px-6 py-3 text-[0.7rem] uppercase tracking-widest font-bold" href="/login" target="_top">
-                Login
-            </a>
-</div>
+<nav id="main-nav" class="flex justify-between items-center w-full px-6 md:px-12 py-5 max-w-none border-none bg-transparent top-0 fixed z-[100] shrink-0 transition-all duration-300">
+    <div class="text-2xl font-bold tracking-tight text-white obesynk-wavy-underline">OBESynK</div>  
+    <div class="hidden md:flex items-center gap-8">
+        <a class="text-white/80 hover:text-white transition-colors uppercase tracking-wider text-xs font-semibold" href="#features">Features</a>
+        <a class="text-white/80 hover:text-white transition-colors uppercase tracking-wider text-xs font-semibold" href="#benefits">For Educators</a>
+        <a class="text-white/80 hover:text-white transition-colors uppercase tracking-wider text-xs font-semibold" href="#students">For Students</a>
+    </div>
+    <div class="flex items-center gap-4">
+        <a class="hidden sm:block bg-[#d4a373] text-[#0f172a] px-6 py-2 text-xs uppercase tracking-wider font-bold rounded shadow hover:bg-[#bc8a5f] transition-colors" href="/login" target="_top">
+            Login
+        </a>
+        <label class="md:hidden text-white cursor-pointer" for="mobile-menu-toggle">
+            <span class="material-symbols-outlined">menu</span>
+        </label>
+    </div>
+    <input class="hidden peer" id="mobile-menu-toggle" type="checkbox"/>
+    <div class="hidden absolute top-full left-0 w-full bg-[#047857] border-t border-white/10 flex-col p-6 gap-6 md:hidden shadow-lg" id="mobile-nav">
+        <a class="text-white uppercase tracking-wider text-xs font-semibold" href="#features">Features</a>
+        <a class="text-white/80 uppercase tracking-wider text-xs font-semibold" href="#benefits">For Educators</a>
+        <a class="text-white/80 uppercase tracking-wider text-xs font-semibold" href="#students">For Students</a>
+        <a class="bg-[#d4a373] text-[#0f172a] px-6 py-3 text-xs text-center uppercase tracking-wider font-bold rounded" href="/login" target="_top">
+            Login
+        </a>
+    </div>
 </nav>
-<!-- Main Scrollable Canvas -->
+
 <main class="flex-grow md:overflow-y-auto no-scrollbar">
-<!-- Hero Section -->
-<section class="hero-gradient px-6 md:px-12 py-16 md:py-20 relative flex flex-col lg:grid lg:grid-cols-12 items-center min-h-[60vh]" id="features">
-<div class="lg:col-span-7 mb-12 lg:mb-0">
-<span class="text-tertiary-fixed-dim font-label text-[0.65rem] md:text-[0.75rem] uppercase tracking-[0.2em] mb-4 block">Archive Specification v2.4</span>
-<h1 class="font-headline text-on-primary text-4xl md:text-5xl lg:text-6xl leading-tight mb-6">
-                    COBALT - The ML-Integrated LMS for Outcome-Based Engineering Education.
-                </h1>
-<p class="font-body text-primary-fixed text-lg md:text-xl max-w-2xl leading-relaxed opacity-80">
-                    Bridging AI-Powered Grading and Complex Educational Analytics. A unified framework for intellectual rigor and institutional precision.
-                </p>
-</div>
-<div class="lg:col-span-5 w-full flex justify-center lg:justify-end">
-</section>
-<!-- Feature Bento Grid -->
-<section class="grid grid-cols-1 md:grid-cols-3 gap-0 border-t border-outline-variant/10">
-<!-- Column 1: Core Integration -->
-<div class="bg-surface-container-lowest p-8 md:p-12 flex flex-col justify-between group hover:bg-surface-container-low transition-colors duration-500 border-b md:border-b-0 md:border-r border-outline-variant/10">
-<div class="mb-8">
-<span class="material-symbols-outlined text-primary mb-6 scale-125 md:scale-150" data-icon="account_tree">account_tree</span>
-<h3 class="font-headline text-2xl mb-4">Outcome-Based Education (OBE) Integration</h3>
-<p class="font-body text-on-surface-variant text-sm leading-relaxed">
-                        Holistic alignment of curriculum, assessment, and reporting. COBALT synchronizes performance data directly with accreditation standards.
-                    </p>
-</div>
-</div>
-<!-- Column 2: OCR Intelligence -->
-<div class="bg-surface-container p-8 md:p-12 flex flex-col justify-between border-b md:border-b-0 md:border-r border-outline-variant/10 group hover:bg-surface-container-high transition-colors duration-500">
-<div class="mb-8">
-<span class="material-symbols-outlined text-primary mb-6 scale-125 md:scale-150" data-icon="document_scanner">document_scanner</span>
-<h3 class="font-headline text-2xl mb-4">AI-Powered Marks Extraction (OCR)</h3>
-<p class="font-body text-on-surface-variant text-sm leading-relaxed">
-                        Transform handwritten assessments into structured data. Our proprietary vision pipeline ensures 99.4% accuracy in high-stakes grading scenarios.
-                    </p>
-</div>
-</div>
-<!-- Column 3: Architecture -->
-<div class="bg-surface-container-high p-8 md:p-12 flex flex-col justify-between group hover:bg-surface-container-highest transition-colors duration-500">
-<div class="mb-8">
-<span class="material-symbols-outlined text-primary mb-6 scale-125 md:scale-150" data-icon="memory">memory</span>
-<h3 class="font-headline text-2xl mb-4">Microservices Architecture</h3>
-<p class="font-body text-on-surface-variant text-sm leading-relaxed">
-                        Decoupled high-availability clusters designed for institutional scale. Engineered for low-latency response and elastic computing loads.
-                    </p>
-</div>
-</div>
-</section>
-<!-- 1. Architecture Section -->
-<section class="bg-surface py-16 md:py-24 px-6 md:px-12 border-t border-outline-variant/20" id="architecture">
-<div class="max-w-6xl mx-auto">
-<div class="mb-12 md:mb-16">
-<span class="text-outline font-label text-[0.7rem] uppercase tracking-[0.3em] mb-4 block">Structural Blueprint</span>
-<h2 class="font-headline text-3xl md:text-4xl text-primary mb-6">System Architecture &amp; Core Infrastructure</h2>
-<p class="font-body text-on-surface-variant max-w-3xl leading-relaxed">
-                        A decoupled microservices ecosystem utilizing a message-queue pattern for high-fidelity ML inference and institutional data persistence.
-                    </p>
-</div>
-<!-- Architecture Diagram -->
-<div class="grid grid-cols-1 md:grid-cols-7 gap-4 md:gap-2 items-center py-10 md:py-12 px-6 md:px-8 bg-surface-container-low border border-outline-variant/10">
-<div class="arch-node p-4 md:p-6 flex flex-col items-center text-center">
-<span class="material-symbols-outlined text-2xl md:text-3xl mb-3 text-primary" data-icon="web">web</span>
-<h4 class="font-headline text-base md:text-lg mb-1">React Client</h4>
-<p class="text-[0.6rem] md:text-[0.65rem] uppercase tracking-widest text-outline font-bold">Frontend SPA</p>
-</div>
-<div class="flex justify-center py-2 md:py-0"><span class="material-symbols-outlined text-outline-variant rotate-90 md:rotate-0" data-icon="arrow_forward">arrow_forward</span></div>
-<div class="arch-node p-4 md:p-6 flex flex-col items-center text-center">
-<span class="material-symbols-outlined text-2xl md:text-3xl mb-3 text-primary" data-icon="api">api</span>
-<h4 class="font-headline text-base md:text-lg mb-1">Express API</h4>
-<p class="text-[0.6rem] md:text-[0.65rem] uppercase tracking-widest text-outline font-bold">Node.js Server</p>
-</div>
-<div class="flex justify-center py-2 md:py-0"><span class="material-symbols-outlined text-outline-variant rotate-90 md:rotate-0" data-icon="sync_alt">sync_alt</span></div>
-<div class="arch-node p-4 md:p-6 flex flex-col items-center text-center">
-<span class="material-symbols-outlined text-2xl md:text-3xl mb-3 text-primary" data-icon="data_usage">data_usage</span>
-<h4 class="font-headline text-base md:text-lg mb-1">Redis + Bull</h4>
-<p class="text-[0.6rem] md:text-[0.65rem] uppercase tracking-widest text-outline font-bold">Job Queue</p>
-</div>
-<div class="flex justify-center py-2 md:py-0"><span class="material-symbols-outlined text-outline-variant rotate-90 md:rotate-0" data-icon="arrow_forward">arrow_forward</span></div>
-<div class="arch-node p-4 md:p-6 flex flex-col items-center text-center">
-<span class="material-symbols-outlined text-2xl md:text-3xl mb-3 text-primary" data-icon="model_training">model_training</span>
-<h4 class="font-headline text-base md:text-lg mb-1">FastAPI OCR</h4>
-<p class="text-[0.6rem] md:text-[0.65rem] uppercase tracking-widest text-outline font-bold">ML Microservice</p>
-</div>
-</div>
-<!-- Tech Stack Detail -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mt-12 md:mt-16">
-<div class="border-l border-outline-variant/30 pl-6">
-<h5 class="font-headline text-xl mb-2">Core Runtime</h5>
-<p class="text-sm text-on-surface-variant font-body">Node.js 18+ with Express framework for the centralized API gateway.</p>
-</div>
-<div class="border-l border-outline-variant/30 pl-6">
-<h5 class="font-headline text-xl mb-2">Persistence</h5>
-<p class="text-sm text-on-surface-variant font-body">MongoDB with Mongoose ODM for curriculum and OBE data structures.</p>
-</div>
-<div class="border-l border-outline-variant/30 pl-6">
-<h5 class="font-headline text-xl mb-2">Concurrency</h5>
-<p class="text-sm text-on-surface-variant font-body">Redis-backed Bull queues for asynchronous processing of intensive OCR tasks.</p>
-</div>
-<div class="border-l border-outline-variant/30 pl-6">
-<h5 class="font-headline text-xl mb-2">ML Engine</h5>
-<p class="text-sm text-on-surface-variant font-body">Python &amp; FastAPI handling heavy neural network inference tasks.</p>
-</div>
-</div>
-</div>
-</section>
-<!-- 2. OCR Pipeline Section -->
-<section class="bg-primary text-on-primary py-16 md:py-24 px-6 md:px-12" id="ocr-pipeline">
-<div class="max-w-6xl mx-auto">
-<div class="flex flex-col lg:grid lg:grid-cols-12 gap-12 md:gap-16 items-start">
-<div class="lg:col-span-4 w-full">
-<span class="text-tertiary-fixed-dim font-label text-[0.7rem] uppercase tracking-[0.3em] mb-4 block">Vision Pipeline</span>
-<h2 class="font-headline text-3xl md:text-4xl mb-6">Neural Extraction Workflow</h2>
-<p class="text-primary-fixed opacity-70 font-body leading-relaxed mb-8">
-                            Proprietary sequence for transforming unstructured paper-based assessments into verified academic data.
-                        </p>
-<div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-4">
-<div class="bg-primary-container p-4 border border-outline/20">
-<p class="text-[0.6rem] uppercase tracking-widest text-tertiary-fixed-dim font-bold mb-1">Layout detection</p>
-<p class="text-sm font-headline italic">PP-DocLayout_plus-L</p>
-</div>
-<div class="bg-primary-container p-4 border border-outline/20">
-<p class="text-[0.6rem] uppercase tracking-widest text-tertiary-fixed-dim font-bold mb-1">Cell detection</p>
-<p class="text-sm font-headline italic">RT-DETR-L_wired_table</p>
-</div>
-<div class="bg-primary-container p-4 border border-outline/20">
-<p class="text-[0.6rem] uppercase tracking-widest text-tertiary-fixed-dim font-bold mb-1">Recognition</p>
-<p class="text-sm font-headline italic">en_PP-OCRv5_mobile</p>
-</div>
-</div>
-</div>
-<div class="lg:col-span-8 w-full">
-<div class="space-y-0">
-<!-- Steps -->
-<div class="flex items-start gap-6 md:gap-8 border-b border-on-primary/10 pb-8 md:pb-10 mb-8 md:mb-10">
-<span class="font-headline text-4xl md:text-5xl text-tertiary-fixed-dim opacity-40">01</span>
-<div>
-<h4 class="font-headline text-xl md:text-2xl mb-2">Secure Submission</h4>
-<p class="text-primary-fixed/60 text-sm font-body max-w-xl">Initial ingestion of Base64 encoded document payloads with SSRF mitigation and payload validation.</p>
-</div>
-</div>
-<div class="flex items-start gap-6 md:gap-8 border-b border-on-primary/10 pb-8 md:pb-10 mb-8 md:mb-10">
-<span class="font-headline text-4xl md:text-5xl text-tertiary-fixed-dim opacity-40">02</span>
-<div>
-<h4 class="font-headline text-xl md:text-2xl mb-2">Bull-Redis Queuing</h4>
-<p class="text-primary-fixed/60 text-sm font-body max-w-xl">Jobs are enqueued in the persistent Redis store, allowing the system to handle spikes in institutional load without data loss.</p>
-</div>
-</div>
-<div class="flex items-start gap-6 md:gap-8 border-b border-on-primary/10 pb-8 md:pb-10 mb-8 md:mb-10">
-<span class="font-headline text-4xl md:text-5xl text-tertiary-fixed-dim opacity-40">03</span>
-<div>
-<h4 class="font-headline text-xl md:text-2xl mb-2">Worker Orchestration</h4>
-<p class="text-primary-fixed/60 text-sm font-body max-w-xl">Adaptive worker selection chooses the healthiest ML endpoint based on real-time health checks and latency metrics.</p>
-</div>
-</div>
-<div class="flex items-start gap-6 md:gap-8 border-b border-on-primary/10 pb-8 md:pb-10 mb-8 md:mb-10">
-<span class="font-headline text-4xl md:text-5xl text-tertiary-fixed-dim opacity-40">04</span>
-<div>
-<h4 class="font-headline text-xl md:text-2xl mb-2">Neural ML Parsing</h4>
-<p class="text-primary-fixed/60 text-sm font-body max-w-xl">Deep vision models execute table detection, box segmentation, and character recognition using multi-variant preprocessing.</p>
-</div>
-</div>
-<div class="flex items-start gap-6 md:gap-8">
-<span class="font-headline text-4xl md:text-5xl text-tertiary-fixed-dim opacity-40">05</span>
-<div>
-<h4 class="font-headline text-xl md:text-2xl mb-2">Data Reconciliation</h4>
-<p class="text-primary-fixed/60 text-sm font-body max-w-xl">Extracted marks are mapped to course outcomes and saved to the primary DB with confidence scores for human verification.</p>
-</div>
-</div>
-</div>
-</div>
-</div>
-
-<!-- Workflow Ribbon -->
-<div class="mt-12 md:mt-16 p-6 md:p-8 bg-[#dde9ff] flex flex-col md:flex-row items-center justify-between gap-6">
-<div class="text-center md:text-left">
-<h5 class="font-headline text-xl text-primary mb-1">Standard Implementation Workflow</h5>
-<p class="text-sm font-body text-on-surface-variant">Curriculum Definition → Assessment Design → OCR Ingestion → Attainment Analysis</p>
-</div>
-<button aria-label="Play workflow video" class="p-4 rounded-full border border-primary bg-primary text-white hover:bg-transparent hover:text-primary transition-all" id="open-video-modal" type="button">
-<span class="material-symbols-outlined" data-icon="play_circle">play_circle</span>
-</button>
-</div>
-</div>
-</section>
-
-<!-- Video Modal -->
-<div aria-hidden="true" class="fixed inset-0 z-[200] hidden items-center justify-center px-4 py-8" id="video-modal">
-<div class="absolute inset-0 bg-black/75" data-close-video-modal></div>
-<div class="relative z-[201] w-full max-w-4xl overflow-hidden border border-white/10 bg-[#04152b] shadow-2xl">
-<div class="flex items-center justify-between border-b border-white/10 px-4 py-3 md:px-6">
-<div>
-<h3 class="font-headline text-lg text-[#f9f9ff]">Workflow Video</h3>
-</div>
-<button aria-label="Close video modal" class="text-[#f9f9ff]/70 transition-colors hover:text-[#f9f9ff]" id="close-video-modal" type="button">
-<span class="material-symbols-outlined">close</span>
-</button>
-</div>
-<video class="block w-full bg-black aspect-video" id="cloudinary-video" controls playsinline preload="metadata">
-<source id="cloudinary-video-source" type="video/mp4"/>
-            Your browser does not support the video tag.
-        </video>
-</div>
-</div>
-
-<!-- Footer -->
-<footer class="flex flex-col lg:flex-row justify-between items-center w-full px-6 md:px-12 py-6 md:py-4 bg-[#f9f9ff] shrink-0 border-t border-[#c4c6cd]/20 z-50 gap-6">
-<div class="text-sm font-bold text-[#04152b]">COBALT</div>
-<div class="font-sans text-[0.6rem] md:text-[0.7rem] uppercase tracking-[0.05em] text-[#0b1c31]/60 text-center">
-            © 2026 COBALT:An ML-Integrated Outcome-Based Engineering Education.
+    <section class="hero-gradient px-6 md:px-12 pt-32 pb-20 relative flex flex-col lg:grid lg:grid-cols-12 items-center min-h-[60vh]" id="features">
+        <div class="lg:col-span-8 mb-12 lg:mb-0">
+            <span class="text-[#d4a373] font-sans text-xs uppercase tracking-widest mb-4 block font-semibold">Transforming Engineering Education</span>       
+            <h1 class="font-sans text-white text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
+                OBESynK: Streamlined platform for automated CO-PO mapping and student attainment tracking.
+            </h1>
+            <p class="font-sans text-[#e2e8f0] text-lg md:text-xl max-w-2xl leading-relaxed opacity-90">
+                An intuitive educational workspace for faculty and students at KUET, blending robust curriculum tracking with smart grading tools to ensure every learning milestone is met.
+            </p>
+            <div class="mt-10 flex flex-col sm:flex-row items-start gap-4">
+                <button aria-label="Play workflow video" id="open-video-modal" type="button" class="bg-[#059669] hover:bg-[#065f46] text-white px-8 py-3 rounded shadow transition-colors font-bold tracking-wide uppercase text-sm flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined" style="font-size: 20px;">play_circle</span>
+                    Watch Workflow Video
+                </button>
+            </div>
         </div>
-</footer>
+    </section>
+
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-0 border-t border-outline-variant">
+        <div class="bg-white p-8 md:p-12 flex flex-col justify-between hover:bg-surface transition-colors border-b md:border-b-0 md:border-r border-outline-variant">
+            <div class="mb-8">
+                <span class="material-symbols-outlined text-primary mb-6 text-5xl" data-icon="school">school</span>
+                <h3 class="font-bold text-2xl mb-4 text-on-surface">Curriculum Mapping</h3>
+                <p class="font-sans text-on-surface-variant text-base leading-relaxed">
+                    Easily link course content, exams, and lab activities to specific Program Outcomes (POs). Ensure your syllabus aligns perfectly with academic goals.
+                </p>
+            </div>
+        </div>
+        <div class="bg-[#f8fafc] p-8 md:p-12 flex flex-col justify-between hover:bg-[#e2e8f0] transition-colors border-b md:border-b-0 md:border-r border-outline-variant">
+            <div class="mb-8">
+                <span class="material-symbols-outlined text-primary mb-6 text-5xl" data-icon="grading">grading</span>
+                <h3 class="font-bold text-2xl mb-4 text-on-surface">Smart Grading Support</h3> 
+                <p class="font-sans text-on-surface-variant text-base leading-relaxed">
+                    Upload scanned exam papers and let our system assist in extracting and calculating marks automatically, reducing administrative burden for educators.
+                </p>
+            </div>
+        </div>
+        <div class="bg-white p-8 md:p-12 flex flex-col justify-between hover:bg-surface transition-colors">       
+            <div class="mb-8">
+                <span class="material-symbols-outlined text-primary mb-6 text-5xl" data-icon="monitoring">monitoring</span>
+                <h3 class="font-bold text-2xl mb-4 text-on-surface">Real-Time Analytics</h3>
+                <p class="font-sans text-on-surface-variant text-base leading-relaxed">
+                    Students and teachers can instantly track academic progress. Visual dashboards show exactly where a student excels and where they need improvement.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <section class="bg-surface py-20 px-6 md:px-12 border-t border-outline-variant" id="benefits">
+        <div class="max-w-6xl mx-auto">
+            <div class="mb-12 md:mb-16">
+                <span class="text-primary text-xs uppercase tracking-widest mb-4 block font-semibold">Empowering Faculty</span>
+                <h2 class="font-bold text-3xl md:text-4xl text-on-surface mb-6">Designed to Simplify Your Workload</h2>
+                <p class="font-sans text-on-surface-variant text-lg max-w-3xl leading-relaxed">
+                    Save hours of manual data entry and focus on what matters most: teaching. OBESynK automates the heavy lifting of Outcome-Based Education compliance.
+                </p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 mt-12">
+                <div class="flex gap-4 items-start">
+                    <span class="material-symbols-outlined text-3xl text-primary bg-primary-container p-3 rounded-full" data-icon="fact_check">fact_check</span>
+                    <div>
+                        <h4 class="font-bold text-xl mb-2 text-on-surface">Automated Attainment Calculation</h4>
+                        <p class="text-on-surface-variant leading-relaxed">The system automatically calculates CO and PO attainment levels based on student marks across assignments, CTs, and final exams.</p>
+                    </div>
+                </div>
+                <div class="flex gap-4 items-start">
+                    <span class="material-symbols-outlined text-3xl text-primary bg-primary-container p-3 rounded-full" data-icon="folder_managed">folder_managed</span>
+                    <div>
+                        <h4 class="font-bold text-xl mb-2 text-on-surface">Digital Course Profiles</h4>
+                        <p class="text-on-surface-variant leading-relaxed">Manage your course outlines, syllabi, and question mappings all in one centralized, secure digital hub.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="bg-[#047857] text-white py-20 px-6 md:px-12" id="students">
+        <div class="max-w-6xl mx-auto text-center">
+            <span class="text-[#d4a373] text-xs uppercase tracking-widest mb-4 block font-semibold">Student Success</span>
+            <h2 class="font-bold text-3xl md:text-4xl mb-6">Take Control of Your Education</h2>
+            <p class="text-white/80 text-lg max-w-2xl mx-auto leading-relaxed mb-12">
+                Stop guessing about your academic standing. OBESynK provides total transparency so you always know exactly how you are progressing towards your graduation requirements.
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div class="bg-black/20 p-8 rounded-lg outline outline-1 outline-white/10 text-center">
+                    <span class="material-symbols-outlined text-4xl mb-4 text-[#d4a373]" data-icon="insights">insights</span>
+                    <h4 class="font-bold text-xl mb-2">Track Milestones</h4>
+                    <p class="text-sm text-white/70">View your performance mapped directly to university goals.</p>
+                </div>
+                <div class="bg-black/20 p-8 rounded-lg outline outline-1 outline-white/10 text-center">
+                    <span class="material-symbols-outlined text-4xl mb-4 text-[#d4a373]" data-icon="history_edu">history_edu</span>
+                    <h4 class="font-bold text-xl mb-2">Historical Records</h4>
+                    <p class="text-sm text-white/70">Access all your past courses and assignment evaluations securely.</p>
+                </div>
+                <div class="bg-black/20 p-8 rounded-lg outline outline-1 outline-white/10 text-center">
+                    <span class="material-symbols-outlined text-4xl mb-4 text-[#d4a373]" data-icon="verified">verified</span>
+                    <h4 class="font-bold text-xl mb-2">Outcome Assurance</h4>
+                    <p class="text-sm text-white/70">Ensure you have the right accredited skills when you graduate.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="flex flex-col lg:flex-row justify-between items-center w-full px-6 md:px-12 py-4 bg-white shrink-0 border-t border-outline-variant z-50 gap-4">
+        <div class="text-xl font-bold text-primary">OBESynK</div>
+        <div class="text-xs uppercase tracking-wider text-on-surface-variant text-center font-medium">
+            &copy; 2026 OBESynK | Khulna University of Engineering & Technology
+        </div>
+    </footer>
+</main>
+
+<!-- Workflow Video Modal -->
+<div aria-hidden="true" class="fixed inset-0 z-[200] hidden items-center justify-center p-4 sm:p-8" id="video-modal">
+    <div class="absolute inset-0 bg-black/80" data-close-video-modal></div>
+    <div class="relative z-[201] w-full max-w-5xl max-h-full flex flex-col overflow-hidden rounded bg-[#0f172a] shadow-2xl border border-white/10">
+        <div class="flex-shrink-0 flex items-center justify-between border-b border-surface/10 px-4 py-3 md:px-6">
+            <h3 class="font-sans font-semibold text-lg text-white">Platform Workflow</h3>
+            <button aria-label="Close video modal" class="text-white/70 hover:text-white transition-colors flex items-center justify-center" id="close-video-modal" type="button">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <div class="flex-grow overflow-hidden bg-black flex items-center justify-center min-h-0">
+            <video class="w-full max-h-[85vh] object-contain aspect-video" id="workflow-video" controls playsinline preload="metadata">
+                <source id="workflow-video-source" type="video/mp4"/>
+                Your browser does not support the video tag.
+            </video>
+        </div>
+    </div>
+</div>
+
 <script>
-        // Simple scroll spy for navigation
-        const sections = document.querySelectorAll('section');
-        const navLinks = document.querySelectorAll('nav a[href^="#"]');
-        const mainCanvas = document.querySelector('main');
-        const isMobile = window.innerWidth < 768;
-        const scrollTarget = isMobile ? window : mainCanvas;
-        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        const CLOUDINARY_VIDEO_URL = 'https://res.cloudinary.com/dkvoohwpi/video/upload/v1775284345/Video_S1._COBALT_demonstration_video_illustrating_software_features_and_workflow._qkmser.mp4';
-        const videoModal = document.getElementById('video-modal');
-        const openVideoModalButton = document.getElementById('open-video-modal');
-        const closeVideoModalButton = document.getElementById('close-video-modal');
-        const cloudinaryVideo = document.getElementById('cloudinary-video');
-        const cloudinaryVideoSource = document.getElementById('cloudinary-video-source');
-
-        const openVideoModal = () => {
-            if (!videoModal) return;
-
-            videoModal.classList.remove('hidden');
-            videoModal.classList.add('flex');
-            videoModal.setAttribute('aria-hidden', 'false');
-            document.body.classList.add('overflow-hidden');
-
-            if (cloudinaryVideo && cloudinaryVideoSource && CLOUDINARY_VIDEO_URL) {
-                cloudinaryVideoSource.src = CLOUDINARY_VIDEO_URL;
-                cloudinaryVideo.load();
-                cloudinaryVideo.play().catch(() => {});
-            }
-        };
-
-        const closeVideoModal = () => {
-            if (!videoModal) return;
-
-            videoModal.classList.add('hidden');
-            videoModal.classList.remove('flex');
-            videoModal.setAttribute('aria-hidden', 'true');
-            document.body.classList.remove('overflow-hidden');
-
-            if (cloudinaryVideo) {
-                cloudinaryVideo.pause();
-                cloudinaryVideo.currentTime = 0;
-            }
-        };
-
-        if (openVideoModalButton) {
-            openVideoModalButton.addEventListener('click', openVideoModal);
+    const nav = document.getElementById("main-nav");
+    const mainEl = document.querySelector("main");
+    const handleScroll = () => {
+        const scrollTop = window.scrollY || mainEl.scrollTop;
+        if (scrollTop > 50) {
+            nav.classList.add("bg-[#047857]", "shadow-md", "py-3");
+            nav.classList.remove("bg-transparent", "py-5");
+        } else {
+            nav.classList.add("bg-transparent", "py-5");
+            nav.classList.remove("bg-[#047857]", "shadow-md", "py-3");
         }
+    };
+    window.addEventListener("scroll", handleScroll);
+    mainEl.addEventListener("scroll", handleScroll);
 
-        if (closeVideoModalButton) {
-            closeVideoModalButton.addEventListener('click', closeVideoModal);
+    // Video Modal Logic
+    const VIDEO_URL = "https://res.cloudinary.com/dkvoohwpi/video/upload/v1775284345/Video_S1._COBALT_demonstration_video_illustrating_software_features_and_workflow._qkmser.mp4";
+    const videoModal = document.getElementById("video-modal");
+    const openBtn = document.getElementById("open-video-modal");
+    const closeBtn = document.getElementById("close-video-modal");
+    const videoEl = document.getElementById("workflow-video");
+    const videoSource = document.getElementById("workflow-video-source");
+
+    const closeVideo = () => {
+        if (!videoModal) return;
+        videoModal.classList.add("hidden");
+        videoModal.classList.remove("flex");
+        document.body.style.overflow = "";
+        if (videoEl) {
+            videoEl.pause();
+            videoEl.currentTime = 0;
         }
+    };
 
-        if (videoModal) {
-            videoModal.addEventListener('click', (event) => {
-                if (event.target && event.target.hasAttribute('data-close-video-modal')) {
-                    closeVideoModal();
-                }
-            });
-        }
-
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') {
-                closeVideoModal();
+    if (openBtn) {
+        openBtn.addEventListener("click", () => {
+            videoModal.classList.remove("hidden");
+            videoModal.classList.add("flex");
+            document.body.style.overflow = "hidden";
+            if (videoEl && videoSource) {
+                videoSource.src = VIDEO_URL;
+                videoEl.load();
+                videoEl.play().catch(() => {});
             }
         });
+    }
 
-        const scrollToSection = (sectionId) => {
-            const section = document.querySelector(sectionId);
-            if (!section) return;
-
-            if (isMobile) {
-                section.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
-                return;
+    if (closeBtn) closeBtn.addEventListener("click", closeVideo);
+    
+    if (videoModal) {
+        videoModal.addEventListener("click", (e) => {
+            if (e.target && e.target.hasAttribute("data-close-video-modal")) {
+                closeVideo();
             }
-
-            const targetTop = section.offsetTop;
-            mainCanvas.scrollTo({
-                top: targetTop,
-                behavior: prefersReducedMotion ? 'auto' : 'smooth'
-            });
-        };
-
-        navLinks.forEach(link => {
-            link.addEventListener('click', (event) => {
-                const href = link.getAttribute('href');
-                if (!href || !href.startsWith('#')) return;
-
-                event.preventDefault();
-                scrollToSection(href);
-                history.replaceState(null, '', href);
-
-                if (link.closest('#mobile-nav')) {
-                    document.getElementById('mobile-menu-toggle').checked = false;
-                }
-            });
         });
+    }
 
-        const updateNav = () => {
-            let current = '';
-            const scrollPos = isMobile ? window.scrollY : mainCanvas.scrollTop;
-            
-            sections.forEach(section => {
-                const sectionTop = section.offsetTop;
-                if (scrollPos >= (sectionTop - 200)) {
-                    current = section.getAttribute('id');
-                }
-            });
-
-            navLinks.forEach(link => {
-                const href = link.getAttribute('href');
-                if (href && href.startsWith('#')) {
-                    link.classList.remove('nav-link-active');
-                    link.classList.add('text-[#f9f9ff]/70');
-                    if (href.includes(current)) {
-                        link.classList.add('nav-link-active');
-                        link.classList.remove('text-[#f9f9ff]/70');
-                    }
-                }
-            });
-        };
-
-        scrollTarget.addEventListener('scroll', updateNav);
-        updateNav();
-        
-        // Close mobile menu on click
-        document.querySelectorAll('#mobile-nav a').forEach(link => {
-            link.addEventListener('click', () => {
-                document.getElementById('mobile-menu-toggle').checked = false;
-            });
+    document.querySelectorAll("nav a[href^=\"#\"]").forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute("href"));
+            if (target) {
+                document.querySelector("main").scrollTo({
+                    top: target.offsetTop - 80,
+                    behavior: "smooth"
+                });
+                document.getElementById("mobile-menu-toggle").checked = false;
+            }
         });
-    </script>
-</body></html>
+    });
+</script>
+</body>
+</html>

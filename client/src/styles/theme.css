@@ -1,30 +1,30 @@
 /* Academic Professional Color Scheme */
 :root {
   /* Primary Colors */
-  --color-primary: #04152b;
-  --color-primary-dark: #1a2a40;
-  --color-primary-hover: #38485f;
-  --color-primary-light: #505f78;
+  --color-primary: #047857;
+  --color-primary-dark: #065f46;
+  --color-primary-hover: #059669;
+  --color-primary-light: #a7f3d0;
   --color-accent: #e9c176;
   
   /* Secondary Colors */
   --color-secondary: #545f72;
   --color-secondary-hover: #586377;
-  --color-secondary-light: #75777d;
+  --color-secondary-light: #94a3b8;
   
   /* Backgrounds */
-  --color-background: #f9f9ff;
+  --color-background: #f8fafc;
   --color-surface: #ffffff;
   
   /* Text Colors */
-  --color-text-primary: #0b1c31;
-  --color-text-secondary: #44474d;
-  --color-text-light: #75777d;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-light: #94a3b8;
   --color-text-white: #ffffff;
   
   /* Borders */
-  --color-border: #c4c6cd;
-  --color-border-light: #eff3ff;
+  --color-border: #cbd5e1;
+  --color-border-light: #f1f5f9;
   
   /* Status Colors */
   --color-success: #1f7a4a;

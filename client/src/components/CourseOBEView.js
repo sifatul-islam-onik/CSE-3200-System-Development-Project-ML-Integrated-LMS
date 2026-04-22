@@ -124,7 +124,7 @@ const CourseOBEView = ({ course: courseProp, onClose, viewingSemester = null }) 
       {/* Continuation Message for Term 0 Courses */}
       {course.term === 0 && viewingSemester && (
         <div className="section-card" style={{
-          backgroundColor: '#e3f2fd',
+          backgroundColor: '#ecfdf5',
           borderLeft: '4px solid #1976d2',
           padding: '16px',
           marginBottom: '20px'
