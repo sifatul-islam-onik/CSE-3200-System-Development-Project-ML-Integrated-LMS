@@ -1,5 +1,6 @@
 const request = require('supertest');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 jest.mock('ioredis');
 jest.mock('bull');
 
@@ -7,7 +8,6 @@ const app = require('../../server');
 const ProgramOutcome = require('../../models/ProgramOutcome');
 const User = require('../../models/User');
 const dbHandler = require('../setup/db');
-const { generateToken } = require('../../utils/tokenUtils');
 
 beforeAll(async () => {
     process.env.NODE_ENV = 'test';
@@ -35,7 +35,11 @@ describe('Program Outcome Controller Test', () => {
             isEmailVerified: true
         });
         await adminUser.save();
-        adminToken = generateToken(adminUser._id);
+        adminToken = jwt.sign(
+            { id: adminUser._id, role: adminUser.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '1d' }
+        );
 
         // Create a student user
         const studentUser = new User({
@@ -48,7 +52,11 @@ describe('Program Outcome Controller Test', () => {
             isEmailVerified: true
         });
         await studentUser.save();
-        studentToken = generateToken(studentUser._id);
+        studentToken = jwt.sign(
+            { id: studentUser._id, role: studentUser.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '1d' }
+        );
 
         // Create initial Program Outcomes
         const pos = [
