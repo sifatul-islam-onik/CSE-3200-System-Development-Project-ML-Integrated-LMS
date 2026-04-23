@@ -24,39 +24,6 @@
   max-width: 480px;
 }
 
-.OBESynK-branding {
-  margin-bottom: 2.5rem;
-  text-align: center;
-}
-
-.OBESynK-branding h1 {
-  margin: 0;
-  font-family: "Inter", "Roboto", sans-serif;
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #047857;
-  letter-spacing: -0.02em;
-  cursor: default;
-  pointer-events: none;
-}
-
-.OBESynK-brand-link {
-  color: inherit;
-  text-decoration: none;
-}
-
-.OBESynK-brand-link:hover {
-  text-decoration: none;
-}
-
-.OBESynK-branding p {
-  margin: 0.5rem 0 0;
-  font-family: "Inter", "Roboto", sans-serif;
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: #475569;
-}
-
 .OBESynK-login-box {
   background: #fff;
   border-radius: 8px;
@@ -74,7 +41,7 @@
   margin: 0;
   text-align: left;
   font-family: "Inter", "Roboto", sans-serif;
-  font-size: 2.8rem;
+  font-size: 3rem;
   font-weight: 500;
   color: #0f172a;
   letter-spacing: -0.03em;
@@ -176,8 +143,8 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  padding: 1.1rem;
-  font-size: 1.1rem;
+  padding: 1.25rem;
+  font-size: 1.25rem;
   font-weight: 500;
   color: #ffffff;
   background: #047857;
@@ -222,101 +189,64 @@
 }
 
 /* Responsive */
-@media (max-width: 768px) {
-  .OBESynK-login-page { flex-direction: column; }
-  .OBESynK-auth-banner { display: none; }
-  .OBESynK-branding-mobile { display: block; }
-
-  .OBESynK-login-main {
-      padding: 2rem 1rem;
-      margin-left: 0;
-      border-radius: 0;
-    }
-  .OBESynK-branding {
-    margin-bottom: 2rem;
+@media (max-width: 1024px) {
+  .OBESynK-auth-banner {
+    padding-left: 3rem;
   }
-  .OBESynK-branding h1 {
-    font-size: 2.25rem;
+  .OBESynK-auth-logo-text {
+    font-size: 3.5rem;
   }
-  .OBESynK-login-box {
-    padding: 2rem 1.5rem;
-  }
-  .OBESynK-login-header h2 {
-    font-size: 1.6rem;
+  .OBESynK-auth-logo-text::after {
+    height: 30px;
+    bottom: -1rem;
   }
 }
 
-
-
-
+@media (max-width: 768px) {
+  .OBESynK-login-page { 
+    flex-direction: column; 
+    height: auto; 
+    overflow: auto;
+  }
+  .OBESynK-login-main {
+    height: auto;
+    overflow: visible;
+    padding: 3rem 1.5rem;
+  }
+  .OBESynK-auth-banner {
+    display: flex;
+    min-height: 40vh;
+    height: auto;
+    width: 100%;
+    align-items: center;
+    padding: 5rem 2rem 3rem 2rem;
+  }
+  .OBESynK-auth-back-nav {
+    top: 1.5rem;
+    left: 1.5rem;
+  }
+  .OBESynK-login-box {
+    padding: 2.5rem 1.5rem;
+  }
+  .OBESynK-login-header h2 {
+    font-size: 2.4rem;
+  }
+}
 .OBESynK-auth-banner {
   flex: 1.15;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: center;
-  background-image: linear-gradient(135deg, rgba(4, 120, 87, 0.85), rgba(2, 44, 34, 0.95)), url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80');
+  align-items: flex-start;
   background-position: center, 20% center;
   background-size: cover, cover;
   background-repeat: no-repeat, no-repeat;
   color: white;
   padding: 3rem;
+  padding-left: 5rem;
   /* Make sure it's at least half the screen on desktop */
   height: 100vh;
 }
-
-.OBESynK-auth-banner-content {
-  max-width: 500px;
-  text-align: left;
-}
-
-.OBESynK-auth-banner-content h1 {
-  font-size: 3.5rem;
-  font-weight: 800;
-  margin-bottom: 2rem;
-  letter-spacing: -0.02em;
-  cursor: default;
-  pointer-events: none;
-}
-
-.OBESynK-auth-banner-content h2 {
-  font-size: 2.2rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-  line-height: 1.2;
-}
-
-.OBESynK-auth-banner-content p {
-  font-size: 1.2rem;
-  line-height: 1.6;
-  opacity: 0.9;
-}
-
-.OBESynK-branding-mobile {
-  display: none;
-  margin-bottom: 2.5rem;
-  text-align: center;
-}
-
-.OBESynK-branding-mobile h1 {
-  margin: 0;
-  font-family: "Inter", "Roboto", sans-serif;
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #047857;
-  letter-spacing: -0.02em;
-  cursor: default;
-  pointer-events: none;
-}
-
-.OBESynK-branding-mobile p {
-  margin: 0.5rem 0 0;
-  font-family: "Inter", "Roboto", sans-serif;
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: #475569;
-}
-
 
 .OBESynK-auth-banner {
   position: relative;
@@ -325,7 +255,7 @@
 .OBESynK-auth-back-nav {
   position: absolute;
   top: 2.5rem;
-  right: 5.5rem;
+  left: 2.5rem;
 }
 
 .OBESynK-auth-back-btn {
@@ -352,13 +282,11 @@
 
 
 .OBESynK-auth-brand-logo {
-  position: absolute;
-  top: 2.5rem;
-  left: 2.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .OBESynK-auth-logo-text {
-  font-size: 2.2rem;
+  font-size: 5rem;
   font-weight: 800;
   color: white;
   text-decoration: none;
@@ -373,34 +301,17 @@
 .OBESynK-auth-logo-text::after {
   content: "";
   position: absolute;
-  bottom: -0.8rem;
+  bottom: -1.2rem;
   left: 0;
   width: 100%;
-  height: 24px;
+  height: 40px;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 35' preserveAspectRatio='none'%3E%3Cpath d='M1,12 C10,25 20,25 25,15 C28,10 32,8 36,15 C45,30 55,20 65,18 C75,15 85,20 98,18' stroke='%23fba013' fill='transparent' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center;
   background-size: 100% 100%;
 }
 
 
 
-.OBESynK-auth-motto {
-  position: absolute;
-  bottom: 2.5rem;
-  left: 0;
-  width: 100%;
-  text-align: center;
-  padding-right: 5.5rem;
-  padding-left: 2rem;
-}
 
-.OBESynK-auth-motto p {
-  font-size: 2.2rem;
-  font-weight: 500;
-  line-height: 1.2;
-  color: rgba(255, 255, 255, 0.95);
-  margin: 0;
-  letter-spacing: 0.02em;
-}
 
 
 /* Hide native browser password reveal */
