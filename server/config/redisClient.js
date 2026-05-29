@@ -9,11 +9,11 @@ const redisClient = new Redis(REDIS_URL, {
 });
 
 redisClient.on('connect', () => {
-    console.log('✅ Connected to Redis cache store');
+    console.log('Connected to Redis cache store');
 });
 
 redisClient.on('error', (err) => {
-    console.error('❌ Redis Connection Error:', err);
+    console.error('Redis Connection Error:', err);
 });
 
 module.exports = redisClient;

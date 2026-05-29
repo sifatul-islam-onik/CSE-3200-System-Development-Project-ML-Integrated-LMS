@@ -6,20 +6,20 @@ let jobSequence = 0;
 
 const ocrQueue = new Bull('ocr-processing', REDIS_URL, {
   defaultJobOptions: {
-    attempts: 3, // 3 attempts max
+    attempts: 3,
     backoff: {
       type: 'exponential',
-      delay: 3000 // 3 second delay between retries
+      delay: 3000
     },
-    removeOnComplete: true, // Auto-remove completed jobs to prevent buildup
-    removeOnFail: false, // Keep failed jobs for debugging
-    timeout: 180000 // 3 minutes timeout
+    removeOnComplete: true,
+    removeOnFail: false,
+    timeout: 180000
   },
   settings: {
-    lockDuration: 180000, // 3 minutes lock
-    lockRenewTime: 60000, // Renew lock every 60s
-    stalledInterval: 60000, // Check for stalled jobs every 60s
-    maxStalledCount: 2 // Max stalls before permanent failure
+    lockDuration: 180000,
+    lockRenewTime: 60000,
+    stalledInterval: 60000,
+    maxStalledCount: 2
   }
 });
 
@@ -28,46 +28,46 @@ function getNextSequence() {
 }
 
 ocrQueue.on('ready', () => {
-  console.log('✅ OCR Queue connected to Redis and ready');
+  console.log('OCR Queue connected to Redis and ready');
 });
 
 ocrQueue.on('disconnected', () => {
-  console.warn('⚠️  OCR Queue disconnected from Redis');
+  console.warn('OCR Queue disconnected from Redis');
 });
 
 ocrQueue.on('reconnected', () => {
-  console.log('🔄 OCR Queue reconnected to Redis');
+  console.log('OCR Queue reconnected to Redis');
 });
 
 ocrQueue.on('error', (error) => {
-  console.error('❌ OCR Queue Error:', error);
+  console.error('OCR Queue Error:', error);
 });
 
 ocrQueue.on('waiting', (jobId) => {
-  console.log(`⏳ Job ${jobId} waiting in queue (FIFO order)`);
+  console.log(`Job ${jobId} waiting in queue (FIFO order)`);
 });
 
 ocrQueue.on('active', (job) => {
-  console.log(`▶️  Job ${job.id} (${job.data.jobId}) started processing`);
+  console.log(`Job ${job.id} (${job.data.jobId}) started processing`);
 });
 
 ocrQueue.on('completed', (job, result) => {
-  console.log(`✅ Job ${job.id} (${job.data.jobId}) completed successfully`);
+  console.log(`Job ${job.id} (${job.data.jobId}) completed successfully`);
 });
 
 ocrQueue.on('failed', (job, err) => {
-  console.error(`❌ Job ${job.id} (${job.data.jobId}) failed:`, err.message);
+  console.error(`Job ${job.id} (${job.data.jobId}) failed:`, err.message);
 });
 
 ocrQueue.on('stalled', (job) => {
-  console.warn(`⚠️  Job ${job.id} (${job.data.jobId}) stalled - will be retried`);
+  console.warn(`Job ${job.id} (${job.data.jobId}) stalled - will be retried`);
 });
 
 ocrQueue.on('cleaned', (jobs, type) => {
-  console.log(`🧹 Cleaned ${jobs.length} ${type} jobs from queue`);
+  console.log(`Cleaned ${jobs.length} ${type} jobs from queue`);
 });
 
-console.log('📋 OCR Queue initialized with STRICT FIFO ordering');
+console.log('OCR Queue initialized with STRICT FIFO ordering');
 
 module.exports = ocrQueue;
 module.exports.getNextSequence = getNextSequence;

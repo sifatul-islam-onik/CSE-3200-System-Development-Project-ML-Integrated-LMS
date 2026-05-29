@@ -1,7 +1,3 @@
-/**
- * Error boundary component for Attainment page
- * Catches and handles React errors gracefully
- */
 
 import React from 'react';
 
