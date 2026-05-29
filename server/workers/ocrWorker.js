@@ -21,7 +21,7 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
   try {
     const jobInStore = await ocrJobStore.getJob(jobId);
     if (!jobInStore) {
-      console.error(`❌ Job ${jobId} not found in store - creating entry`);
+      console.error(`Job ${jobId} not found in store - creating entry`);
       throw new Error('Job not found in store - may have been deleted');
     }
 
@@ -40,14 +40,14 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
 
     const waitTime = Date.now() - (submittedAt || Date.now());
     if (waitTime > 5000) {
-      console.log(`  ⏱️  Job ${jobId} waited ${(waitTime/1000).toFixed(1)}s in queue`);
+      console.log(`Job ${jobId} waited ${(waitTime/1000).toFixed(1)}s in queue`);
     }
 
     if (selectedWorker.activeRequests > 0) {
-      console.log(`  ⚠️  Worker ${workerId} has ${selectedWorker.activeRequests} active request(s)`);
+      console.log(`Worker ${workerId} has ${selectedWorker.activeRequests} active request(s)`);
     }
 
-    console.log(`🔄 Worker ${workerId}: Processing job ${jobId} [SEQ:${sequence}]${isRetry ? ` (Retry ${attemptNumber}/${maxAttempts})` : ''} [FIFO]`);
+    console.log(`Worker ${workerId}: Processing job ${jobId} [SEQ:${sequence}]${isRetry ? ` (Retry ${attemptNumber}/${maxAttempts})` : ''} [FIFO]`);
 
     workerRegistry.requestStart(workerId);
 
@@ -94,7 +94,7 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
         'ngrok-skip-browser-warning': 'true',
         'X-API-Key': process.env.ML_API_KEY || ''
       },
-      timeout: 180000 // 3 minutes timeout (increased from 2 minutes for cold starts)
+      timeout: 180000
     });
 
     const mlDuration = ((Date.now() - mlStartTime) / 1000).toFixed(2);
@@ -117,7 +117,7 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
         error: null
       });
       job.progress(100);
-      console.log(`✅ Worker ${workerId}: Job ${jobId} completed${isRetry ? ' (after retry)' : ''}`);
+      console.log(`Worker ${workerId}: Job ${jobId} completed${isRetry ? ' (after retry)' : ''}`);
       
       workerRegistry.requestComplete(workerId, true);
 
@@ -132,7 +132,7 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
     }
 
   } catch (error) {
-    console.error(`❌ Worker ${workerId || 'unknown'}: Job ${jobId} failed: ${error.message}`);
+    console.error(`Worker ${workerId || 'unknown'}: Job ${jobId} failed: ${error.message}`);
     
     if (error.response) {
       console.error(`  ML Server response status: ${error.response.status}`);
@@ -141,7 +141,7 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
     const willRetry = attemptNumber < maxAttempts;
     
     if (willRetry) {
-      console.log(`  🔄 Will retry (attempt ${attemptNumber}/${maxAttempts})`);
+      console.log(`Will retry (attempt ${attemptNumber}/${maxAttempts})`);
       await ocrJobStore.updateJob(jobId, {
         status: 'retrying',
         error: error.message,
@@ -152,7 +152,7 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
         lastFailedAt: new Date()
       });
     } else {
-      console.log(`  ❌ Final failure (all ${maxAttempts} attempts exhausted)`);
+      console.log(`Final failure (all ${maxAttempts} attempts exhausted)`);
       await ocrJobStore.updateJob(jobId, {
         status: 'failed',
         error: error.message,
