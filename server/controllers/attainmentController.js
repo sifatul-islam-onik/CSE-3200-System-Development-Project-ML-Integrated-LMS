@@ -5,6 +5,14 @@ const AssignmentAttainment = require('../models/AssignmentAttainment');
 const LabActivityAttainment = require('../models/LabActivityAttainment');
 const TermExamMarks = require('../models/TermExamMarks');
 const TermExamAttainment = require('../models/TermExamAttainment');
+const CourseOutcome = require('../models/CourseOutcome');
+const {
+  calculateTheoryCoAttainmentByStudent,
+  calculateLabCoAttainmentByStudent,
+  calculateCombinedCoAttainmentByStudent,
+  calculateUnnormedCoAttainmentByStudent,
+  calculateEqualWtCoAttainmentByStudent,
+} = require('../utils/coAttainmentCalc');
 
 const getTeacherCourses = async (teacherId) => {
   const courses = await Course.find({
@@ -25,6 +33,253 @@ const getTeacherCourses = async (teacherId) => {
       semester: course.semester
     };
   });
+};
+
+const getCourseByCode = async (courseCode) => {
+  if (!courseCode) return null;
+  return Course.findOne({ courseCode: { $regex: new RegExp(`^${courseCode}$`, 'i') } }).lean();
+};
+
+const normalizeCoNumber = (code) => {
+  const raw = String(code || '').trim();
+  const match = raw.match(/(CO|CLO)\d+/i);
+  if (match) return match[0].toUpperCase().replace('CLO', 'CO');
+  return raw.toUpperCase();
+};
+
+const buildCombinedCourseOutcomes = async (course) => {
+  if (!course?.courseCode) return { coNumbers: [], sourceTypeMap: {} };
+
+  const courseCode = course.courseCode.toUpperCase();
+  const codeMatch = courseCode.match(/^([A-Z]+)\s*(\d+)$/i);
+  const isLab = codeMatch ? parseInt(codeMatch[2], 10) % 2 === 0 : false;
+  const currentType = isLab ? 'lab' : 'theory';
+
+  let courseOutcomes = await CourseOutcome.find({ course: course._id, is_deleted: false })
+    .sort({ co_code: 1 }).lean();
+
+  let relatedOutcomes = [];
+  if (codeMatch) {
+    const prefix = codeMatch[1];
+    const number = parseInt(codeMatch[2], 10);
+    const relatedCourseCode = isLab ? `${prefix} ${number - 1}` : `${prefix} ${number + 1}`;
+    const relatedCourse = await getCourseByCode(relatedCourseCode);
+    if (relatedCourse) {
+      relatedOutcomes = await CourseOutcome.find({ course: relatedCourse._id, is_deleted: false })
+        .sort({ co_code: 1 }).lean();
+    }
+  }
+
+  const ownCoCodes = new Set(courseOutcomes.map(co => String(co.co_code || '').toUpperCase()));
+  const relatedCoCodes = new Set(relatedOutcomes.map(co => String(co.co_code || '').toUpperCase()));
+  const coMap = new Map();
+
+  [...courseOutcomes, ...relatedOutcomes].forEach(co => {
+    const coCode = String(co.co_code || '').toUpperCase();
+    if (!coMap.has(coCode)) {
+      coMap.set(coCode, { coCode, sourceType: currentType });
+    }
+  });
+
+  coMap.forEach((val, coCode) => {
+    const inOwn = ownCoCodes.has(coCode);
+    const inRelated = relatedCoCodes.has(coCode);
+    if (inOwn && inRelated) {
+      val.sourceType = 'both';
+    } else if (inOwn) {
+      val.sourceType = currentType;
+    } else {
+      val.sourceType = currentType === 'lab' ? 'theory' : 'lab';
+    }
+  });
+
+  const coNumbers = Array.from(coMap.values())
+    .sort((a, b) => a.coCode.localeCompare(b.coCode))
+    .map(co => normalizeCoNumber(co.coCode));
+
+  const sourceTypeMap = {};
+  Array.from(coMap.values()).forEach(co => {
+    sourceTypeMap[normalizeCoNumber(co.coCode)] = co.sourceType;
+  });
+
+  return { coNumbers, sourceTypeMap };
+};
+
+const getEnrolledStudentsForCourse = async (course) => {
+  if (!course) return [];
+  const assignedBatches = course.assignedBatches || [];
+  if (assignedBatches.length === 0) return [];
+
+  const students = await User.find({
+    role: 'student',
+    isActive: true,
+    isEmailVerified: true,
+    isApprovedByAdmin: true,
+  }).select('name roll email').lean();
+
+  const matched = students.filter(student => {
+    let roll = student.roll;
+    if (!roll && student.email) {
+      const match = student.email.match(/^(\d+)/);
+      if (match) roll = match[1];
+    }
+    if (!roll || roll.length < 4) return false;
+    const batch = roll.substring(0, 2);
+    const deptCode = roll.substring(2, 4);
+    return assignedBatches.some(assignment => assignment.batch === batch && assignment.deptCode === deptCode);
+  }).map(s => ({
+    rollNumber: (s.roll || '').trim(),
+    name: s.name || ''
+  }));
+
+  return matched.sort((a, b) => String(a.rollNumber).localeCompare(String(b.rollNumber), undefined, { numeric: true }));
+};
+
+const buildRollFallback = (rows) => {
+  const seen = new Set();
+  const list = [];
+  (rows || []).forEach(r => {
+    const roll = String(r?.rollNumber || '').trim();
+    if (!roll || roll.toLowerCase() === 'roll') return;
+    const key = roll.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    list.push({ rollNumber: roll, name: r?.name || '' });
+  });
+  return list;
+};
+
+const getMark = (marksObj, row, question) => {
+  try {
+    let marks = marksObj;
+    if (marks instanceof Map) {
+      const tmp = {};
+      for (const [k, v] of marks.entries()) {
+        tmp[k] = v instanceof Map ? Object.fromEntries(v) : v;
+      }
+      marks = tmp;
+    }
+    if (!marks || !marks[row]) return 0;
+    let rowData = marks[row];
+    if (rowData instanceof Map) rowData = Object.fromEntries(rowData);
+    if (!rowData || typeof rowData !== 'object') return 0;
+    const value = rowData[question] !== undefined ? rowData[question] : rowData[String(question)];
+    if (value === '' || value === null || value === undefined) return 0;
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? 0 : parsed;
+  } catch {
+    return 0;
+  }
+};
+
+const buildSectionARow = (examMark) => ({
+  rollNumber: examMark.student?.roll || '',
+  name: examMark.student?.name || '',
+  Q1a: getMark(examMark.marks, 'a', '1'), Q1b: getMark(examMark.marks, 'b', '1'),
+  Q1c: getMark(examMark.marks, 'c', '1'), Q1d: getMark(examMark.marks, 'd', '1'),
+  Q2a: getMark(examMark.marks, 'a', '2'), Q2b: getMark(examMark.marks, 'b', '2'),
+  Q2c: getMark(examMark.marks, 'c', '2'), Q2d: getMark(examMark.marks, 'd', '2'),
+  Q3a: getMark(examMark.marks, 'a', '3'), Q3b: getMark(examMark.marks, 'b', '3'),
+  Q3c: getMark(examMark.marks, 'c', '3'), Q3d: getMark(examMark.marks, 'd', '3'),
+  Q4a: getMark(examMark.marks, 'a', '4'), Q4b: getMark(examMark.marks, 'b', '4'),
+  Q4c: getMark(examMark.marks, 'c', '4'), Q4d: getMark(examMark.marks, 'd', '4'),
+});
+
+const buildSectionBRow = (examMark) => ({
+  rollNumber: examMark.student?.roll || '',
+  name: examMark.student?.name || '',
+  Q1a: getMark(examMark.marks, 'a', '5'), Q1b: getMark(examMark.marks, 'b', '5'),
+  Q1c: getMark(examMark.marks, 'c', '5'), Q1d: getMark(examMark.marks, 'd', '5'),
+  Q2a: getMark(examMark.marks, 'a', '6'), Q2b: getMark(examMark.marks, 'b', '6'),
+  Q2c: getMark(examMark.marks, 'c', '6'), Q2d: getMark(examMark.marks, 'd', '6'),
+  Q3a: getMark(examMark.marks, 'a', '7'), Q3b: getMark(examMark.marks, 'b', '7'),
+  Q3c: getMark(examMark.marks, 'c', '7'), Q3d: getMark(examMark.marks, 'd', '7'),
+  Q4a: getMark(examMark.marks, 'a', '8'), Q4b: getMark(examMark.marks, 'b', '8'),
+  Q4c: getMark(examMark.marks, 'c', '8'), Q4d: getMark(examMark.marks, 'd', '8'),
+});
+
+const extractCONumbers = (sectionARows, courseOutcomes) => {
+  if (courseOutcomes && courseOutcomes.length > 0) {
+    return courseOutcomes
+      .filter(co => !co.is_deleted)
+      .map(co => normalizeCoNumber(co.co_code));
+  }
+  return (sectionARows || []).map(r => normalizeCoNumber(r.coNumber));
+};
+
+const loadCourseAttainmentData = async (courseId) => {
+  const [termExamDoc, ctDoc, assignDoc, courseOutcomes, termMarksA, termMarksB] = await Promise.all([
+    TermExamAttainment.findOne({ course: courseId }).lean(),
+    CTAttainment.findOne({ course: courseId }).lean(),
+    AssignmentAttainment.findOne({ course: courseId }).lean(),
+    CourseOutcome.find({ course: courseId, is_deleted: false }).lean(),
+    TermExamMarks.find({ course: courseId, section: 'A' }).populate('student', 'roll name').lean(),
+    TermExamMarks.find({ course: courseId, section: 'B' }).populate('student', 'roll name').lean(),
+  ]);
+
+  const sectionAObtainedRows = (termMarksA || []).map(buildSectionARow);
+  const sectionBObtainedRows = (termMarksB || []).map(buildSectionBRow);
+
+  const sectionARows = termExamDoc ? termExamDoc.sectionARows : [];
+  const sectionBRows = termExamDoc ? termExamDoc.sectionBRows : [];
+
+  const unwrapMap = (m) => {
+    if (!m) return {};
+    if (m instanceof Map) return Object.fromEntries(m);
+    if (typeof m === 'object' && m.constructor?.name === 'Object') return m;
+    return {};
+  };
+
+  return {
+    sectionAData: { sectionARows, sectionAObtainedRows },
+    sectionBData: { sectionBRows, sectionBObtainedRows },
+    ctData: {
+      ctRows: ctDoc ? ctDoc.ctRows : [],
+      ctObtainedRows: ctDoc ? ctDoc.ctObtainedRows : [],
+      ctManualWts: ctDoc ? unwrapMap(ctDoc.ctManualWts) : {},
+      ctSummary: ctDoc ? ctDoc.ctSummary : {},
+    },
+    assignData: {
+      assignmentRows: assignDoc ? assignDoc.assignmentRows : [],
+      attnAssignObtainedRows: assignDoc ? assignDoc.attnAssignObtainedRows : [],
+      assignmentManualWts: assignDoc ? unwrapMap(assignDoc.assignmentManualWts) : {},
+      assignmentSummary: assignDoc ? assignDoc.assignmentSummary : {},
+    },
+    coNumbers: extractCONumbers(sectionARows, courseOutcomes),
+  };
+};
+
+const loadLabCourseAttainmentData = async (courseId) => {
+  const labDoc = await LabActivityAttainment.findOne({ course: courseId }).lean();
+  if (!labDoc) return null;
+
+  const unwrapMap = (m) => {
+    if (!m) return {};
+    if (m instanceof Map) return Object.fromEntries(m);
+    if (typeof m === 'object' && m.constructor?.name === 'Object') return m;
+    return {};
+  };
+
+  const labActivityRows = labDoc.labActivityRows || [];
+  const coNumbers = labActivityRows
+    .map(row => normalizeCoNumber(row.coNumber))
+    .filter(Boolean);
+
+  return {
+    coNumbers: [...new Set(coNumbers)],
+    labActivityRows,
+    labActivityScores: unwrapMap(labDoc.labActivityScores),
+    labActivityObtainedRows: labDoc.labActivityObtainedRows || [],
+    labAttendanceMarks: labDoc.labAttendanceMarks || 0,
+    labQuizMarks: labDoc.labQuizMarks || 0,
+    labVivaMarks: labDoc.labVivaMarks || 0,
+    activityTaken: labDoc.activityTaken || 5,
+    useEqWtActivity: labDoc.useEqWtActivity || 0,
+    coMappedActivityMarks: labDoc.coMappedActivityMarks || 0,
+    labActivityManualWts: unwrapMap(labDoc.labActivityManualWts),
+    otherActivityRemaining: labDoc.otherActivityRemaining || 0,
+    otherActivityMeasured: labDoc.otherActivityMeasured || 0,
+  };
 };
 
 exports.getAttainmentData = async (req, res) => {
@@ -83,6 +338,105 @@ exports.getSheets = async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+};
+
+exports.getCoAttainmentCalcs = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const course = await Course.findById(courseId).lean();
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    if (req.user.role === 'teacher') {
+      const isAssigned = (course.assignedTeachers || []).some(assignment => {
+        const teacherId = assignment.teacher?._id || assignment.teacher;
+        return teacherId.toString() === req.user._id.toString();
+      });
+      if (!isAssigned) {
+        return res.status(403).json({ success: false, message: 'Access denied. You are not assigned to this course.' });
+      }
+    }
+
+    const courseCode = course.courseCode || '';
+    const codeMatch = courseCode.match(/^([A-Z]+)\s*(\d+)$/i);
+    const isLab = codeMatch ? parseInt(codeMatch[2], 10) % 2 === 0 : false;
+
+    const theoryCode = codeMatch
+      ? (isLab ? `${codeMatch[1]} ${parseInt(codeMatch[2], 10) - 1}` : `${codeMatch[1]} ${parseInt(codeMatch[2], 10)}`)
+      : courseCode;
+    const labCode = codeMatch
+      ? (isLab ? `${codeMatch[1]} ${parseInt(codeMatch[2], 10)}` : `${codeMatch[1]} ${parseInt(codeMatch[2], 10) + 1}`)
+      : '';
+
+    const theoryCourse = await getCourseByCode(theoryCode);
+    const labCourse = labCode ? await getCourseByCode(labCode) : null;
+
+    const [theoryData, labData] = await Promise.all([
+      theoryCourse ? loadCourseAttainmentData(theoryCourse._id) : Promise.resolve(null),
+      labCourse ? loadLabCourseAttainmentData(labCourse._id) : Promise.resolve(null),
+    ]);
+
+    const { coNumbers: combinedCoNumbers, sourceTypeMap } = await buildCombinedCourseOutcomes(course);
+    const coNumbers = combinedCoNumbers.length > 0
+      ? combinedCoNumbers
+      : (theoryData?.coNumbers?.length ? theoryData.coNumbers : (labData?.coNumbers || []));
+
+    const theoryStudents = theoryCourse ? await getEnrolledStudentsForCourse(theoryCourse) : [];
+    const labStudents = labCourse ? await getEnrolledStudentsForCourse(labCourse) : [];
+
+    const theoryFallback = buildRollFallback([
+      ...(theoryData?.sectionAData?.sectionAObtainedRows || []),
+      ...(theoryData?.sectionBData?.sectionBObtainedRows || []),
+      ...(theoryData?.ctData?.ctObtainedRows || []),
+      ...(theoryData?.assignData?.attnAssignObtainedRows || []),
+    ]);
+
+    const labFallback = buildRollFallback([
+      ...(labData?.labActivityObtainedRows || [])
+    ]);
+
+    const finalTheoryStudents = theoryStudents.length > 0 ? theoryStudents : theoryFallback;
+    const finalLabStudents = labStudents.length > 0 ? labStudents : labFallback;
+
+    const combinedBaseStudents = finalTheoryStudents.length > 0
+      ? finalTheoryStudents
+      : finalLabStudents;
+
+    const theoryCoAttainmentData = theoryData && coNumbers.length > 0
+      ? calculateTheoryCoAttainmentByStudent(finalTheoryStudents, coNumbers, theoryData)
+      : [];
+
+    const labCoAttainmentData = labData && coNumbers.length > 0
+      ? calculateLabCoAttainmentByStudent(finalLabStudents, coNumbers, labData)
+      : [];
+
+    const combinedCoAttainmentData = (combinedBaseStudents.length > 0 && coNumbers.length > 0)
+      ? calculateCombinedCoAttainmentByStudent(combinedBaseStudents, coNumbers, theoryData || {}, labData || {})
+      : [];
+
+    const unnormedCoAttainmentData = (combinedBaseStudents.length > 0 && coNumbers.length > 0)
+      ? calculateUnnormedCoAttainmentByStudent(combinedBaseStudents, coNumbers, theoryData || {}, labData || {})
+      : [];
+
+    const equalWtCoAttainmentData = coNumbers.length > 0
+      ? calculateEqualWtCoAttainmentByStudent(theoryCoAttainmentData, labCoAttainmentData, coNumbers, sourceTypeMap)
+      : [];
+
+    return res.json({
+      success: true,
+      data: {
+        theoryCoAttainmentData,
+        labCoAttainmentData,
+        combinedCoAttainmentData,
+        unnormedCoAttainmentData,
+        equalWtCoAttainmentData,
+      }
+    });
+  } catch (error) {
+    console.error('Error calculating CO attainment:', error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
 

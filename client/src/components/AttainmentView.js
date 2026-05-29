@@ -26,6 +26,7 @@ import {
   saveAssignmentData,
   getAssignmentData,
   getTermExamMarks,
+  getCoAttainmentCalcs,
   saveLabActivityData,
   getLabActivityData,
   saveSectionAData,
@@ -153,9 +154,14 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
   const [obtainedModalView, setObtainedModalView] = useState(0);
   const [coAttainmentData, setCoAttainmentData] = useState([]);
   const [coAttainmentReady, setCoAttainmentReady] = useState(false);
-  const coAttainmentSettleTimerRef = useRef(null);
   const [isStandaloneCourse, setIsStandaloneCourse] = useState(null);
   const [coCalcData, setCoCalcData] = useState([]);
+  const [theoryCoAttainmentData, setTheoryCoAttainmentData] = useState([]);
+  const [labCoAttainmentData, setLabCoAttainmentData] = useState([]);
+  const [combinedCoAttainmentData, setCombinedCoAttainmentData] = useState([]);
+  const [unnormedCoAttainmentData, setUnnormedCoAttainmentData] = useState([]);
+  const [equalWtCoAttainmentData, setEqualWtCoAttainmentData] = useState([]);
+  const [coAttainmentRefreshKey, setCoAttainmentRefreshKey] = useState(0);
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     setUserRole(user.role || '');
@@ -683,6 +689,64 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
     loadCOCalcData();
   }, [selectedSheet, selectedCourse, clos, combinedClos, sheetNames, sectionAObtainedRows, sectionARows, sectionBObtainedRows, sectionBRows, attnAssignObtainedRows, assignmentRows, assignmentManualWts, assignmentSummary, ctObtainedRows, ctRows, ctSummary]);
+
+  const refreshCoAttainmentCalcs = useCallback(() => {
+    setCoAttainmentRefreshKey(key => key + 1);
+  }, []);
+
+  useEffect(() => {
+    const calcSheetGroup = new Set(['COCalc', 'COCalc_LabUnnorm', 'COAttainment', 'POCalcMax', 'POCalc', 'CheckPO', 'Charts']);
+    if (!calcSheetGroup.has(selectedSheet) || !selectedCourse?._id) {
+      setCoAttainmentData([]);
+      setTheoryCoAttainmentData([]);
+      setLabCoAttainmentData([]);
+      setCombinedCoAttainmentData([]);
+      setUnnormedCoAttainmentData([]);
+      setEqualWtCoAttainmentData([]);
+      return;
+    }
+
+    let cancelled = false;
+    setCoAttainmentReady(false);
+
+    const loadCoAttainmentCalcs = async () => {
+      try {
+        const resp = await getCoAttainmentCalcs(selectedCourse._id);
+        if (cancelled) return;
+        const data = resp?.data || {};
+        const fallbackData = [
+          data.theoryCoAttainmentData,
+          data.labCoAttainmentData,
+          data.combinedCoAttainmentData,
+          data.unnormedCoAttainmentData,
+          data.equalWtCoAttainmentData
+        ].find(list => Array.isArray(list) && list.length) || [];
+        setCoAttainmentData(fallbackData);
+        setTheoryCoAttainmentData(Array.isArray(data.theoryCoAttainmentData) ? data.theoryCoAttainmentData : []);
+        setLabCoAttainmentData(Array.isArray(data.labCoAttainmentData) ? data.labCoAttainmentData : []);
+        setCombinedCoAttainmentData(Array.isArray(data.combinedCoAttainmentData) ? data.combinedCoAttainmentData : []);
+        setUnnormedCoAttainmentData(Array.isArray(data.unnormedCoAttainmentData) ? data.unnormedCoAttainmentData : []);
+        setEqualWtCoAttainmentData(Array.isArray(data.equalWtCoAttainmentData) ? data.equalWtCoAttainmentData : []);
+        setCoAttainmentReady(true);
+      } catch (err) {
+        if (cancelled) return;
+        logger.error('Failed to load CO attainment calculations:', err);
+        setCoAttainmentData([]);
+        setTheoryCoAttainmentData([]);
+        setLabCoAttainmentData([]);
+        setCombinedCoAttainmentData([]);
+        setUnnormedCoAttainmentData([]);
+        setEqualWtCoAttainmentData([]);
+        setCoAttainmentReady(true);
+      }
+    };
+
+    loadCoAttainmentCalcs();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSheet, selectedCourse, coAttainmentRefreshKey]);
   const initObtainedRows = useCallback(async (forSheet) => {
     if (forSheet === 'CT' && ctDataLoadedRef.current) {
       return;
@@ -1264,6 +1328,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       };
 
       setSaveStatus('saved');
+      refreshCoAttainmentCalcs();
       setTimeout(() => setSaveStatus(''), 2000);
     } catch (error) {
       console.error('[handleManualSave] Error:', error);
@@ -1313,6 +1378,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       };
 
       setSaveStatus('saved');
+      refreshCoAttainmentCalcs();
       setTimeout(() => setSaveStatus(''), 2000);
     } catch (error) {
       console.error('[handleManualSaveAssignment] Error:', error);
@@ -1397,6 +1463,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
       console.log('Lab Activity data saved successfully!');
       setLabActivitySaveStatus('saved');
+      refreshCoAttainmentCalcs();
       setTimeout(() => setLabActivitySaveStatus(''), 2000);
     } catch (error) {
       console.error('[handleManualSaveLabActivity] Error:', error);
@@ -1433,6 +1500,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
       console.log('Section A & B data saved successfully!');
       setSectionASaveStatus('saved');
+      refreshCoAttainmentCalcs();
       setTimeout(() => setSectionASaveStatus(''), 2000);
     } catch (error) {
       console.error('[handleManualSaveSectionA] Error:', error);
@@ -1470,6 +1538,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
       console.log('Section A & B data saved successfully!');
       setSectionBSaveStatus('saved');
+      refreshCoAttainmentCalcs();
       setTimeout(() => setSectionBSaveStatus(''), 2000);
     } catch (error) {
       console.error('[handleManualSaveSectionB] Error:', error);
@@ -3024,21 +3093,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     }
     return result;
   };
-  const labCoAttainmentData = useMemo(() => {
-    const effectiveClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
-    if (!labActivityObtainedRows.length || !effectiveClos.length) return [];
-    return labActivityObtainedRows
-      .filter(student => student.rollNumber)
-      .map(student => {
-        const coValues = {};
-        effectiveClos.forEach(clo => {
-          const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-          const ratio = getLabActivityCOAttainment(student, cn);
-          coValues[cn] = ratio != null ? parseFloat((ratio * 100).toFixed(4)) : 0;
-        });
-        return { rollNumber: student.rollNumber, coValues };
-      });
-  }, [labActivityObtainedRows, labActivityRows, clos, combinedClos, useEqWtActivity, coMappedActivityMarks, activityTaken, labActivityManualWts]);
 
   const columnTotals = () => {
     const fields = ['CT1_Q1', 'CT1_Q2', 'CT1_Q3', 'CT2_Q1', 'CT2_Q2', 'CT2_Q3', 'CT3_Q1', 'CT3_Q2', 'CT3_Q3'];
@@ -3148,161 +3202,14 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
     return result;
   };
-  const theoryCoAttainmentData = useMemo(() => {
-    const effectiveClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
-    if (!coCalcData.length || !effectiveClos.length) return [];
-    const factoredTotals = calculateFactoredCOTotals();
-    const factoredAssignTotals = calculateFactoredAssignmentCOTotals();
-    return coCalcData.map(studentRow => {
-      const coValues = {};
-      effectiveClos.forEach(clo => {
-        const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-        const totalObt = (studentRow.sectionA.marksObtained[cn] || 0)
-          + (studentRow.sectionB.marksObtained[cn] || 0)
-          + getStudentCTFactoredMarks(studentRow.rollNumber, cn)
-          + getStudentAssignmentFactoredMarks(studentRow.rollNumber, cn);
-        const totalDist = (studentRow.sectionA.marksDistribution[cn] || 0)
-          + (studentRow.sectionB.marksDistribution[cn] || 0)
-          + (factoredTotals[cn] || 0)
-          + (factoredAssignTotals[cn] || 0);
-        coValues[cn] = totalDist > 0 ? parseFloat(((totalObt / totalDist) * 100).toFixed(4)) : 0;
-      });
-      return { rollNumber: studentRow.rollNumber, coValues };
-    });
-  }, [coCalcData, clos, combinedClos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary]);
-  const combinedCoAttainmentData = useMemo(() => {
-    const effectiveClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
-    if (!coCalcData.length || !effectiveClos.length) return [];
-    const factoredTotals = calculateFactoredCOTotals();
-    const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
-    return coCalcData.map(studentRow => {
-      const coValues = {};
-      effectiveClos.forEach(clo => {
-        const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-        const labStudent = labActivityObtainedRows.find(s =>
-          String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
-        );
-        const labObt = getLabActivityStudentCOMappedMarks(labStudent, cn);
-        const theoryObt = (studentRow.sectionA.marksObtained[cn] || 0)
-          + (studentRow.sectionB.marksObtained[cn] || 0)
-          + getStudentCTFactoredMarks(studentRow.rollNumber, cn)
-          + getStudentAssignmentFactoredMarks(studentRow.rollNumber, cn);
-        const totalObt = theoryObt + labObt;
-        const theoryDist = (studentRow.sectionA.marksDistribution[cn] || 0)
-          + (studentRow.sectionB.marksDistribution[cn] || 0)
-          + (factoredTotals[cn] || 0)
-          + (factoredAssignmentTotals[cn] || 0);
-        const labRow = labActivityRows.find(r => r.coNumber === cn);
-        let labCoTotal = 0;
-        if (labRow && activityTaken > 0) {
-          const eqWt = (coMappedActivityMarks || 0) / (activityTaken || 1);
-          for (let i = 1; i <= activityTaken; i++) {
-            if ((labRow[`Activity${i}_Q1`] || 0) !== 0) labCoTotal += eqWt;
-            if ((labRow[`Activity${i}_Q2`] || 0) !== 0) labCoTotal += eqWt;
-            if ((labRow[`Activity${i}_Q3`] || 0) !== 0) labCoTotal += eqWt;
-          }
-        }
-        const totalDist = theoryDist + labCoTotal;
-        coValues[cn] = totalDist > 0 ? parseFloat(((totalObt / totalDist) * 100).toFixed(4)) : 0;
-      });
-      return { rollNumber: studentRow.rollNumber, coValues };
-    });
-  }, [coCalcData, clos, combinedClos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary,
-    labActivityObtainedRows, labActivityRows, activityTaken, coMappedActivityMarks]);
-  const unnormedCoAttainmentData = useMemo(() => {
-    const effectiveClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
-    if (!coCalcData.length || !effectiveClos.length) return [];
-    const factoredTotals = calculateFactoredCOTotals();
-    const factoredAssignmentTotals = calculateFactoredAssignmentCOTotals();
-    return coCalcData.map(studentRow => {
-      const coValues = {};
-      effectiveClos.forEach(clo => {
-        const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-        const labStudent = labActivityObtainedRows.find(s =>
-          String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
-        );
-        const labObt = getLabActivityStudentCOMarks(labStudent, cn);
-        const theoryObt = (studentRow.sectionA.marksObtained[cn] || 0)
-          + (studentRow.sectionB.marksObtained[cn] || 0)
-          + getStudentCTFactoredMarks(studentRow.rollNumber, cn)
-          + getStudentAssignmentFactoredMarks(studentRow.rollNumber, cn);
-        const totalObt = theoryObt + labObt;
-        const theoryDist = (studentRow.sectionA.marksDistribution[cn] || 0)
-          + (studentRow.sectionB.marksDistribution[cn] || 0)
-          + (factoredTotals[cn] || 0)
-          + (factoredAssignmentTotals[cn] || 0);
-        const labRow = labActivityRows.find(r => r.coNumber === cn);
-        const labCoTotal = computeLabActivityCOTotal(labRow);
-        const totalDist = theoryDist + labCoTotal;
-        coValues[cn] = totalDist > 0 ? parseFloat(((totalObt / totalDist) * 100).toFixed(4)) : 0;
-      });
-      return { rollNumber: studentRow.rollNumber, coValues };
-    });
-  }, [coCalcData, clos, combinedClos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary,
-    labActivityObtainedRows, labActivityRows, activityTaken]);
-  const equalWtCoAttainmentData = useMemo(() => {
-    const effectiveClos = combinedClos.length > 0 ? combinedClos : clos;
-    if (!effectiveClos.length) return [];
-    if (!theoryCoAttainmentData.length && !labCoAttainmentData.length) return [];
-
-    const coNumbers = effectiveClos.map(clo => (clo.cloNumber || '').toString().replace('CLO', 'CO'));
-    const theoryWt = {};
-    const labWt = {};
-    coNumbers.forEach((cn, i) => {
-      const clo = effectiveClos.find(c => (c.cloNumber || '').toString().replace('CLO', 'CO') === cn) || effectiveClos[i];
-      let tBin, lBin;
-      if (clo && clo.sourceType) {
-        tBin = (clo.sourceType === 'theory' || clo.sourceType === 'both') ? 1 : 0;
-        lBin = (clo.sourceType === 'lab'    || clo.sourceType === 'both') ? 1 : 0;
-      } else {
-        tBin = Array.isArray(theoryCoAttainmentData) && theoryCoAttainmentData.some(s => (s.coValues?.[cn] || 0) > 0) ? 1 : 0;
-        lBin = Array.isArray(labCoAttainmentData)    && labCoAttainmentData.some(s => (s.coValues?.[cn] || 0) > 0) ? 1 : 0;
-      }
-      const s = tBin + lBin;
-      theoryWt[cn] = s > 0 ? tBin / s : 0;
-      labWt[cn]    = s > 0 ? lBin / s : 0;
-    });
-    const rollSet = new Set([
-      ...theoryCoAttainmentData.map(s => String(s.rollNumber || '').trim()),
-      ...labCoAttainmentData.map(s => String(s.rollNumber || '').trim()),
-    ]);
-
-    return [...rollSet].filter(Boolean).map(roll => {
-      const theoryRow = theoryCoAttainmentData.find(s =>
-        String(s.rollNumber || '').trim().toLowerCase() === roll.toLowerCase()
-      );
-      const labRow = labCoAttainmentData.find(s =>
-        String(s.rollNumber || '').trim().toLowerCase() === roll.toLowerCase()
-      );
-      const coValues = {};
-      coNumbers.forEach(cn => {
-        const tVal = theoryRow?.coValues?.[cn] || 0;
-        const lVal = labRow?.coValues?.[cn] || 0;
-        coValues[cn] = parseFloat(((tVal * theoryWt[cn]) + (lVal * labWt[cn])).toFixed(4));
-      });
-      return { rollNumber: roll, coValues };
-    });
-  }, [theoryCoAttainmentData, labCoAttainmentData, clos, combinedClos]);
   const coAttainmentKeyRef = useRef('');
   useEffect(() => {
     const key = `${selectedSheet}__${selectedCourse?._id || ''}`;
     if (key !== coAttainmentKeyRef.current) {
       coAttainmentKeyRef.current = key;
       setCoAttainmentReady(false);
-      if (coAttainmentSettleTimerRef.current) clearTimeout(coAttainmentSettleTimerRef.current);
     }
   }, [selectedSheet, selectedCourse]);
-  useEffect(() => {
-    if (selectedSheet !== 'COAttainment') return;
-    if (coAttainmentSettleTimerRef.current) clearTimeout(coAttainmentSettleTimerRef.current);
-    coAttainmentSettleTimerRef.current = setTimeout(() => {
-      setCoAttainmentReady(true);
-    }, 400);
-    return () => {
-      if (coAttainmentSettleTimerRef.current) clearTimeout(coAttainmentSettleTimerRef.current);
-    };
-  }, [selectedSheet, selectedCourse, coCalcData, ctObtainedRows, attnAssignObtainedRows,
-    labActivityObtainedRows, labActivityRows, activityTaken, coMappedActivityMarks]);
 
   const sumEqWtTotal = () => {
     const autoEqWt = calculateAutoEqWt();
@@ -3901,6 +3808,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                     setCoMappedActivityMarks(0);
                     labActivityDataLoadedRef.current = false;
                     coCalcApiCacheRef.current = null;
+                    refreshCoAttainmentCalcs();
                   } catch (err) {
                     alert('Failed to reset attainment data: ' + (err?.message || err?.error || 'Unknown error'));
                   }
