@@ -2,12 +2,12 @@ const axios = require('axios');
 
 class WorkerRegistry {
   constructor() {
-    this.workers = new Map(); // workerId -> worker data
+    this.workers = new Map();
     this.healthCheckInterval = null;
-    this.healthCheckIntervalMs = 20000; // 20 seconds (reduced frequency to avoid conflicts)
-    this.healthCheckTimeout = 5000; // 5 seconds
+    this.healthCheckIntervalMs = 20000;
+    this.healthCheckTimeout = 5000;
     this.roundRobinIndex = 0;
-    this.loadBalanceStrategy = 'round-robin'; // 'round-robin' or 'least-load'
+    this.loadBalanceStrategy = 'round-robin';
   }
 
   addWorker(workerId, url, metadata = {}) {
@@ -17,10 +17,10 @@ class WorkerRegistry {
 
     const worker = {
       id: workerId,
-      url: url.replace(/\/$/, ''), // Remove trailing slash
+      url: url.replace(/\/$/, ''),
       name: metadata.name || workerId,
       description: metadata.description || '',
-      status: 'unknown', // 'healthy', 'unhealthy', 'unknown'
+      status: 'unknown',
       isActive: true,
       lastHealthCheck: null,
       lastHealthCheckSuccess: null,
@@ -34,7 +34,7 @@ class WorkerRegistry {
     };
 
     this.workers.set(workerId, worker);
-    console.log(`✓ Worker added: ${workerId} (${url})`);
+    console.log(`Worker added: ${workerId} (${url})`);
 
     this.checkWorkerHealth(workerId);
 
@@ -48,7 +48,7 @@ class WorkerRegistry {
     }
 
     this.workers.delete(workerId);
-    console.log(`✓ Worker removed: ${workerId}`);
+    console.log(`Worker removed: ${workerId}`);
     return true;
   }
 
@@ -59,7 +59,7 @@ class WorkerRegistry {
     }
 
     worker.isActive = isActive;
-    console.log(`✓ Worker ${workerId} ${isActive ? 'enabled' : 'disabled'}`);
+    console.log(`Worker ${workerId} ${isActive ? 'enabled' : 'disabled'}`);
     return worker;
   }
 
@@ -81,7 +81,7 @@ class WorkerRegistry {
       
       if (w.lastHealthCheckSuccess) {
         const timeSinceSuccess = now - new Date(w.lastHealthCheckSuccess).getTime();
-        return timeSinceSuccess < 180000; // 3 minutes
+        return timeSinceSuccess < 180000;
       }
       
       return false;
@@ -95,7 +95,7 @@ class WorkerRegistry {
     if (worker.activeRequests > 0) {
       worker.lastHealthCheck = new Date();
       if (worker.status !== 'healthy') {
-        worker.status = 'healthy'; // Worker is processing, so it's alive
+        worker.status = 'healthy';
         worker.consecutiveFailures = 0;
       }
       return true;
@@ -135,9 +135,9 @@ class WorkerRegistry {
       
       if (worker.consecutiveFailures >= 3) {
         worker.status = 'unhealthy';
-        console.error(`✗ Health check failed for worker ${workerId}: ${error.message} (${worker.consecutiveFailures} consecutive failures)`);
+        console.error(`Health check failed for worker ${workerId}: ${error.message} (${worker.consecutiveFailures} consecutive failures)`);
       } else {
-        console.warn(`⚠ Health check timeout for worker ${workerId}: ${error.message} (${worker.consecutiveFailures}/3)`);
+        console.warn(`Health check timeout for worker ${workerId}: ${error.message} (${worker.consecutiveFailures}/3)`);
       }
       
       return worker.status === 'healthy';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PageLoader, SheetLoader, SkeletonTable } from './attainment/LoadingSpinner';
 import CourseProfileSheet from './attainment/CourseProfileSheet';
 import CTSheet from './attainment/CTSheet';
@@ -38,8 +38,6 @@ import { getAllProgramOutcomes } from '../services/programOutcomeService';
 
 import logger from '../utils/logger';
 import '../styles/AttainmentView.css';
-
-// Helper function to format numbers - round to 2 decimal places, strip trailing zeros
 const formatNumber = (num) => {
   if (num === 0 || num === null || num === undefined || isNaN(num)) return '0';
   return parseFloat(Number(num).toFixed(2)).toString();
@@ -118,26 +116,15 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
   const previousCourseIdForAssignmentRef = useRef(null);
   const previousCourseIdForLabActivityRef = useRef(null);
   const previousCourseIdForSectionARef = useRef(null);
-  // Per-course student fetch cache — deduplicates concurrent getCourseStudents calls across effects
   const studentsFetchCacheRef = useRef({});
-  // API data cache for loadCOCalcData — lets section-row re-runs skip redundant network calls
   const coCalcApiCacheRef = useRef(null); // { courseId, uniqueStudents, ctData, assignData }
-  // Tracks which sheet was active on the previous loadCOCalcData run (used to detect cache staleness)
   const prevCoCalcSheetRef = useRef(null);
-
-  // Assignment & Attendance states
   const [assignmentRows, setAssignmentRows] = useState([]);
   const [assignmentManualWts, setAssignmentManualWts] = useState({});
   const [attendanceMarks, setAttendanceMarks] = useState(0);
   const [assignmentSummary, setAssignmentSummary] = useState({ assignTaken: 0, assignmentMarks30: 0, useEqWt: 0 });
-
-  // Section A states
   const [sectionARows, setSectionARows] = useState([]);
-
-  // Section B states
   const [sectionBRows, setSectionBRows] = useState([]);
-
-  // LabActivity states
   const [labActivityRows, setLabActivityRows] = useState([]);
   const [labActivityFactors, setLabActivityFactors] = useState({});
   const [labActivityEqWts, setLabActivityEqWts] = useState({});
@@ -145,85 +132,42 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
   const [labAttendanceMarks, setLabAttendanceMarks] = useState(0);
   const [labQuizMarks, setLabQuizMarks] = useState(0);
   const [labVivaMarks, setLabVivaMarks] = useState(0);
-
-  // LabActivity summary table states
   const [activityTaken, setActivityTaken] = useState(0);
   const [otherActivityRemaining, setOtherActivityRemaining] = useState(0);
   const [otherActivityMeasured, setOtherActivityMeasured] = useState(0);
   const [coMappedActivityMarks, setCoMappedActivityMarks] = useState(0);
   const [useEqWtActivity, setUseEqWtActivity] = useState(0);
-
-  // LabActivity obtained marks table state
   const [labActivityObtainedRows, setLabActivityObtainedRows] = useState([]);
-
-  // Modal state for generated table
   const [showGeneratedTableModal, setShowGeneratedTableModal] = useState(false);
-
-  // Modal state for obtained generated table
   const [showObtainedGeneratedModal, setShowObtainedGeneratedModal] = useState(false);
-
-  // Modal state for Section A generated table
   const [showSectionAGeneratedModal, setShowSectionAGeneratedModal] = useState(false);
-
-  // Modal state for Section A Obtained generated table
   const [showSectionAObtainedModal, setShowSectionAObtainedModal] = useState(false);
-
-  // Modal state for Section B generated table
   const [showSectionBGeneratedModal, setShowSectionBGeneratedModal] = useState(false);
-
-  // Modal state for Section B Obtained generated table
   const [showSectionBObtainedModal, setShowSectionBObtainedModal] = useState(false);
-
-  // Modal state for LabActivity generated table
   const [showLabActivityGeneratedModal, setShowLabActivityGeneratedModal] = useState(false);
-
-  // Modal state for LabActivity obtained table
   const [showLabActivityObtainedModal, setShowLabActivityObtainedModal] = useState(false);
-
-  // Term exam marks state
   const [termExamMarks, setTermExamMarks] = useState([]);
   const [termExamLoading, setTermExamLoading] = useState(false);
-
-  // Navigation state for LabActivity generated modal (0 = factored values, 1 = multiplication factor)
   const [labActivityGeneratedView, setLabActivityGeneratedView] = useState(0);
-
-  // Navigation state for LabActivity obtained modal (0 = CO wise marks, 1 = CO attainment)
   const [labActivityObtainedView, setLabActivityObtainedView] = useState(0);
-
-  // Navigation state for obtained generated modal (0 = original view, 1 = factored view)
   const [obtainedModalView, setObtainedModalView] = useState(0);
-
-  // CO Attainment state
   const [coAttainmentData, setCoAttainmentData] = useState([]);
-  // Gate: prevent rendering tables while async loaders are still updating state.
-  // Reset whenever any feed-state changes; show tables only after 400ms of no updates.
   const [coAttainmentReady, setCoAttainmentReady] = useState(false);
   const coAttainmentSettleTimerRef = useRef(null);
-  // null = not yet checked, true = no pair course, false = has a pair course
   const [isStandaloneCourse, setIsStandaloneCourse] = useState(null);
-
-  // COCalc state
   const [coCalcData, setCoCalcData] = useState([]);
-
-  // Load user role
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     setUserRole(user.role || '');
   }, []);
-
-  // Preselect course if navigated from Admin Dashboard
   useEffect(() => {
     if (preselectedAdminCourse) {
       setSelectedCourse(preselectedAdminCourse);
     }
   }, [preselectedAdminCourse]);
-
-  // Load sheet names on mount
   useEffect(() => {
     loadSheetNames();
   }, []);
-
-  // Load course profile function - fetch own + combined COs in parallel
   const loadCourseProfile = useCallback(async () => {
     if (!selectedCourse) return;
     const [ownResult, combinedResult] = await Promise.allSettled([
@@ -243,9 +187,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       setCombinedClos([]);
     }
   }, [selectedCourse]);
-
-  // Stable helper — returns (or creates) a cached Promise for getCourseStudents so concurrent effects
-  // share a single in-flight request per course ID rather than each firing their own.
   const fetchCourseStudentsCached = useCallback((courseId) => {
     if (!studentsFetchCacheRef.current[courseId]) {
       studentsFetchCacheRef.current[courseId] =
@@ -253,19 +194,14 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     }
     return studentsFetchCacheRef.current[courseId];
   }, []);
-
-  // Memoize sheets that require CLOs to avoid repeated string checks
   const cloDependentSheets = useMemo(() =>
     ['CourseProfile', 'CT', 'Attn_Assign', 'SectionA', 'SectionB', 'LabActivity', 'COAttainment', 'COCalc', 'COCalc_LabUnnorm', 'COPOMap', 'Charts', 'POCalcMax', 'POCalc', 'CheckPO'],
     []
   );
-
-  // Load/clear course outcomes - optimized with memoization
   useEffect(() => {
     if (selectedCourse && cloDependentSheets.includes(selectedSheet)) {
       loadCourseProfile();
     } else {
-      // Only clear if not already empty to avoid creating new array references
       if (clos.length > 0) {
         setClos([]);
       }
@@ -274,10 +210,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       }
     }
   }, [selectedCourse, selectedSheet, loadCourseProfile, cloDependentSheets, clos.length, combinedClos.length]);
-
-  // Initialize / reconcile CT matrix rows whenever clos changes (own-course COs only).
-  // Uses functional setState so we never stale-close over ctRows and always reconcile
-  // saved data with the live CO list — this also handles admin CO edits via Edit Course.
   useEffect(() => {
     if (selectedSheet === 'CT' && clos.length > 0) {
       setCtRows(prevRows => {
@@ -292,14 +224,12 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             CT3_Q1: 0, CT3_Q2: 0, CT3_Q3: 0,
           };
         });
-        // Avoid re-render when nothing changed (same objects in same order)
         if (reconciled.length === prevRows.length &&
             reconciled.every((row, idx) => row === prevRows[idx])) {
           return prevRows;
         }
         return reconciled;
       });
-      // Only reset factors/weights on first load (no saved data yet)
       if (!ctDataLoadedRef.current) {
         const fields = ['CT1_Q1', 'CT1_Q2', 'CT1_Q3', 'CT2_Q1', 'CT2_Q2', 'CT2_Q3', 'CT3_Q1', 'CT3_Q2', 'CT3_Q3'];
         const manualInit = {};
@@ -310,7 +240,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         setCtSummary({ ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 });
       }
     }
-    // Don't clear CT data when on COCalc/COAttainment/POCalcMax/POCalc/CheckPO/Charts sheets (they need CT data for calculations)
     if (selectedSheet !== 'CT' && selectedSheet !== 'COCalc' && selectedSheet !== 'COCalc_LabUnnorm' && selectedSheet !== 'COAttainment' && selectedSheet !== 'POCalcMax' && selectedSheet !== 'POCalc' && selectedSheet !== 'CheckPO' && selectedSheet !== 'Charts') {
       setCtRows([]);
       setCtFactors({});
@@ -320,8 +249,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       ctDataLoadedRef.current = false; // Reset when leaving the sheet
     }
   }, [selectedSheet, clos]);
-
-  // Initialize / reconcile Assignment matrix rows whenever clos changes.
   useEffect(() => {
     if (selectedSheet === 'Attn_Assign' && clos.length > 0) {
       setAssignmentRows(prevRows => {
@@ -343,7 +270,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         }
         return reconciled;
       });
-      // Only reset manual weights / attendance on first load
       if (!assignmentDataLoadedRef.current) {
         const manualInit = {};
         ['Assgn1_Q1', 'Assgn1_Q2', 'Assgn1_Q3', 'Assgn2_Q1', 'Assgn2_Q2', 'Assgn2_Q3', 'Assgn3_Q1', 'Assgn3_Q2', 'Assgn3_Q3'].forEach(f => {
@@ -353,7 +279,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         setAttendanceMarks(0);
       }
     }
-    // Don't clear Assignment data when on COCalc/COAttainment/POCalcMax/POCalc/CheckPO/Charts sheets (they need Assignment data for calculations)
     if (selectedSheet !== 'Attn_Assign' && selectedSheet !== 'COCalc' && selectedSheet !== 'COCalc_LabUnnorm' && selectedSheet !== 'COAttainment' && selectedSheet !== 'POCalcMax' && selectedSheet !== 'POCalc' && selectedSheet !== 'CheckPO' && selectedSheet !== 'Charts') {
       setAssignmentRows([]);
       setAssignmentManualWts({});
@@ -361,8 +286,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       assignmentDataLoadedRef.current = false; // Reset when leaving the sheet
     }
   }, [selectedSheet, clos]);
-
-  // Initialize / reconcile SectionA matrix rows whenever clos changes.
   useEffect(() => {
     if (selectedSheet === 'SectionA' && clos.length > 0) {
       setSectionARows(prevRows => {
@@ -392,8 +315,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       setSectionARows([]);
     }
   }, [selectedSheet, clos]);
-
-  // Initialize / reconcile SectionB matrix rows whenever clos changes.
   useEffect(() => {
     if (selectedSheet === 'SectionB' && clos.length > 0) {
       setSectionBRows(prevRows => {
@@ -420,8 +341,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       });
     }
   }, [selectedSheet, clos]);
-
-  // Initialize / reconcile LabActivity matrix rows whenever clos changes.
   useEffect(() => {
     if (selectedSheet === 'LabActivity' && clos.length > 0) {
       setLabActivityRows(prevRows => {
@@ -446,7 +365,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         }
         return reconciled;
       });
-      // Only reset extra lab fields on first load
       if (!labActivityDataLoadedRef.current) {
         setLabActivityFactors({});
         setLabActivityEqWts({});
@@ -456,26 +374,17 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         setLabVivaMarks(0);
       }
     }
-    // Don't clear Lab Activity data when on COCalc/COAttainment/POCalcMax/POCalc/CheckPO/Charts (they need Lab Activity data for calculations)
     if (selectedSheet !== 'LabActivity' && selectedSheet !== 'COCalc' && selectedSheet !== 'COCalc_LabUnnorm' && selectedSheet !== 'COAttainment' && selectedSheet !== 'POCalcMax' && selectedSheet !== 'POCalc' && selectedSheet !== 'CheckPO' && selectedSheet !== 'Charts') {
       setLabActivityRows([]);
     }
   }, [selectedSheet, clos]);
-
-  // Clear per-course fetch caches when the selected course changes so effect re-runs
-  // on a different course always get fresh data.
   useEffect(() => {
     studentsFetchCacheRef.current = {};
     coCalcApiCacheRef.current = null;
   }, [selectedCourse]);
-
-  // Initialize COCalc data when COCalc or COCalc_LabUnnorm sheet is selected
   useEffect(() => {
     const loadCOCalcData = async () => {
       if ((selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax' || selectedSheet === 'POCalc' || selectedSheet === 'CheckPO' || selectedSheet === 'Charts') && selectedCourse && clos.length > 0) {
-
-        // Invalidate the API data cache when returning from outside the CO-calc sheet group
-        // (e.g. user edited CT/Assignment marks on another tab and came back).
         const calcSheetGroup = new Set(['COCalc', 'COCalc_LabUnnorm', 'COAttainment', 'POCalcMax', 'POCalc', 'CheckPO', 'Charts']);
         if (!calcSheetGroup.has(prevCoCalcSheetRef.current)) {
           coCalcApiCacheRef.current = null;
@@ -486,10 +395,8 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         let uniqueStudents, ctData, assignData;
 
         if (coCalcApiCacheRef.current?.courseId === cacheKey) {
-          // Re-run triggered by a section-row state update — reuse previously fetched API data
           ({ uniqueStudents, ctData, assignData } = coCalcApiCacheRef.current);
         } else {
-          // First run for this course (or cache invalidated) — parallel-fetch all required data
           setTermExamLoading(true);
           let studentsResp, ctResp, termResp, assignResp, sectAFallbackResp;
           try {
@@ -510,17 +417,12 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
           } finally {
             setTermExamLoading(false);
           }
-
-          // Build student list (with Section A sheet as fallback)
           let allStudents = [];
           if (studentsResp.success && Array.isArray(studentsResp.data) && studentsResp.data.length > 0) {
             allStudents = studentsResp.data.map(s => ({ rollNumber: s.roll || s.rollNumber }));
           } else if (sectAFallbackResp?.success && Array.isArray(sectAFallbackResp.data)) {
             allStudents = sectAFallbackResp.data.map(s => ({ rollNumber: s.rollNumber }));
           }
-
-          // Fallback: if still no students, use rolls from live assignment/CT obtained rows
-          // (handles courses where students aren't formally enrolled in the system)
           if (allStudents.length === 0) {
             const assignRolls = attnAssignObtainedRows
               .filter(r => r.rollNumber && String(r.rollNumber).trim().toLowerCase() !== 'roll')
@@ -530,8 +432,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
               .map(r => ({ rollNumber: String(r.rollNumber).trim() }));
             allStudents = assignRolls.length > 0 ? assignRolls : ctRolls;
           }
-
-          // Deduplicate students
           const seenRolls = new Set();
           uniqueStudents = [];
           allStudents.forEach(student => {
@@ -546,14 +446,8 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
           assignData = (assignResp?.success && Array.isArray(assignResp.data)) ? assignResp.data : [];
           const termData = (termResp?.success && Array.isArray(termResp.data)) ? termResp.data : [];
           setTermExamMarks(termData.length ? termData : []);
-
-          // Cache so re-runs from section-row updates on the same tab skip the API calls
           coCalcApiCacheRef.current = { courseId: cacheKey, uniqueStudents, ctData, assignData };
         }
-
-        // Apply live-state fallback AFTER cache path too: if uniqueStudents is still empty
-        // (e.g. cache was set when enrollment was empty but assignment data is now available),
-        // build the student list from obtained rows.
         if (uniqueStudents.length === 0) {
           const assignRolls = attnAssignObtainedRows
             .filter(r => r.rollNumber && String(r.rollNumber).trim().toLowerCase() !== 'roll')
@@ -569,16 +463,11 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
               const r = String(s.rollNumber).trim().toLowerCase();
               if (r && !seenFallback.has(r)) { seenFallback.add(r); uniqueStudents.push(s); }
             });
-            // Update the cache so subsequent re-runs don't fall back to empty
             if (coCalcApiCacheRef.current?.courseId === cacheKey) {
               coCalcApiCacheRef.current = { ...coCalcApiCacheRef.current, uniqueStudents };
             }
           }
         }
-
-        // Build COCalc rows
-        // Use effectiveClos = combinedClos (theory+lab merged) when available so that
-        // theory COs (e.g. CO2, CO3) are included even when viewing a lab course.
         const effectiveClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
         const calcRows = uniqueStudents.map(student => {
           const row = {
@@ -605,21 +494,12 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
               marksDistribution: {}
             }
           };
-
-          // CT and Assignment marks are computed from live state via helper functions
-          // (ctData/assignData from API are unreliable — use getStudentCTFactoredMarks et al. instead)
-
-          // Populate CO marks for Section A
           effectiveClos.forEach(clo => {
             const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-
-            // Find student in sectionAObtainedRows for real-time calculation
             const studentObtainedA = sectionAObtainedRows.find(s =>
               String(s.rollNumber || '').trim().toLowerCase() ===
               String(student.rollNumber || '').trim().toLowerCase()
             );
-
-            // Calculate marks obtained using the same logic as getStudentCOTotal
             let marksObtained = 0;
             if (studentObtainedA) {
               const coRow = sectionARows.find(r => r.coNumber === coNumber);
@@ -637,13 +517,10 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             }
 
             row.sectionA.marksObtained[coNumber] = marksObtained;
-
-            // Calculate marks distribution using HLOOKUP logic (same as getStudentCODistribution)
             let marksDistribution = 0;
             if (studentObtainedA) {
               const coRow = sectionARows.find(r => r.coNumber === coNumber);
               if (coRow) {
-                // Get the student's answer combination
                 const answeredQuestions = [];
                 for (let qNum = 1; qNum <= 4; qNum++) {
                   const parts = ['a', 'b', 'c', 'd'];
@@ -656,16 +533,12 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                   }
                 }
                 const answerCombination = answeredQuestions.length > 0 ? answeredQuestions.join(',') : 'None';
-
-                // Convert to combination key
                 const combinationMap = {
                   '1,2,3': 'q123', '1,2,4': 'q124', '1,3,4': 'q134', '2,3,4': 'q234',
                   '1,2': 'q12', '1,3': 'q13', '1,4': 'q14', '2,3': 'q23', '2,4': 'q24', '3,4': 'q34',
                   '1': 'q1', '2': 'q2', '3': 'q3', '4': 'q4'
                 };
                 const combinationKey = answerCombination === 'None' ? 'none' : (combinationMap[answerCombination] || 'none');
-
-                // Calculate auto-generated combination value
                 const q1Total = (coRow.Q1a || 0) + (coRow.Q1b || 0) + (coRow.Q1c || 0) + (coRow.Q1d || 0);
                 const q2Total = (coRow.Q2a || 0) + (coRow.Q2b || 0) + (coRow.Q2c || 0) + (coRow.Q2d || 0);
                 const q3Total = (coRow.Q3a || 0) + (coRow.Q3b || 0) + (coRow.Q3c || 0) + (coRow.Q3d || 0);
@@ -692,18 +565,12 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             }
             row.sectionA.marksDistribution[coNumber] = marksDistribution;
           });
-
-          // Populate CO marks for Section B
           effectiveClos.forEach(clo => {
             const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-
-            // Find student in sectionBObtainedRows for real-time calculation
             const studentObtainedB = sectionBObtainedRows.find(s =>
               String(s.rollNumber || '').trim().toLowerCase() ===
               String(student.rollNumber || '').trim().toLowerCase()
             );
-
-            // Calculate marks obtained using the same logic as getStudentCOTotalB
             let marksObtained = 0;
             if (studentObtainedB) {
               const coRow = sectionBRows.find(r => r.coNumber === coNumber);
@@ -721,13 +588,10 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             }
 
             row.sectionB.marksObtained[coNumber] = marksObtained;
-
-            // Calculate marks distribution using HLOOKUP logic (same as getStudentCODistributionB)
             let marksDistributionB = 0;
             if (studentObtainedB) {
               const coRow = sectionBRows.find(r => r.coNumber === coNumber);
               if (coRow) {
-                // Get the student's answer combination (questions 5-8 displayed, stored as 1-4)
                 const answeredQuestions = [];
                 for (let qNum = 1; qNum <= 4; qNum++) {
                   const parts = ['a', 'b', 'c', 'd'];
@@ -740,16 +604,12 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                   }
                 }
                 const answerCombination = answeredQuestions.length > 0 ? answeredQuestions.join(',') : 'None';
-
-                // Convert to combination key (5,6,7,8 map to q1,q2,q3,q4 internally)
                 const combinationMap = {
                   '5,6,7': 'q123', '5,6,8': 'q124', '5,7,8': 'q134', '6,7,8': 'q234',
                   '5,6': 'q12', '5,7': 'q13', '5,8': 'q14', '6,7': 'q23', '6,8': 'q24', '7,8': 'q34',
                   '5': 'q1', '6': 'q2', '7': 'q3', '8': 'q4'
                 };
                 const combinationKey = answerCombination === 'None' ? 'none' : (combinationMap[answerCombination] || 'none');
-
-                // Calculate auto-generated combination value
                 const q1Total = (coRow.Q1a || 0) + (coRow.Q1b || 0) + (coRow.Q1c || 0) + (coRow.Q1d || 0);
                 const q2Total = (coRow.Q2a || 0) + (coRow.Q2b || 0) + (coRow.Q2c || 0) + (coRow.Q2d || 0);
                 const q3Total = (coRow.Q3a || 0) + (coRow.Q3b || 0) + (coRow.Q3c || 0) + (coRow.Q3d || 0);
@@ -776,31 +636,23 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             }
             row.sectionB.marksDistribution[coNumber] = marksDistributionB;
           });
-
-          // Populate CO marks for CT (from live ctObtainedRows + ctRows state)
           const factoredCOTotals = calculateFactoredCOTotals();
           effectiveClos.forEach(clo => {
             const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
             row.ct.marksObtained[coNumber] = getStudentCTFactoredMarks(student.rollNumber, coNumber);
             row.ct.marksDistribution[coNumber] = factoredCOTotals[coNumber] || 0;
           });
-
-          // Populate CO marks for Assignment (from live attnAssignObtainedRows + assignmentRows state)
           const factoredAssignCOTotals = calculateFactoredAssignmentCOTotals();
           effectiveClos.forEach(clo => {
             const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
             row.assignment.marksObtained[coNumber] = getStudentAssignmentFactoredMarks(student.rollNumber, coNumber);
             row.assignment.marksDistribution[coNumber] = factoredAssignCOTotals[coNumber] || 0;
           });
-
-          // Populate attendance marks (from live attnAssignObtainedRows)
           const studentAssignRow = attnAssignObtainedRows.find(s =>
             String(s.rollNumber || '').trim().toLowerCase() ===
             String(student.rollNumber || '').trim().toLowerCase()
           );
           row.attendance = studentAssignRow ? (studentAssignRow.attendanceMark || studentAssignRow.attendance || 0) : 0;
-
-          // Calculate total marks (CT + Assign + Section A + Section B) — all from live state
           effectiveClos.forEach(clo => {
             const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
 
@@ -831,11 +683,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
     loadCOCalcData();
   }, [selectedSheet, selectedCourse, clos, combinedClos, sheetNames, sectionAObtainedRows, sectionARows, sectionBObtainedRows, sectionBRows, attnAssignObtainedRows, assignmentRows, assignmentManualWts, assignmentSummary, ctObtainedRows, ctRows, ctSummary]);
-
-  // Initialize Obtained Marks table rows from student list when CT, Attn_Assign, SectionA or SectionB selected
   const initObtainedRows = useCallback(async (forSheet) => {
-    // Don't initialize if we already have saved data for this sheet type
-    // Only check the ref (not state length) because setState is async
     if (forSheet === 'CT' && ctDataLoadedRef.current) {
       return;
     }
@@ -845,7 +693,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     if (forSheet === 'LabActivity' && labActivityDataLoadedRef.current) {
       return;
     }
-    // For Section A/B: Check if data has already been loaded from backend
     if ((forSheet === 'SectionA' || forSheet === 'SectionB') && sectionADataLoadedRef.current) {
       return;
     }
@@ -906,12 +753,9 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       const bNum = String(b.rollNumber).replace(/\D/g, '');
       return aNum.localeCompare(bNum, undefined, { numeric: true });
     });
-
-    // If no valid students found after processing, don't add sample students
     if (uniqueByRoll.length === 0) {
     }
     if (uniqueByRoll.length > 0) {
-      // Don't initialize CT if saved data has been loaded
       if (!ctDataLoadedRef.current) {
         const initial = uniqueByRoll.map(stu => ({
           rollNumber: stu.rollNumber,
@@ -922,7 +766,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         }));
         setCtObtainedRows(initial);
       }
-      // Don't initialize Attn_Assign if saved data has been loaded
       if (!assignmentDataLoadedRef.current) {
         const initial = uniqueByRoll.map(stu => ({
           rollNumber: stu.rollNumber,
@@ -934,9 +777,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         }));
         setAttnAssignObtainedRows(initial);
       }
-      // Section A
       const initialSectionA = uniqueByRoll.map(stu => {
-        // Check if we have term marks for this student
         let studentData = {
           rollNumber: stu.rollNumber,
           name: stu.name,
@@ -945,8 +786,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
           Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
           Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
         };
-
-        // Try to populate from term marks if available
         if (termExamMarks && termExamMarks.length > 0) {
           const studentTermMarks = termExamMarks.find(tm => {
             if (!tm.student) return false;
@@ -956,8 +795,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
           if (studentTermMarks && studentTermMarks.marks) {
             const marks = studentTermMarks.marks;
-
-            // Helper function to safely get numeric value
             const getValue = (row, question) => {
               const val = marks[row]?.[question] || marks[row]?.[String(question)];
               if (val === null || val === undefined || val === '') return 0;
@@ -992,10 +829,8 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         return studentData;
       });
       setSectionAObtainedRows(initialSectionA);
-      // Section B
 
       const initialSectionB = uniqueByRoll.map(stu => {
-        // Check if we have term marks for this student
         let studentData = {
           rollNumber: stu.rollNumber,
           name: stu.name,
@@ -1004,8 +839,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
           Q3a: 0, Q3b: 0, Q3c: 0, Q3d: 0,
           Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
         };
-
-        // Try to populate from term marks if available
         if (termExamMarks && termExamMarks.length > 0) {
           const studentTermMarks = termExamMarks.find(tm => {
             if (!tm.student) return false;
@@ -1015,8 +848,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
           if (studentTermMarks && studentTermMarks.marks) {
             const marks = studentTermMarks.marks;
-
-            // Helper function to safely get numeric value
             const getValue = (row, question) => {
               const val = marks[row]?.[question] || marks[row]?.[String(question)];
               if (val === null || val === undefined || val === '') return 0;
@@ -1026,7 +857,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
             studentData = {
               ...studentData,
-              // Section B uses questions 5-8 from term marks
               Q1a: getValue('a', '5'),
               Q1b: getValue('b', '5'),
               Q1c: getValue('c', '5'),
@@ -1050,7 +880,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         return studentData;
       });
       setSectionBObtainedRows(initialSectionB);
-      // Don't initialize LabActivity if saved data has been loaded
       if (!labActivityDataLoadedRef.current) {
         const initial = uniqueByRoll.map(stu => ({
           rollNumber: stu.rollNumber,
@@ -1070,7 +899,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       } else {
       }
     } else {
-      // Don't clear if saved data has been loaded
       if (!ctDataLoadedRef.current) {
         setCtObtainedRows([]);
       }
@@ -1086,8 +914,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       }
     }
   }, [selectedCourse, sheetNames, attainmentData, termExamMarks, fetchCourseStudentsCached]);
-
-  // Effect to trigger initialization when sheet changes
   useEffect(() => {
     if (selectedSheet === 'CT') initObtainedRows('CT');
     else if (selectedSheet === 'Attn_Assign') initObtainedRows('Attn_Assign');
@@ -1095,8 +921,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     else if (selectedSheet === 'SectionB') initObtainedRows('SectionB');
     else if (selectedSheet === 'LabActivity') initObtainedRows('LabActivity');
   }, [selectedSheet, initObtainedRows]);
-
-  // Load Program Outcomes when COPOMap, POCalcMax, Charts, CheckPO, or POCalc is selected
   useEffect(() => {
     const loadProgramOutcomes = async () => {
       if (selectedSheet === 'COPOMap' || selectedSheet === 'POCalcMax' || selectedSheet === 'Charts' || selectedSheet === 'CheckPO' || selectedSheet === 'POCalc') {
@@ -1112,8 +936,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     };
     loadProgramOutcomes();
   }, [selectedSheet]);
-
-  // Load students when POCalcMax, CheckPO, or POCalc is selected
   useEffect(() => {
     const loadStudents = async () => {
       if ((selectedSheet === 'POCalcMax' || selectedSheet === 'CheckPO' || selectedSheet === 'POCalc') && selectedCourse && selectedCourse._id) {
@@ -1134,8 +956,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     };
     loadStudents();
   }, [selectedSheet, selectedCourse]);
-
-  // Load combined CO-PO matrix for theory and lab courses
   useEffect(() => {
     const loadCombinedCOPOMatrix = async () => {
       if ((selectedSheet === 'COPOMap' || selectedSheet === 'POCalcMax' || selectedSheet === 'POCalc' || selectedSheet === 'CheckPO' || selectedSheet === 'Charts') && selectedCourse && selectedCourse.courseCode) {
@@ -1144,18 +964,12 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
           const lastDigit = parseInt(courseCode.slice(-1));
 
           if (isNaN(lastDigit)) return;
-
-          // Determine if current course is theory (odd) or lab (even)
           const isTheory = lastDigit % 2 === 1;
-
-          // Generate matching course code
           const baseCode = courseCode.slice(0, -1);
           const matchingLastDigit = isTheory ? lastDigit + 1 : lastDigit - 1;
           const matchingCode = baseCode + matchingLastDigit;
 
           setMatchingCourseCode(matchingCode);
-
-          // Load both course profiles
           const [currentProfile, matchingProfile] = await Promise.all([
             getCourseProfile(courseCode),
             getCourseProfile(matchingCode).catch(() => ({ success: false, data: [] }))
@@ -1169,11 +983,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
           const currentCLOs = currentProfile.data;
           const matchingCLOs = matchingProfile.success ? matchingProfile.data : [];
-
-          // Create combined matrix
           const combined = {};
-
-          // Process current course CLOs
           currentCLOs.forEach(clo => {
             const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
             const ploAssessed = clo.ploAssessed || '';
@@ -1191,8 +1001,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
             combined[coNumber] = Array.from(mappedPOs);
           });
-
-          // Merge matching course CLOs (OR logic)
           matchingCLOs.forEach(clo => {
             const coNumber = (clo.cloNumber || '').toString().replace('CLO', 'CO');
             const ploAssessed = clo.ploAssessed || '';
@@ -1212,14 +1020,11 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
               });
             }
           });
-
-          // Sort PO numbers for each CO
           Object.keys(combined).forEach(co => {
             combined[co].sort((a, b) => a - b);
           });
 
           setCombinedCOPOMatrix(combined);
-          // Store the lab course's own CLOs for the Lab Only normalized CO-PO map
           setLabCourseClos(isTheory ? matchingCLOs : currentCLOs);
 
         } catch (err) {
@@ -1231,8 +1036,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     };
     loadCombinedCOPOMatrix();
   }, [selectedSheet, selectedCourse]);
-
-  // Detect whether the selected course is standalone (no paired theory/lab course in the database)
   useEffect(() => {
     if (!selectedCourse?.courseCode) {
       setIsStandaloneCourse(null);
@@ -1241,14 +1044,13 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     const courseCode = selectedCourse.courseCode;
     const lastDigit = parseInt(courseCode.slice(-1));
     if (isNaN(lastDigit)) {
-      setIsStandaloneCourse(false); // Cannot determine — treat as paired
+      setIsStandaloneCourse(false); // Cannot determine â€” treat as paired
       return;
     }
     const baseCode = courseCode.slice(0, -1);
     const isTheory = lastDigit % 2 === 1;
     const pairLastDigit = isTheory ? lastDigit + 1 : lastDigit - 1;
     const pairCode = baseCode + pairLastDigit;
-    // Also verify both codes share the same first two numeric digits (same semester block)
     const firstTwoDigits = (code) => (code.match(/\d+/)?.[0] || '').slice(0, 2);
     const sameSemester = firstTwoDigits(courseCode) === firstTwoDigits(pairCode);
     if (!sameSemester) {
@@ -1259,8 +1061,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       .then(() => setIsStandaloneCourse(false))
       .catch(() => setIsStandaloneCourse(true));
   }, [selectedCourse]);
-
-  // Calculate CO totals from CT table (sum of all CO Total values)
   const calculateCOTotals = () => {
     const coTotals = {};
     ctRows.forEach((row, idx) => {
@@ -1270,8 +1070,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     });
     return coTotals;
   };
-
-  // Calculate factored CO totals from generated table (View Generated Table)
   const calculateFactoredCOTotals = () => {
     const coTotals = {};
     ctRows.forEach((row, idx) => {
@@ -1286,8 +1084,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     });
     return coTotals;
   };
-
-  // Calculate assignment CO totals (original)
   const calculateAssignmentCOTotals = () => {
     const coTotals = {};
     assignmentRows.forEach((row, idx) => {
@@ -1297,13 +1093,10 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     });
     return coTotals;
   };
-
-  // Calculate assignment CO totals excluding attendance (for Generated Obtained Table)
   const calculateAssignmentCOTotalsNoAttendance = () => {
     const coTotals = {};
     assignmentRows.forEach((row, idx) => {
       const coKey = row.coNumber || `CO${idx + 1}`;
-      // Only sum assignment marks that are allocated to this CO, exclude attendance
       const coTotal = getActiveAssignmentFields().reduce((sum, field) => {
         const allocatedMarks = row[field] || 0;
         if (allocatedMarks === 0) return sum; // Skip if no allocation for this field in this CO
@@ -1313,8 +1106,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     });
     return coTotals;
   };
-
-  // Calculate factored assignment CO totals
   const calculateFactoredAssignmentCOTotals = () => {
     const coTotals = {};
     assignmentRows.forEach((row, idx) => {
@@ -1330,10 +1121,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     });
     return coTotals;
   };
-
-  // Helper to get dynamic CT field names based on ctTaken.
-  // If ctTaken is 0 (not yet configured), auto-detect from which CT columns have non-zero
-  // distribution data in ctRows so that uploaded CT data is always reflected.
   const getActiveCTFields = () => {
     let ctTaken = ctSummary.ctTaken > 0 ? ctSummary.ctTaken
       : ctRows.some(r => (r.CT3_Q1 || 0) + (r.CT3_Q2 || 0) + (r.CT3_Q3 || 0) > 0) ? 3
@@ -1342,9 +1129,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     const allFields = ['CT1_Q1', 'CT1_Q2', 'CT1_Q3', 'CT2_Q1', 'CT2_Q2', 'CT2_Q3', 'CT3_Q1', 'CT3_Q2', 'CT3_Q3'];
     return allFields.slice(0, ctTaken * 3);
   };
-
-  // Helper to get CT keys based on ctTaken.
-  // If ctTaken is 0, auto-detect from ctRows (mirrors getActiveCTFields logic).
   const getActiveCTs = () => {
     const ctTaken = ctSummary.ctTaken > 0 ? ctSummary.ctTaken
       : ctRows.some(r => (r.CT3_Q1 || 0) + (r.CT3_Q2 || 0) + (r.CT3_Q3 || 0) > 0) ? 3
@@ -1352,9 +1136,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       : ctRows.some(r => (r.CT1_Q1 || 0) + (r.CT1_Q2 || 0) + (r.CT1_Q3 || 0) > 0) ? 1 : 0;
     return ['CT1', 'CT2', 'CT3'].slice(0, ctTaken);
   };
-
-  // Helper to get Assignment keys based on assignTaken.
-  // If assignTaken is 0, auto-detect from assignmentRows that have non-zero distribution data.
   const getActiveAssignments = () => {
     const assignTaken = assignmentSummary.assignTaken > 0 ? assignmentSummary.assignTaken
       : assignmentRows.some(r => (r.Assgn3_Q1 || 0) + (r.Assgn3_Q2 || 0) + (r.Assgn3_Q3 || 0) > 0) ? 3
@@ -1362,9 +1143,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       : assignmentRows.some(r => (r.Assgn1_Q1 || 0) + (r.Assgn1_Q2 || 0) + (r.Assgn1_Q3 || 0) > 0) ? 1 : 0;
     return ['Assgn1', 'Assgn2', 'Assgn3'].slice(0, assignTaken);
   };
-
-  // Helper to get dynamic Assignment field names based on assignTaken.
-  // If assignTaken is 0, auto-detect from assignmentRows (mirrors getActiveAssignments logic).
   const getActiveAssignmentFields = () => {
     const assignTaken = assignmentSummary.assignTaken > 0 ? assignmentSummary.assignTaken
       : assignmentRows.some(r => (r.Assgn3_Q1 || 0) + (r.Assgn3_Q2 || 0) + (r.Assgn3_Q3 || 0) > 0) ? 3
@@ -1373,15 +1151,11 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     const allFields = ['Assgn1_Q1', 'Assgn1_Q2', 'Assgn1_Q3', 'Assgn2_Q1', 'Assgn2_Q2', 'Assgn2_Q3', 'Assgn3_Q1', 'Assgn3_Q2', 'Assgn3_Q3'];
     return allFields.slice(0, assignTaken * 3);
   };
-
-  // Helper to get factored CT marks for a student and CO
   const getStudentCTFactoredMarks = (rollNumber, coNumber) => {
     const studentRow = ctObtainedRows.find(r =>
       String(r.rollNumber || '').trim().toLowerCase() === String(rollNumber || '').trim().toLowerCase()
     );
     if (!studentRow) return 0;
-
-    // Find the CO row to check which fields are allocated to this CO
     const coIdx = ctRows.findIndex(row => {
       const rowCoNumber = (row.coNumber || '').toString().replace('CLO', 'CO');
       return rowCoNumber === coNumber;
@@ -1392,7 +1166,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     const coRow = ctRows[coIdx];
 
     return getActiveCTFields().reduce((sum, field) => {
-      // Only include fields allocated to this CO
       const allocatedMarks = coRow[field] || 0;
       if (allocatedMarks === 0) return sum;
 
@@ -1403,15 +1176,11 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return sum + (factor * studentMark);
     }, 0);
   };
-
-  // Helper to get factored Assignment marks for a student and CO
   const getStudentAssignmentFactoredMarks = (rollNumber, coNumber) => {
     const studentRow = attnAssignObtainedRows.find(r =>
       String(r.rollNumber || '').trim().toLowerCase() === String(rollNumber || '').trim().toLowerCase()
     );
     if (!studentRow) return 0;
-
-    // Find the CO row in assignmentRows to check fields
     const coIdx = assignmentRows.findIndex(row => {
       const rowCoNumber = (row.coNumber || '').toString().replace('CLO', 'CO');
       return rowCoNumber === coNumber;
@@ -1422,7 +1191,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     const coRow = assignmentRows[coIdx];
 
     return getActiveAssignmentFields().reduce((sum, field) => {
-      // Only include fields allocated to this CO
       const allocatedMarks = coRow[field] || 0;
       if (allocatedMarks === 0) return sum;
 
@@ -1432,9 +1200,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return sum + (factor * studentMark);
     }, 0);
   };
-
-  // Helper to get original (unfactored) Assignment marks for a student and CO
-  // Matches "Generated Obtained Table - CO-wise Marks (Original)" in Attn_Assign tab
   const getStudentAssignmentOriginalMarks = (rollNumber, coNumber) => {
     const studentRow = attnAssignObtainedRows.find(r =>
       String(r.rollNumber || '').trim().toLowerCase() === String(rollNumber || '').trim().toLowerCase()
@@ -1455,14 +1220,9 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return sum + (studentRow[field] || 0); // factor = 1 (Original, no scaling)
     }, 0);
   };
-
-  // Autosave function disabled - using manual save only
   const triggerAutosave = useCallback(() => {
-    // Autosave disabled for CT - users must click Save buttons
     return;
   }, []);
-
-  // Manual save function (saves immediately without debounce)
   const handleManualSave = async (scope = 'all') => {
     if (selectedSheet !== 'CT') return;
     if (activeManualSaveRef.current && activeManualSaveRef.current !== 'CT') return;
@@ -1473,8 +1233,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return;
     }
     activeManualSaveRef.current = 'CT';
-
-    // Clear any pending autosave
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
@@ -1506,8 +1264,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       };
 
       setSaveStatus('saved');
-
-      // Clear saved status after 2 seconds
       setTimeout(() => setSaveStatus(''), 2000);
     } catch (error) {
       console.error('[handleManualSave] Error:', error);
@@ -1518,8 +1274,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       activeManualSaveRef.current = null;
     }
   };
-
-  // Manual save function for Assignment/Attendance (saves immediately without debounce)
   const handleManualSaveAssignment = async (scope = 'all') => {
     if (selectedSheet !== 'Attn_Assign') return;
     if (activeManualSaveRef.current && activeManualSaveRef.current !== 'ASSIGNMENT') return;
@@ -1530,8 +1284,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return;
     }
     activeManualSaveRef.current = 'ASSIGNMENT';
-
-    // Clear any pending autosave
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
@@ -1561,8 +1313,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       };
 
       setSaveStatus('saved');
-
-      // Clear saved status after 2 seconds
       setTimeout(() => setSaveStatus(''), 2000);
     } catch (error) {
       console.error('[handleManualSaveAssignment] Error:', error);
@@ -1573,8 +1323,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       activeManualSaveRef.current = null;
     }
   };
-
-  // Manual save function for Lab Activity (saves immediately without debounce)
   const handleManualSaveLabActivity = async (scope = 'all') => {
     if (selectedSheet !== 'LabActivity') return;
     if (activeManualSaveRef.current && activeManualSaveRef.current !== 'LAB') return;
@@ -1586,8 +1334,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return;
     }
     activeManualSaveRef.current = 'LAB';
-
-    // Clear any pending autosave
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
@@ -1598,8 +1344,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       const saveTopOnly = scope === 'top';
       const saveBottomOnly = scope === 'bottom';
       const persisted = labPersistedRef.current || {};
-
-      // Calculate the 'other' field for each student row before saving
       const totals = labActivityActivityTotals();
       let totalMeasuredTotal = (labAttendanceMarks || 0) + (labQuizMarks || 0) + (labVivaMarks || 0);
       for (let i = 1; i <= (activityTaken || 5); i++) {
@@ -1613,7 +1357,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         const factor = (otherActivityRemaining || 0) / totalMeasuredTotal;
         const studentMeasuredTotal = row.otherMeasured || 0;
         const calculatedOther = studentMeasuredTotal * factor;
-        // Round to 4 decimal places to avoid floating point precision issues
         const rounded = Math.round(calculatedOther * 10000) / 10000;
         return { ...row, other: rounded };
       });
@@ -1654,8 +1397,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
       console.log('Lab Activity data saved successfully!');
       setLabActivitySaveStatus('saved');
-
-      // Clear saved status after 2 seconds
       setTimeout(() => setLabActivitySaveStatus(''), 2000);
     } catch (error) {
       console.error('[handleManualSaveLabActivity] Error:', error);
@@ -1672,8 +1413,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       activeManualSaveRef.current = null;
     }
   };
-
-  // Manual save function for Section A allocated marks
   const handleManualSaveSectionA = async () => {
     if (!selectedCourse || !selectedCourse._id) {
       console.warn('Section A Save: Please select a course first');
@@ -1694,8 +1433,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
       console.log('Section A & B data saved successfully!');
       setSectionASaveStatus('saved');
-
-      // Clear saved status after 2 seconds
       setTimeout(() => setSectionASaveStatus(''), 2000);
     } catch (error) {
       console.error('[handleManualSaveSectionA] Error:', error);
@@ -1713,8 +1450,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       setTimeout(() => setSectionASaveStatus(''), 3000);
     }
   };
-
-  // Manual save function for Section B allocated marks
   const handleManualSaveSectionB = async () => {
     if (!selectedCourse || !selectedCourse._id) {
       console.warn('Section B Save: Please select a course first');
@@ -1735,8 +1470,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
       console.log('Section A & B data saved successfully!');
       setSectionBSaveStatus('saved');
-
-      // Clear saved status after 2 seconds
       setTimeout(() => setSectionBSaveStatus(''), 2000);
     } catch (error) {
       console.error('[handleManualSaveSectionB] Error:', error);
@@ -1754,11 +1487,8 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       setTimeout(() => setSectionBSaveStatus(''), 3000);
     }
   };
-
-  // Load saved CT data when course and CT sheet selected (also load for COCalc sheets)
   useEffect(() => {
     const loadCTData = async () => {
-      // Only reset the flag when course actually changes (not on every render)
       const currentCourseId = selectedCourse?._id;
       if (currentCourseId !== previousCourseIdRef.current) {
         ctDataLoadedRef.current = false;
@@ -1774,10 +1504,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       }
 
       if (selectedCourse && selectedCourse._id && (selectedSheet === 'CT' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax' || selectedSheet === 'POCalc' || selectedSheet === 'CheckPO' || selectedSheet === 'Charts')) {
-        // Set the flag immediately to prevent initialization from running during load
         ctDataLoadedRef.current = true;
-
-        // For lab courses on COCalc/COAttainment/POCalcMax/POCalc/CheckPO/Charts sheets, use the paired theory course's CT data
         let courseIdToUse = selectedCourse._id;
         if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax' || selectedSheet === 'POCalc' || selectedSheet === 'CheckPO' || selectedSheet === 'Charts') {
           const courseCode = selectedCourse.courseCode || '';
@@ -1806,7 +1533,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
             setCtRows(() => {
               if (!savedRows || savedRows.length === 0) {
-                // DB was reset — reinitialize blank rows from CLOs
                 if (clos.length === 0) return [];
                 return clos.map(clo => {
                   const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
@@ -1818,8 +1544,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                   };
                 });
               }
-              // When loading theory partner data for a lab course, preserve all theory
-              // partner COs (e.g. CO2, CO3) — don't filter down to the lab's own clos.
               if (courseIdToUse !== selectedCourse._id) return savedRows;
               if (clos.length === 0) return savedRows;
               const savedMap = {};
@@ -1866,31 +1590,24 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                 setCtObtainedRows(cleaned);
               }
             } else {
-              // No saved obtained rows - allow initialization and trigger it
               ctDataLoadedRef.current = false;
               initObtainedRows('CT');
             }
           } else {
-            // No data found - allow initialization and trigger it immediately
             ctDataLoadedRef.current = false;
             initObtainedRows('CT');
           }
         } catch (error) {
           console.error('[loadCTData] Error loading saved data:', error);
-          // Error loading - allow initialization and trigger it immediately
           ctDataLoadedRef.current = false;
           initObtainedRows('CT');
         }
       }
     };
     loadCTData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCourse, selectedSheet, initObtainedRows, teacherCourses]);
-
-  // Load saved Assignment/Attendance data when course and Attn_Assign sheet selected (also load for COCalc sheets)
   useEffect(() => {
     const loadAssignmentData = async () => {
-      // Only reset the flag when course actually changes (not on every render)
       const currentCourseId = selectedCourse?._id;
       const courseActuallyChanged = currentCourseId !== previousCourseIdForAssignmentRef.current;
       if (courseActuallyChanged) {
@@ -1906,10 +1623,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       }
 
       if (selectedCourse && selectedCourse._id && (selectedSheet === 'Attn_Assign' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax' || selectedSheet === 'POCalc' || selectedSheet === 'CheckPO' || selectedSheet === 'Charts')) {
-        // Set the flag immediately to prevent initialization from running during load
         assignmentDataLoadedRef.current = true;
-
-        // For lab courses on COCalc/COAttainment/POCalcMax/POCalc/CheckPO/Charts sheets, use the paired theory course's assignment data
         let courseIdToUse = selectedCourse._id;
         if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax' || selectedSheet === 'POCalc' || selectedSheet === 'CheckPO' || selectedSheet === 'Charts') {
           const courseCode = selectedCourse.courseCode || '';
@@ -1938,7 +1652,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
             setAssignmentRows(() => {
               if (!savedRows || savedRows.length === 0) {
-                // DB was reset — reinitialize blank rows from CLOs
                 if (clos.length === 0) return [];
                 return clos.map(clo => {
                   const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
@@ -1951,8 +1664,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                   };
                 });
               }
-              // When loading theory partner data for a lab course, preserve all theory
-              // partner COs — don't filter down to the lab's own clos.
               if (courseIdToUse !== selectedCourse._id) return savedRows;
               if (clos.length === 0) return savedRows;
               const savedMap = {};
@@ -1971,10 +1682,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             if (savedManual) setAssignmentManualWts(savedManual);
             if (savedSummary) setAssignmentSummary(savedSummary);
             if (savedAttendance !== undefined) setAttendanceMarks(savedAttendance);
-
-            // Helper: merge saved rows with all enrolled batch students so every batch
-            // student always appears (students in saved data keep their marks; missing
-            // batch students are added with zeroed marks).
             const mergeWithEnrolled = async (rows) => {
               try {
                 const stuResp = await fetchCourseStudentsCached(selectedCourse._id);
@@ -1995,7 +1702,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                     return merged;
                   }
                 }
-              } catch (e) { /* fall through */ }
+              } catch (e) {  }
               return rows;
             };
 
@@ -2003,18 +1710,15 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
               const merged = await mergeWithEnrolled(savedObtained);
               setAttnAssignObtainedRows(merged);
             } else {
-              // No saved rows — seed entirely from enrolled batch students
               const seeded = await mergeWithEnrolled([]);
               if (seeded.length > 0) {
                 setAttnAssignObtainedRows(seeded);
               } else if (courseActuallyChanged || attnAssignObtainedRows.length === 0) {
-                // Final fallback: initObtainedRows (uses attainment sheet data etc.)
                 assignmentDataLoadedRef.current = false;
                 initObtainedRows('Attn_Assign');
               }
             }
           } else {
-            // No data found - seed from enrolled batch students first, fall back to initObtainedRows
             if (courseActuallyChanged || attnAssignObtainedRows.length === 0) {
               try {
                 const stuResp = await fetchCourseStudentsCached(selectedCourse._id);
@@ -2046,7 +1750,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
           }
         } catch (error) {
           console.error('[loadAssignmentData] Error loading saved data:', error);
-          // Error loading - reinitialize only if course changed or no in-memory data
           if (courseActuallyChanged || attnAssignObtainedRows.length === 0) {
             assignmentDataLoadedRef.current = false;
             initObtainedRows('Attn_Assign');
@@ -2055,13 +1758,9 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       }
     };
     loadAssignmentData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCourse, selectedSheet, initObtainedRows, teacherCourses]);
-
-  // Load saved Lab Activity data when course and LabActivity sheet selected (also load for COCalc sheets)
   useEffect(() => {
     const loadLabActivityData = async () => {
-      // Only reset the flag when course actually changes (not on every render)
       const currentCourseId = selectedCourse?._id;
       if (currentCourseId !== previousCourseIdForLabActivityRef.current) {
         labActivityDataLoadedRef.current = false;
@@ -2082,17 +1781,13 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
           labActivityObtainedRows: []
         };
       }
-      // Force reload when refresh key changes (e.g. lab settings saved from TeacherDashboard)
       if (labDataRefreshKey !== lastLabDataRefreshKeyRef.current) {
         labActivityDataLoadedRef.current = false;
         lastLabDataRefreshKeyRef.current = labDataRefreshKey;
       }
 
       if (selectedCourse && selectedCourse._id && (selectedSheet === 'LabActivity' || selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax' || selectedSheet === 'POCalc' || selectedSheet === 'CheckPO' || selectedSheet === 'Charts')) {
-        // Set the flag immediately to prevent initialization from running during load
         labActivityDataLoadedRef.current = true;
-
-        // For theory courses on COCalc/COAttainment/POCalcMax/POCalc/CheckPO/Charts sheets, use the paired lab course's lab activity data
         let courseIdToUse = selectedCourse._id;
         if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax' || selectedSheet === 'POCalc' || selectedSheet === 'CheckPO' || selectedSheet === 'Charts') {
           const courseCode = selectedCourse.courseCode || '';
@@ -2141,7 +1836,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
             setLabActivityRows(() => {
               if (!savedRows || savedRows.length === 0) {
-                // DB was reset — reinitialize blank rows from CLOs
                 if (clos.length === 0) return [];
                 return clos.map(clo => {
                   const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
@@ -2217,10 +1911,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                 setLabActivityObtainedRows(cleaned);
               }
             } else {
-              // No saved obtained rows — seed from enrolled students directly.
-              // Do NOT reset labActivityDataLoadedRef here; keeping it true protects
-              // the marks (labAttendanceMarks etc.) from being zeroed by the
-              // [selectedSheet, clos] init effect when CLOs load asynchronously.
               try {
                 const stuResp = await fetchCourseStudentsCached(selectedCourse._id);
                 if (stuResp.success && Array.isArray(stuResp.data) && stuResp.data.length > 0) {
@@ -2239,28 +1929,22 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                     })));
                   }
                 }
-              } catch (e) { /* leave obtained rows empty */ }
+              } catch (e) {  }
             }
           } else {
-            // No data found - allow initialization
             labActivityDataLoadedRef.current = false;
             initObtainedRows('LabActivity');
           }
         } catch (error) {
           console.error('[loadLabActivityData] Error loading saved data:', error);
-          // Error loading - allow initialization
           labActivityDataLoadedRef.current = false;
         }
       }
     };
     loadLabActivityData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCourse, selectedSheet, teacherCourses, labDataRefreshKey]);
-
-  // Load saved Section A data when course is selected
   useEffect(() => {
     const loadSectionAData = async () => {
-      // Only reset the flag when course actually changes (not on every render)
       const currentCourseId = selectedCourse?._id;
       if (currentCourseId !== previousCourseIdForSectionARef.current) {
         sectionADataLoadedRef.current = false;
@@ -2268,7 +1952,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       }
 
       if (selectedCourse && selectedCourse._id) {
-        // For lab courses on COCalc/COAttainment/POCalcMax/POCalc/CheckPO/Charts sheets, use the paired theory course's section A/B data
         let courseIdToUse = selectedCourse._id;
         if (selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm' || selectedSheet === 'COAttainment' || selectedSheet === 'POCalcMax' || selectedSheet === 'POCalc' || selectedSheet === 'CheckPO' || selectedSheet === 'Charts') {
           const courseCode = selectedCourse.courseCode || '';
@@ -2290,14 +1973,10 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
               sectionBRows: savedSectionBRows,
               sectionBObtainedRows: savedSectionBObtainedRows
             } = response.data;
-
-            // Check if we have allocated rows data (CO mappings)
             const hasAllocatedData = (savedSectionARows && savedSectionARows.length > 0) ||
               (savedSectionBRows && savedSectionBRows.length > 0);
 
             if (!hasAllocatedData) {
-
-              // Initialize with COs if available
               if (clos.length > 0) {
                 const initialRows = clos.map(clo => ({
                   coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
@@ -2312,8 +1991,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                 setSectionARows(initialRows);
                 setSectionBRows(initialRows);
               }
-
-              // Get all enrolled students and merge with saved data
               let allStudents = [];
               try {
                 const resp = await fetchCourseStudentsCached(selectedCourse._id);
@@ -2326,8 +2003,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
               } catch (error) {
                 console.error('[loadSectionAData] Error fetching students:', error);
               }
-
-              // Filter and sort students by roll number
               const uniqueByRoll = [];
               const seen = new Set();
               for (const stu of allStudents) {
@@ -2344,9 +2019,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                 const bNum = String(b.rollNumber).replace(/\D/g, '');
                 return aNum.localeCompare(bNum, undefined, { numeric: true });
               });
-
-              // Merge saved Section A data with all students
-              // Deduplicate saved data - keep last occurrence of each roll number
               const dedupedSectionA = [];
               const seenRollsA = new Set();
               if (savedSectionAObtainedRows) {
@@ -2374,14 +2046,9 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                   Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
                 };
               });
-
-              // Merge saved Section B data with all students
-
-              // Deduplicate saved data - keep last occurrence of each roll number
               const dedupedSectionB = [];
               const seenRolls = new Set();
               if (savedSectionBObtainedRows) {
-                // Process in reverse to keep last occurrence
                 for (let i = savedSectionBObtainedRows.length - 1; i >= 0; i--) {
                   const row = savedSectionBObtainedRows[i];
                   const roll = String(row.rollNumber);
@@ -2414,15 +2081,10 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
               sectionADataLoadedRef.current = true;
               return; // Exit early
             }
-
-            // We have saved allocated rows, load them
-            // Also load the obtained rows from the backend (they are now fetched from TermExamMarks)
             sectionADataLoadedRef.current = true; // Mark as loaded to prevent re-initialization
 
             if (savedSectionARows && savedSectionARows.length > 0) {
               setSectionARows(() => {
-                // When loading theory partner data for a lab course, preserve all theory
-                // partner COs (e.g. CO2, CO3) — don't filter down to the lab's own clos.
                 if (courseIdToUse !== selectedCourse._id) return savedSectionARows;
                 if (clos.length === 0) return savedSectionARows;
                 const savedMap = {};
@@ -2444,8 +2106,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             }
             if (savedSectionBRows && savedSectionBRows.length > 0) {
               setSectionBRows(() => {
-                // When loading theory partner data for a lab course, preserve all theory
-                // partner COs — don't filter down to the lab's own clos.
                 if (courseIdToUse !== selectedCourse._id) return savedSectionBRows;
                 if (clos.length === 0) return savedSectionBRows;
                 const savedMap = {};
@@ -2465,8 +2125,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                 });
               });
             }
-
-            // Get all enrolled students and merge with saved obtained rows data
             let allStudents = [];
             try {
               const resp = await fetchCourseStudentsCached(selectedCourse._id);
@@ -2479,8 +2137,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             } catch (error) {
               console.error('[loadSectionAData] Error fetching students:', error);
             }
-
-            // Filter and sort students by roll number
             const uniqueByRoll = [];
             const seen = new Set();
             for (const stu of allStudents) {
@@ -2497,9 +2153,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
               const bNum = String(b.rollNumber).replace(/\D/g, '');
               return aNum.localeCompare(bNum, undefined, { numeric: true });
             });
-
-            // Merge saved Section A data with all students
-            // Deduplicate saved data - keep last occurrence of each roll number
             const dedupedSectionA = [];
             const seenRollsA = new Set();
             if (savedSectionAObtainedRows) {
@@ -2527,14 +2180,9 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                 Q4a: 0, Q4b: 0, Q4c: 0, Q4d: 0,
               };
             });
-
-            // Merge saved Section B data with all students
-
-            // Deduplicate saved data - keep last occurrence of each roll number
             const dedupedSectionB = [];
             const seenRolls = new Set();
             if (savedSectionBObtainedRows) {
-              // Process in reverse to keep last occurrence
               for (let i = savedSectionBObtainedRows.length - 1; i >= 0; i--) {
                 const row = savedSectionBObtainedRows[i];
                 const roll = String(row.rollNumber);
@@ -2564,10 +2212,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
             setSectionBObtainedRows(mergedSectionB);
           } else {
-            // No data found - allow initialization
             sectionADataLoadedRef.current = false;
-
-            // Initialize with COs if available
             if (clos.length > 0) {
               const initialRows = clos.map(clo => ({
                 coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
@@ -2585,10 +2230,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
           }
         } catch (error) {
           console.error('[loadSectionAData] Error loading saved data:', error);
-          // Error loading - allow initialization
           sectionADataLoadedRef.current = false;
-
-          // Initialize with COs if available
           if (clos.length > 0) {
             const initialRows = clos.map(clo => ({
               coNumber: (clo.cloNumber || '').toString().replace('CLO', 'CO'),
@@ -2607,7 +2249,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       }
     };
     loadSectionAData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCourse, selectedSheet, clos, teacherCourses]);
 
   const handleCTCellChange = (index, field, value) => {
@@ -2624,8 +2265,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       (row.CT3_Q1 || 0) + (row.CT3_Q2 || 0) + (row.CT3_Q3 || 0)
     );
   };
-
-  // Assignment handlers
   const handleAssignmentCellChange = (index, field, value) => {
     const num = Number(value);
     const updated = [...assignmentRows];
@@ -2643,15 +2282,12 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
   };
 
   const assignmentSums = () => {
-    // Each Q column maps to exactly one CO (all others are 0), so use max across rows
     const maxQ = (field) => Math.max(0, ...assignmentRows.map(r => r[field] || 0));
     const assgn1 = maxQ('Assgn1_Q1') + maxQ('Assgn1_Q2') + maxQ('Assgn1_Q3');
     const assgn2 = maxQ('Assgn2_Q1') + maxQ('Assgn2_Q2') + maxQ('Assgn2_Q3');
     const assgn3 = maxQ('Assgn3_Q1') + maxQ('Assgn3_Q2') + maxQ('Assgn3_Q3');
     return { assgn1, assgn2, assgn3 };
   };
-
-  // Calculate assignment totals grouped by assignment (Assgn1, Assgn2, Assgn3)
   const assignmentColumnGroupTotals = () => {
     const sums = assignmentSums();
     return {
@@ -2660,30 +2296,22 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       Assgn3: sums.assgn3
     };
   };
-
-  // Calculate automatic Eq. Wt for each Assignment
   const calculateAssignmentAutoEqWt = () => {
     const sums = assignmentSums();
     const assignmentMarks = assignmentSummary.assignmentMarks30 || 0;
     const assignTaken = assignmentSummary.assignTaken || 1; // Avoid division by zero
 
     const result = {};
-
-    // Assignment 1
     if (sums.assgn1 > 0) {
       result.Assgn1 = assignmentMarks / assignTaken;
     } else {
       result.Assgn1 = 0;
     }
-
-    // Assignment 2  
     if (sums.assgn2 > 0) {
       result.Assgn2 = assignmentMarks / assignTaken;
     } else {
       result.Assgn2 = 0;
     }
-
-    // Assignment 3
     if (sums.assgn3 > 0) {
       result.Assgn3 = assignmentMarks / assignTaken;
     } else {
@@ -2692,15 +2320,11 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
     return result;
   };
-
-  // Calculate automatic Factor for each Assignment
   const calculateAutoAssignmentFactor = () => {
     const assignmentTotals = assignmentColumnGroupTotals();
     const autoEqWt = calculateAssignmentAutoEqWt();
     const useEqWt = assignmentSummary.useEqWt || 0;
     const result = {};
-
-    // Assignment 1
     try {
       const totalMarks = assignmentTotals.Assgn1 || 0;
       if (totalMarks > 0) {
@@ -2716,8 +2340,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     } catch (error) {
       result.Assgn1 = 0;
     }
-
-    // Assignment 2
     try {
       const totalMarks = assignmentTotals.Assgn2 || 0;
       if (totalMarks > 0) {
@@ -2733,8 +2355,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     } catch (error) {
       result.Assgn2 = 0;
     }
-
-    // Assignment 3
     try {
       const totalMarks = assignmentTotals.Assgn3 || 0;
       if (totalMarks > 0) {
@@ -2769,8 +2389,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     const { Assgn1 = 0, Assgn2 = 0, Assgn3 = 0 } = assignmentManualWts || {};
     return (Assgn1 + Assgn2 + Assgn3);
   };
-
-  // SectionA handlers
   const handleSectionACellChange = (index, field, value) => {
     const num = Number(value);
     const updated = [...sectionARows];
@@ -2786,16 +2404,12 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       (row.Q4a || 0) + (row.Q4b || 0) + (row.Q4c || 0) + (row.Q4d || 0)
     );
   };
-
-  // SectionA Generated Table handler
   const handleSectionAGeneratedCellChange = (index, field, value) => {
     const num = Number(value);
     const updated = [...sectionARows];
     updated[index] = { ...updated[index], [field]: isNaN(num) ? 0 : num };
     setSectionARows(updated);
   };
-
-  // Auto-calculate combination values from allocated marks
   const calculateQ1Total = (row) => (row.Q1a || 0) + (row.Q1b || 0) + (row.Q1c || 0) + (row.Q1d || 0);
   const calculateQ2Total = (row) => (row.Q2a || 0) + (row.Q2b || 0) + (row.Q2c || 0) + (row.Q2d || 0);
   const calculateQ3Total = (row) => (row.Q3a || 0) + (row.Q3b || 0) + (row.Q3c || 0) + (row.Q3d || 0);
@@ -2821,8 +2435,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       default: return 0;
     }
   };
-
-  // Section A Generated Table calculations
   const calculateSectionACOMsrd = (row) => {
     const sum3Combo = getAutoGeneratedCombination(row, 'q123') +
       getAutoGeneratedCombination(row, 'q124') +
@@ -2847,8 +2459,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     if (totalForAllCOs === 0) return 0;
     return rowValue / totalForAllCOs;
   };
-
-  // Calculate population standard deviation for a 3-combination column
   const calculateStDevP = (combination) => {
     const values = sectionARows.map(row => calculateCombinationRatio(row, combination));
     const n = values.length;
@@ -2857,8 +2467,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / n;
     return Math.sqrt(variance);
   };
-
-  // Calculate Dist: SUM of (Unit V - combination ratio)² for each 3-combination
   const calculateDist = (combination) => {
     return sectionARows.reduce((sum, row) => {
       const unitV = calculateUnitV(row);
@@ -2866,8 +2474,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return sum + Math.pow(unitV - combinationValue, 2);
     }, 0);
   };
-
-  // Helper: Get marks obtained for a specific question (Q1, Q2, Q3, Q4) for a student
   const getStudentQuestionTotal = (studentRow, questionNum) => {
     const parts = ['a', 'b', 'c', 'd'];
     return parts.reduce((sum, part) => {
@@ -2875,26 +2481,19 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return sum + (parseFloat(studentRow[field]) || 0);
     }, 0);
   };
-
-  // Helper: Get total marks obtained per CO for a student
   const getStudentCOTotal = (studentRow, coNumber) => {
     const coRow = sectionARows.find(r => r.coNumber === coNumber);
     if (!coRow) return 0;
-
-    // Sum across all questions for this CO
     const parts = ['a', 'b', 'c', 'd'];
     return [1, 2, 3, 4].reduce((total, qNum) => {
       return total + parts.reduce((qSum, part) => {
         const field = `Q${qNum}${part}`;
         const allocated = parseFloat(coRow[field]) || 0;
         const obtained = parseFloat(studentRow[field]) || 0;
-        // Only count if this question part is allocated to this CO
         return qSum + (allocated > 0 ? obtained : 0);
       }, 0);
     }, 0);
   };
-
-  // Helper: Count how many questions have zero marks for a student
   const getStudentZeroCount = (studentRow) => {
     let zeroCount = 0;
     for (let qNum = 1; qNum <= 4; qNum++) {
@@ -2904,8 +2503,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     }
     return zeroCount;
   };
-
-  // Helper: Determine which combination the student answered
   const getStudentAnswerCombination = (studentRow) => {
     const answeredQuestions = [];
     for (let qNum = 1; qNum <= 4; qNum++) {
@@ -2915,12 +2512,8 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     }
     return answeredQuestions.length > 0 ? answeredQuestions.join(',') : 'None';
   };
-
-  // Helper: Convert answer combination string to combination key
   const answerCombinationToKey = (answerCombination) => {
     if (!answerCombination || answerCombination === 'None') return 'none';
-
-    // Map answer combinations to their keys
     const combinationMap = {
       '1,2,3': 'q123',
       '1,2,4': 'q124',
@@ -2940,33 +2533,17 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
     return combinationMap[answerCombination] || 'none';
   };
-
-  // Helper: Get CO marks distribution - HLOOKUP equivalent
-  // Returns the allocated marks for the specific answer combination the student chose
   const getStudentCODistribution = (studentRow, coNumber) => {
     const coRow = sectionARows.find(r => r.coNumber === coNumber);
     if (!coRow) return 0;
-
-    // Get the student's answer combination (e.g., "1,2,3")
     const answerCombination = getStudentAnswerCombination(studentRow);
-
-    // Convert to combination key (e.g., "q123")
     const combinationKey = answerCombinationToKey(answerCombination);
-
-    // Look up the value in the Possible Answer Combinations table
-    // This is equivalent to HLOOKUP in Excel
     return getAutoGeneratedCombination(coRow, combinationKey);
   };
-
-  // ========== Section B Calculation Functions ==========
-
-  // Calculate totals for each question in Section B
   const calculateQ1TotalB = (row) => (row.Q1a || 0) + (row.Q1b || 0) + (row.Q1c || 0) + (row.Q1d || 0);
   const calculateQ2TotalB = (row) => (row.Q2a || 0) + (row.Q2b || 0) + (row.Q2c || 0) + (row.Q2d || 0);
   const calculateQ3TotalB = (row) => (row.Q3a || 0) + (row.Q3b || 0) + (row.Q3c || 0) + (row.Q3d || 0);
   const calculateQ4TotalB = (row) => (row.Q4a || 0) + (row.Q4b || 0) + (row.Q4c || 0) + (row.Q4d || 0);
-
-  // Auto-generate combination values for Section B
   const getAutoGeneratedCombinationB = (row, combination) => {
     const q1 = calculateQ1TotalB(row);
     const q2 = calculateQ2TotalB(row);
@@ -2992,8 +2569,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       default: return 0;
     }
   };
-
-  // Calculate CO measured for Section B (1 if any 3-combo > 0, else 0)
   const calculateSectionBCOMsrd = (row) => {
     const sum3combos = getAutoGeneratedCombinationB(row, 'q123') +
       getAutoGeneratedCombinationB(row, 'q124') +
@@ -3001,27 +2576,19 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       getAutoGeneratedCombinationB(row, 'q234');
     return sum3combos > 0 ? 1 : 0;
   };
-
-  // Calculate total CO measured across all COs for Section B
   const calculateTotalCOMsrdB = () => {
     return sectionBRows.reduce((sum, row) => sum + calculateSectionBCOMsrd(row), 0);
   };
-
-  // Calculate Unit V for Section B
   const calculateUnitVB = (row) => {
     const totalCOMsrd = calculateTotalCOMsrdB();
     if (totalCOMsrd === 0) return 0;
     return calculateSectionBCOMsrd(row) / totalCOMsrd;
   };
-
-  // Calculate combination ratio for Section B
   const calculateCombinationRatioB = (row, combination) => {
     const totalForAllCOs = sectionBRows.reduce((sum, r) => sum + getAutoGeneratedCombinationB(r, combination), 0);
     if (totalForAllCOs === 0) return 0;
     return getAutoGeneratedCombinationB(row, combination) / totalForAllCOs;
   };
-
-  // Calculate standard deviation (population) for Section B
   const calculateStDevPB = (combination) => {
     const values = sectionBRows.map(row => calculateCombinationRatioB(row, combination));
     const n = values.length;
@@ -3030,8 +2597,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / n;
     return Math.sqrt(variance);
   };
-
-  // Calculate distance for Section B
   const calculateDistB = (combination) => {
     return sectionBRows.reduce((sum, row) => {
       const unitV = calculateUnitVB(row);
@@ -3039,8 +2604,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return sum + Math.pow(unitV - combinationValue, 2);
     }, 0);
   };
-
-  // Helper: Get marks obtained for a specific question (Q1, Q2, Q3, Q4) for a student in Section B
   const getStudentQuestionTotalB = (studentRow, questionNum) => {
     const parts = ['a', 'b', 'c', 'd'];
     return parts.reduce((sum, part) => {
@@ -3048,8 +2611,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return sum + (parseFloat(studentRow[field]) || 0);
     }, 0);
   };
-
-  // Helper: Get total marks obtained per CO for a student in Section B
   const getStudentCOTotalB = (studentRow, coNumber) => {
     const coRow = sectionBRows.find(r => r.coNumber === coNumber);
     if (!coRow) return 0;
@@ -3064,8 +2625,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       }, 0);
     }, 0);
   };
-
-  // Helper: Count how many questions have zero marks for a student in Section B
   const getStudentZeroCountB = (studentRow) => {
     let zeroCount = 0;
     for (let qNum = 1; qNum <= 4; qNum++) {
@@ -3075,8 +2634,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     }
     return zeroCount;
   };
-
-  // Helper: Determine which combination the student answered in Section B
   const getStudentAnswerCombinationB = (studentRow) => {
     const answeredQuestions = [];
     for (let qNum = 1; qNum <= 4; qNum++) {
@@ -3086,12 +2643,8 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     }
     return answeredQuestions.length > 0 ? answeredQuestions.join(',') : 'None';
   };
-
-  // Helper: Convert answer combination string to combination key (Section B)
   const answerCombinationToKeyB = (answerCombination) => {
     if (!answerCombination || answerCombination === 'None') return 'none';
-
-    // Map answer combinations (5,6,7,8) to their keys (which use q1,q2,q3,q4 internally)
     const combinationMap = {
       '5,6,7': 'q123',
       '5,6,8': 'q124',
@@ -3111,21 +2664,11 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
     return combinationMap[answerCombination] || 'none';
   };
-
-  // Helper: Get CO marks distribution for Section B - HLOOKUP equivalent
-  // Returns the allocated marks for the specific answer combination the student chose
   const getStudentCODistributionB = (studentRow, coNumber) => {
     const coRow = sectionBRows.find(r => r.coNumber === coNumber);
     if (!coRow) return 0;
-
-    // Get the student's answer combination (e.g., "1,2,3")
     const answerCombination = getStudentAnswerCombinationB(studentRow);
-
-    // Convert to combination key (e.g., "q123")
     const combinationKey = answerCombinationToKeyB(answerCombination);
-
-    // Look up the value in the Possible Answer Combinations table
-    // This is equivalent to HLOOKUP in Excel
     return getAutoGeneratedCombinationB(coRow, combinationKey);
   };
 
@@ -3145,8 +2688,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     const q4 = (totals.Q4a || 0) + (totals.Q4b || 0) + (totals.Q4c || 0) + (totals.Q4d || 0);
     return { q1, q2, q3, q4 };
   };
-
-  // SectionA Obtained Marks handlers
   const handleSectionAObtainedCellChange = (index, field, value) => {
     const num = Number(value);
     const raw = isNaN(num) ? 0 : Math.max(0, num);
@@ -3165,8 +2706,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       (row.Q4a || 0) + (row.Q4b || 0) + (row.Q4c || 0) + (row.Q4d || 0)
     );
   };
-
-  // SectionB handlers
   const handleSectionBCellChange = (index, field, value) => {
     const num = Number(value);
     const updated = [...sectionBRows];
@@ -3199,8 +2738,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     const q4 = (totals.Q4a || 0) + (totals.Q4b || 0) + (totals.Q4c || 0) + (totals.Q4d || 0);
     return { q1, q2, q3, q4 };
   };
-
-  // SectionB Obtained Marks handlers
   const handleSectionBObtainedCellChange = (index, field, value) => {
     const num = Number(value);
     const raw = isNaN(num) ? 0 : Math.max(0, num);
@@ -3219,8 +2756,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       (row.Q4a || 0) + (row.Q4b || 0) + (row.Q4c || 0) + (row.Q4d || 0)
     );
   };
-
-  // LabActivity handlers
   const handleLabActivityCellChange = (index, field, value) => {
     const num = Number(value);
     const updated = [...labActivityRows];
@@ -3251,8 +2786,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     }
     return sum;
   };
-
-  // Helper function to calculate activity totals only (excluding attn, quiz, viva)
   const computeLabActivityMeasuredTotal = (row) => {
     let sum = 0;
     for (let i = 1; i <= (activityTaken || 5); i++) {
@@ -3260,25 +2793,19 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     }
     return sum;
   };
-
-  // Helper function to calculate factored value for LabActivity generated table
   const getLabActivityFactoredValue = (row, field, activityKey) => {
     try {
       const cellValue = parseFloat(row[field]) || 0;
       if (cellValue === 0) return 0;
-
-      // Calculate factor dynamically
       const totals = labActivityActivityTotals();
       const activityTotal = totals[activityKey] || 0;
       let calculatedFactor = 0;
 
       if (activityTotal > 0) {
         if (useEqWtActivity) {
-          // Use Eq. Wt: calculate Eq. Wt value / Activity Total
           const eqWtValue = (coMappedActivityMarks || 0) / (activityTaken || 1);
           calculatedFactor = eqWtValue / activityTotal;
         } else {
-          // Use Manual Wt: calculate Manual Wt value / Activity Total
           const manualWtValue = labActivityManualWts[activityKey] || 0;
           calculatedFactor = manualWtValue / activityTotal;
         }
@@ -3289,8 +2816,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return 0;
     }
   };
-
-  // Helper function to calculate multiplication factor (generated/allocated) for LabActivity
   const getLabActivityMultiplicationFactor = (row, field, activityKey) => {
     try {
       const generatedValue = getLabActivityFactoredValue(row, field, activityKey);
@@ -3301,8 +2826,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return 0;
     }
   };
-
-  // Helper function to calculate CO total for generated table (multiplication factor view)
   const getLabActivityMultiplicationCOTotal = (row) => {
     try {
       let sum = 0;
@@ -3317,17 +2840,12 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return 0;
     }
   };
-
-  // Helper function to get CO-wise obtained marks for a student (out of CO Total from allocated table)
   const getLabActivityStudentCOMarks = (studentRow, coNumber) => {
     try {
-      // Find the CO row in labActivityRows to see which activities have this CO allocated
       const coRow = labActivityRows.find(r => r.coNumber === coNumber);
       if (!coRow) return 0;
 
       let studentTotal = 0;
-
-      // Add marks from attendance, quiz, and viva if CO has them allocated
       if ((coRow.attn || 0) > 0) {
         studentTotal += (parseFloat(studentRow.attn) || 0);
       }
@@ -3337,14 +2855,10 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       if ((coRow.viva || 0) > 0) {
         studentTotal += (parseFloat(studentRow.viva) || 0);
       }
-
-      // Calculate for each activity - only include if this CO has marks allocated
       for (let i = 1; i <= (activityTaken || 5); i++) {
         const q1Field = `Activity${i}_Q1`;
         const q2Field = `Activity${i}_Q2`;
         const q3Field = `Activity${i}_Q3`;
-
-        // Only add student marks for questions where CO has allocated marks
         if ((coRow[q1Field] || 0) > 0) {
           studentTotal += (parseFloat(studentRow[q1Field]) || 0);
         }
@@ -3361,8 +2875,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return 0;
     }
   };
-
-  // Helper function to get CO-wise obtained marks (out of CO Mapped Activity Marks)
   const getLabActivityStudentCOMappedMarks = (studentRow, coNumber) => {
     try {
       const coRow = labActivityRows.find(r => r.coNumber === coNumber);
@@ -3370,31 +2882,23 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
       let total = 0;
       const totals = labActivityActivityTotals();
-
-      // Only process activities (not attn/quiz/viva) for CO Mapped Activity Marks
       for (let i = 1; i <= (activityTaken || 5); i++) {
         const activityKey = `activity${i}`;
         const q1Field = `Activity${i}_Q1`;
         const q2Field = `Activity${i}_Q2`;
         const q3Field = `Activity${i}_Q3`;
-
-        // Calculate factor dynamically for this activity
         const activityTotal = totals[activityKey] || 0;
         let calculatedFactor = 0;
 
         if (activityTotal > 0) {
           if (useEqWtActivity) {
-            // Use Eq. Wt: calculate Eq. Wt value / Activity Total
             const eqWtValue = (coMappedActivityMarks || 0) / (activityTaken || 1);
             calculatedFactor = eqWtValue / activityTotal;
           } else {
-            // Use Manual Wt: calculate Manual Wt value / Activity Total
             const manualWtValue = labActivityManualWts[activityKey] || 0;
             calculatedFactor = manualWtValue / activityTotal;
           }
         }
-
-        // Only add student marks if CO has allocated marks for this question
         if ((coRow[q1Field] || 0) > 0) {
           const studentQ1 = parseFloat(studentRow[q1Field]) || 0;
           total += studentQ1 * calculatedFactor;
@@ -3414,11 +2918,8 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return 0;
     }
   };
-
-  // Helper function to calculate CO attainment (obtained/allocated)
   const getLabActivityCOAttainment = (studentRow, coNumber) => {
     try {
-      // If row is empty (no roll number), return null to keep cell blank
       if (!studentRow.rollNumber) {
         return null;
       }
@@ -3428,29 +2929,18 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       if (!coRow) return 0;
 
       const allocatedMarks = getLabActivityGeneratedCOTotal(coRow);
-
-      // If division fails (allocated marks is 0), return 0
       if (allocatedMarks === 0) return 0;
-
-      // Calculate the ratio
       return obtainedMarks / allocatedMarks;
     } catch (error) {
       return 0;
     }
   };
-
-  // Helper function to calculate total marks for a student (sum of all CO attainments)
   const getLabActivityStudentTotalMarks = (studentRow) => {
     try {
       let total = 0;
-
-      // Add Attn, Quiz, Viva — use parseFloat(x)||0 so 'A' (absent) → NaN → 0
       total += parseFloat(studentRow.attn) || 0;
       total += parseFloat(studentRow.quiz) || 0;
       total += parseFloat(studentRow.viva) || 0;
-
-      // Add factored Other: compute from otherMeasured (stored by TeacherDashboard upload),
-      // falling back to the pre-computed 'other' field (stored by old AttainmentView save).
       const rawOther = parseFloat(studentRow.otherMeasured) || 0;
       if (rawOther > 0 && (otherActivityRemaining || 0) > 0) {
         const totals = labActivityActivityTotals();
@@ -3460,8 +2950,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       } else {
         total += parseFloat(studentRow.other) || 0;
       }
-
-      // Add all CO mapped marks (factored activity marks for each CO)
       labActivityRows.forEach(coRow => {
         total += getLabActivityStudentCOMappedMarks(studentRow, coRow.coNumber);
       });
@@ -3471,8 +2959,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       return 0;
     }
   };
-
-  // Helper function to get letter grade based on marks
   const getLetterGrade = (marks) => {
     if (marks >= 80) return 'A+';
     if (marks >= 75) return 'A';
@@ -3485,8 +2971,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     if (marks >= 40) return 'D';
     return 'F';
   };
-
-  // Helper function to get grade color (green → yellow-green → yellow → orange → red)
   const getGradeColor = (grade) => {
     switch (grade) {
       case 'A+': return '#006400'; // dark green
@@ -3502,12 +2986,9 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       default:   return '#065f46';
     }
   };
-
-  // Helper function to calculate CO total for generated table
   const getLabActivityGeneratedCOTotal = (row) => {
     try {
       let total = 0;
-      // Only process configured number of activities
       for (let i = 1; i <= (activityTaken || 5); i++) {
         const activityKey = `activity${i}`;
         total += getLabActivityFactoredValue(row, `Activity${i}_Q1`, activityKey);
@@ -3543,12 +3024,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     }
     return result;
   };
-
-  // CO Attainment (Lab) – AK32*100, where AK32 = getLabActivityCOAttainment (a 0-1 ratio).
-  // Placed after labActivityActivityTotals to avoid TDZ (all transitively called consts must be above).
   const labCoAttainmentData = useMemo(() => {
-    // Use combinedClos when available so that theory-only COs (e.g. CO2, CO3) appear
-    // with value 0 in the lab attainment table, allowing combined tables to show all COs.
     const effectiveClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
     if (!labActivityObtainedRows.length || !effectiveClos.length) return [];
     return labActivityObtainedRows
@@ -3562,7 +3038,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         });
         return { rollNumber: student.rollNumber, coValues };
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [labActivityObtainedRows, labActivityRows, clos, combinedClos, useEqWtActivity, coMappedActivityMarks, activityTaken, labActivityManualWts]);
 
   const columnTotals = () => {
@@ -3572,8 +3047,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     ctRows.forEach(r => fields.forEach(f => totals[f] += (r[f] || 0)));
     return totals;
   };
-
-  // Calculate CT totals grouped by CT (CT1, CT2, CT3)
   const ctColumnTotals = () => {
     const sums = ctSums();
     return {
@@ -3598,30 +3071,22 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     setCtManualWts(prev => ({ ...prev, [ctKey]: isNaN(num) ? 0 : num }));
     triggerAutosave();
   };
-
-  // Calculate automatic Eq. Wt for each CT column
   const calculateAutoEqWt = () => {
     const sums = ctSums();
     const coMappedMarks = ctSummary.coMappedMarks60 || 0;
     const ctTaken = ctSummary.ctTaken || 1; // Avoid division by zero
 
     const result = {};
-
-    // CT1
     if (sums.ct1 > 0) {
       result.CT1 = coMappedMarks / ctTaken;
     } else {
       result.CT1 = 0;
     }
-
-    // CT2  
     if (sums.ct2 > 0) {
       result.CT2 = coMappedMarks / ctTaken;
     } else {
       result.CT2 = 0;
     }
-
-    // CT3
     if (sums.ct3 > 0) {
       result.CT3 = coMappedMarks / ctTaken;
     } else {
@@ -3630,15 +3095,11 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
     return result;
   };
-
-  // Calculate automatic Factor for each CT column
   const calculateAutoFactor = () => {
     const ctTotals = ctColumnTotals();
     const autoEqWt = calculateAutoEqWt();
     const useEqWt = ctSummary.useEqWt || 0;
     const result = {};
-
-    // CT1
     try {
       const totalMarks = ctTotals.CT1 || 0;
       if (totalMarks > 0) {
@@ -3654,8 +3115,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     } catch (error) {
       result.CT1 = 0;
     }
-
-    // CT2
     try {
       const totalMarks = ctTotals.CT2 || 0;
       if (totalMarks > 0) {
@@ -3671,8 +3130,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     } catch (error) {
       result.CT2 = 0;
     }
-
-    // CT3
     try {
       const totalMarks = ctTotals.CT3 || 0;
       if (totalMarks > 0) {
@@ -3691,12 +3148,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
 
     return result;
   };
-
-  // CO Attainment (Theory) – exact same formula as TheoryCOPOTable CO Attainment (Theory) column.
-  // Placed after calculateAutoFactor to avoid temporal dead zone (const TDZ).
-  // CT/Assignment states are preserved for COAttainment tab so factored helpers work correctly.
   const theoryCoAttainmentData = useMemo(() => {
-    // Use combinedClos when available so CO2/CO3 (theory-only) are computed when viewing a lab course.
     const effectiveClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
     if (!coCalcData.length || !effectiveClos.length) return [];
     const factoredTotals = calculateFactoredCOTotals();
@@ -3717,14 +3169,8 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       });
       return { rollNumber: studentRow.rollNumber, coValues };
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coCalcData, clos, combinedClos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary]);
-
-  // CO Attainment – Combined (Theory+Lab): =IFERROR(BP5/BV5, 0)*100
-  // BP5 = totalObt (theory + lab obtained), BV5 = totalDist (theory + lab distribution)
-  // Mirrors the CombinedCOPOTable logic in COCalcSheet.js.
   const combinedCoAttainmentData = useMemo(() => {
-    // Use combinedClos when available so CO2/CO3 (theory-only) are computed when viewing a lab course.
     const effectiveClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
     if (!coCalcData.length || !effectiveClos.length) return [];
     const factoredTotals = calculateFactoredCOTotals();
@@ -3733,7 +3179,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       const coValues = {};
       effectiveClos.forEach(clo => {
         const cn = (clo.cloNumber || '').toString().replace('CLO', 'CO');
-        // BP5: theory obtained + lab activity obtained (factored/weighted)
         const labStudent = labActivityObtainedRows.find(s =>
           String(s.rollNumber || '').trim().toLowerCase() === String(studentRow.rollNumber || '').trim().toLowerCase()
         );
@@ -3743,7 +3188,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
           + getStudentCTFactoredMarks(studentRow.rollNumber, cn)
           + getStudentAssignmentFactoredMarks(studentRow.rollNumber, cn);
         const totalObt = theoryObt + labObt;
-        // BV5: theory distribution + lab activity distribution (eq-wt per question)
         const theoryDist = (studentRow.sectionA.marksDistribution[cn] || 0)
           + (studentRow.sectionB.marksDistribution[cn] || 0)
           + (factoredTotals[cn] || 0)
@@ -3759,18 +3203,13 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
           }
         }
         const totalDist = theoryDist + labCoTotal;
-        // IFERROR(BP5/BV5, 0) * 100
         coValues[cn] = totalDist > 0 ? parseFloat(((totalObt / totalDist) * 100).toFixed(4)) : 0;
       });
       return { rollNumber: studentRow.rollNumber, coValues };
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coCalcData, clos, combinedClos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary,
     labActivityObtainedRows, labActivityRows, activityTaken, coMappedActivityMarks]);
-
-  // CO Attainment – Unnormed (Theory+Lab): raw lab marks / raw lab distribution, no weighting
   const unnormedCoAttainmentData = useMemo(() => {
-    // Use combinedClos when available so CO2/CO3 (theory-only) are computed when viewing a lab course.
     const effectiveClos = (combinedClos && combinedClos.length > 0) ? combinedClos : clos;
     if (!coCalcData.length || !effectiveClos.length) return [];
     const factoredTotals = calculateFactoredCOTotals();
@@ -3799,26 +3238,14 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       });
       return { rollNumber: studentRow.rollNumber, coValues };
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coCalcData, clos, combinedClos, ctRows, assignmentRows, attnAssignObtainedRows, ctObtainedRows, ctManualWts, ctSummary,
     labActivityObtainedRows, labActivityRows, activityTaken]);
-
-  // CO Attainment – Equal Wt (Theory+Lab): forces equal weight across all lab activities regardless of manual-wt setting
-  // CO Attainment – Equal Wt (Theory+Lab):
-  // Excel formula: =B6:G6*$H$143:$M$143 + U6:Z6*$H$144:$M$144
-  // B6:G6  = theoryCoAttainmentData CO % per student
-  // U6:Z6  = labCoAttainmentData CO % per student
-  // H143:M143 = Wt table Theory row  (theoryBin[CO] / sumBin[CO])
-  // H144:M144 = Wt table Lab row     (labBin[CO]   / sumBin[CO])
   const equalWtCoAttainmentData = useMemo(() => {
     const effectiveClos = combinedClos.length > 0 ? combinedClos : clos;
     if (!effectiveClos.length) return [];
     if (!theoryCoAttainmentData.length && !labCoAttainmentData.length) return [];
 
     const coNumbers = effectiveClos.map(clo => (clo.cloNumber || '').toString().replace('CLO', 'CO'));
-
-    // Use sourceType from combinedClos (Course Profile tag) when available,
-    // otherwise fall back to data-presence check — keeps weights in sync with the summary table
     const theoryWt = {};
     const labWt = {};
     coNumbers.forEach((cn, i) => {
@@ -3835,8 +3262,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       theoryWt[cn] = s > 0 ? tBin / s : 0;
       labWt[cn]    = s > 0 ? lBin / s : 0;
     });
-
-    // Union of all students from both datasets
     const rollSet = new Set([
       ...theoryCoAttainmentData.map(s => String(s.rollNumber || '').trim()),
       ...labCoAttainmentData.map(s => String(s.rollNumber || '').trim()),
@@ -3857,10 +3282,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       });
       return { rollNumber: roll, coValues };
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theoryCoAttainmentData, labCoAttainmentData, clos, combinedClos]);
-
-  // Effect 1: Reset ready-gate whenever the user navigates to a different course/sheet.
   const coAttainmentKeyRef = useRef('');
   useEffect(() => {
     const key = `${selectedSheet}__${selectedCourse?._id || ''}`;
@@ -3870,9 +3292,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       if (coAttainmentSettleTimerRef.current) clearTimeout(coAttainmentSettleTimerRef.current);
     }
   }, [selectedSheet, selectedCourse]);
-
-  // Effect 2: After data settles (400ms of no further changes), mark ready.
-  // Uses a separate effect so that data updates AFTER the first settle do NOT hide the tables.
   useEffect(() => {
     if (selectedSheet !== 'COAttainment') return;
     if (coAttainmentSettleTimerRef.current) clearTimeout(coAttainmentSettleTimerRef.current);
@@ -3882,7 +3301,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     return () => {
       if (coAttainmentSettleTimerRef.current) clearTimeout(coAttainmentSettleTimerRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSheet, selectedCourse, coCalcData, ctObtainedRows, attnAssignObtainedRows,
     labActivityObtainedRows, labActivityRows, activityTaken, coMappedActivityMarks]);
 
@@ -3895,8 +3313,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     const { CT1 = 0, CT2 = 0, CT3 = 0 } = ctManualWts || {};
     return (CT1 + CT2 + CT3);
   };
-
-  // CT group totals for header: calculate from column totals
   const ctGroupTotals = () => {
     const totals = columnTotals();
     const ct1 = (totals.CT1_Q1 || 0) + (totals.CT1_Q2 || 0) + (totals.CT1_Q3 || 0);
@@ -3909,7 +3325,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
   const handleObtainedCellChange = (index, field, value) => {
     const num = Number(value);
     const raw = isNaN(num) ? 0 : Math.max(0, num);
-    // Cap at the distribution total for this field across all CO rows
     const maxAllowed = ctRows.reduce((sum, coRow) => sum + (coRow[field] || 0), 0);
     const capped = maxAllowed > 0 ? Math.min(raw, maxAllowed) : raw;
     const updated = [...ctObtainedRows];
@@ -3925,21 +3340,13 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       v(row.CT3_Q1) + v(row.CT3_Q2) + v(row.CT3_Q3)
     );
   };
-
-  // Filter sheets when course is selected
   useEffect(() => {
     if (selectedCourse && sheetNames.length > 0) {
-      // Get course code for detection
       const courseCode = (selectedCourse.courseCode || '').toLowerCase();
-
-      // Determine course type from course code last-digit convention:
-      // odd last digit = theory, even last digit = lab/sessional/project
       const lastDigitMatch = courseCode.match(/(\d)(?:\s*)$/);
       const lastDigitNum = lastDigitMatch ? parseInt(lastDigitMatch[1]) : NaN;
       const isLabCourse = !isNaN(lastDigitNum) && lastDigitNum % 2 === 0;
       const isTheoryCourse = !isNaN(lastDigitNum) && lastDigitNum % 2 === 1;
-
-      // Define sheets for each course type
       const theorySheets = [
         'CourseProfile', 'CT', 'Attn_Assign', 'SectionA', 'SectionB', 'COAttainment', 'COCalc', 'COCalc_LabUnnorm', 'COPOMap', 'POCalcMax', 'Charts', 'POCalc', 'CheckPO'
       ];
@@ -3948,14 +3355,8 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         'CourseProfile', 'LabActivity', 'COAttainment', 'COCalc_LabUnnorm',
         'COCalc', 'COPOMap', 'POCalcMax', 'Charts', 'POCalc', 'CheckPO'
       ];
-
-      // Select appropriate sheet list based solely on odd/even digit
       const allowedSheets = isTheoryCourse ? theorySheets : labSheets;
-
-      // Filter sheets to only show allowed ones
       let filtered = sheetNames.filter(sheet => allowedSheets.includes(sheet));
-
-      // Always include default sheets even if not in Excel file
       const defaultSheets = isTheoryCourse ? ['CourseProfile'] : ['CourseProfile', 'LabActivity'];
 
       defaultSheets.forEach(sheet => {
@@ -3963,8 +3364,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
           filtered.unshift(sheet);
         }
       });
-
-      // For theory courses with specific section assignment, filter section sheets
       if (isTheoryCourse && selectedCourse.section) {
         const teacherSection = `Section${selectedCourse.section}`;
         filtered = filtered.filter(sheet => {
@@ -3981,8 +3380,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       setFilteredSheets([]);
     }
   }, [selectedCourse, sheetNames]);
-
-  // Load attainment data when sheet selected (skip CourseProfile)
   useEffect(() => {
     if (selectedSheet && selectedSheet !== 'CourseProfile') {
       loadAttainmentData(selectedSheet);
@@ -3994,12 +3391,8 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       setLoading(true);
       const response = await getSheetNames();
       setSheetNames(response.sheets || []);
-
-      // Get current user's ID to find their section assignment
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       const userId = user._id || user.id;
-
-      // Extract the section for the logged-in teacher from assignedTeachers array
       const courseList = response.courses || [];
       const coursesWithSection = courseList.map(course => {
         if (course.assignedTeachers && Array.isArray(course.assignedTeachers)) {
@@ -4015,8 +3408,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       });
 
       setTeacherCourses(coursesWithSection);
-
-      // Auto-select first sheet
       if (response.sheets && response.sheets.length > 0) {
         setSelectedSheet(response.sheets[0]);
       } else if (coursesWithSection && coursesWithSection.length > 0) {
@@ -4043,7 +3434,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
   };
 
   const handleCLOCellEdit = (cloNumber, field, currentValue) => {
-    // Only allow editing CLO-PLO correlation field
     if (field !== 'cloPloCorrelation') return;
     if (userRole !== 'teacher' && userRole !== 'admin') return;
     setEditingCLOCell({ cloNumber, field, value: currentValue });
@@ -4053,7 +3443,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     if (!editingCLOCell) return;
     try {
       setSaving(true);
-      // Find the CLO to get its _id and the course _id
       const clo = clos.find(c => c.cloNumber === editingCLOCell.cloNumber);
       if (clo && clo._id && selectedCourse && selectedCourse._id && editingCLOCell.field === 'cloPloCorrelation') {
         await updateCOCorrelation(selectedCourse._id, clo._id, editingCLOCell.value);
@@ -4110,18 +3499,12 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
   };
 
   const canEdit = userRole === 'teacher' || userRole === 'admin';
-
-  // Refresh teacher courses (force reload from backend)
   const refreshTeacherCourses = useCallback(async () => {
     try {
       const data = await getAllCourses();
       const courseList = Array.isArray(data) ? data : (data.courses || []);
-
-      // Get current user's ID to find their section assignment
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       const userId = user._id || user.id;
-
-      // Extract the section for the logged-in teacher from assignedTeachers array
       const coursesWithSection = courseList.map(course => {
         if (course.assignedTeachers && Array.isArray(course.assignedTeachers)) {
           const teacherAssignment = course.assignedTeachers.find(
@@ -4134,11 +3517,8 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         }
         return course;
       });
-
-      // Only update if we get a valid course list
       if (coursesWithSection && coursesWithSection.length > 0) {
         setTeacherCourses(coursesWithSection);
-        // If a course is already selected, update it with the latest info
         if (selectedCourse) {
           const updated = coursesWithSection.find(c => c._id === selectedCourse._id);
           if (updated) {
@@ -4148,20 +3528,15 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       } else {
       }
     } catch (err) {
-      logger.error('🚨 refreshTeacherCourses error:', err);
-      // Don't clear existing courses on error, just log it
+      logger.error('ðŸš¨ refreshTeacherCourses error:', err);
     }
   }, [selectedCourse]);
-
-  // Load courses for teachers on mount
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     if (user.role === 'teacher') {
       refreshTeacherCourses();
     }
   }, [refreshTeacherCourses]);
-
-  // Auto-refresh courses when AttainmentView mounts and when sheet changes to Attn_Assign
   useEffect(() => {
     if (selectedSheet === 'Attn_Assign') {
       refreshTeacherCourses();
@@ -4176,11 +3551,11 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
     <div className="attainment-container">
       <h1>Course Outcome Attainment</h1>
 
-      {/* Mid-session loading banner */}
+      {}
       {loading && attainmentData && (
         <div className="attainment-loading-banner">
           <SheetLoader label="" />
-          <p className="attainment-loading-banner__text">Refreshing sheet data…</p>
+          <p className="attainment-loading-banner__text">Refreshing sheet dataâ€¦</p>
         </div>
       )}
 
@@ -4190,7 +3565,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         </div>
       )}
 
-      {/* Course Selector - First Step - Always shown for teachers */}
+      {}
       {userRole === 'teacher' && (
         <div className="course-selector" style={{ marginBottom: '20px' }}>
           <label htmlFor="course-select" style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
@@ -4223,10 +3598,10 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       )}
 
 
-      {/* Evaluation Selector - Second Step (shown only after course selection) */}
+      {}
       {selectedCourse && (
         <>
-          {/* Show message when no sheets found */}
+          {}
           {filteredSheets.length === 0 && !loading && (
             <div className="attainment-empty" style={{ textAlign: 'center', padding: '20px', backgroundColor: '#fff3cd', borderRadius: '4px', marginTop: '10px', marginBottom: '20px' }}>
               <p style={{ margin: 0 }}>No evaluation sheets found for {selectedCourse.courseCode}.</p>
@@ -4254,12 +3629,12 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             </div>
           )}
 
-          {/* Course Profile - shown only when selected */}
+          {}
           {selectedSheet === 'CourseProfile' && clos.length > 0 && (
             <CourseProfileSheet clos={clos} renderCLOCell={renderCLOCell} />
           )}
 
-          {/* CT Matrix */}
+          {}
           {selectedSheet === 'CT' && (
             <CTSheet
               ctRows={ctRows}
@@ -4286,7 +3661,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             />
           )}
 
-          {/* Section A */}
+          {}
           {selectedSheet === 'SectionA' && (
             <SectionASheet
               clos={clos}
@@ -4299,7 +3674,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             />
           )}
 
-          {/* Section B */}
+          {}
           {selectedSheet === 'SectionB' && (
             <SectionBSheet
               clos={clos}
@@ -4312,7 +3687,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             />
           )}
 
-          {/* Lab Activity */}
+          {}
           {selectedSheet === 'LabActivity' && (
             <LabActivitySheet
               clos={clos}
@@ -4350,7 +3725,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             />
           )}
 
-          {/* Attendance & Assignment */}
+          {}
           {selectedSheet === 'Attn_Assign' && (
             <AssignmentSheet
               clos={clos}
@@ -4379,12 +3754,12 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
         </>
       )}
 
-      {/* Show message if no data loaded yet */}
+      {}
       {!attainmentData && !loading && selectedSheet && (
         <SkeletonTable rows={7} cols={6} />
       )}
 
-      {/* CT / Attn_Assign Modals */}
+      {}
           <CTModals
             selectedSheet={selectedSheet}
             showGeneratedTableModal={showGeneratedTableModal}
@@ -4411,7 +3786,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             calculateFactoredAssignmentCOTotals={calculateFactoredAssignmentCOTotals}
           />
 
-          {/* Section A Modals */}
+          {}
           <SectionAModals
             sectionARows={sectionARows}
             sectionAObtainedRows={sectionAObtainedRows}
@@ -4434,7 +3809,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             formatNumber={formatNumber}
           />
 
-          {/* Section B Modals */}
+          {}
           <SectionBModals
             sectionBRows={sectionBRows}
             sectionBObtainedRows={sectionBObtainedRows}
@@ -4457,7 +3832,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             formatNumber={formatNumber}
           />
 
-          {/* Lab Activity Modals */}
+          {}
           <LabActivityModals
             showLabActivityGeneratedModal={showLabActivityGeneratedModal}
             setShowLabActivityGeneratedModal={setShowLabActivityGeneratedModal}
@@ -4481,7 +3856,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             formatNumber={formatNumber}
           />
 
-          {/* CO Attainment */}
+          {}
           {selectedCourse && selectedSheet === 'COAttainment' && (
             coAttainmentReady ? (
               <COAttainmentSheet
@@ -4505,20 +3880,17 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                   )) return;
                   try {
                     await resetAttainmentData(selectedCourse._id);
-                    // Reset CT state
                     setCtRows([]);
                     setCtManualWts({});
                     setCtSummary({ ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 });
                     setCtObtainedRows([]);
                     ctDataLoadedRef.current = false;
-                    // Reset Assignment state
                     setAssignmentRows([]);
                     setAssignmentManualWts({});
                     setAssignmentSummary({ assignTaken: 0, assignmentMarks30: 0, useEqWt: 0 });
                     setAttendanceMarks(0);
                     setAttnAssignObtainedRows([]);
                     assignmentDataLoadedRef.current = false;
-                    // Reset Lab Activity state
                     setLabActivityRows([]);
                     setLabActivityFactors({});
                     setLabActivityEqWts({});
@@ -4528,7 +3900,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                     setActivityTaken(0);
                     setCoMappedActivityMarks(0);
                     labActivityDataLoadedRef.current = false;
-                    // Invalidate COCalc cache so next visit re-fetches
                     coCalcApiCacheRef.current = null;
                   } catch (err) {
                     alert('Failed to reset attainment data: ' + (err?.message || err?.error || 'Unknown error'));
@@ -4536,11 +3907,11 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                 }}
               />
             ) : (
-              <SheetLoader label="Calculating CO Attainment…" />
+              <SheetLoader label="Calculating CO Attainmentâ€¦" />
             )
           )}
 
-          {/* CO Calculation (COCalc and COCalc_LabUnnorm) */}
+          {}
           {(selectedSheet === 'COCalc' || selectedSheet === 'COCalc_LabUnnorm') && (
             <COCalcSheet
               selectedSheet={selectedSheet}
@@ -4573,7 +3944,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             />
           )}
 
-          {/* CO-PO Mapping */}
+          {}
           {selectedSheet === 'COPOMap' && (
             <COPOMapSheet
               selectedCourse={selectedCourse}
@@ -4584,7 +3955,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             />
           )}
 
-          {/* PO Calculation Max */}
+          {}
           {selectedSheet === 'POCalcMax' && (
             <POCalcMaxSheet
               selectedCourse={selectedCourse}
@@ -4600,7 +3971,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             />
           )}
 
-          {/* Charts */}
+          {}
           {selectedSheet === 'Charts' && (
             <ChartsSheet
               selectedCourse={selectedCourse}
@@ -4616,7 +3987,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             />
           )}
 
-          {/* Check PO */}
+          {}
           {selectedSheet === 'CheckPO' && (
             <CheckPOSheet
               selectedCourse={selectedCourse}
@@ -4627,7 +3998,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
             />
           )}
 
-          {/* PO Calculation */}
+          {}
           {selectedSheet === 'POCalc' && (
             <POCalcSheet
               selectedCourse={selectedCourse}
