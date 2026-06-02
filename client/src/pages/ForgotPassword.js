@@ -102,7 +102,9 @@ const ForgotPassword = () => {
         </div>
       <main className="OBESynK-reset-main">
         <div className="OBESynK-reset-container">
-
+          <div className="OBESynK-mobile-brand-logo">
+            <Link to="/" className="OBESynK-auth-logo-text">OBESynK</Link>
+          </div>
           <div className="OBESynK-reset-card">
             <div className="OBESynK-reset-header">
               <h1>{step === 1 ? 'Reset Your Password' : 'Set New Password'}</h1>

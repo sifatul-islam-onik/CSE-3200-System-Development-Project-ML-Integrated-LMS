@@ -654,7 +654,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     let targetRow = row;
     let targetCol = question;
 
-    if (e.key === 'ArrowDown') {
+    if (e.key === 'ArrowDown' || e.key === 'Enter') {
       const nextRowIdx = ROWS.indexOf(row) + 1;
       if (nextRowIdx >= ROWS.length) return;
       targetRow = ROWS[nextRowIdx];

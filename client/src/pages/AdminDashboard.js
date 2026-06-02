@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye, faExclamationTriangle, faGraduationCap } from '@fortawesome/free-solid-svg-icons';
@@ -559,6 +560,35 @@ const AdminDashboard = () => {
     } finally {
       setTeacherExportLoading(false);
     }
+  };
+
+  const handleDownloadTemplate = (type) => {
+    let ws_data = [];
+    let sheetName = "";
+    let fileName = "";
+    
+    if (type === 'student') {
+      ws_data = [['Roll', 'Name', 'Department', 'Advisor', 'Father', 'Mother', 'Hall', 'Scholarship']];
+      sheetName = "Students";
+      fileName = "Student_Import_Template.xlsx";
+    } else if (type === 'teacher') {
+      ws_data = [['Full Name', 'Name', 'Department', 'Designation']];
+      sheetName = "Teachers";
+      fileName = "Teacher_Import_Template.xlsx";
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleSectionChange = (section) => {
@@ -1963,6 +1993,12 @@ const AdminDashboard = () => {
                           >
                             {importLoading ? 'Importing...' : 'Import Students'}
                           </button>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => handleDownloadTemplate('student')}
+                          >
+                            Download Template
+                          </button>
                         </div>
                         {(importMessage || importError) && (
                           <div style={{ marginTop: '10px' }}>
@@ -2122,6 +2158,12 @@ const AdminDashboard = () => {
                             disabled={teacherImportLoading || !teacherImportFile}
                           >
                             {teacherImportLoading ? 'Importing...' : 'Import Teachers'}
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => handleDownloadTemplate('teacher')}
+                          >
+                            Download Template
                           </button>
                         </div>
                       </div>
@@ -3195,7 +3237,6 @@ const AdminDashboard = () => {
               {sidebarOpen && (
                 <div className="user-details-small">
                   <p className="user-name">{user.name}</p>
-                  <p className="user-role">{user.role}</p>
                 </div>
               )}
             </div>

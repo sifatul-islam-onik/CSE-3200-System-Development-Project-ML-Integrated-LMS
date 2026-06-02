@@ -143,9 +143,11 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  padding: 1.25rem;
-  font-size: 1.25rem;
-  font-weight: 500;
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 0.95rem;
+  font-size: 1.05rem;
+  font-weight: 600;
   color: #ffffff;
   background: #047857;
   border: none;
@@ -189,6 +191,10 @@
 }
 
 /* Responsive */
+.OBESynK-mobile-brand-logo {
+  display: none;
+}
+
 @media (max-width: 1024px) {
   .OBESynK-auth-banner {
     padding-left: 3rem;
@@ -204,29 +210,62 @@
 
 @media (max-width: 768px) {
   .OBESynK-login-page { 
-    flex-direction: column; 
-    height: auto; 
-    overflow: auto;
-  }
-  .OBESynK-login-main {
-    height: auto;
-    overflow: visible;
-    padding: 3rem 1.5rem;
+    display: block; 
+    position: relative;
+    height: 100vh;
+    overflow: hidden;
   }
   .OBESynK-auth-banner {
-    display: flex;
-    min-height: 40vh;
-    height: auto;
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
+    height: 100vh;
+    z-index: 0;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    padding: 5rem 2rem 3rem 2rem;
+    justify-content: flex-start;
+    padding: 5rem 1rem 1rem 1rem;
+  }
+  .OBESynK-auth-banner .OBESynK-auth-brand-logo {
+    display: none;
+  }
+  .OBESynK-mobile-brand-logo {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+  }
+  .OBESynK-mobile-brand-logo .OBESynK-auth-logo-text {
+    font-size: 2.8rem;
+  }
+  .OBESynK-login-main {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    z-index: 1;
+    background: transparent;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 1.5rem;
   }
   .OBESynK-auth-back-nav {
     top: 1.5rem;
     left: 1.5rem;
+    z-index: 2;
   }
   .OBESynK-login-box {
+    margin-top: 1rem;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
     padding: 2.5rem 1.5rem;
+    width: 100%;
+    max-width: 480px;
   }
   .OBESynK-login-header h2 {
     font-size: 2.4rem;
@@ -242,8 +281,7 @@
   background-size: cover, cover;
   background-repeat: no-repeat, no-repeat;
   color: white;
-  padding: 3rem;
-  padding-left: 5rem;
+  padding: 6rem 3rem 3rem 5rem;
   /* Make sure it's at least half the screen on desktop */
   height: 100vh;
 }
@@ -256,6 +294,7 @@
   position: absolute;
   top: 2.5rem;
   left: 2.5rem;
+  z-index: 10;
 }
 
 .OBESynK-auth-back-btn {

@@ -728,6 +728,33 @@ exports.parseCTUpload = async (req, res) => {
     }
 
     if (!q1CO || !q2CO || !q3CO || (!q1Total && !q2Total && !q3Total)) {
+      for (let r = 1; r < (dataStartRow !== -1 ? dataStartRow : totalRows + 1); r++) {
+        const row = worksheet.getRow(r);
+        const c1 = getCellText(row.getCell(1).value).trim().toLowerCase();
+        
+        if (c1 === 'total marks' || c1 === 'total') {
+          let vals = [];
+          for(let c=2; c<=Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20); c++) {
+             let val = getCellText(row.getCell(c).value).trim();
+             if (val && !isNaN(parseFloat(val))) vals.push(parseFloat(val));
+          }
+          if (!q1Total && vals.length > 0) q1Total = vals[0] || 0;
+          if (!q2Total && vals.length > 1) q2Total = vals[1] || 0;
+          if (!q3Total && vals.length > 2) q3Total = vals[2] || 0;
+        } else if (c1 === 'co mapping' || c1 === 'co no.' || c1 === 'co no' || c1 === 'co') {
+          let vals = [];
+          for(let c=2; c<=Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20); c++) {
+             let val = getCellText(row.getCell(c).value).trim();
+             if (/^(CO|CLO)\d+$/i.test(val)) vals.push(val.replace(/^CLO/i, 'CO').toUpperCase());
+          }
+          if (!q1CO && vals.length > 0) q1CO = vals[0];
+          if (!q2CO && vals.length > 1) q2CO = vals[1];
+          if (!q3CO && vals.length > 2) q3CO = vals[2];
+        }
+      }
+    }
+
+    if (!q1CO || !q2CO || !q3CO || (!q1Total && !q2Total && !q3Total)) {
       for (let r = 1; r <= totalRows; r++) {
         const row = worksheet.getRow(r);
         const c1 = getCellText(row.getCell(1).value).trim().toLowerCase();
@@ -896,6 +923,33 @@ exports.parseLabUpload = async (req, res) => {
       }
     }
     if (!q1CO || !q2CO || !q3CO || (!q1Total && !q2Total && !q3Total)) {
+      for (let r = 1; r < (dataStartRow !== -1 ? dataStartRow : totalRows + 1); r++) {
+        const row = worksheet.getRow(r);
+        const c1 = getCellText(row.getCell(1).value).trim().toLowerCase();
+        
+        if (c1 === 'total marks' || c1 === 'total') {
+          let vals = [];
+          for(let c=2; c<=Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20); c++) {
+             let val = getCellText(row.getCell(c).value).trim();
+             if (val && !isNaN(parseFloat(val))) vals.push(parseFloat(val));
+          }
+          if (!q1Total && vals.length > 0) q1Total = vals[0] || 0;
+          if (!q2Total && vals.length > 1) q2Total = vals[1] || 0;
+          if (!q3Total && vals.length > 2) q3Total = vals[2] || 0;
+        } else if (c1 === 'co mapping' || c1 === 'co no.' || c1 === 'co no' || c1 === 'co') {
+          let vals = [];
+          for(let c=2; c<=Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20); c++) {
+             let val = getCellText(row.getCell(c).value).trim();
+             if (/^(CO|CLO)\d+$/i.test(val)) vals.push(val.replace(/^CLO/i, 'CO').toUpperCase());
+          }
+          if (!q1CO && vals.length > 0) q1CO = vals[0];
+          if (!q2CO && vals.length > 1) q2CO = vals[1];
+          if (!q3CO && vals.length > 2) q3CO = vals[2];
+        }
+      }
+    }
+
+    if (!q1CO || !q2CO || !q3CO || (!q1Total && !q2Total && !q3Total)) {
       for (let r = 1; r <= totalRows; r++) {
         const row = worksheet.getRow(r);
         const c1 = getCellText(row.getCell(1).value).trim().toLowerCase();
@@ -1052,6 +1106,33 @@ exports.parseAssignUpload = async (req, res) => {
         break;
       }
     }
+    if (!q1CO || !q2CO || !q3CO || (!q1Total && !q2Total && !q3Total)) {
+      for (let r = 1; r < (dataStartRow !== -1 ? dataStartRow : totalRows + 1); r++) {
+        const row = worksheet.getRow(r);
+        const c1 = getCellText(row.getCell(1).value).trim().toLowerCase();
+        
+        if (c1 === 'total marks' || c1 === 'total') {
+          let vals = [];
+          for(let c=2; c<=Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20); c++) {
+             let val = getCellText(row.getCell(c).value).trim();
+             if (val && !isNaN(parseFloat(val))) vals.push(parseFloat(val));
+          }
+          if (!q1Total && vals.length > 0) q1Total = vals[0] || 0;
+          if (!q2Total && vals.length > 1) q2Total = vals[1] || 0;
+          if (!q3Total && vals.length > 2) q3Total = vals[2] || 0;
+        } else if (c1 === 'co mapping' || c1 === 'co no.' || c1 === 'co no' || c1 === 'co') {
+          let vals = [];
+          for(let c=2; c<=Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20); c++) {
+             let val = getCellText(row.getCell(c).value).trim();
+             if (/^(CO|CLO)\d+$/i.test(val)) vals.push(val.replace(/^CLO/i, 'CO').toUpperCase());
+          }
+          if (!q1CO && vals.length > 0) q1CO = vals[0];
+          if (!q2CO && vals.length > 1) q2CO = vals[1];
+          if (!q3CO && vals.length > 2) q3CO = vals[2];
+        }
+      }
+    }
+
     if (!q1CO || !q2CO || !q3CO || (!q1Total && !q2Total && !q3Total)) {
       for (let r = 1; r <= totalRows; r++) {
         const row = worksheet.getRow(r);
