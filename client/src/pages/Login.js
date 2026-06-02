@@ -88,7 +88,9 @@ const Login = () => {
         </div>
       <main className="OBESynK-login-main">
         <div className="OBESynK-login-container">
-
+          <div className="OBESynK-mobile-brand-logo">
+            <Link to="/" className="OBESynK-auth-logo-text">OBESynK</Link>
+          </div>
           <div className="OBESynK-login-box">
             <header className="OBESynK-login-header">
               <h2>Sign In</h2>
@@ -153,7 +155,7 @@ const Login = () => {
 
               <button
                 type="submit"
-                className={`btn-submit OBESynK-btn-submit ${loading ? 'loading' : ''}`}
+                className={`OBESynK-btn-submit ${loading ? 'loading' : ''}`}
                 disabled={loading}
               >
                 {loading && <span className="spinner"></span>}

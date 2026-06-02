@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { handleTableEnterNav } from '../../utils/tableNav';
 
 const ASSIGN_INPUT_CSS = `
 .assign-cell-input {
@@ -18,6 +19,9 @@ const ASSIGN_INPUT_CSS = `
   outline: none;
   transition: border-color 0.15s, background 0.15s;
 }
+th .assign-cell-input {
+  color: #ffffff;
+}
 .assign-cell-input:hover {
   border-bottom-color: #5c7cfa;
   background: rgba(92,124,250,0.04);
@@ -26,6 +30,7 @@ const ASSIGN_INPUT_CSS = `
   border: 1px solid #5c7cfa;
   border-radius: 4px;
   background: #fff;
+  color: #1a2332;
   box-shadow: 0 0 0 2px rgba(92,124,250,0.15);
 }
 /* hide browser number spinners */
@@ -49,6 +54,7 @@ const AssignmentSheet = ({
   assignmentManualWts,
   assignmentSummary,
   // Setters
+  setAssignmentSummary,
   setAssignmentRows,
   setAttnAssignObtainedRows,
   setAssignmentManualWts,
@@ -212,7 +218,19 @@ const AssignmentSheet = ({
                   ))}
                 </tr>
                 <tr>
-                  <th>{assignmentSummary.attendancePerformance ?? 0}</th>
+                  <th style={{ padding: '2px' }}>
+                    <input
+                      type="text"
+                      className="assign-cell-input"
+                      style={{ fontWeight: 'bold' }}
+                      value={assignmentSummary.attendancePerformance ?? 0}
+                      onChange={e => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setAssignmentSummary(prev => ({ ...prev, attendancePerformance: val }));
+                      }}
+                      onKeyDown={handleTableEnterNav}
+                    />
+                  </th>
                   {getActiveAssignments().map((assignment) => (
                     <React.Fragment key={assignment}>
                       <th>Q1</th>
@@ -234,6 +252,7 @@ const AssignmentSheet = ({
                           className="assign-cell-input"
                           value={row[field] ?? 0}
                           onChange={e => handleAssignmentCoMapCell(idx, field, e.target.value)}
+                          onKeyDown={handleTableEnterNav}
                         />
                       </td>
                     ))}
@@ -295,6 +314,7 @@ const AssignmentSheet = ({
                           const val = raw === '' ? 0 : isNaN(parseFloat(raw)) ? 0 : parseFloat(raw);
                           setAssignmentManualWts(prev => ({ ...prev, [assignment]: val }));
                         }}
+                        onKeyDown={handleTableEnterNav}
                         style={{ width: '80px', display: 'inline-block' }}
                       />
                     </td>
@@ -464,6 +484,7 @@ const AssignmentSheet = ({
                           className="assign-cell-input"
                           value={row.attendance ?? 0}
                           onChange={e => handleAttendanceCell(idx, e.target.value)}
+                          onKeyDown={handleTableEnterNav}
                         />
                       </td>
                       {getActiveAssignmentFields().map(field => (
@@ -473,6 +494,7 @@ const AssignmentSheet = ({
                             className="assign-cell-input"
                             value={row[field] ?? 0}
                             onChange={e => handleObtainedCell(idx, field, e.target.value)}
+                            onKeyDown={handleTableEnterNav}
                           />
                         </td>
                       ))}

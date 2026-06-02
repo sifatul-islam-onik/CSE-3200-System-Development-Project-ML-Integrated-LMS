@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PageLoader, SheetLoader, SkeletonTable } from './attainment/LoadingSpinner';
 import CourseProfileSheet from './attainment/CourseProfileSheet';
 import CTSheet from './attainment/CTSheet';
@@ -3578,6 +3578,10 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
               sectionAQuestionTotals={sectionAQuestionTotals}
               setShowSectionAGeneratedModal={setShowSectionAGeneratedModal}
               setShowSectionAObtainedModal={setShowSectionAObtainedModal}
+              setSectionARows={setSectionARows}
+              setSectionAObtainedRows={setSectionAObtainedRows}
+              handleManualSaveSectionA={handleManualSaveSectionA}
+              sectionASaveStatus={sectionASaveStatus}
             />
           )}
 
@@ -3591,6 +3595,10 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
               sectionBQuestionTotals={sectionBQuestionTotals}
               setShowSectionBGeneratedModal={setShowSectionBGeneratedModal}
               setShowSectionBObtainedModal={setShowSectionBObtainedModal}
+              setSectionBRows={setSectionBRows}
+              setSectionBObtainedRows={setSectionBObtainedRows}
+              handleManualSaveSectionB={handleManualSaveSectionB}
+              sectionBSaveStatus={sectionBSaveStatus}
             />
           )}
 
@@ -3641,6 +3649,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
               attendanceMarks={attendanceMarks}
               assignmentManualWts={assignmentManualWts}
               assignmentSummary={assignmentSummary}
+              setAssignmentSummary={setAssignmentSummary}
               setAssignmentRows={setAssignmentRows}
               setAttnAssignObtainedRows={setAttnAssignObtainedRows}
               setAssignmentManualWts={setAssignmentManualWts}

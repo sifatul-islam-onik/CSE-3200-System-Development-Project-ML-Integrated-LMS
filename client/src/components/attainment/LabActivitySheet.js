@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { handleTableEnterNav } from '../../utils/tableNav';
 
 const LAB_INPUT_CSS = `
 .lab-cell-input {
@@ -18,6 +19,9 @@ const LAB_INPUT_CSS = `
   outline: none;
   transition: border-color 0.15s, background 0.15s;
 }
+th .lab-cell-input {
+  color: #ffffff;
+}
 .lab-cell-input:hover {
   border-bottom-color: #5c7cfa;
   background: rgba(92,124,250,0.04);
@@ -26,6 +30,7 @@ const LAB_INPUT_CSS = `
   border: 1px solid #5c7cfa;
   border-radius: 4px;
   background: #fff;
+  color: #1a2332;
   box-shadow: 0 0 0 2px rgba(92,124,250,0.15);
 }
 .lab-cell-input.absent {
@@ -63,6 +68,9 @@ const LabActivitySheet = ({
   coMappedActivityMarks,
   useEqWtActivity,
   // Setters
+  setLabAttendanceMarks,
+  setLabQuizMarks,
+  setLabVivaMarks,
   setLabActivityRows,
   setLabActivityObtainedRows,
   setLabActivityManualWts,
@@ -237,9 +245,45 @@ const LabActivitySheet = ({
                   <th rowSpan="2">Measured Total</th>
                 </tr>
                 <tr>
-                  <th>{labAttendanceMarks || 0}</th>
-                  <th>{labQuizMarks || 0}</th>
-                  <th>{labVivaMarks || 0}</th>
+                  <th style={{ padding: '2px' }}>
+                    <input
+                      type="text"
+                      className="lab-cell-input"
+                      style={{ fontWeight: 'bold' }}
+                      value={labAttendanceMarks || 0}
+                      onChange={e => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setLabAttendanceMarks(val);
+                      }}
+                      onKeyDown={handleTableEnterNav}
+                    />
+                  </th>
+                  <th style={{ padding: '2px' }}>
+                    <input
+                      type="text"
+                      className="lab-cell-input"
+                      style={{ fontWeight: 'bold' }}
+                      value={labQuizMarks || 0}
+                      onChange={e => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setLabQuizMarks(val);
+                      }}
+                      onKeyDown={handleTableEnterNav}
+                    />
+                  </th>
+                  <th style={{ padding: '2px' }}>
+                    <input
+                      type="text"
+                      className="lab-cell-input"
+                      style={{ fontWeight: 'bold' }}
+                      value={labVivaMarks || 0}
+                      onChange={e => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setLabVivaMarks(val);
+                      }}
+                      onKeyDown={handleTableEnterNav}
+                    />
+                  </th>
                   {Array.from({ length: activityTaken || 5 }, (_, i) => (
                     <React.Fragment key={`q-headers-${i + 1}`}>
                       <th>Q1</th>
@@ -269,6 +313,7 @@ const LabActivitySheet = ({
                                   className="lab-cell-input"
                                   value={row[field] || 0}
                                   onChange={e => handleLabCoMapCell(idx, field, e.target.value)}
+                                  onKeyDown={handleTableEnterNav}
                                 />
                               </td>
                             );
@@ -421,6 +466,7 @@ const LabActivitySheet = ({
                             const val = raw === '' ? 0 : isNaN(parseFloat(raw)) ? 0 : parseFloat(raw);
                             setLabActivityManualWts(prev => ({ ...prev, [activityKey]: val }));
                           }}
+                          onKeyDown={handleTableEnterNav}
                           style={{ width: '80px', display: 'inline-block' }}
                         />
                       </td>
@@ -588,6 +634,7 @@ const LabActivitySheet = ({
                           className="lab-cell-input"
                           value={row.attn != null && row.attn !== '' ? row.attn : 0}
                           onChange={e => handleObtainedBaseCell(idx, 'attn', e.target.value)}
+                          onKeyDown={handleTableEnterNav}
                         />
                       </td>
                       <td style={{ padding: '2px 3px' }}>
@@ -596,6 +643,7 @@ const LabActivitySheet = ({
                           className="lab-cell-input"
                           value={row.quiz != null && row.quiz !== '' ? row.quiz : 0}
                           onChange={e => handleObtainedBaseCell(idx, 'quiz', e.target.value)}
+                          onKeyDown={handleTableEnterNav}
                         />
                       </td>
                       <td style={{ padding: '2px 3px' }}>
@@ -604,6 +652,7 @@ const LabActivitySheet = ({
                           className="lab-cell-input"
                           value={row.viva != null && row.viva !== '' ? row.viva : 0}
                           onChange={e => handleObtainedBaseCell(idx, 'viva', e.target.value)}
+                          onKeyDown={handleTableEnterNav}
                         />
                       </td>
                       {Array.from({ length: activityTaken || 5 }, (_, activityIndex) => {
@@ -621,6 +670,7 @@ const LabActivitySheet = ({
                                     className={`lab-cell-input${isAbsent ? ' absent' : ''}`}
                                     value={isAbsent ? 'A' : (val != null ? val : 0)}
                                     onChange={e => handleObtainedActivityCell(idx, field, e.target.value)}
+                                    onKeyDown={handleTableEnterNav}
                                   />
                                 </td>
                               );
@@ -634,6 +684,7 @@ const LabActivitySheet = ({
                           className="lab-cell-input"
                           value={row.otherMeasured || 0}
                           onChange={e => handleObtainedBaseCell(idx, 'otherMeasured', e.target.value)}
+                          onKeyDown={handleTableEnterNav}
                         />
                       </td>
                       <td style={{ textAlign: 'center', fontWeight: 'bold' }}>

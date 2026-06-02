@@ -650,7 +650,6 @@ const StudentDashboard = () => {
               {sidebarOpen && (
                 <div className="user-details-small">
                   <p className="user-name">{user.name}</p>
-                  <p className="user-role">Student</p>
                 </div>
               )}
             </div>
