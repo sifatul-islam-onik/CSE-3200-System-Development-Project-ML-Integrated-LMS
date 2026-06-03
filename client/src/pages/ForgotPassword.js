@@ -94,6 +94,9 @@ const ForgotPassword = () => {
       <div className="OBESynK-auth-banner" style={{ background: "linear-gradient(135deg, rgba(4, 120, 87, 0.4), rgba(2, 44, 34, 0.6)), url('/login-background.jpg') center/cover no-repeat" }}>
           <div className="OBESynK-auth-brand-logo">
             <Link to="/" className="OBESynK-auth-logo-text">OBESynK</Link>
+            <div className="OBESynK-auth-full-form">
+              <span className="highlight-symbol">O</span>utcome-<span className="highlight-symbol">B</span>ased <span className="highlight-symbol">E</span>ducation <span className="highlight-symbol">Syn</span>chronized at <span className="highlight-symbol">K</span>UET
+            </div>
           </div>
           <div className="OBESynK-auth-back-nav">
             <Link to="/" className="OBESynK-auth-back-btn">&larr; Back to website</Link>
@@ -104,6 +107,9 @@ const ForgotPassword = () => {
         <div className="OBESynK-reset-container">
           <div className="OBESynK-mobile-brand-logo">
             <Link to="/" className="OBESynK-auth-logo-text">OBESynK</Link>
+            <div className="OBESynK-auth-full-form">
+              <span className="highlight-symbol">O</span>utcome-<span className="highlight-symbol">B</span>ased <span className="highlight-symbol">E</span>ducation <span className="highlight-symbol">Syn</span>chronized at <span className="highlight-symbol">K</span>UET
+            </div>
           </div>
           <div className="OBESynK-reset-card">
             <div className="OBESynK-reset-header">
@@ -194,7 +200,12 @@ const ForgotPassword = () => {
               </form>
             )}
 
-            <div className="OBESynK-reset-nav">
+            <div className="OBESynK-reset-nav" style={step === 2 ? { display: 'flex', justifyContent: 'space-between', width: '100%' } : {}}>
+              {step === 2 && (
+                <button type="button" className="OBESynK-reset-link" onClick={() => setStep(1)}>
+                  &larr; Back
+                </button>
+              )}
               <button type="button" className="OBESynK-reset-link" onClick={() => navigate('/login')}>
                 Back to Login
               </button>
