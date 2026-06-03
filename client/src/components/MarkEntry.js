@@ -882,7 +882,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
   };
 
   const handleDistCellChange = (section, idx, field, value) => {
-    const num = parseFloat(value) || 0;
+    const num = value === '' ? '' : (parseFloat(value) || 0);
     if (section === 'A') {
       setDistSectionARows(prev => { const u = [...prev]; u[idx] = { ...u[idx], [field]: num }; return u; });
     } else {
@@ -915,17 +915,17 @@ const MarkEntry = ({ course, students, section, onClose }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content mark-entry-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+      <div className="modal-content mark-entry-modal" onClick={(e) => e.stopPropagation()} style={{ position: 'relative' }}>
+        <div className="modal-header" style={{ paddingRight: '72px' }}>
           {showMarksDistribution ? (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                   <button
                     onClick={() => setShowMarksDistribution(false)}
                     style={{ padding: '6px 12px', backgroundColor: '#6b7280', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
                   >
-                    ← Back
+                    ←<span className="back-btn-text"> Back</span>
                   </button>
                   <div>
                     <h3>{course.courseCode} - Marks Distribution</h3>
@@ -943,9 +943,6 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                     style={{ padding: '8px 16px', backgroundColor: distSaveStatus === 'saving' ? '#95a5a6' : '#059669', color: 'white', border: 'none', borderRadius: '6px', cursor: distSaveStatus === 'saving' ? 'not-allowed' : 'pointer', fontWeight: '600' }}
                   >
                     {distSaveStatus === 'saving' ? 'Saving...' : 'Save Distribution'}
-                  </button>
-                  <button className="close-btn" onClick={onClose}>
-                    <FontAwesomeIcon icon={faTimes} />
                   </button>
                 </div>
               </div>
@@ -967,12 +964,12 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                 >
                   {isDistributionValid ? '✓ Set Marks Distribution' : '⚠ Set Marks Distribution'}
                 </button>
-                <button className="close-btn" onClick={onClose}>
-                  <FontAwesomeIcon icon={faTimes} />
-                </button>
               </div>
             </>
           )}
+          <button className="close-btn" onClick={onClose} style={{ position: 'absolute', top: '16px', right: '16px' }}>
+            <FontAwesomeIcon icon={faTimes} />
+          </button>
         </div>
 
         {!showMarksDistribution && (
@@ -1435,7 +1432,8 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                               <td key={`${q}${l}`} style={{ padding: '6px', border: '1px solid #ddd', borderLeft: li === 0 && qi > 0 ? '3px solid #aaa' : undefined }}>
                                 <input
                                   type="number" min="0"
-                                  value={row[`${q}${l}`] || 0}
+                                  value={row[`${q}${l}`] === 0 ? '' : row[`${q}${l}`]}
+                                  placeholder="0"
                                   onChange={e => handleDistCellChange(sec, idx, `${q}${l}`, e.target.value)}
                                   style={{ width: '70px', textAlign: 'center', border: '1px solid #ccc', borderRadius: '4px', padding: '6px 4px', fontSize: 'inherit' }}
                                 />
