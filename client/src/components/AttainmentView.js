@@ -3671,7 +3671,7 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
       )}
 
       {}
-      {!attainmentData && !loading && selectedSheet && (
+      {!attainmentData && !loading && selectedSheet && (userRole !== 'teacher' || selectedCourse) && (
         <SkeletonTable rows={7} cols={6} />
       )}
 
