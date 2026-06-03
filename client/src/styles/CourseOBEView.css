@@ -36,6 +36,29 @@
   font-weight: 700;
   color: var(--color-text-primary);
   margin: 0;
+  flex: 1;
+  padding-right: 1rem;
+  word-break: break-word;
+}
+
+.obe-view-header .close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-base);
+  flex-shrink: 0;
+}
+
+.obe-view-header .close-btn:hover {
+  background-color: var(--color-background);
 }
 
 .obe-tabs {
@@ -654,6 +677,8 @@
   margin-bottom: var(--spacing-md);
   color: var(--color-text-secondary);
   line-height: 1.6;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* KPA Mapping Table */
@@ -766,12 +791,13 @@
 /* Responsive */
 @media (max-width: 768px) {
   .obe-view-overlay {
-    padding: 0;
+    padding: 1rem;
+    padding-top: 5rem;
   }
 
   .obe-view-container {
-    max-height: 100vh;
-    border-radius: 0;
+    max-height: calc(100vh - 6rem);
+    border-radius: var(--radius-lg);
   }
 
   .info-grid,

@@ -607,7 +607,7 @@ const AdminDashboard = () => {
     let fileName = "";
     
     if (type === 'student') {
-      ws_data = [['Roll', 'Name', 'Department', 'Advisor', 'Father', 'Mother', 'Hall', 'Scholarship']];
+      ws_data = [['Roll', 'Name', 'Advisor', 'Father', 'Mother', 'Hall', 'Scholarship']];
       sheetName = "Students";
       fileName = "Student_Import_Template.xlsx";
     } else if (type === 'teacher') {
@@ -1821,7 +1821,7 @@ const AdminDashboard = () => {
                 <div className="courses-tree">
                   {courseGroupPath && (
                     <div className="breadcrumb-nav">
-                      <button className="breadcrumb-btn" onClick={goBackGroup}>← Back</button>
+                      <button className="breadcrumb-btn" onClick={goBackGroup}>←<span className="back-btn-text"> Back</span></button>
                     </div>
                   )}
 
@@ -2004,7 +2004,7 @@ const AdminDashboard = () => {
               ) : selectedUserRole ? (
                 <div>
                   <div className="breadcrumb-nav" style={{marginBottom: '12px'}}>
-                    <button className="breadcrumb-btn" onClick={goBackUserGroups}>← Back</button>
+                    <button className="breadcrumb-btn" onClick={goBackUserGroups}>←<span className="back-btn-text"> Back</span></button>
                   </div>
                   {selectedUserRole === 'student' && (
                     <>

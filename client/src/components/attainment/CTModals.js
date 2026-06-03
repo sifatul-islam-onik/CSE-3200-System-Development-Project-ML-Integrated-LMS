@@ -300,8 +300,8 @@ const CTModals = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <button onClick={() => setObtainedModalView(prev => Math.max(0, prev - 1))}
                   disabled={obtainedModalView === 0}
-                  style={{ padding: '6px 12px', backgroundColor: obtainedModalView === 0 ? '#ccc' : '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: obtainedModalView === 0 ? 'not-allowed' : 'pointer', fontSize: '14px' }}>
-                  ← Previous
+                  style={{ padding: '6px 12px', backgroundColor: obtainedModalView === 0 ? '#ccc' : '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: obtainedModalView === 0 ? 'not-allowed' : 'pointer', fontSize: '14px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  ←<span className="back-btn-text"> Previous</span>
                 </button>
                 <h3>
                   Generated Obtained Table - CO-wise Marks{' '}
@@ -309,18 +309,18 @@ const CTModals = ({
                 </h3>
                 <button onClick={() => setObtainedModalView(prev => Math.min(1, prev + 1))}
                   disabled={obtainedModalView === 1}
-                  style={{ padding: '6px 12px', backgroundColor: obtainedModalView === 1 ? '#ccc' : '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: obtainedModalView === 1 ? 'not-allowed' : 'pointer', fontSize: '14px' }}>
-                  Next →
+                  style={{ padding: '6px 12px', backgroundColor: obtainedModalView === 1 ? '#ccc' : '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: obtainedModalView === 1 ? 'not-allowed' : 'pointer', fontSize: '14px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span className="back-btn-text">Next </span>→
                 </button>
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 {(selectedSheet === 'CT' || selectedSheet === 'Attn_Assign') && (
                   <button
                     onClick={handleExportToExcel}
-                    style={{ padding: '6px 14px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+                    style={{ padding: '6px 14px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}
                     title="Export both Original and Factored tables to Excel"
                   >
-                    ⬇ Export Excel
+                    ⬇<span className="back-btn-text"> Export</span>
                   </button>
                 )}
                 <button onClick={() => { setShowObtainedGeneratedModal(false); setObtainedModalView(0); }}
