@@ -3787,41 +3787,6 @@ const AttainmentView = ({ labDataRefreshKey = 0, preselectedAdminCourse = null }
                 unnormedCoAttainmentData={unnormedCoAttainmentData}
                 equalWtCoAttainmentData={equalWtCoAttainmentData}
                 formatNumber={formatNumber}
-                onResetData={async () => {
-                  if (!selectedCourse?._id) return;
-                  if (!window.confirm(
-                    `Reset ALL attainment data for ${selectedCourse.courseCode}?\n\n` +
-                    'This will permanently delete CT, Assignment, and Lab Activity marks for the current batch. ' +
-                    'This action cannot be undone.'
-                  )) return;
-                  try {
-                    await resetAttainmentData(selectedCourse._id);
-                    setCtRows([]);
-                    setCtManualWts({});
-                    setCtSummary({ ctTaken: 0, coMappedMarks60: 0, useEqWt: 0 });
-                    setCtObtainedRows([]);
-                    ctDataLoadedRef.current = false;
-                    setAssignmentRows([]);
-                    setAssignmentManualWts({});
-                    setAssignmentSummary({ assignTaken: 0, assignmentMarks30: 0, useEqWt: 0 });
-                    setAttendanceMarks(0);
-                    setAttnAssignObtainedRows([]);
-                    assignmentDataLoadedRef.current = false;
-                    setLabActivityRows([]);
-                    setLabActivityFactors({});
-                    setLabActivityEqWts({});
-                    setLabActivityManualWts({});
-                    setLabActivityObtainedRows([]);
-                    setLabAttendanceMarks(0);
-                    setActivityTaken(0);
-                    setCoMappedActivityMarks(0);
-                    labActivityDataLoadedRef.current = false;
-                    coCalcApiCacheRef.current = null;
-                    refreshCoAttainmentCalcs();
-                  } catch (err) {
-                    alert('Failed to reset attainment data: ' + (err?.message || err?.error || 'Unknown error'));
-                  }
-                }}
               />
             ) : (
               <SheetLoader label="Calculating CO Attainmentâ€¦" />
