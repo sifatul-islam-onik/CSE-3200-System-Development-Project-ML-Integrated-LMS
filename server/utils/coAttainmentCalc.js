@@ -88,6 +88,80 @@ const calculateFactoredAssignmentCOTotals = (assignData, activeAssignFields, coN
   return factoredTotals;
 };
 
+const normalizeRoll = (value) => String(value || '').trim().toLowerCase();
+
+const resolveCtTaken = (ctData) => {
+  const ctSummary = ctData?.ctSummary || {};
+  const ctRows = ctData?.ctRows || [];
+  if ((ctSummary.ctTaken || 0) > 0) return ctSummary.ctTaken;
+  const hasCT3 = ctRows.some(r => (r.CT3_Q1 || 0) + (r.CT3_Q2 || 0) + (r.CT3_Q3 || 0) > 0);
+  if (hasCT3) return 3;
+  const hasCT2 = ctRows.some(r => (r.CT2_Q1 || 0) + (r.CT2_Q2 || 0) + (r.CT2_Q3 || 0) > 0);
+  if (hasCT2) return 2;
+  const hasCT1 = ctRows.some(r => (r.CT1_Q1 || 0) + (r.CT1_Q2 || 0) + (r.CT1_Q3 || 0) > 0);
+  return hasCT1 ? 1 : 0;
+};
+
+const resolveAssignTaken = (assignData) => {
+  const assignmentSummary = assignData?.assignmentSummary || {};
+  const assignmentRows = assignData?.assignmentRows || [];
+  if ((assignmentSummary.assignTaken || 0) > 0) return assignmentSummary.assignTaken;
+  const hasA3 = assignmentRows.some(r => (r.Assgn3_Q1 || 0) + (r.Assgn3_Q2 || 0) + (r.Assgn3_Q3 || 0) > 0);
+  if (hasA3) return 3;
+  const hasA2 = assignmentRows.some(r => (r.Assgn2_Q1 || 0) + (r.Assgn2_Q2 || 0) + (r.Assgn2_Q3 || 0) > 0);
+  if (hasA2) return 2;
+  const hasA1 = assignmentRows.some(r => (r.Assgn1_Q1 || 0) + (r.Assgn1_Q2 || 0) + (r.Assgn1_Q3 || 0) > 0);
+  return hasA1 ? 1 : 0;
+};
+
+const getSectionMarksDistribution = (coRow, studentObtainedRow, isSectionB = false) => {
+  if (!coRow || !studentObtainedRow) return 0;
+
+  const answered = [];
+  for (let qNum = 1; qNum <= 4; qNum++) {
+    let total = 0;
+    ['a', 'b', 'c', 'd'].forEach(part => {
+      total += (parseFloat(studentObtainedRow[`Q${qNum}${part}`]) || 0);
+    });
+    if (total > 0) answered.push(qNum + (isSectionB ? 4 : 0));
+  }
+
+  const combinationMap = {
+    '1,2,3': 'q123', '1,2,4': 'q124', '1,3,4': 'q134', '2,3,4': 'q234',
+    '1,2': 'q12', '1,3': 'q13', '1,4': 'q14', '2,3': 'q23', '2,4': 'q24', '3,4': 'q34',
+    '1': 'q1', '2': 'q2', '3': 'q3', '4': 'q4',
+    '5,6,7': 'q123', '5,6,8': 'q124', '5,7,8': 'q134', '6,7,8': 'q234',
+    '5,6': 'q12', '5,7': 'q13', '5,8': 'q14', '6,7': 'q23', '6,8': 'q24', '7,8': 'q34',
+    '5': 'q1', '6': 'q2', '7': 'q3', '8': 'q4',
+  };
+
+  const answerKey = answered.length > 0 ? answered.join(',') : 'none';
+  const combinationKey = answerKey === 'none' ? 'none' : (combinationMap[answerKey] || 'none');
+
+  const q1 = (coRow.Q1a || 0) + (coRow.Q1b || 0) + (coRow.Q1c || 0) + (coRow.Q1d || 0);
+  const q2 = (coRow.Q2a || 0) + (coRow.Q2b || 0) + (coRow.Q2c || 0) + (coRow.Q2d || 0);
+  const q3 = (coRow.Q3a || 0) + (coRow.Q3b || 0) + (coRow.Q3c || 0) + (coRow.Q3d || 0);
+  const q4 = (coRow.Q4a || 0) + (coRow.Q4b || 0) + (coRow.Q4c || 0) + (coRow.Q4d || 0);
+
+  switch (combinationKey) {
+    case 'q123': return q1 + q2 + q3;
+    case 'q124': return q1 + q2 + q4;
+    case 'q134': return q1 + q3 + q4;
+    case 'q234': return q2 + q3 + q4;
+    case 'q12': return q1 + q2;
+    case 'q13': return q1 + q3;
+    case 'q14': return q1 + q4;
+    case 'q23': return q2 + q3;
+    case 'q24': return q2 + q4;
+    case 'q34': return q3 + q4;
+    case 'q1': return q1;
+    case 'q2': return q2;
+    case 'q3': return q3;
+    case 'q4': return q4;
+    default: return 0;
+  }
+};
+
 const calculateTheoryCOAttainment = (students, coNumbers, attainmentData) => {
   const { sectionAData, sectionBData, ctData, assignData } = attainmentData;
   const { sectionARows = [], sectionAObtainedRows = [] } = sectionAData;
@@ -272,6 +346,228 @@ const calculateLabCOAttainment = (students, coNumbers, attainmentData) => {
   return generateFinalStats(coStats);
 };
 
+const getLabActivityStudentCOMarks = (studentRow, coRow, activityTaken) => {
+  if (!studentRow || !coRow) return 0;
+  let total = 0;
+  if ((coRow.attn || 0) > 0) total += (parseFloat(studentRow.attn) || 0);
+  if ((coRow.quiz || 0) > 0) total += (parseFloat(studentRow.quiz) || 0);
+  if ((coRow.viva || 0) > 0) total += (parseFloat(studentRow.viva) || 0);
+  for (let i = 1; i <= (activityTaken || 5); i++) {
+    const q1Field = `Activity${i}_Q1`;
+    const q2Field = `Activity${i}_Q2`;
+    const q3Field = `Activity${i}_Q3`;
+    if ((coRow[q1Field] || 0) > 0) total += (parseFloat(studentRow[q1Field]) || 0);
+    if ((coRow[q2Field] || 0) > 0) total += (parseFloat(studentRow[q2Field]) || 0);
+    if ((coRow[q3Field] || 0) > 0) total += (parseFloat(studentRow[q3Field]) || 0);
+  }
+  return total;
+};
+
+const computeLabActivityCOTotal = (coRow, activityTaken) => {
+  if (!coRow) return 0;
+  let sum = (coRow.attn || 0) + (coRow.quiz || 0) + (coRow.viva || 0);
+  for (let i = 1; i <= (activityTaken || 5); i++) {
+    sum += (coRow[`Activity${i}_Q1`] || 0) + (coRow[`Activity${i}_Q2`] || 0) + (coRow[`Activity${i}_Q3`] || 0);
+  }
+  return sum;
+};
+
+const buildTheoryTotalsByStudent = (students, coNumbers, attainmentData) => {
+  const { sectionAData, sectionBData, ctData, assignData } = attainmentData;
+  const { sectionARows = [], sectionAObtainedRows = [] } = sectionAData || {};
+  const { sectionBRows = [], sectionBObtainedRows = [] } = sectionBData || {};
+
+  const ctTaken = resolveCtTaken(ctData);
+  const allCTFields = ['CT1_Q1', 'CT1_Q2', 'CT1_Q3', 'CT2_Q1', 'CT2_Q2', 'CT2_Q3', 'CT3_Q1', 'CT3_Q2', 'CT3_Q3'];
+  const activeCTFields = allCTFields.slice(0, ctTaken * 3);
+
+  const assignTaken = resolveAssignTaken(assignData);
+  const allAssignFields = ['Assgn1_Q1', 'Assgn1_Q2', 'Assgn1_Q3', 'Assgn2_Q1', 'Assgn2_Q2', 'Assgn2_Q3', 'Assgn3_Q1', 'Assgn3_Q2', 'Assgn3_Q3'];
+  const activeAssignFields = allAssignFields.slice(0, assignTaken * 3);
+
+  const factoredCTTotals = calculateFactoredCOTotals(ctData || {}, activeCTFields, coNumbers);
+  const factoredAssignTotals = calculateFactoredAssignmentCOTotals(assignData || {}, activeAssignFields, coNumbers);
+
+  return (students || []).map(student => {
+    const roll = student.roll || student.rollNumber || student.studentRoll;
+    const studentObtA = sectionAObtainedRows.find(r => normalizeRoll(r.rollNumber) === normalizeRoll(roll));
+    const studentObtB = sectionBObtainedRows.find(r => normalizeRoll(r.rollNumber) === normalizeRoll(roll));
+    const totals = {};
+
+    coNumbers.forEach(coNumber => {
+      const coRowA = sectionARows.find(r => String(r.coNumber || '').replace('CLO', 'CO') === coNumber);
+      const coRowB = sectionBRows.find(r => String(r.coNumber || '').replace('CLO', 'CO') === coNumber);
+
+      const distA = getSectionMarksDistribution(coRowA, studentObtA, false);
+      const distB = getSectionMarksDistribution(coRowB, studentObtB, true);
+
+      const obtA = computeSectionCOMarks(studentObtA, coRowA);
+      const obtB = computeSectionCOMarks(studentObtB, coRowB);
+      const obtCT = getStudentCTFactoredMarks(roll, coNumber, ctData || {});
+      const obtAssign = getStudentAssignmentFactoredMarks(roll, coNumber, assignData || {});
+
+      totals[coNumber] = {
+        obtained: obtA + obtB + obtCT + obtAssign,
+        distribution: distA + distB + (factoredCTTotals[coNumber] || 0) + (factoredAssignTotals[coNumber] || 0)
+      };
+    });
+
+    return { rollNumber: roll, totals };
+  });
+};
+
+const calculateTheoryCoAttainmentByStudent = (students, coNumbers, attainmentData) => {
+  const totalsByStudent = buildTheoryTotalsByStudent(students, coNumbers, attainmentData || {
+    sectionAData: {}, sectionBData: {}, ctData: {}, assignData: {}
+  });
+
+  return totalsByStudent.map(studentRow => {
+    const coValues = {};
+    coNumbers.forEach(coNumber => {
+      const totals = studentRow.totals[coNumber] || { obtained: 0, distribution: 0 };
+      coValues[coNumber] = totals.distribution > 0
+        ? Number(((totals.obtained / totals.distribution) * 100).toFixed(4))
+        : 0;
+    });
+    return { rollNumber: studentRow.rollNumber, coValues };
+  });
+};
+
+const calculateLabCoAttainmentByStudent = (students, coNumbers, labData) => {
+  const { labActivityRows = [], labActivityObtainedRows = [] } = labData || {};
+  const activityTotals = computeLabActivityColumnTotals(labActivityRows, labData?.activityTaken || 5);
+
+  return (students || []).map(student => {
+    const roll = student.roll || student.rollNumber || student.studentRoll;
+    const studentObt = labActivityObtainedRows.find(r => normalizeRoll(r.rollNumber) === normalizeRoll(roll));
+    const coValues = {};
+
+    coNumbers.forEach(coNumber => {
+      const coRow = labActivityRows.find(r => String(r.coNumber || '').replace('CLO', 'CO') === coNumber);
+      if (!studentObt || !coRow) {
+        coValues[coNumber] = 0;
+        return;
+      }
+      const allocatedMarks = getLabActivityGeneratedCOTotal(coRow, activityTotals, labData || {});
+      const obtainedMarks = getLabActivityStudentCOMappedMarks(studentObt, coRow, activityTotals, labData || {});
+      coValues[coNumber] = allocatedMarks > 0 ? Number(((obtainedMarks / allocatedMarks) * 100).toFixed(4)) : 0;
+    });
+
+    return { rollNumber: roll, coValues };
+  });
+};
+
+const calculateCombinedCoAttainmentByStudent = (students, coNumbers, theoryData, labData) => {
+  const theoryTotals = buildTheoryTotalsByStudent(students, coNumbers, theoryData || {
+    sectionAData: {}, sectionBData: {}, ctData: {}, assignData: {}
+  });
+
+  const { labActivityRows = [], labActivityObtainedRows = [] } = labData || {};
+  const activityTaken = labData?.activityTaken || 5;
+  const eqWt = (labData?.coMappedActivityMarks || 0) / (activityTaken || 1);
+  const activityTotals = computeLabActivityColumnTotals(labActivityRows, activityTaken);
+
+  return theoryTotals.map(studentRow => {
+    const roll = studentRow.rollNumber;
+    const studentObt = labActivityObtainedRows.find(r => normalizeRoll(r.rollNumber) === normalizeRoll(roll));
+    const coValues = {};
+
+    coNumbers.forEach(coNumber => {
+      const theory = studentRow.totals[coNumber] || { obtained: 0, distribution: 0 };
+      const coRow = labActivityRows.find(r => String(r.coNumber || '').replace('CLO', 'CO') === coNumber);
+      let labObt = 0;
+      let labDist = 0;
+
+      if (studentObt && coRow) {
+        labObt = getLabActivityStudentCOMappedMarks(studentObt, coRow, activityTotals, labData || {});
+        for (let i = 1; i <= activityTaken; i++) {
+          if ((coRow[`Activity${i}_Q1`] || 0) !== 0) labDist += eqWt;
+          if ((coRow[`Activity${i}_Q2`] || 0) !== 0) labDist += eqWt;
+          if ((coRow[`Activity${i}_Q3`] || 0) !== 0) labDist += eqWt;
+        }
+      }
+
+      const totalDist = (theory.distribution || 0) + labDist;
+      const totalObt = (theory.obtained || 0) + labObt;
+      coValues[coNumber] = totalDist > 0 ? Number(((totalObt / totalDist) * 100).toFixed(4)) : 0;
+    });
+
+    return { rollNumber: roll, coValues };
+  });
+};
+
+const calculateUnnormedCoAttainmentByStudent = (students, coNumbers, theoryData, labData) => {
+  const theoryTotals = buildTheoryTotalsByStudent(students, coNumbers, theoryData || {
+    sectionAData: {}, sectionBData: {}, ctData: {}, assignData: {}
+  });
+
+  const { labActivityRows = [], labActivityObtainedRows = [] } = labData || {};
+  const activityTaken = labData?.activityTaken || 5;
+
+  return theoryTotals.map(studentRow => {
+    const roll = studentRow.rollNumber;
+    const studentObt = labActivityObtainedRows.find(r => normalizeRoll(r.rollNumber) === normalizeRoll(roll));
+    const coValues = {};
+
+    coNumbers.forEach(coNumber => {
+      const theory = studentRow.totals[coNumber] || { obtained: 0, distribution: 0 };
+      const coRow = labActivityRows.find(r => String(r.coNumber || '').replace('CLO', 'CO') === coNumber);
+      let labObt = 0;
+      let labDist = 0;
+
+      if (studentObt && coRow) {
+        labObt = getLabActivityStudentCOMarks(studentObt, coRow, activityTaken);
+        labDist = computeLabActivityCOTotal(coRow, activityTaken);
+      }
+
+      const totalDist = (theory.distribution || 0) + labDist;
+      const totalObt = (theory.obtained || 0) + labObt;
+      coValues[coNumber] = totalDist > 0 ? Number(((totalObt / totalDist) * 100).toFixed(4)) : 0;
+    });
+
+    return { rollNumber: roll, coValues };
+  });
+};
+
+const calculateEqualWtCoAttainmentByStudent = (theoryRows, labRows, coNumbers, sourceTypeMap = {}) => {
+  const theoryMap = new Map((theoryRows || []).map(r => [normalizeRoll(r.rollNumber), r]));
+  const labMap = new Map((labRows || []).map(r => [normalizeRoll(r.rollNumber), r]));
+  const rollSet = new Set([...theoryMap.keys(), ...labMap.keys()]);
+
+  const weights = {};
+  coNumbers.forEach(coNumber => {
+    const sourceType = sourceTypeMap[coNumber];
+    let tBin = 0;
+    let lBin = 0;
+    if (sourceType === 'theory' || sourceType === 'both') tBin = 1;
+    if (sourceType === 'lab' || sourceType === 'both') lBin = 1;
+    if (!sourceType) {
+      tBin = (theoryRows || []).some(r => (r.coValues?.[coNumber] || 0) > 0) ? 1 : 0;
+      lBin = (labRows || []).some(r => (r.coValues?.[coNumber] || 0) > 0) ? 1 : 0;
+    }
+    const sum = tBin + lBin;
+    weights[coNumber] = {
+      theory: sum > 0 ? tBin / sum : 0,
+      lab: sum > 0 ? lBin / sum : 0,
+    };
+  });
+
+  return Array.from(rollSet).filter(Boolean).map(roll => {
+    const theoryRow = theoryMap.get(roll);
+    const labRow = labMap.get(roll);
+    const coValues = {};
+
+    coNumbers.forEach(coNumber => {
+      const tVal = theoryRow?.coValues?.[coNumber] || 0;
+      const lVal = labRow?.coValues?.[coNumber] || 0;
+      const wt = weights[coNumber] || { theory: 0, lab: 0 };
+      coValues[coNumber] = Number(((tVal * wt.theory) + (lVal * wt.lab)).toFixed(4));
+    });
+
+    return { rollNumber: roll, coValues };
+  });
+};
+
 const calculateCourseCOAttainment = (courseType, students, coNumbers, attainmentData) => {
   const isLab = courseType === 'SESSIONAL' || courseType === 'PROJECT/THESIS';
   if (isLab) {
@@ -282,5 +578,10 @@ const calculateCourseCOAttainment = (courseType, students, coNumbers, attainment
 };
 
 module.exports = {
-  calculateCourseCOAttainment
+  calculateCourseCOAttainment,
+  calculateTheoryCoAttainmentByStudent,
+  calculateLabCoAttainmentByStudent,
+  calculateCombinedCoAttainmentByStudent,
+  calculateUnnormedCoAttainmentByStudent,
+  calculateEqualWtCoAttainmentByStudent
 };

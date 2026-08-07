@@ -24,6 +24,7 @@ router.post('/users/export-credentials', adminController.exportStudentCredential
 router.post('/teachers/import', upload.single('file'), adminController.importTeachersFromExcel);
 router.post('/teachers/export-credentials', adminController.exportTeacherCredentials);
 router.get('/students/batches', adminController.getStudentBatches);
+router.get('/departments', adminController.getDepartments);
 
 router.post('/courses/:courseId/assign-teacher', adminController.assignTeacherToCourse);
 router.delete('/courses/:courseId/unassign-teacher/:teacherId', adminController.unassignTeacherFromCourse);
@@ -34,5 +35,4 @@ router.delete('/courses/:courseId/unassign-batch', adminController.unassignBatch
 router.get('/courses/:courseId/assigned-batches', adminController.getAssignedBatches);
 router.get('/courses/:courseId/students', adminController.getStudentsForCourse);
 router.post('/courses/normalize-batches', adminController.normalizeBatchAssignments);
-
 module.exports = router;

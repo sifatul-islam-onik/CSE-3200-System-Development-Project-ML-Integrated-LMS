@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBook, faPlus, faHourglass, faCheckCircle, faTimesCircle, faEye, faTrash, faEdit, faSignOutAlt, faChevronDown, faChevronRight, faClipboardList, faTimes } from '@fortawesome/free-solid-svg-icons';
@@ -19,6 +20,53 @@ import '../styles/spinner.css';
 import '../styles/Profile.css';
 
 const TeacherDashboard = () => {
+  const handleDownloadTemplate = (type) => {
+    let ws_data = [];
+    let sheetName = "";
+    let fileName = "";
+    
+    if (type === 'ct') {
+      ws_data = [
+        ['Manual Wt', ''],
+        ['Total Marks', '[Q1 Total]', '[Q2 Total]', '[Q3 Total]'],
+        ['CO Mapping', '[Q1 CO]', '[Q2 CO]', '[Q3 CO]'],
+        ['Roll', 'Q1', 'Q2', 'Q3']
+      ];
+    } else if (type === 'assignment') {
+      ws_data = [
+        ['Manual Wt', ''],
+        ['Total Marks', '', '[Q1 Total]', '[Q2 Total]', '[Q3 Total]'],
+        ['CO Mapping', '', '[Q1 CO]', '[Q2 CO]', '[Q3 CO]'],
+        ['Roll', 'Attn. Perf.', 'Q1', 'Q2', 'Q3']
+      ];
+    } else if (type === 'lab') {
+      ws_data = [
+        ['Manual Wt', ''],
+        ['Total Marks', '', '', '', '[Q1 Total]', '[Q2 Total]', '[Q3 Total]'],
+        ['CO Mapping', '', '', '', '[Q1 CO]', '[Q2 CO]', '[Q3 CO]'],
+        ['Roll', 'Attn.', 'Quiz', 'C. Viva', 'Q1', 'Q2', 'Q3', 'Other']
+      ];
+    }
+
+    if (type === 'ct' || type === 'assignment' || type === 'lab') {
+      sheetName = "Marks_Template";
+      fileName = `${type.toUpperCase()}_Marks_Template.xlsx`;
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Helper: sort courses by courseCode ascending (numeric + case-insensitive)
   const sortCoursesByCode = (list = []) => {
     const normalize = (code = '') => {
@@ -579,7 +627,7 @@ const TeacherDashboard = () => {
                   {/* Breadcrumb Navigation */}
                   {courseGroupPath && (
                     <div className="breadcrumb-nav">
-                      <button className="breadcrumb-btn" onClick={goBackGroup}>← Back</button>
+                      <button className="breadcrumb-btn" onClick={goBackGroup}>←<span className="back-btn-text"> Back</span></button>
                     </div>
                   )}
 
@@ -1145,7 +1193,6 @@ const TeacherDashboard = () => {
               {sidebarOpen && (
                 <div className="user-details-small">
                   <p className="user-name">{user.name}</p>
-                  <p className="user-role">{user.role}</p>
                 </div>
               )}
             </div>
@@ -1356,6 +1403,13 @@ const TeacherDashboard = () => {
                           >
                             {ctUploadLoading ? 'Parsing...' : 'Parse File'}
                           </button>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => handleDownloadTemplate('ct')}
+                            style={{ fontSize: '13px', padding: '8px 16px', whiteSpace: 'nowrap', marginLeft: '10px' }}
+                          >
+                            Download Template
+                          </button>
                         </div>
                       </div>
 
@@ -1363,8 +1417,13 @@ const TeacherDashboard = () => {
                       <div style={{ marginBottom: '12px', padding: '10px', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', color: '#6b7280' }}>
                         <strong>Expected file format:</strong><br />
                         Row 1: <code>Manual Wt</code> | &lt;value&gt;<br />
-                        Row 2 (header): <code>Roll</code> | <code>Q1(&lt;total&gt;)</code> | <code>Q2(&lt;total&gt;)</code> | <code>Q3(&lt;total&gt;)</code><br />
-                        Row 3+: roll number | Q1 marks | Q2 marks | Q3 marks
+                        Row 2: <code>Total Marks</code> | &lt;Q1 total&gt; | &lt;Q2 total&gt; | &lt;Q3 total&gt;<br />
+                        Row 3: <code>CO Mapping</code> | &lt;Q1 CO&gt; | &lt;Q2 CO&gt; | &lt;Q3 CO&gt;<br />
+                        Row 4: <code>Roll</code> | <code>Q1</code> | <code>Q2</code> | <code>Q3</code><br />
+                        Row 5+: roll number | Q1 marks | Q2 marks | Q3 marks<br />
+                        <span style={{ color: '#d97706', marginTop: '6px', display: 'inline-block' }}>
+                          <em>Note: If a question (e.g. Q2) is not applicable, leave its column completely blank. Do not shift other columns left to fill the empty space!</em>
+                        </span>
                       </div>
 
                       {/* Parsed preview */}
@@ -1380,9 +1439,27 @@ const TeacherDashboard = () => {
                               <thead>
                                 <tr style={{ backgroundColor: '#f3f4f6', position: 'sticky', top: 0 }}>
                                   <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, border: '1px solid #e5e7eb' }}>Roll</th>
-                                  <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q1({ctUploadParsed.q1Total}){ctUploadParsed.q1CO ? `(${ctUploadParsed.q1CO})` : ''}</th>
-                                  <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q2({ctUploadParsed.q2Total}){ctUploadParsed.q2CO ? `(${ctUploadParsed.q2CO})` : ''}</th>
-                                  <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q3({ctUploadParsed.q3Total}){ctUploadParsed.q3CO ? `(${ctUploadParsed.q3CO})` : ''}</th>
+                                  <th style={{ padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb' }}>
+                                    <div style={{ fontWeight: 600, marginBottom: '4px' }}>Q1</div>
+                                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap', fontSize: '11px', fontWeight: 500 }}>
+                                      <span style={{ backgroundColor: '#eef2ff', color: '#4f46e5', padding: '2px 6px', borderRadius: '4px', border: '1px solid #c7d2fe' }}>Total: {ctUploadParsed.q1Total}</span>
+                                      {ctUploadParsed.q1CO && <span style={{ backgroundColor: '#ecfdf5', color: '#059669', padding: '2px 6px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>{ctUploadParsed.q1CO}</span>}
+                                    </div>
+                                  </th>
+                                  <th style={{ padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb' }}>
+                                    <div style={{ fontWeight: 600, marginBottom: '4px' }}>Q2</div>
+                                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap', fontSize: '11px', fontWeight: 500 }}>
+                                      <span style={{ backgroundColor: '#eef2ff', color: '#4f46e5', padding: '2px 6px', borderRadius: '4px', border: '1px solid #c7d2fe' }}>Total: {ctUploadParsed.q2Total}</span>
+                                      {ctUploadParsed.q2CO && <span style={{ backgroundColor: '#ecfdf5', color: '#059669', padding: '2px 6px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>{ctUploadParsed.q2CO}</span>}
+                                    </div>
+                                  </th>
+                                  <th style={{ padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb' }}>
+                                    <div style={{ fontWeight: 600, marginBottom: '4px' }}>Q3</div>
+                                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap', fontSize: '11px', fontWeight: 500 }}>
+                                      <span style={{ backgroundColor: '#eef2ff', color: '#4f46e5', padding: '2px 6px', borderRadius: '4px', border: '1px solid #c7d2fe' }}>Total: {ctUploadParsed.q3Total}</span>
+                                      {ctUploadParsed.q3CO && <span style={{ backgroundColor: '#ecfdf5', color: '#059669', padding: '2px 6px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>{ctUploadParsed.q3CO}</span>}
+                                    </div>
+                                  </th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -1770,6 +1847,13 @@ const TeacherDashboard = () => {
                         >
                           {labUploadLoading ? 'Parsing...' : 'Parse File'}
                         </button>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => handleDownloadTemplate('lab')}
+                          style={{ fontSize: '13px', padding: '8px 16px', whiteSpace: 'nowrap', marginLeft: '10px' }}
+                        >
+                          Download Template
+                        </button>
                       </div>
                     </div>
 
@@ -1777,8 +1861,13 @@ const TeacherDashboard = () => {
                     <div style={{ marginBottom: '12px', padding: '10px', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', color: '#6b7280' }}>
                       <strong>Expected file format:</strong><br />
                       Row 1: <code>Manual Wt</code> | &lt;value&gt;<br />
-                      Row 2 (header): <code>Roll</code> | <em>[optional]</em> <code>Attn.</code> | <code>Quiz</code> | <code>C. Viva</code> | <code>Q1(&lt;total&gt;)(&lt;CO&gt;)</code> | <code>Q2(&lt;total&gt;)(&lt;CO&gt;)</code> | <code>Q3(&lt;total&gt;)(&lt;CO&gt;)</code> | <em>[optional]</em> <code>Other</code><br />
-                      Row 3+: roll | attn (optional) | quiz (optional) | viva (optional) | Q1 | Q2 | Q3 marks | other measured (optional)
+                      Row 2: <code>Total Marks</code> | &lt;empty&gt; | &lt;empty&gt; | &lt;empty&gt; | &lt;Q1 total&gt; | &lt;Q2 total&gt; | &lt;Q3 total&gt;<br />
+                      Row 3: <code>CO Mapping</code> | &lt;empty&gt; | &lt;empty&gt; | &lt;empty&gt; | &lt;Q1 CO&gt; | &lt;Q2 CO&gt; | &lt;Q3 CO&gt;<br />
+                      Row 4: <code>Roll</code> | <em>[opt]</em> <code>Attn.</code> | <code>Quiz</code> | <code>C. Viva</code> | <code>Q1</code> | <code>Q2</code> | <code>Q3</code> | <em>[opt]</em> <code>Other</code><br />
+                      Row 5+: roll | attn (opt) | quiz (opt) | viva (opt) | Q1 | Q2 | Q3 marks | other (opt)<br />
+                      <span style={{ color: '#d97706', marginTop: '6px', display: 'inline-block' }}>
+                        <em>Note: If a column is not applicable, leave it completely blank. Do not shift other columns left to fill the empty space!</em>
+                      </span>
                     </div>
 
                     {/* Parsed preview */}
@@ -1797,9 +1886,27 @@ const TeacherDashboard = () => {
                                 {labUploadParsed.hasAttn && <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Attn.</th>}
                                 {labUploadParsed.hasQuiz && <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Quiz</th>}
                                 {labUploadParsed.hasViva && <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>C. Viva</th>}
-                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q1({labUploadParsed.q1Total}){labUploadParsed.q1CO ? `(${labUploadParsed.q1CO})` : ''}</th>
-                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q2({labUploadParsed.q2Total}){labUploadParsed.q2CO ? `(${labUploadParsed.q2CO})` : ''}</th>
-                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q3({labUploadParsed.q3Total}){labUploadParsed.q3CO ? `(${labUploadParsed.q3CO})` : ''}</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb' }}>
+                                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>Q1</div>
+                                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap', fontSize: '11px', fontWeight: 500 }}>
+                                    <span style={{ backgroundColor: '#eef2ff', color: '#4f46e5', padding: '2px 6px', borderRadius: '4px', border: '1px solid #c7d2fe' }}>Total: {labUploadParsed.q1Total}</span>
+                                    {labUploadParsed.q1CO && <span style={{ backgroundColor: '#ecfdf5', color: '#059669', padding: '2px 6px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>{labUploadParsed.q1CO}</span>}
+                                  </div>
+                                </th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb' }}>
+                                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>Q2</div>
+                                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap', fontSize: '11px', fontWeight: 500 }}>
+                                    <span style={{ backgroundColor: '#eef2ff', color: '#4f46e5', padding: '2px 6px', borderRadius: '4px', border: '1px solid #c7d2fe' }}>Total: {labUploadParsed.q2Total}</span>
+                                    {labUploadParsed.q2CO && <span style={{ backgroundColor: '#ecfdf5', color: '#059669', padding: '2px 6px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>{labUploadParsed.q2CO}</span>}
+                                  </div>
+                                </th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb' }}>
+                                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>Q3</div>
+                                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap', fontSize: '11px', fontWeight: 500 }}>
+                                    <span style={{ backgroundColor: '#eef2ff', color: '#4f46e5', padding: '2px 6px', borderRadius: '4px', border: '1px solid #c7d2fe' }}>Total: {labUploadParsed.q3Total}</span>
+                                    {labUploadParsed.q3CO && <span style={{ backgroundColor: '#ecfdf5', color: '#059669', padding: '2px 6px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>{labUploadParsed.q3CO}</span>}
+                                  </div>
+                                </th>
                                 {labUploadParsed.hasOther && <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Other</th>}
                               </tr>
                             </thead>
@@ -2216,6 +2323,13 @@ const TeacherDashboard = () => {
                         >
                           {assignUploadLoading ? 'Parsing...' : 'Parse File'}
                         </button>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => handleDownloadTemplate('assignment')}
+                          style={{ fontSize: '13px', padding: '8px 16px', whiteSpace: 'nowrap', marginLeft: '10px' }}
+                        >
+                          Download Template
+                        </button>
                       </div>
                     </div>
 
@@ -2223,8 +2337,13 @@ const TeacherDashboard = () => {
                     <div style={{ marginBottom: '12px', padding: '10px', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', color: '#6b7280' }}>
                       <strong>Expected file format:</strong><br />
                       Row 1: <code>Manual Wt</code> | &lt;value&gt;<br />
-                      Row 2 (header): <code>Roll</code> | <em>[optional]</em> <code>Attn. Perf.</code> | <code>Q1(&lt;total&gt;)(&lt;CO&gt;)</code> | <code>Q2(&lt;total&gt;)(&lt;CO&gt;)</code> | <code>Q3(&lt;total&gt;)(&lt;CO&gt;)</code><br />
-                      Row 3+: roll | attn perf (optional) | Q1 | Q2 | Q3 marks
+                      Row 2: <code>Total Marks</code> | &lt;empty&gt; | &lt;Q1 total&gt; | &lt;Q2 total&gt; | &lt;Q3 total&gt;<br />
+                      Row 3: <code>CO Mapping</code> | &lt;empty&gt; | &lt;Q1 CO&gt; | &lt;Q2 CO&gt; | &lt;Q3 CO&gt;<br />
+                      Row 4: <code>Roll</code> | <em>[optional]</em> <code>Attn. Perf.</code> | <code>Q1</code> | <code>Q2</code> | <code>Q3</code><br />
+                      Row 5+: roll | attn perf (optional) | Q1 | Q2 | Q3 marks<br />
+                      <span style={{ color: '#d97706', marginTop: '6px', display: 'inline-block' }}>
+                        <em>Note: If a column is not applicable, leave it completely blank. Do not shift other columns left to fill the empty space!</em>
+                      </span>
                     </div>
 
                     {/* Parsed preview */}
@@ -2241,9 +2360,27 @@ const TeacherDashboard = () => {
                               <tr style={{ backgroundColor: '#f3f4f6', position: 'sticky', top: 0 }}>
                                 <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, border: '1px solid #e5e7eb' }}>Roll</th>
                                 {assignUploadParsed.hasAttnPerf && <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Attn. Perf.</th>}
-                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q1({assignUploadParsed.q1Total}){assignUploadParsed.q1CO ? `(${assignUploadParsed.q1CO})` : ''}</th>
-                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q2({assignUploadParsed.q2Total}){assignUploadParsed.q2CO ? `(${assignUploadParsed.q2CO})` : ''}</th>
-                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, border: '1px solid #e5e7eb' }}>Q3({assignUploadParsed.q3Total}){assignUploadParsed.q3CO ? `(${assignUploadParsed.q3CO})` : ''}</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb' }}>
+                                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>Q1</div>
+                                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap', fontSize: '11px', fontWeight: 500 }}>
+                                    <span style={{ backgroundColor: '#eef2ff', color: '#4f46e5', padding: '2px 6px', borderRadius: '4px', border: '1px solid #c7d2fe' }}>Total: {assignUploadParsed.q1Total}</span>
+                                    {assignUploadParsed.q1CO && <span style={{ backgroundColor: '#ecfdf5', color: '#059669', padding: '2px 6px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>{assignUploadParsed.q1CO}</span>}
+                                  </div>
+                                </th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb' }}>
+                                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>Q2</div>
+                                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap', fontSize: '11px', fontWeight: 500 }}>
+                                    <span style={{ backgroundColor: '#eef2ff', color: '#4f46e5', padding: '2px 6px', borderRadius: '4px', border: '1px solid #c7d2fe' }}>Total: {assignUploadParsed.q2Total}</span>
+                                    {assignUploadParsed.q2CO && <span style={{ backgroundColor: '#ecfdf5', color: '#059669', padding: '2px 6px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>{assignUploadParsed.q2CO}</span>}
+                                  </div>
+                                </th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', border: '1px solid #e5e7eb' }}>
+                                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>Q3</div>
+                                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap', fontSize: '11px', fontWeight: 500 }}>
+                                    <span style={{ backgroundColor: '#eef2ff', color: '#4f46e5', padding: '2px 6px', borderRadius: '4px', border: '1px solid #c7d2fe' }}>Total: {assignUploadParsed.q3Total}</span>
+                                    {assignUploadParsed.q3CO && <span style={{ backgroundColor: '#ecfdf5', color: '#059669', padding: '2px 6px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>{assignUploadParsed.q3CO}</span>}
+                                  </div>
+                                </th>
                               </tr>
                             </thead>
                             <tbody>

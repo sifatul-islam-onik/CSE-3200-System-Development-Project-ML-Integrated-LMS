@@ -111,6 +111,12 @@ router.get(
   attainmentController.getTermExamMarks
 );
 
+router.get(
+  '/co-calcs/:courseId',
+  authorizeRoles('teacher', 'admin'),
+  attainmentController.getCoAttainmentCalcs
+);
+
 router.delete(
   '/reset/:courseId',
   authorizeRoles('teacher', 'admin'),

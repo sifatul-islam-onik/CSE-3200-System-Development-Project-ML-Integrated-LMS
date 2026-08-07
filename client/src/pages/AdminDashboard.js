@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faTimes, faChartBar, faEdit, faBookOpen, faPlus, faUsers, faCog, faSignOutAlt, faTrash, faClipboardList, faChevronRight, faUser, faEye, faExclamationTriangle, faGraduationCap } from '@fortawesome/free-solid-svg-icons';
@@ -176,6 +177,40 @@ const AdminDashboard = () => {
     return organized;
   };
 
+  const computedBatches = React.useMemo(() => {
+    const batches = new Set();
+    systemUsersMeta.students.forEach(s => {
+      const rollStr = String(s.roll || s.rollNumber || '');
+      const rollDigits = rollStr.replace(/\D/g, '');
+      if (rollDigits.length >= 4) {
+        batches.add(rollDigits.substring(0, 2));
+      }
+    });
+    courses.forEach(c => {
+      if (c.assignedBatches) {
+        c.assignedBatches.forEach(ab => batches.add(ab.batch));
+      }
+    });
+    return Array.from(batches).sort((a, b) => b.localeCompare(a));
+  }, [systemUsersMeta.students, courses]);
+
+  const computedDepartments = React.useMemo(() => {
+    const depts = new Set();
+    systemUsersMeta.students.forEach(s => {
+      const rollStr = String(s.roll || s.rollNumber || '');
+      const rollDigits = rollStr.replace(/\D/g, '');
+      if (rollDigits.length >= 4) {
+        depts.add(rollDigits.substring(2, 4));
+      }
+    });
+    courses.forEach(c => {
+      if (c.assignedBatches) {
+        c.assignedBatches.forEach(ab => depts.add(ab.deptCode));
+      }
+    });
+    return Array.from(depts).sort();
+  }, [systemUsersMeta.students, courses]);
+
   useEffect(() => {
     const userData = getUser();
     setUser(userData);
@@ -214,11 +249,16 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (activeSection === 'courses') {
       fetchCourses();
+      if (users.length === 0) fetchAllUsers();
     } else if (activeSection === 'proposals') {
       fetchProposals();
     } else if (activeSection === 'users') {
       fetchAllUsers();
+    } else if (activeSection === 'results') {
+      fetchCourses();
+      if (users.length === 0) fetchAllUsers();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection]);
 
   const fetchCourses = async () => {
@@ -559,6 +599,35 @@ const AdminDashboard = () => {
     } finally {
       setTeacherExportLoading(false);
     }
+  };
+
+  const handleDownloadTemplate = (type) => {
+    let ws_data = [];
+    let sheetName = "";
+    let fileName = "";
+    
+    if (type === 'student') {
+      ws_data = [['Roll', 'Name', 'Advisor', 'Father', 'Mother', 'Hall', 'Scholarship']];
+      sheetName = "Students";
+      fileName = "Student_Import_Template.xlsx";
+    } else if (type === 'teacher') {
+      ws_data = [['Full Name', 'Name', 'Department', 'Designation']];
+      sheetName = "Teachers";
+      fileName = "Teacher_Import_Template.xlsx";
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleSectionChange = (section) => {
@@ -1752,7 +1821,7 @@ const AdminDashboard = () => {
                 <div className="courses-tree">
                   {courseGroupPath && (
                     <div className="breadcrumb-nav">
-                      <button className="breadcrumb-btn" onClick={goBackGroup}>← Back</button>
+                      <button className="breadcrumb-btn" onClick={goBackGroup}>←<span className="back-btn-text"> Back</span></button>
                     </div>
                   )}
 
@@ -1935,7 +2004,7 @@ const AdminDashboard = () => {
               ) : selectedUserRole ? (
                 <div>
                   <div className="breadcrumb-nav" style={{marginBottom: '12px'}}>
-                    <button className="breadcrumb-btn" onClick={goBackUserGroups}>← Back</button>
+                    <button className="breadcrumb-btn" onClick={goBackUserGroups}>←<span className="back-btn-text"> Back</span></button>
                   </div>
                   {selectedUserRole === 'student' && (
                     <>
@@ -1962,6 +2031,12 @@ const AdminDashboard = () => {
                             disabled={importLoading}
                           >
                             {importLoading ? 'Importing...' : 'Import Students'}
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => handleDownloadTemplate('student')}
+                          >
+                            Download Template
                           </button>
                         </div>
                         {(importMessage || importError) && (
@@ -2122,6 +2197,12 @@ const AdminDashboard = () => {
                             disabled={teacherImportLoading || !teacherImportFile}
                           >
                             {teacherImportLoading ? 'Importing...' : 'Import Teachers'}
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => handleDownloadTemplate('teacher')}
+                          >
+                            Download Template
                           </button>
                         </div>
                       </div>
@@ -2811,26 +2892,34 @@ const AdminDashboard = () => {
               {/* Filter controls */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '20px', alignItems: 'flex-end' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 600 }}>Batch (e.g. 21)</label>
-                  <input
+                  <label style={{ fontSize: '13px', fontWeight: 600 }}>Batch</label>
+                  <select
                     className="form-input"
                     style={{ width: '100px' }}
                     value={resultBatch}
-                    onChange={e => setResultBatch(e.target.value.trim())}
-                    placeholder="21"
-                    maxLength={2}
-                  />
+                    onChange={e => setResultBatch(e.target.value)}
+                  >
+                    <option value="">Select</option>
+                    {computedBatches.map(batchStr => (
+                      <option key={batchStr} value={batchStr}>{batchStr}</option>
+                    ))}
+                  </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 600 }}>Dept Code (e.g. 07)</label>
-                  <input
+                  <label style={{ fontSize: '13px', fontWeight: 600 }}>Department</label>
+                  <select
                     className="form-input"
                     style={{ width: '110px' }}
                     value={resultDeptCode}
-                    onChange={e => setResultDeptCode(e.target.value.trim())}
-                    placeholder="07"
-                    maxLength={2}
-                  />
+                    onChange={e => setResultDeptCode(e.target.value)}
+                  >
+                    <option value="">Select</option>
+                    {computedDepartments.map(deptStr => (
+                      <option key={deptStr} value={deptStr}>
+                        {departmentMap[deptStr] ? `${departmentMap[deptStr]}-${deptStr}` : deptStr}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '13px', fontWeight: 600 }}>Year Level</label>
@@ -3126,14 +3215,17 @@ const AdminDashboard = () => {
             <span className="logo-icon">
               <img src="/images/kuet-logo.png" alt="KUET Logo" className="logo-image" />
             </span>
-            {sidebarOpen && <h1>KUET Admin</h1>}
+            {sidebarOpen && <h1>Admin</h1>}
           </div>
           <button 
             className="sidebar-toggle"
             onClick={() => setSidebarOpen(!sidebarOpen)}
             title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           >
-            {sidebarOpen ? '←' : '→'}
+            <svg width="20" height="20" viewBox="2 2 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="5" ry="5"></rect>
+              <line x1="9" y1="3" x2="9" y2="21"></line>
+            </svg>
           </button>
         </div>
 
@@ -3195,7 +3287,6 @@ const AdminDashboard = () => {
               {sidebarOpen && (
                 <div className="user-details-small">
                   <p className="user-name">{user.name}</p>
-                  <p className="user-role">{user.role}</p>
                 </div>
               )}
             </div>
@@ -3833,19 +3924,28 @@ const AdminDashboard = () => {
                     <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
                       Hall Name
                     </label>
-                    <input
-                      type="text"
-                      value={userProfileForm.hall}
+                    <select
+                      value={userProfileForm.hall || ''}
                       onChange={(e) => setUserProfileForm({ ...userProfileForm, hall: e.target.value })}
                       style={{
                         width: '100%',
                         padding: '8px 12px',
                         border: '1px solid #d1d5db',
                         borderRadius: '6px',
-                        fontSize: '14px'
+                        fontSize: '14px',
+                        backgroundColor: '#fff'
                       }}
                       disabled={profileSaving}
-                    />
+                    >
+                      <option value="">Select Hall</option>
+                      <option value="Amar Ekushey Hall">Amar Ekushey Hall</option>
+                      <option value="Dr. M.A Rashid Hall">Dr. M.A Rashid Hall</option>
+                      <option value="Fazlul Haque Hall">Fazlul Haque Hall</option>
+                      <option value="Khan Jahan Ali Hall">Khan Jahan Ali Hall</option>
+                      <option value="Lalan Shah Hall">Lalan Shah Hall</option>
+                      <option value="Rokeya Hall">Rokeya Hall</option>
+                      <option value="Shaheed Smrity Hall">Shaheed Smrity Hall</option>
+                    </select>
                   </div>
                 )}
 
@@ -4070,14 +4170,11 @@ const AdminDashboard = () => {
                 <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '10px', alignItems: 'end'}}>
                   <div>
                     <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
-                      Batch (2 digits)
+                      Batch
                     </label>
-                    <input
-                      type="text"
-                      placeholder="e.g., 21"
+                    <select
                       value={batchInput}
                       onChange={(e) => setBatchInput(e.target.value)}
-                      maxLength={2}
                       style={{
                         width: '100%',
                         padding: '8px 12px',
@@ -4086,7 +4183,12 @@ const AdminDashboard = () => {
                         fontSize: '14px'
                       }}
                       disabled={batchAssignmentLoading}
-                    />
+                    >
+                      <option value="">Select Batch</option>
+                      {computedBatches.map(batchStr => (
+                        <option key={batchStr} value={batchStr}>{batchStr}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label style={{display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151'}}>
@@ -4105,22 +4207,11 @@ const AdminDashboard = () => {
                       disabled={batchAssignmentLoading}
                     >
                       <option value="">Select Dept</option>
-                      <option value="07">CSE-07</option>
-                      <option value="03">EEE-03</option>
-                      <option value="05">ME-05</option>
-                      <option value="01">CE-01</option>
-                      <option value="09">ECE-09</option>
-                      <option value="11">IEM-11</option>
-                      <option value="13">ESE-13</option>
-                      <option value="15">BME-15</option>
-                      <option value="17">URP-17</option>
-                      <option value="19">LE-19</option>
-                      <option value="27">MSE-27</option>
-                      <option value="31">MTE-31</option>
-                      <option value="23">BECM-23</option>
-                      <option value="25">ARCH-25</option>
-                      <option value="21">TE-21</option>
-                      <option value="29">CHE-29</option>
+                      {computedDepartments.map(deptStr => (
+                        <option key={deptStr} value={deptStr}>
+                          {departmentMap[deptStr] ? `${departmentMap[deptStr]}-${deptStr}` : deptStr}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <button
