@@ -1,4 +1,58 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { handleTableEnterNav } from '../../utils/tableNav';
+
+const SECT_INPUT_CSS = `
+.sect-cell-input {
+  display: block;
+  width: 100%;
+  min-width: 32px;
+  box-sizing: border-box;
+  padding: 5px 2px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 1.5px solid #c8d0da;
+  border-radius: 0;
+  font-size: 15px;
+  font-family: inherit;
+  text-align: center;
+  color: inherit;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+th .sect-cell-input {
+  color: #ffffff;
+}
+.sect-cell-input:hover {
+  border-bottom-color: #5c7cfa;
+  background: rgba(92,124,250,0.04);
+}
+.sect-cell-input:focus {
+  border: 1px solid #5c7cfa;
+  border-radius: 4px;
+  background: #fff;
+  color: #1a2332;
+  box-shadow: 0 0 0 2px rgba(92,124,250,0.15);
+}
+.sect-cell-input.absent {
+  color: #e74c3c;
+  font-style: italic;
+  border-bottom-color: #e74c3c;
+}
+.sect-cell-input.absent:focus {
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 2px rgba(231,76,60,0.12);
+}
+.sect-cell-input::-webkit-inner-spin-button {display:none;}
+`;
+
+let _sectStyleInjected = false;
+const injectSectStyles = () => {
+  if (_sectStyleInjected) return;
+  const tag = document.createElement('style');
+  tag.textContent = SECT_INPUT_CSS;
+  document.head.appendChild(tag);
+  _sectStyleInjected = true;
+};
 
 const SectionASheet = ({
   clos,
@@ -8,7 +62,32 @@ const SectionASheet = ({
   sectionAQuestionTotals,
   setShowSectionAGeneratedModal,
   setShowSectionAObtainedModal,
+  setSectionARows,
+  setSectionAObtainedRows,
+  handleManualSaveSectionA,
+  sectionASaveStatus,
 }) => {
+  injectSectStyles();
+
+  const handleCoMapCell = (rowIdx, field, raw) => {
+    const val = raw === '' ? 0 : (isNaN(parseFloat(raw)) ? 0 : parseFloat(raw));
+    setSectionARows(prev => prev.map((r, i) => i === rowIdx ? { ...r, [field]: val } : r));
+  };
+
+  const handleObtainedCell = (rowIdx, field, raw) => {
+    const trimmed = raw.trim();
+    let val = trimmed.toLowerCase() === 'a' ? 'A'
+      : trimmed === '' ? 0
+      : isNaN(parseFloat(trimmed)) ? 0
+      : parseFloat(trimmed);
+
+    if (typeof val === 'number') {
+      const field_total = sectionARows.reduce((sum, r) => sum + (parseFloat(r[field]) || 0), 0);
+      if (field_total > 0 && val > field_total) return;
+    }
+
+    setSectionAObtainedRows(prev => prev.map((r, i) => i === rowIdx ? { ...r, [field]: val } : r));
+  };
   return (
     <section className="section-a-section" style={{ marginTop: '30px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -16,7 +95,9 @@ const SectionASheet = ({
           Allocated marks for Section-A in final question
         </h2>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <span style={{ fontSize: '13px', color: '#7f8c8d', fontStyle: 'italic' }}>Edit via "Marks Distribution" in Enter Term Marks</span>
+          <button type="button" onClick={handleManualSaveSectionA} disabled={sectionASaveStatus === 'saving'} className="btn-professional btn-success">
+            {sectionASaveStatus === 'saving' ? 'Saving...' : sectionASaveStatus === 'saved' ? 'Saved!' : 'Save'}
+          </button>
           <button
             onClick={() => setShowSectionAGeneratedModal(true)}
             className="btn-professional btn-primary"
@@ -55,16 +136,24 @@ const SectionASheet = ({
                   <tr key={row.coNumber || idx}>
                     <td className="co-label">{row.coNumber || '-'}</td>
                     {['Q1a','Q1b','Q1c','Q1d'].map((f) => (
-                      <td key={f} style={{ textAlign: 'center' }}>{row[f] || 0}</td>
+                      <td key={f} style={{ padding: '2px 3px' }}>
+                        <input type="text" className="sect-cell-input" value={row[f] ?? 0} onChange={e => handleCoMapCell(idx, f, e.target.value)} onKeyDown={handleTableEnterNav} />
+                      </td>
                     ))}
                     {['Q2a','Q2b','Q2c','Q2d'].map((f, fi) => (
-                      <td key={f} style={{ ...(fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}), textAlign: 'center' }}>{row[f] || 0}</td>
+                      <td key={f} style={{ ...(fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}), padding: '2px 3px' }}>
+                        <input type="text" className="sect-cell-input" value={row[f] ?? 0} onChange={e => handleCoMapCell(idx, f, e.target.value)} onKeyDown={handleTableEnterNav} />
+                      </td>
                     ))}
                     {['Q3a','Q3b','Q3c','Q3d'].map((f, fi) => (
-                      <td key={f} style={{ ...(fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}), textAlign: 'center' }}>{row[f] || 0}</td>
+                      <td key={f} style={{ ...(fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}), padding: '2px 3px' }}>
+                        <input type="text" className="sect-cell-input" value={row[f] ?? 0} onChange={e => handleCoMapCell(idx, f, e.target.value)} onKeyDown={handleTableEnterNav} />
+                      </td>
                     ))}
                     {['Q4a','Q4b','Q4c','Q4d'].map((f, fi) => (
-                      <td key={f} style={{ ...(fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}), textAlign: 'center' }}>{row[f] || 0}</td>
+                      <td key={f} style={{ ...(fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}), padding: '2px 3px' }}>
+                        <input type="text" className="sect-cell-input" value={row[f] ?? 0} onChange={e => handleCoMapCell(idx, f, e.target.value)} onKeyDown={handleTableEnterNav} />
+                      </td>
                     ))}
                   </tr>
                 ))}
@@ -92,12 +181,17 @@ const SectionASheet = ({
           <section style={{ marginTop: '30px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ margin: 0 }}>Obtained marks for Section-A</h3>
-              <button
-                onClick={() => setShowSectionAObtainedModal(true)}
-                className="btn-professional btn-primary"
-              >
-                View Generated Table
-              </button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button type="button" onClick={handleManualSaveSectionA} disabled={sectionASaveStatus === 'saving'} className="btn-professional btn-success">
+                  {sectionASaveStatus === 'saving' ? 'Saving...' : sectionASaveStatus === 'saved' ? 'Saved!' : 'Save'}
+                </button>
+                <button
+                  onClick={() => setShowSectionAObtainedModal(true)}
+                  className="btn-professional btn-primary"
+                >
+                  View Generated Table
+                </button>
+              </div>
             </div>
             <div className="table-wrapper">
               <table className="section-a-table">
@@ -121,22 +215,42 @@ const SectionASheet = ({
                   {sectionAObtainedRows.length > 0 ? sectionAObtainedRows.map((row, idx) => (
                     <tr key={`sectA-${row.rollNumber}-${idx}`}>
                       <td className="roll-cell" title={row.name || row.rollNumber}>{row.rollNumber || '-'}</td>
-                      <td style={{ textAlign: 'center' }}>{row.Q1a || 0}</td>
-                      <td style={{ textAlign: 'center' }}>{row.Q1b || 0}</td>
-                      <td style={{ textAlign: 'center' }}>{row.Q1c || 0}</td>
-                      <td style={{ textAlign: 'center' }}>{row.Q1d || 0}</td>
-                      <td style={{ borderLeft: '2px solid #d5d5d5', textAlign: 'center' }}>{row.Q2a || 0}</td>
-                      <td style={{ textAlign: 'center' }}>{row.Q2b || 0}</td>
-                      <td style={{ textAlign: 'center' }}>{row.Q2c || 0}</td>
-                      <td style={{ textAlign: 'center' }}>{row.Q2d || 0}</td>
-                      <td style={{ borderLeft: '2px solid #d5d5d5', textAlign: 'center' }}>{row.Q3a || 0}</td>
-                      <td style={{ textAlign: 'center' }}>{row.Q3b || 0}</td>
-                      <td style={{ textAlign: 'center' }}>{row.Q3c || 0}</td>
-                      <td style={{ textAlign: 'center' }}>{row.Q3d || 0}</td>
-                      <td style={{ borderLeft: '2px solid #d5d5d5', textAlign: 'center' }}>{row.Q4a || 0}</td>
-                      <td style={{ textAlign: 'center' }}>{row.Q4b || 0}</td>
-                      <td style={{ textAlign: 'center' }}>{row.Q4c || 0}</td>
-                      <td style={{ textAlign: 'center' }}>{row.Q4d || 0}</td>
+                      {['Q1a','Q1b','Q1c','Q1d'].map(f => {
+                        const val = row[f];
+                        const isAbsent = val === 'A' || val === 'Absent';
+                        return (
+                          <td key={f} style={{ padding: '2px 3px' }}>
+                            <input type="text" className={`sect-cell-input${isAbsent ? ' absent' : ''}`} value={isAbsent ? 'A' : (val ?? 0)} onChange={e => handleObtainedCell(idx, f, e.target.value)} onKeyDown={handleTableEnterNav} />
+                          </td>
+                        )
+                      })}
+                      {['Q2a','Q2b','Q2c','Q2d'].map((f, fi) => {
+                        const val = row[f];
+                        const isAbsent = val === 'A' || val === 'Absent';
+                        return (
+                          <td key={f} style={{ ...(fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}), padding: '2px 3px' }}>
+                            <input type="text" className={`sect-cell-input${isAbsent ? ' absent' : ''}`} value={isAbsent ? 'A' : (val ?? 0)} onChange={e => handleObtainedCell(idx, f, e.target.value)} onKeyDown={handleTableEnterNav} />
+                          </td>
+                        )
+                      })}
+                      {['Q3a','Q3b','Q3c','Q3d'].map((f, fi) => {
+                        const val = row[f];
+                        const isAbsent = val === 'A' || val === 'Absent';
+                        return (
+                          <td key={f} style={{ ...(fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}), padding: '2px 3px' }}>
+                            <input type="text" className={`sect-cell-input${isAbsent ? ' absent' : ''}`} value={isAbsent ? 'A' : (val ?? 0)} onChange={e => handleObtainedCell(idx, f, e.target.value)} onKeyDown={handleTableEnterNav} />
+                          </td>
+                        )
+                      })}
+                      {['Q4a','Q4b','Q4c','Q4d'].map((f, fi) => {
+                        const val = row[f];
+                        const isAbsent = val === 'A' || val === 'Absent';
+                        return (
+                          <td key={f} style={{ ...(fi === 0 ? { borderLeft: '2px solid #d5d5d5' } : {}), padding: '2px 3px' }}>
+                            <input type="text" className={`sect-cell-input${isAbsent ? ' absent' : ''}`} value={isAbsent ? 'A' : (val ?? 0)} onChange={e => handleObtainedCell(idx, f, e.target.value)} onKeyDown={handleTableEnterNav} />
+                          </td>
+                        )
+                      })}
                       <td className="co-total">{computeSectionAObtainedTotal(row)}</td>
                     </tr>
                   )) : (

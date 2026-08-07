@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { handleTableEnterNav } from '../../utils/tableNav';
 
 const CT_INPUT_CSS = `
 .ct-cell-input {
@@ -230,6 +231,7 @@ const CTSheet = ({
                       className="ct-cell-input"
                       value={row[field] ?? 0}
                       onChange={e => handleCoMapCell(rowIdx, field, e.target.value)}
+                      onKeyDown={handleTableEnterNav}
                     />
                   </td>
                 ))}
@@ -466,6 +468,7 @@ const CTSheet = ({
                               className={`ct-cell-input${isAbsent ? ' absent' : ''}`}
                               value={isAbsent ? 'A' : (val ?? 0)}
                               onChange={e => handleObtainedCell(rowIdx, field, e.target.value)}
+                              onKeyDown={handleTableEnterNav}
                             />
                           </td>
                         );
