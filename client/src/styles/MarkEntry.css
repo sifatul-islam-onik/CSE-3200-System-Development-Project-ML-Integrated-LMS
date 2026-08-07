@@ -598,6 +598,10 @@
 }
 
 @media (max-width: 480px) {
+  .back-btn-text {
+    display: none;
+  }
+
   .mark-entry-body {
     padding: 16px;
   }

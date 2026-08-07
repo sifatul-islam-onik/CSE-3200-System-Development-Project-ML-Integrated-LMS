@@ -247,6 +247,23 @@ export const getTermExamMarks = async (courseId, section = null) => {
 };
 
 /**
+ * Get server-side computed CO attainment datasets for a course.
+ * @param {string} courseId - Course ID
+ */
+export const getCoAttainmentCalcs = async (courseId) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(
+      `${API_URL}/attainment/co-calcs/${courseId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
  * Save Lab Activity attainment data
  * @param {string} courseId - Course ID
  * @param {object} data - Lab Activity data to save

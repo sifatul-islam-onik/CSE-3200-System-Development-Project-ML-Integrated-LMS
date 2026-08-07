@@ -80,6 +80,9 @@ const Login = () => {
       <div className="OBESynK-auth-banner" style={{ background: "linear-gradient(135deg, rgba(4, 120, 87, 0.4), rgba(2, 44, 34, 0.6)), url('/login-background.jpg') center/cover no-repeat" }}>
           <div className="OBESynK-auth-brand-logo">
             <Link to="/" className="OBESynK-auth-logo-text">OBESynK</Link>
+            <div className="OBESynK-auth-full-form">
+              <span className="highlight-symbol">O</span>utcome-<span className="highlight-symbol">B</span>ased <span className="highlight-symbol">E</span>ducation <span className="highlight-symbol">Syn</span>chronized at <span className="highlight-symbol">K</span>UET
+            </div>
           </div>
           <div className="OBESynK-auth-back-nav">
             <Link to="/" className="OBESynK-auth-back-btn">&larr; Back to website</Link>
@@ -88,7 +91,12 @@ const Login = () => {
         </div>
       <main className="OBESynK-login-main">
         <div className="OBESynK-login-container">
-
+          <div className="OBESynK-mobile-brand-logo">
+            <Link to="/" className="OBESynK-auth-logo-text">OBESynK</Link>
+            <div className="OBESynK-auth-full-form">
+              <span className="highlight-symbol">O</span>utcome-<span className="highlight-symbol">B</span>ased <span className="highlight-symbol">E</span>ducation <span className="highlight-symbol">Syn</span>chronized at <span className="highlight-symbol">K</span>UET
+            </div>
+          </div>
           <div className="OBESynK-login-box">
             <header className="OBESynK-login-header">
               <h2>Sign In</h2>
@@ -153,7 +161,7 @@ const Login = () => {
 
               <button
                 type="submit"
-                className={`btn-submit OBESynK-btn-submit ${loading ? 'loading' : ''}`}
+                className={`OBESynK-btn-submit ${loading ? 'loading' : ''}`}
                 disabled={loading}
               >
                 {loading && <span className="spinner"></span>}
