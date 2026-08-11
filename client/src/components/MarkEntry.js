@@ -923,7 +923,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                   <button
                     onClick={() => setShowMarksDistribution(false)}
-                    style={{ padding: '6px 12px', backgroundColor: '#6b7280', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+                    style={{ padding: '6px 12px', backgroundColor: '#6b7280', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}
                   >
                     ←<span className="back-btn-text"> Back</span>
                   </button>

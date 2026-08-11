@@ -1094,7 +1094,7 @@
 
   /* Adjust sidebar header for mobile to avoid overlap with hamburger button */
   .sidebar-header {
-    padding-top: 4rem;
+    padding-top: 4.5rem;
   }
 
   /* Show sidebar overlay when open */
@@ -1208,7 +1208,11 @@
   }
 
   .sidebar-header {
-    padding-top: 4rem;
+    padding-top: 5rem;
+  }
+  
+  .back-btn-text {
+    display: none;
   }
 
   .content-wrapper {
@@ -1576,6 +1580,8 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  white-space: nowrap;
+  display: inline-block;
 }
 
 .proposal-type-badge.create {

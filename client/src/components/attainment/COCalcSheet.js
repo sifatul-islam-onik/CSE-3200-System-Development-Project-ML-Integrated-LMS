@@ -132,7 +132,7 @@ const TheoryCOPOTable = ({ clos, coCalcData, attnAssignObtainedRows, attendanceM
               <th colSpan={clos.length}>Total Marks Distribution</th>
               <th colSpan={clos.length} style={{ backgroundColor: '#10b981', color: '#fff' }}>CO Attainment (Theory)</th>
               <th rowSpan="3" style={{ backgroundColor: '#059669', color: '#fff', fontWeight: '700', fontSize: '14px' }}>Total</th>
-              <th rowSpan="3" style={{ backgroundColor: '#34d399', color: '#fff', fontWeight: '700', fontSize: '14px' }}>Ltr Grade</th>
+              <th rowSpan="3" style={{ backgroundColor: '#10b981', color: '#fff', fontWeight: '700', fontSize: '14px' }}>Ltr Grade</th>
             </tr>
             <tr>
               {clos.map((clo, idx) => <th key={`obt-co-${idx}`}>{(clo.cloNumber || '').toString().replace('CLO', 'CO')}</th>)}

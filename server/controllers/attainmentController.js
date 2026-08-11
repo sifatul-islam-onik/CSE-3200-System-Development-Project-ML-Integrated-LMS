@@ -733,23 +733,38 @@ exports.parseCTUpload = async (req, res) => {
         const c1 = getCellText(row.getCell(1).value).trim().toLowerCase();
         
         if (c1 === 'total marks' || c1 === 'total') {
-          let vals = [];
-          for(let c=2; c<=Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20); c++) {
-             let val = getCellText(row.getCell(c).value).trim();
-             if (val && !isNaN(parseFloat(val))) vals.push(parseFloat(val));
+          const noHeaders = q1Col === -1 && q2Col === -1 && q3Col === -1;
+          const colQ1 = q1Col !== -1 ? q1Col : (noHeaders ? 2 : -1);
+          const colQ2 = q2Col !== -1 ? q2Col : (noHeaders ? 3 : -1);
+          const colQ3 = q3Col !== -1 ? q3Col : (noHeaders ? 4 : -1);
+          if (colQ1 !== -1 && !q1Total) {
+            let val = getCellText(row.getCell(colQ1).value).trim();
+            if (val && !isNaN(parseFloat(val))) q1Total = parseFloat(val);
           }
-          if (!q1Total && vals.length > 0) q1Total = vals[0] || 0;
-          if (!q2Total && vals.length > 1) q2Total = vals[1] || 0;
-          if (!q3Total && vals.length > 2) q3Total = vals[2] || 0;
+          if (colQ2 !== -1 && !q2Total) {
+            let val = getCellText(row.getCell(colQ2).value).trim();
+            if (val && !isNaN(parseFloat(val))) q2Total = parseFloat(val);
+          }
+          if (colQ3 !== -1 && !q3Total) {
+            let val = getCellText(row.getCell(colQ3).value).trim();
+            if (val && !isNaN(parseFloat(val))) q3Total = parseFloat(val);
+          }
         } else if (c1 === 'co mapping' || c1 === 'co no.' || c1 === 'co no' || c1 === 'co') {
-          let vals = [];
-          for(let c=2; c<=Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20); c++) {
-             let val = getCellText(row.getCell(c).value).trim();
-             if (/^(CO|CLO)\d+$/i.test(val)) vals.push(val.replace(/^CLO/i, 'CO').toUpperCase());
+          const colQ1 = q1Col !== -1 ? q1Col : 2;
+          const colQ2 = q2Col !== -1 ? q2Col : (q1Col !== -1 ? -1 : 3);
+          const colQ3 = q3Col !== -1 ? q3Col : (q1Col !== -1 ? -1 : 4);
+          if (colQ1 !== -1 && !q1CO) {
+            let val = getCellText(row.getCell(colQ1).value).trim();
+            if (/^(CO|CLO)\d+$/i.test(val)) q1CO = val.replace(/^CLO/i, 'CO').toUpperCase();
           }
-          if (!q1CO && vals.length > 0) q1CO = vals[0];
-          if (!q2CO && vals.length > 1) q2CO = vals[1];
-          if (!q3CO && vals.length > 2) q3CO = vals[2];
+          if (colQ2 !== -1 && !q2CO) {
+            let val = getCellText(row.getCell(colQ2).value).trim();
+            if (/^(CO|CLO)\d+$/i.test(val)) q2CO = val.replace(/^CLO/i, 'CO').toUpperCase();
+          }
+          if (colQ3 !== -1 && !q3CO) {
+            let val = getCellText(row.getCell(colQ3).value).trim();
+            if (/^(CO|CLO)\d+$/i.test(val)) q3CO = val.replace(/^CLO/i, 'CO').toUpperCase();
+          }
         }
       }
     }
@@ -928,23 +943,39 @@ exports.parseLabUpload = async (req, res) => {
         const c1 = getCellText(row.getCell(1).value).trim().toLowerCase();
         
         if (c1 === 'total marks' || c1 === 'total') {
-          let vals = [];
-          for(let c=2; c<=Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20); c++) {
-             let val = getCellText(row.getCell(c).value).trim();
-             if (val && !isNaN(parseFloat(val))) vals.push(parseFloat(val));
+          const noHeaders = q1Col === -1 && q2Col === -1 && q3Col === -1;
+          const colQ1 = q1Col !== -1 ? q1Col : (noHeaders ? 5 : -1);
+          const colQ2 = q2Col !== -1 ? q2Col : (noHeaders ? 6 : -1);
+          const colQ3 = q3Col !== -1 ? q3Col : (noHeaders ? 7 : -1);
+          if (colQ1 !== -1 && !q1Total) {
+            let val = getCellText(row.getCell(colQ1).value).trim();
+            if (val && !isNaN(parseFloat(val))) q1Total = parseFloat(val);
           }
-          if (!q1Total && vals.length > 0) q1Total = vals[0] || 0;
-          if (!q2Total && vals.length > 1) q2Total = vals[1] || 0;
-          if (!q3Total && vals.length > 2) q3Total = vals[2] || 0;
+          if (colQ2 !== -1 && !q2Total) {
+            let val = getCellText(row.getCell(colQ2).value).trim();
+            if (val && !isNaN(parseFloat(val))) q2Total = parseFloat(val);
+          }
+          if (colQ3 !== -1 && !q3Total) {
+            let val = getCellText(row.getCell(colQ3).value).trim();
+            if (val && !isNaN(parseFloat(val))) q3Total = parseFloat(val);
+          }
         } else if (c1 === 'co mapping' || c1 === 'co no.' || c1 === 'co no' || c1 === 'co') {
-          let vals = [];
-          for(let c=2; c<=Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20); c++) {
-             let val = getCellText(row.getCell(c).value).trim();
-             if (/^(CO|CLO)\d+$/i.test(val)) vals.push(val.replace(/^CLO/i, 'CO').toUpperCase());
+          const noHeaders = q1Col === -1 && q2Col === -1 && q3Col === -1;
+          const colQ1 = q1Col !== -1 ? q1Col : (noHeaders ? 5 : -1);
+          const colQ2 = q2Col !== -1 ? q2Col : (noHeaders ? 6 : -1);
+          const colQ3 = q3Col !== -1 ? q3Col : (noHeaders ? 7 : -1);
+          if (colQ1 !== -1 && !q1CO) {
+            let val = getCellText(row.getCell(colQ1).value).trim();
+            if (/^(CO|CLO)\d+$/i.test(val)) q1CO = val.replace(/^CLO/i, 'CO').toUpperCase();
           }
-          if (!q1CO && vals.length > 0) q1CO = vals[0];
-          if (!q2CO && vals.length > 1) q2CO = vals[1];
-          if (!q3CO && vals.length > 2) q3CO = vals[2];
+          if (colQ2 !== -1 && !q2CO) {
+            let val = getCellText(row.getCell(colQ2).value).trim();
+            if (/^(CO|CLO)\d+$/i.test(val)) q2CO = val.replace(/^CLO/i, 'CO').toUpperCase();
+          }
+          if (colQ3 !== -1 && !q3CO) {
+            let val = getCellText(row.getCell(colQ3).value).trim();
+            if (/^(CO|CLO)\d+$/i.test(val)) q3CO = val.replace(/^CLO/i, 'CO').toUpperCase();
+          }
         }
       }
     }
@@ -1112,23 +1143,39 @@ exports.parseAssignUpload = async (req, res) => {
         const c1 = getCellText(row.getCell(1).value).trim().toLowerCase();
         
         if (c1 === 'total marks' || c1 === 'total') {
-          let vals = [];
-          for(let c=2; c<=Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20); c++) {
-             let val = getCellText(row.getCell(c).value).trim();
-             if (val && !isNaN(parseFloat(val))) vals.push(parseFloat(val));
+          const noHeaders = q1Col === -1 && q2Col === -1 && q3Col === -1;
+          const colQ1 = q1Col !== -1 ? q1Col : (noHeaders ? 2 : -1);
+          const colQ2 = q2Col !== -1 ? q2Col : (noHeaders ? 3 : -1);
+          const colQ3 = q3Col !== -1 ? q3Col : (noHeaders ? 4 : -1);
+          if (colQ1 !== -1 && !q1Total) {
+            let val = getCellText(row.getCell(colQ1).value).trim();
+            if (val && !isNaN(parseFloat(val))) q1Total = parseFloat(val);
           }
-          if (!q1Total && vals.length > 0) q1Total = vals[0] || 0;
-          if (!q2Total && vals.length > 1) q2Total = vals[1] || 0;
-          if (!q3Total && vals.length > 2) q3Total = vals[2] || 0;
+          if (colQ2 !== -1 && !q2Total) {
+            let val = getCellText(row.getCell(colQ2).value).trim();
+            if (val && !isNaN(parseFloat(val))) q2Total = parseFloat(val);
+          }
+          if (colQ3 !== -1 && !q3Total) {
+            let val = getCellText(row.getCell(colQ3).value).trim();
+            if (val && !isNaN(parseFloat(val))) q3Total = parseFloat(val);
+          }
         } else if (c1 === 'co mapping' || c1 === 'co no.' || c1 === 'co no' || c1 === 'co') {
-          let vals = [];
-          for(let c=2; c<=Math.max(worksheet.columnCount || 0, row.cellCount || 0, 20); c++) {
-             let val = getCellText(row.getCell(c).value).trim();
-             if (/^(CO|CLO)\d+$/i.test(val)) vals.push(val.replace(/^CLO/i, 'CO').toUpperCase());
+          const noHeaders = q1Col === -1 && q2Col === -1 && q3Col === -1;
+          const colQ1 = q1Col !== -1 ? q1Col : (noHeaders ? 2 : -1);
+          const colQ2 = q2Col !== -1 ? q2Col : (noHeaders ? 3 : -1);
+          const colQ3 = q3Col !== -1 ? q3Col : (noHeaders ? 4 : -1);
+          if (colQ1 !== -1 && !q1CO) {
+            let val = getCellText(row.getCell(colQ1).value).trim();
+            if (/^(CO|CLO)\d+$/i.test(val)) q1CO = val.replace(/^CLO/i, 'CO').toUpperCase();
           }
-          if (!q1CO && vals.length > 0) q1CO = vals[0];
-          if (!q2CO && vals.length > 1) q2CO = vals[1];
-          if (!q3CO && vals.length > 2) q3CO = vals[2];
+          if (colQ2 !== -1 && !q2CO) {
+            let val = getCellText(row.getCell(colQ2).value).trim();
+            if (/^(CO|CLO)\d+$/i.test(val)) q2CO = val.replace(/^CLO/i, 'CO').toUpperCase();
+          }
+          if (colQ3 !== -1 && !q3CO) {
+            let val = getCellText(row.getCell(colQ3).value).trim();
+            if (/^(CO|CLO)\d+$/i.test(val)) q3CO = val.replace(/^CLO/i, 'CO').toUpperCase();
+          }
         }
       }
     }
