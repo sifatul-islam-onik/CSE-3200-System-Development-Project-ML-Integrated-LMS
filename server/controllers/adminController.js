@@ -181,8 +181,7 @@ exports.importStudentsFromExcel = async (req, res) => {
         father: normalizeVal(row, ['father', 'Father']),
         mother: normalizeVal(row, ['mother', 'Mother']),
         hall: normalizeVal(row, ['hall', 'Hall']),
-        scholarship: normalizeVal(row, ['scholarship', 'Scholarship']),
-        department: normalizeVal(row, ['department', 'Department', 'dept', 'Dept'])
+        scholarship: normalizeVal(row, ['scholarship', 'Scholarship'])
       });
     }
 
@@ -205,7 +204,7 @@ exports.importStudentsFromExcel = async (req, res) => {
     const intraBatchRolls = new Set();
 
     for (const data of processedRows) {
-      const { idx, roll, name, email, deptCode, advisor, father, mother, hall, scholarship, department } = data;
+      const { idx, roll, name, email, deptCode, advisor, father, mother, hall, scholarship } = data;
 
       if (existingEmails.has(email) || existingRolls.has(roll) || intraBatchEmails.has(email) || intraBatchRolls.has(roll)) {
         results.skipped.push({ row: idx + 2, roll, email, reason: 'Email or roll already exists/duplicated' });
@@ -215,11 +214,9 @@ exports.importStudentsFromExcel = async (req, res) => {
       intraBatchEmails.add(email);
       intraBatchRolls.add(roll);
 
-      let finalDepartment = department;
-      if (!finalDepartment && deptCode && deptMap.has(deptCode)) {
+      let finalDepartment = '';
+      if (deptCode && deptMap.has(deptCode)) {
         finalDepartment = deptMap.get(deptCode);
-      } else if (!finalDepartment) {
-        finalDepartment = '';
       }
 
       const randomPassword = generateRandomPassword();
@@ -286,6 +283,17 @@ exports.getStudentBatches = async (req, res) => {
   } catch (error) {
     console.error('Get student batches error:', error);
     return res.status(500).json({ success: false, message: 'Server error fetching student batches' });
+  }
+};
+
+exports.getDepartments = async (req, res) => {
+  try {
+    const Department = require('../models/Department');
+    const departments = await Department.find({ isActive: true }).select('_id name numericCode').sort({ _id: 1 });
+    return res.status(200).json({ success: true, data: departments });
+  } catch (error) {
+    console.error('Get departments error:', error);
+    return res.status(500).json({ success: false, message: 'Server error fetching departments' });
   }
 };
 
@@ -1238,6 +1246,21 @@ exports.assignBatchToCourse = async (req, res) => {
     }
 
 
+    const TermResult = require('../models/TermResult');
+    const publishedResult = await TermResult.findOne({
+      batch: batch,
+      deptCode: deptCode,
+      yearLevel: y,
+      term: t,
+      isPublished: true
+    });
+
+    if (publishedResult) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot assign batch: Results for year ${y}, term ${t} are already published for this batch.`
+      });
+    }
 
     const existingForBatch = await Course.find({
       'assignedBatches.batch': batch,
@@ -1577,4 +1600,3 @@ exports.normalizeBatchAssignments = async (req, res) => {
     });
   }
 };
-

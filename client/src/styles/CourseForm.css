@@ -43,6 +43,9 @@
   margin: 0;
   font-family: Arial, Helvetica, sans-serif;
   letter-spacing: 0;
+  flex: 1;
+  padding-right: 1rem;
+  word-break: break-word;
 }
 
 .close-btn {
@@ -58,6 +61,7 @@
   justify-content: center;
   border-radius: var(--radius-sm);
   transition: var(--transition-base);
+  flex-shrink: 0;
 }
 
 .close-btn:hover:not(:disabled) {
@@ -224,12 +228,13 @@
 /* Responsive */
 @media (max-width: 768px) {
   .course-form-overlay {
-    padding: 0;
+    padding: 1rem;
+    padding-top: 5rem;
   }
 
   .course-form-container {
-    max-height: 100vh;
-    border-radius: 0;
+    max-height: calc(100vh - 6rem);
+    border-radius: var(--radius-lg);
   }
 
   .form-row {

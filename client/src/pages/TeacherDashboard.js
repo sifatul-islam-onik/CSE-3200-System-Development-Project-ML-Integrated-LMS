@@ -35,15 +35,15 @@ const TeacherDashboard = () => {
     } else if (type === 'assignment') {
       ws_data = [
         ['Manual Wt', ''],
-        ['Total Marks', '[Q1 Total]', '[Q2 Total]', '[Q3 Total]'],
-        ['CO Mapping', '[Q1 CO]', '[Q2 CO]', '[Q3 CO]'],
+        ['Total Marks', '', '[Q1 Total]', '[Q2 Total]', '[Q3 Total]'],
+        ['CO Mapping', '', '[Q1 CO]', '[Q2 CO]', '[Q3 CO]'],
         ['Roll', 'Attn. Perf.', 'Q1', 'Q2', 'Q3']
       ];
     } else if (type === 'lab') {
       ws_data = [
         ['Manual Wt', ''],
-        ['Total Marks', '[Q1 Total]', '[Q2 Total]', '[Q3 Total]'],
-        ['CO Mapping', '[Q1 CO]', '[Q2 CO]', '[Q3 CO]'],
+        ['Total Marks', '', '', '', '[Q1 Total]', '[Q2 Total]', '[Q3 Total]'],
+        ['CO Mapping', '', '', '', '[Q1 CO]', '[Q2 CO]', '[Q3 CO]'],
         ['Roll', 'Attn.', 'Quiz', 'C. Viva', 'Q1', 'Q2', 'Q3', 'Other']
       ];
     }
@@ -627,7 +627,7 @@ const TeacherDashboard = () => {
                   {/* Breadcrumb Navigation */}
                   {courseGroupPath && (
                     <div className="breadcrumb-nav">
-                      <button className="breadcrumb-btn" onClick={goBackGroup}>← Back</button>
+                      <button className="breadcrumb-btn" onClick={goBackGroup}>←<span className="back-btn-text"> Back</span></button>
                     </div>
                   )}
 
@@ -1420,7 +1420,10 @@ const TeacherDashboard = () => {
                         Row 2: <code>Total Marks</code> | &lt;Q1 total&gt; | &lt;Q2 total&gt; | &lt;Q3 total&gt;<br />
                         Row 3: <code>CO Mapping</code> | &lt;Q1 CO&gt; | &lt;Q2 CO&gt; | &lt;Q3 CO&gt;<br />
                         Row 4: <code>Roll</code> | <code>Q1</code> | <code>Q2</code> | <code>Q3</code><br />
-                        Row 5+: roll number | Q1 marks | Q2 marks | Q3 marks
+                        Row 5+: roll number | Q1 marks | Q2 marks | Q3 marks<br />
+                        <span style={{ color: '#d97706', marginTop: '6px', display: 'inline-block' }}>
+                          <em>Note: If a question (e.g. Q2) is not applicable, leave its column completely blank. Do not shift other columns left to fill the empty space!</em>
+                        </span>
                       </div>
 
                       {/* Parsed preview */}
@@ -1858,10 +1861,13 @@ const TeacherDashboard = () => {
                     <div style={{ marginBottom: '12px', padding: '10px', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', color: '#6b7280' }}>
                       <strong>Expected file format:</strong><br />
                       Row 1: <code>Manual Wt</code> | &lt;value&gt;<br />
-                      Row 2: <code>Total Marks</code> | &lt;Q1 total&gt; | &lt;Q2 total&gt; | &lt;Q3 total&gt;<br />
-                      Row 3: <code>CO Mapping</code> | &lt;Q1 CO&gt; | &lt;Q2 CO&gt; | &lt;Q3 CO&gt;<br />
+                      Row 2: <code>Total Marks</code> | &lt;empty&gt; | &lt;empty&gt; | &lt;empty&gt; | &lt;Q1 total&gt; | &lt;Q2 total&gt; | &lt;Q3 total&gt;<br />
+                      Row 3: <code>CO Mapping</code> | &lt;empty&gt; | &lt;empty&gt; | &lt;empty&gt; | &lt;Q1 CO&gt; | &lt;Q2 CO&gt; | &lt;Q3 CO&gt;<br />
                       Row 4: <code>Roll</code> | <em>[opt]</em> <code>Attn.</code> | <code>Quiz</code> | <code>C. Viva</code> | <code>Q1</code> | <code>Q2</code> | <code>Q3</code> | <em>[opt]</em> <code>Other</code><br />
-                      Row 5+: roll | attn (opt) | quiz (opt) | viva (opt) | Q1 | Q2 | Q3 marks | other (opt)
+                      Row 5+: roll | attn (opt) | quiz (opt) | viva (opt) | Q1 | Q2 | Q3 marks | other (opt)<br />
+                      <span style={{ color: '#d97706', marginTop: '6px', display: 'inline-block' }}>
+                        <em>Note: If a column is not applicable, leave it completely blank. Do not shift other columns left to fill the empty space!</em>
+                      </span>
                     </div>
 
                     {/* Parsed preview */}
@@ -2331,10 +2337,13 @@ const TeacherDashboard = () => {
                     <div style={{ marginBottom: '12px', padding: '10px', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px', color: '#6b7280' }}>
                       <strong>Expected file format:</strong><br />
                       Row 1: <code>Manual Wt</code> | &lt;value&gt;<br />
-                      Row 2: <code>Total Marks</code> | &lt;Q1 total&gt; | &lt;Q2 total&gt; | &lt;Q3 total&gt;<br />
-                      Row 3: <code>CO Mapping</code> | &lt;Q1 CO&gt; | &lt;Q2 CO&gt; | &lt;Q3 CO&gt;<br />
+                      Row 2: <code>Total Marks</code> | &lt;empty&gt; | &lt;Q1 total&gt; | &lt;Q2 total&gt; | &lt;Q3 total&gt;<br />
+                      Row 3: <code>CO Mapping</code> | &lt;empty&gt; | &lt;Q1 CO&gt; | &lt;Q2 CO&gt; | &lt;Q3 CO&gt;<br />
                       Row 4: <code>Roll</code> | <em>[optional]</em> <code>Attn. Perf.</code> | <code>Q1</code> | <code>Q2</code> | <code>Q3</code><br />
-                      Row 5+: roll | attn perf (optional) | Q1 | Q2 | Q3 marks
+                      Row 5+: roll | attn perf (optional) | Q1 | Q2 | Q3 marks<br />
+                      <span style={{ color: '#d97706', marginTop: '6px', display: 'inline-block' }}>
+                        <em>Note: If a column is not applicable, leave it completely blank. Do not shift other columns left to fill the empty space!</em>
+                      </span>
                     </div>
 
                     {/* Parsed preview */}

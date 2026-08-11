@@ -233,8 +233,10 @@ const StudentDashboard = () => {
                                     <span 
                                       className="proposal-type-badge" 
                                       style={{ 
-                                        backgroundColor: course.course_type === 'THEORY' ? '#04152b' : 
-                                                         course.course_type === 'SESSIONAL' ? '#1f7a4a' : '#505f78'
+                                        backgroundColor: course.course_type === 'THEORY' ? '#e0f2fe' : 
+                                                         course.course_type === 'SESSIONAL' ? '#d1fae5' : '#fef3c7',
+                                        color: course.course_type === 'THEORY' ? '#0369a1' : 
+                                               course.course_type === 'SESSIONAL' ? '#065f46' : '#92400e'
                                       }}
                                     >
                                       {course.course_type}
