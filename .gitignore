@@ -9,6 +9,13 @@ ml_server_colab
 # Environment variables
 .env
 
+# Manuscript and research data (kept local, never published)
+System Project/
+validation_data/
+
+# Generated exports (may contain student credentials/PII)
+server/data/
+
 # Logs
 logs
 *.log
