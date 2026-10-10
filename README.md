@@ -159,9 +159,25 @@ Both `ml_server/app.py` and `ml_server_huggingface/app.py` expose:
 
 ### OCR Model Stack
 
-- `PP-DocLayout_plus-L`: layout/table detection
-- `RT-DETR-L_wired_table_cell_det`: cell detection
-- `en_PP-OCRv5_mobile_rec`: text recognition
+| Model | Role |
+|---|---|
+| `PP-DocLayout_plus-L` | layout/table detection |
+| `RT-DETR-L_wired_table_cell_det` | cell detection |
+| `en_PP-OCRv5_mobile_rec` | text recognition |
+
+All three are pretrained PaddlePaddle models used without fine-tuning. On first start, PaddleX downloads them from Hugging Face into `~/.paddlex/official_models/`.
+
+#### Model versions used for the published benchmark
+
+The benchmark results were produced with `paddleocr==3.3.2`, `paddlex==3.3.12` and `paddlepaddle==3.0.0` (CPU), using these model revisions:
+
+| Model | Hugging Face revision | SHA-256 of `inference.pdiparams` |
+|---|---|---|
+| [`PaddlePaddle/PP-DocLayout_plus-L`](https://huggingface.co/PaddlePaddle/PP-DocLayout_plus-L) | `aa52b8528c84f9b1a34ac3a88fe0e576edb9d11d` | `24ca3e2e442164505e250deef59f7ee9a54ea12dd32875c9cd6155d959dc97da` |
+| [`PaddlePaddle/RT-DETR-L_wired_table_cell_det`](https://huggingface.co/PaddlePaddle/RT-DETR-L_wired_table_cell_det) | `e2bd53c06b3a815d86acbf5c6779dada58819cfe` | `357321c2845f0a035e8d118622649685a3cdb89d28b09a64e45a5a3df7a9fedc` |
+| [`PaddlePaddle/en_PP-OCRv5_mobile_rec`](https://huggingface.co/PaddlePaddle/en_PP-OCRv5_mobile_rec) | `267c36e24c331595590fe7bd72bde2436fd286f2` | `3ec8a97ed6cefe8568d3e2ee90bb193299b566a7661aa4fd52d224b96b59f66b` |
+
+To check a local copy, compare `sha256sum ~/.paddlex/official_models/<model>/inference.pdiparams` with the table. To fetch exactly these revisions, download each repository at the listed revision (for example `huggingface-cli download PaddlePaddle/en_PP-OCRv5_mobile_rec --revision 267c36e24c331595590fe7bd72bde2436fd286f2 --local-dir ~/.paddlex/official_models/en_PP-OCRv5_mobile_rec`) before starting the service.
 
 ### Extraction Strategy
 
@@ -225,10 +241,10 @@ Important keys:
 
 ### Prerequisites
 
-- Node.js (v14+)
+- Node.js 20 or later (Docker images use Node 20; development used Node 22)
 - MongoDB
 - Redis
-- Python 3.8+
+- Python 3.10
 
 ### 1) Start Redis
 
@@ -307,6 +323,7 @@ The backend tests are designed to cover both base models and integration behavio
 - **Course Integration (`controllers/courseController.test.js`):** Used to validate curriculum creation. Ensures that only System Admins can create courses, parses specific course codes (e.g. Sessional/Theory odd-even digit constraints), processes KPA arrays, and enforces appropriate reading roles.
 - **Curriculum Validation Unit Tests (`utils/curriculumValidation.test.js`):** Used to validate OBE consistency helpers (CO validation, PO coverage aggregation, semester-year consistency, assessment plan checks, and CO-PO matrix generation).
 - **Token Utility Unit Tests (`utils/tokenUtils.test.js`):** Used to validate secure token generation and deterministic SHA-256 hashing behavior for auth/password-reset flows.
+- **CO Attainment Unit Tests (`utils/coAttainmentCalc.test.js`):** Used to check course-level theory CO attainment: Section B allocations, COs assessed in both sections, allocations limited to attempted questions, and agreement with the per-student values shown in the CO Attainment sheet.
 
 To run the backend tests and generate a coverage report:
 ```bash
@@ -346,7 +363,6 @@ npm test
 - `npm run seed-po` - seed program outcomes
 - `npm test` - run Jest with coverage
 - `npm run test:watch` - watch-mode tests
-- `npm run test:redis` - Redis connectivity test
 
 ### Client (`client/package.json`)
 

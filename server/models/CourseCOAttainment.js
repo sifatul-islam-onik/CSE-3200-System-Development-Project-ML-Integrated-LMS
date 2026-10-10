@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const coStatSchema = new mongoose.Schema({
   coNumber: { type: String, required: true }, // e.g., 'CO1', 'CO2'
-  targetThreshold: { type: Number, default: 40 }, // Default passing percentage threshold (e.g. 40%)
+  targetThreshold: { type: Number, default: 40 }, // Student-level threshold used for this record (set to 55 by coAttainmentCalc)
   studentsAttempted: { type: Number, default: 0 },
   studentsPassed: { type: Number, default: 0 },
   passPercentage: { type: Number, default: 0 },

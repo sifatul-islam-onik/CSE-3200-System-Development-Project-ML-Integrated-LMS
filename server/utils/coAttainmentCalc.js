@@ -162,21 +162,13 @@ const getSectionMarksDistribution = (coRow, studentObtainedRow, isSectionB = fal
   }
 };
 
+// Uses the same per-student totals as the CO Attainment sheet (buildTheoryTotalsByStudent),
+// so stored course-level results agree with what teachers see. Section B rows store their
+// allocations as Q1a-Q4d, and only the questions a student attempted count toward the allocation.
 const calculateTheoryCOAttainment = (students, coNumbers, attainmentData) => {
-  const { sectionAData, sectionBData, ctData, assignData } = attainmentData;
-  const { sectionARows = [], sectionAObtainedRows = [] } = sectionAData;
-  const { sectionBRows = [], sectionBObtainedRows = [] } = sectionBData;
-
-  const ctTaken = (ctData?.ctSummary?.ctTaken) || 3;
-  const allCTFields = ['CT1_Q1', 'CT1_Q2', 'CT1_Q3', 'CT2_Q1', 'CT2_Q2', 'CT2_Q3', 'CT3_Q1', 'CT3_Q2', 'CT3_Q3'];
-  const activeCTFields = allCTFields.slice(0, ctTaken * 3);
-
-  const assignTaken = (assignData?.assignmentSummary?.assignTaken) || 3;
-  const allAssignFields = ['Assgn1_Q1', 'Assgn1_Q2', 'Assgn1_Q3', 'Assgn2_Q1', 'Assgn2_Q2', 'Assgn2_Q3', 'Assgn3_Q1', 'Assgn3_Q2', 'Assgn3_Q3'];
-  const activeAssignFields = allAssignFields.slice(0, assignTaken * 3);
-
-  const factoredCTTotals = calculateFactoredCOTotals(ctData, activeCTFields, coNumbers);
-  const factoredAssignTotals = calculateFactoredAssignmentCOTotals(assignData, activeAssignFields, coNumbers);
+  const totalsByStudent = buildTheoryTotalsByStudent(students, coNumbers, attainmentData || {
+    sectionAData: {}, sectionBData: {}, ctData: {}, assignData: {}
+  });
 
   const coStats = {};
   coNumbers.forEach(co => {
@@ -186,34 +178,14 @@ const calculateTheoryCOAttainment = (students, coNumbers, attainmentData) => {
     };
   });
 
-  students.forEach(student => {
-    const studentObtA = sectionAObtainedRows.find(r => String(r.rollNumber || '').trim().toLowerCase() === String(student.roll || '').trim().toLowerCase());
-    const studentObtB = sectionBObtainedRows.find(r => String(r.rollNumber || '').trim().toLowerCase() === String(student.roll || '').trim().toLowerCase());
-
+  totalsByStudent.forEach(studentRow => {
     coNumbers.forEach(coNumber => {
-      const coRowA = sectionARows.find(r => String(r.coNumber || '').replace('CLO', 'CO') === coNumber);
-      const coRowB = sectionBRows.find(r => String(r.coNumber || '').replace('CLO', 'CO') === coNumber);
+      const { obtained = 0, distribution = 0 } = studentRow.totals[coNumber] || {};
 
-      let distA = 0; let distB = 0;
-      if (coRowA) {
-        ['Q1a','Q1b','Q1c','Q1d','Q2a','Q2b','Q2c','Q2d','Q3a','Q3b','Q3c','Q3d','Q4a','Q4b','Q4c','Q4d'].forEach(f => distA += (parseFloat(coRowA[f]) || 0));
-      }
-      if (coRowB) {
-        ['Q5a','Q5b','Q5c','Q5d','Q6a','Q6b','Q6c','Q6d','Q7a','Q7b','Q7c','Q7d','Q8a','Q8b','Q8c','Q8d'].forEach(f => distB += (parseFloat(coRowB[f]) || 0));
-      }
-
-      const totalDist = distA + distB + (factoredCTTotals[coNumber] || 0) + (factoredAssignTotals[coNumber] || 0);
-
-      const obtA = computeSectionCOMarks(studentObtA, coRowA);
-      const obtB = computeSectionCOMarks(studentObtB, coRowB);
-      const obtCT = getStudentCTFactoredMarks(student.roll, coNumber, ctData);
-      const obtAssign = getStudentAssignmentFactoredMarks(student.roll, coNumber, assignData);
-      const totalObt = obtA + obtB + obtCT + obtAssign;
-
-      if (totalDist > 0) {
+      if (distribution > 0) {
         coStats[coNumber].attempted += 1;
-        const percentage = (totalObt / totalDist) * 100;
-        if (percentage >= 55.0) { // Using standard 40% pass threshold
+        const percentage = Number(((obtained / distribution) * 100).toFixed(4));
+        if (percentage >= 55.0) { // Student-level CO achievement threshold
           coStats[coNumber].passedThreshold += 1;
         }
       }

@@ -51,7 +51,6 @@ const termExamMarksSchema = new mongoose.Schema({
   timestamps: true
 });
 
-termExamMarksSchema.index({ courseId: 1, studentId: 1, examType: 1 });
-termExamMarksSchema.index({ courseId: 1, year: 1, semester: 1, section: 1 });
+termExamMarksSchema.index({ course: 1, student: 1, section: 1 });
 
 module.exports = mongoose.model('TermExamMarks', termExamMarksSchema);

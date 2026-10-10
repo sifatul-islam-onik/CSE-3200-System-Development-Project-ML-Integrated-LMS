@@ -12,6 +12,7 @@ ml_server_colab
 # Manuscript and research data (kept local, never published)
 System Project/
 validation_data/
+papers/
 
 # Generated exports (may contain student credentials/PII)
 server/data/
