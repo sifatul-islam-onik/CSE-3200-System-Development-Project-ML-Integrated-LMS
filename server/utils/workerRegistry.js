@@ -212,6 +212,20 @@ class WorkerRegistry {
     return selectedWorker;
   }
 
+  // A refused or dropped connection means the worker is down. Without this, a dead worker stays
+  // selectable for up to 180 s and, with no active requests, wins the least-active choice.
+  markUnhealthy(workerId, reason = '') {
+    const worker = this.workers.get(workerId);
+    if (!worker) return;
+    worker.status = 'unhealthy';
+    worker.lastHealthCheckSuccess = null;
+    console.warn(`Worker ${workerId} marked unhealthy until its next successful health check${reason ? ` (${reason})` : ''}`);
+  }
+
+  isConnectionError(error) {
+    return Boolean(error && error.isAxiosError && !error.response);
+  }
+
   requestStart(workerId) {
     const worker = this.workers.get(workerId);
     if (worker) {

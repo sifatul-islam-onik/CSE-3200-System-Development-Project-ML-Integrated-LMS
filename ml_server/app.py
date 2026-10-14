@@ -10,7 +10,7 @@ import tempfile
 import json
 from typing import Dict, List, Optional
 from paddleocr import TableCellsDetection, TextRecognition, LayoutDetection
-from PIL import Image
+from PIL import Image, ImageOps
 import re
 
 app = FastAPI(title="Marks Extraction API")
@@ -111,7 +111,8 @@ def unwarp_and_detect_tables(image_path, output_dir):
     for res in layout_output:
         res.save_to_json(save_path=detection_json_path)
     
-    original_image = Image.open(image_path)
+    # Apply the EXIF orientation, as the layout model's image reader does, so the box matches the pixels
+    original_image = ImageOps.exif_transpose(Image.open(image_path))
     
     with open(detection_json_path, "r") as f:
         res_dict = json.load(f)

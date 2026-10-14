@@ -166,6 +166,9 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
 
     if (workerId) {
       workerRegistry.requestComplete(workerId, false);
+      if (workerRegistry.isConnectionError(error)) {
+        workerRegistry.markUnhealthy(workerId, error.code || error.message);
+      }
     }
     
     done(new Error(error.message));
