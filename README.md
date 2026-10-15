@@ -27,6 +27,7 @@ The system supports regular LMS workflows (courses, users, outcomes, marks, resu
 - [Configuration](#configuration)
 - [Running Locally](#running-locally)
 - [Testing](#testing)
+- [Reproducing the Benchmark](#reproducing-the-benchmark)
 - [Scripts](#scripts)
 - [Security Notes](#security-notes)
 - [Project Structure](#project-structure)
@@ -140,6 +141,10 @@ The backend (`server/server.js`) initializes in this sequence:
 5. ML server runs table detection, cell detection, and OCR recognition.
 6. Worker stores extracted marks + confidence and marks job as completed.
 7. Client polls `/api/ocr/status/:jobId` for progress/result.
+8. The teacher checks the pre-filled marks grid and saves. Some cells are highlighted until the teacher changes them. The ML service returns these cells in `review`:
+   - marks recognised with a score below 0.90;
+   - digits rejected below the 0.55 threshold;
+   - every row from a row label that could not be read, when marks follow it, because those rows may have moved up by one.
 
 Security characteristics:
 
@@ -186,6 +191,7 @@ To check a local copy, compare `sha256sum ~/.paddlex/official_models/<model>/inf
 - Run multiple preprocessing variants per cell.
 - Pick best-confidence recognition output.
 - Parse into row labels (`a..g`) and question columns (`1..8`).
+- Flag the cells the teacher should check (`review` in the response; see step 8 of the OCR processing pipeline).
 
 ---
 
@@ -321,6 +327,8 @@ The backend tests are designed to cover both base models and integration behavio
 - **Authentication Integration (`controllers/authController.test.js`):** Used to verify the system login flows. It ensures passwords are valid, correct JWT tokens are generated, and role-based metadata is assigned directly upon login.
 - **Attainment Integration (`controllers/attainmentController.test.js`):** Used to test the most complex module: Core OBE Business Logic. It verifies that Teachers have proper role permissions, evaluates saving structures for Continuous Assessment (CT/Assignments) marks, and successfully intercepts/purges data cache pipelines during resets.
 - **Course Integration (`controllers/courseController.test.js`):** Used to validate curriculum creation. Ensures that only System Admins can create courses, parses specific course codes (e.g. Sessional/Theory odd-even digit constraints), processes KPA arrays, and enforces appropriate reading roles.
+- **Program Outcome Integration (`controllers/programOutcomeController.test.js`):** Used to check PO listing and lookup by code, and that only an authenticated admin can update a PO.
+- **Worker Registry Unit Tests (`utils/workerRegistry.test.js`):** Used to check OCR worker routing on failure: a worker whose connection fails is excluded at once, readmitted after its next successful health check, and kept out while health checks keep failing.
 - **Curriculum Validation Unit Tests (`utils/curriculumValidation.test.js`):** Used to validate OBE consistency helpers (CO validation, PO coverage aggregation, semester-year consistency, assessment plan checks, and CO-PO matrix generation).
 - **Token Utility Unit Tests (`utils/tokenUtils.test.js`):** Used to validate secure token generation and deterministic SHA-256 hashing behavior for auth/password-reset flows.
 - **CO Attainment Unit Tests (`utils/coAttainmentCalc.test.js`):** Used to check course-level theory CO attainment: Section B allocations, COs assessed in both sections, allocations limited to attempted questions, and agreement with the per-student values shown in the CO Attainment sheet.
@@ -350,6 +358,104 @@ To run frontend tests:
 cd client
 npm test
 ```
+
+### Continuous Integration
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the server and client test suites on every push to `main` and on every pull request. The server suites need no `.env`: `__tests__/setup/env.js` supplies test values for the JWT settings.
+
+---
+
+## Reproducing the Benchmark
+
+The scripts in `ml_server/benchmark/` and `server/benchmark/` produce the OCR and throughput results reported in the OBESynK paper. All results were produced with release `v1.0.2`, on CPU only.
+
+### Data
+
+The benchmark dataset is archived on Zenodo (the DOI is given in the paper's Data availability statement). It contains:
+
+| Path | Content |
+|---|---|
+| `images/image_01.jpg` … `image_100.jpg` | 100 phone photographs of the answer-script marks table |
+| `ground_truth.json` | Transcribed marks for every cell (rows a–g × 4 questions per image) |
+| `images.csv` | Section, split (`dev`: `image_01`–`30`, one writer; `test`: `image_31`–`100`, seven other writers) and writer ID |
+
+Images 66–100 rely on their EXIF Orientation tag. The scripts apply it; any other tool must too.
+
+### Setup
+
+```bash
+cd ml_server
+python -m venv venv
+venv/Scripts/activate          # Linux/macOS: source venv/bin/activate
+pip install -r requirements.txt
+```
+
+Use the model revisions listed under [Model versions used for the published benchmark](#model-versions-used-for-the-published-benchmark). The direct-OCR baseline also uses PaddleOCR's default text-detection model, `PP-OCRv5_server_det`, which is downloaded on its first run. The commands below are run from `ml_server/`, with `DATA` set to the unpacked dataset and `RUNS` to an output folder:
+
+```bash
+DATA=../obesynk_benchmark
+RUNS=../benchmark_runs
+```
+
+### OCR accuracy, ablation and processing time
+
+Each configuration is run once over all 100 images. The run folder names are the ones `analyze.py` expects.
+
+```bash
+python benchmark/run_ocr_benchmark.py --config full        --images $DATA/images --gt $DATA/ground_truth.json --out $RUNS/A0_full
+python benchmark/run_ocr_benchmark.py --config full_client --images $DATA/images --gt $DATA/ground_truth.json --out $RUNS/A0c_full_client
+python benchmark/run_ocr_benchmark.py --config no_layout   --images $DATA/images --gt $DATA/ground_truth.json --out $RUNS/A1_no_layout
+python benchmark/run_ocr_benchmark.py --config direct_ocr  --images $DATA/images --gt $DATA/ground_truth.json --out $RUNS/B1_direct_ocr
+
+python benchmark/analyze.py --runs $RUNS --gt $DATA/ground_truth.json --manifest $DATA/images.csv
+```
+
+| Configuration | Description |
+|---|---|
+| `full` | The production pipeline in `app.py`, unchanged |
+| `full_client` | The same pipeline on the image as the web client uploads it (orientation applied, longest side 1920 px, JPEG quality 0.92) |
+| `no_layout` | The production pipeline without the layout crop |
+| `direct_ocr` | Baseline: PaddleOCR text detection and the same recognizer on the whole photograph, with each value assigned to the nearest row and column of the printed grid (`baselines.py`) |
+
+`analyze.py` writes to `$RUNS/analysis/`:
+- `RESULTS.md`: all tables.
+- `main_table.csv`: accuracy, precision, recall, F1, Wilson intervals, McNemar tests and time per script, for each configuration and split. The single-variant rows (v1–v4) are rebuilt offline from the `full` log, using the same selection rule and the same 0.55 threshold.
+- `a0_error_cells.csv`: every error of the full pipeline, with its cause.
+- `per_writer.csv`, `per_image.csv` and `threshold_sweep.csv`: the per-writer, per-image and threshold breakdowns.
+
+Processing times depend on the hardware. The paper's times were measured on an Intel Core i3-1215U laptop with 16 GB RAM. The extracted marks were identical on the two laptops tested.
+
+### Throughput and failure handling
+
+These runs use the real submission path: API, Bull queue and OCR worker pool. They need:
+- a local Redis on `127.0.0.1:6379` (database 7 is used and flushed);
+- `npm install` in `server/`.
+
+Each run starts its own in-memory MongoDB, ML workers and API, with random credentials. It never reads `server/.env`.
+
+```bash
+# The 30 development images as the web client uploads them
+python benchmark/make_client_inputs.py --images $DATA/images --out $RUNS/client_inputs
+
+# One and two workers on this machine (the paper ran each configuration twice: _r1, _r2)
+python benchmark/run_scalability.py --workers 1 --images $RUNS/client_inputs --gt $DATA/ground_truth.json --out $RUNS/scalability/L1_r1
+python benchmark/run_scalability.py --workers 2 --images $RUNS/client_inputs --gt $DATA/ground_truth.json --out $RUNS/scalability/L2_r1
+
+# Failure test: worker 2 is stopped 60 s into the burst and restarted 120 s later
+python benchmark/run_scalability.py --workers 2 --images $RUNS/client_inputs --gt $DATA/ground_truth.json --out $RUNS/scalability/F2_r1 \
+    --kill-worker 2 --kill-at 60 --restart-at 180
+
+# Second machine: start a worker there first (same requirements and models):
+#   ML_API_KEY=<key> uvicorn app:app --host 0.0.0.0 --port 8000
+python benchmark/run_scalability.py --workers 1 --remote-workers http://<host>:8000 --api-key <key> \
+    --images $RUNS/client_inputs --gt $DATA/ground_truth.json --out $RUNS/scalability/M2_r1
+
+python benchmark/summarize_scalability.py --runs $RUNS/scalability --a0 $RUNS/A0c_full_client
+```
+
+`summarize_scalability.py` writes `SCALABILITY.md` and `runs_summary.json`. They contain throughput, queue waiting time, processing time, CPU use and peak memory per process, failed and retried jobs, and a check that the marks returned under load equal the single-image `full_client` run. To record CPU and memory on a remote worker, run `benchmark/monitor_worker.py --out <file.csv>` on that machine during the burst.
+
+`measure_resources.py` and `summarize_resources.py` measure the CPU and memory of a single configuration outside the queue; see the usage notes at the top of each script.
 
 ---
 
