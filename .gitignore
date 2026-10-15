@@ -38,3 +38,7 @@ Thumbs.db
 # Build
 build/
 dist/
+
+# Python bytecode
+__pycache__/
+*.pyc
