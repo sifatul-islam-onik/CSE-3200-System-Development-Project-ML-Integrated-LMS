@@ -109,6 +109,7 @@ ocrQueue.process(CONCURRENCY, async (job, done) => {
         marks: mlResponse.data.marks,
         confidence: mlResponse.data.confidence,
         rawTable: mlResponse.data.raw_table,
+        review: mlResponse.data.review || null,
         progress: 100,
         completedAt: new Date(),
         processedBy: workerId,

@@ -22,6 +22,7 @@ class OCRJobStore {
       marks: null,
       confidence: null,
       rawTable: null,
+      review: null,
       error: null,
       createdAt: new Date().toISOString(),
       startedAt: null,
@@ -95,6 +96,9 @@ class OCRJobStore {
     if (formattedUpdates.rawTable && typeof formattedUpdates.rawTable === 'object') {
        formattedUpdates.rawTable = JSON.stringify(formattedUpdates.rawTable);
     }
+    if (formattedUpdates.review && typeof formattedUpdates.review === 'object') {
+       formattedUpdates.review = JSON.stringify(formattedUpdates.review);
+    }
     if (formattedUpdates.completedAt instanceof Date) {
        formattedUpdates.completedAt = formattedUpdates.completedAt.toISOString();
     }
@@ -125,7 +129,8 @@ class OCRJobStore {
     try { if (parsed.student && typeof parsed.student === 'string') parsed.student = JSON.parse(parsed.student); } catch(e){}
     try { if (parsed.marks && typeof parsed.marks === 'string') parsed.marks = JSON.parse(parsed.marks); } catch(e){}
     try { if (parsed.rawTable && typeof parsed.rawTable === 'string') parsed.rawTable = JSON.parse(parsed.rawTable); } catch(e){}
-    
+    try { if (parsed.review && typeof parsed.review === 'string') parsed.review = JSON.parse(parsed.review); } catch(e){}
+
     if (parsed.progress !== undefined) parsed.progress = Number(parsed.progress);
     if (parsed.sequence !== undefined && parsed.sequence !== null && parsed.sequence !== 'null') parsed.sequence = Number(parsed.sequence);
     if (parsed.confidence !== undefined && parsed.confidence !== null && parsed.confidence !== 'null') parsed.confidence = Number(parsed.confidence);
@@ -139,6 +144,7 @@ class OCRJobStore {
     if (parsed.error === 'null') parsed.error = null;
     if (parsed.marks === 'null') parsed.marks = null;
     if (parsed.rawTable === 'null') parsed.rawTable = null;
+    if (parsed.review === 'null' || parsed.review === '') parsed.review = null;
 
     if (parsed.createdAt) parsed.createdAt = new Date(parsed.createdAt);
     if (parsed.startedAt && parsed.startedAt !== 'null') parsed.startedAt = new Date(parsed.startedAt);

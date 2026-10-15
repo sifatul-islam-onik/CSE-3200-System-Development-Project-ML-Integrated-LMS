@@ -34,12 +34,16 @@ layout_model = None
 cell_detection_model = None
 text_rec_model = None
 
+# Marks recognised below this score are flagged for the teacher to check (chosen on the development set)
+REVIEW_SCORE = 0.90
+
 class MarksResponse(BaseModel):
     success: bool
     marks: Optional[Dict[str, Dict[str, str]]] = None
     message: Optional[str] = None
     confidence: Optional[float] = None
     raw_table: Optional[List[List[str]]] = None
+    review: Optional[Dict[str, List[str]]] = None
 
 def preprocess_cell_for_ocr(cell_image):
     """Preprocess cell image for better OCR accuracy"""
@@ -221,12 +225,13 @@ def extract_table_from_image(image_path: str, confidence_threshold: float = 0.55
             else:
                 high_confidence_count += 1
                 filtered_text = filter_allowed_characters(rec_text)
-            
+
             cells_with_center.append({
                 "text": filtered_text,
                 "center_x": center_x,
                 "center_y": center_y,
-                "score": rec_score
+                "score": rec_score,
+                "rejected_digit": rec_score < confidence_threshold and any(ch.isdigit() for ch in rec_text)
             })
         
         cells_with_center.sort(key=lambda c: c["center_y"])
@@ -255,11 +260,15 @@ def extract_table_from_image(image_path: str, confidence_threshold: float = 0.55
         for row in rows:
             table_row = [cell["text"] for cell in row]
             table_data.append(table_row)
-        
+        score_data = [[cell["score"] for cell in row] for row in rows]
+        rejected_data = [[cell["rejected_digit"] for cell in row] for row in rows]
+
         avg_confidence = sum(result.get("rec_score", 0) for result in all_results) / len(all_results) if all_results else 0
-        
+
         return {
             "table_data": table_data,
+            "score_data": score_data,
+            "rejected_data": rejected_data,
             "confidence": avg_confidence,
             "total_cells": total_cells,
             "confident_cells": high_confidence_count
@@ -268,6 +277,79 @@ def extract_table_from_image(image_path: str, confidence_threshold: float = 0.55
     finally:
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
+
+def find_section_header(table_data: List[List[str]]):
+    """Return (header row index, section 'A' or 'B') from the first row holding at least three question numbers"""
+    for idx, row in enumerate(table_data):
+        if len(row) < 4:
+            continue
+
+        section_a_count = sum(1 for cell in row if cell.strip() in ['1', '2', '3', '4'])
+        section_b_count = sum(1 for cell in row if cell.strip() in ['5', '6', '7', '8'])
+
+        if section_a_count >= 3:
+            print(f"  Detected Section A header at row {idx}: {row}")
+            return idx, 'A'
+        elif section_b_count >= 3:
+            print(f"  Detected Section B header at row {idx}: {row}")
+            return idx, 'B'
+
+    print("  Warning: No clear section header found, assuming Section A at row 0")
+    return 0, 'A'
+
+def find_cells_to_review(table_data: List[List[str]], score_data: List[List[float]],
+                         rejected_data: List[List[bool]]) -> Dict[str, List[str]]:
+    """Return {row label: [questions]} of extracted marks the teacher should check.
+
+    Follows the row selection of parse_marks_from_table. A cell is flagged when its mark was recognised
+    with a score below REVIEW_SCORE, or when a digit was read but rejected below the confidence threshold.
+    When a data row is skipped because its label was not read as a letter, the marks of every later row
+    may have moved up by one, so all rows from that position on are flagged if any of them holds marks.
+    """
+    review = {}
+    if len(table_data) < 2:
+        return review
+
+    header_row_idx, section_type = find_section_header(table_data)
+    question_numbers = ['5', '6', '7', '8'] if section_type == 'B' else ['1', '2', '3', '4']
+    row_labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
+    student_idx = 0
+    shift_from = None
+    shift_has_marks = False
+
+    for table_row_idx in range(header_row_idx + 1, len(table_data)):
+        row = table_data[table_row_idx]
+
+        if len(row) < 2 or all(cell.strip() == '' for cell in row):
+            continue
+
+        has_marks = any(cell.strip() for cell in row[1:5])
+        first_cell = row[0].strip().lower()
+        if not ((len(first_cell) == 1 and first_cell.isalpha()) or first_cell == ''):
+            if shift_from is None:
+                shift_from = student_idx
+            shift_has_marks = shift_has_marks or has_marks
+            continue
+
+        if student_idx >= len(row_labels):
+            break
+        if shift_from is not None and has_marks:
+            shift_has_marks = True
+
+        for col_idx, question in zip(range(1, min(5, len(row))), question_numbers):
+            low_score = row[col_idx].strip() != '' and score_data[table_row_idx][col_idx] < REVIEW_SCORE
+            if low_score or rejected_data[table_row_idx][col_idx]:
+                review.setdefault(row_labels[student_idx], []).append(question)
+
+        student_idx += 1
+        if student_idx >= 7:
+            break
+
+    if shift_from is not None and shift_has_marks:
+        for label in row_labels[shift_from:]:
+            review[label] = list(question_numbers)
+
+    return review
 
 def parse_marks_from_table(table_data: List[List[str]]) -> Dict[str, Dict[str, str]]:
     """Parse marks from table data into row/question structure with section support"""
@@ -283,33 +365,9 @@ def parse_marks_from_table(table_data: List[List[str]]) -> Dict[str, Dict[str, s
     
     if len(table_data) < 2:
         return marks
-    
-    section_type = None  # 'A' or 'B'
-    header_row_idx = -1
-    
-    for idx, row in enumerate(table_data):
-        if len(row) < 4:
-            continue
-        
-        section_a_count = sum(1 for cell in row if cell.strip() in ['1', '2', '3', '4'])
-        section_b_count = sum(1 for cell in row if cell.strip() in ['5', '6', '7', '8'])
-        
-        if section_a_count >= 3:
-            section_type = 'A'
-            header_row_idx = idx
-            print(f"  Detected Section A header at row {idx}: {row}")
-            break
-        elif section_b_count >= 3:
-            section_type = 'B'
-            header_row_idx = idx
-            print(f"  Detected Section B header at row {idx}: {row}")
-            break
-    
-    if header_row_idx == -1:
-        print("  Warning: No clear section header found, assuming Section A at row 0")
-        header_row_idx = 0
-        section_type = 'A'
-    
+
+    header_row_idx, section_type = find_section_header(table_data)
+
     if section_type == 'B':
         question_numbers = ['5', '6', '7', '8']
     else:  # Section A (default)
@@ -421,16 +479,19 @@ async def extract_marks(image: UploadFile = File(...)):
             print(f"  Row {i}: {row}")
         
         marks = parse_marks_from_table(result["table_data"])
-        
+        review = find_cells_to_review(result["table_data"], result["score_data"], result["rejected_data"])
+
         print("Parsed marks:")
         for row_label, questions in marks.items():
             print(f"  {row_label}: {questions}")
-        
+        print(f"Cells to review: {review}")
+
         return MarksResponse(
             success=True,
             marks=marks,
             confidence=result["confidence"],
             raw_table=result["table_data"],
+            review=review,
             message="Marks extracted successfully"
         )
         

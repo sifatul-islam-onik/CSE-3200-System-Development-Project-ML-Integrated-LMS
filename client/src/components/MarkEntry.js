@@ -691,7 +691,24 @@ const MarkEntry = ({ course, students, section, onClose }) => {
     });
     return total.toFixed(2);
   }, [marks]);
-  
+
+  // Cells the OCR service flagged for checking; a cell stays highlighted while it still holds the OCR value
+  const currentOcrJob = currentStudent ? ocrJobs.get(currentStudent._id) : null;
+  const reviewCells = useMemo(() => {
+    const flagged = new Set();
+    if (!currentOcrJob || currentOcrJob.status !== 'completed' || !currentOcrJob.review || !currentOcrJob.marks) {
+      return flagged;
+    }
+    Object.entries(currentOcrJob.review).forEach(([row, questions]) => {
+      (questions || []).forEach(question => {
+        if (marks[row] && marks[row][question] === currentOcrJob.marks[row]?.[question]) {
+          flagged.add(`${row}${question}`);
+        }
+      });
+    });
+    return flagged;
+  }, [currentOcrJob, marks]);
+
   // Manual save to database
   const handleSave = useCallback(async () => {
     const studentId = currentStudent._id;
@@ -1168,6 +1185,7 @@ const MarkEntry = ({ course, students, section, onClose }) => {
               fontSize: '14px'
             }}>
                <FontAwesomeIcon icon={faCheck} /> OCR processing completed! Marks have been auto-filled.
+               {reviewCells.size > 0 && ` Check the ${reviewCells.size} highlighted cell${reviewCells.size === 1 ? '' : 's'}.`}
             </div>
           )}
 
@@ -1328,7 +1346,8 @@ const MarkEntry = ({ course, students, section, onClose }) => {
                               data-row={row}
                               data-col={question}
                               placeholder="0"
-                              className="mark-input"
+                              className={reviewCells.has(`${row}${question}`) ? 'mark-input mark-input-review' : 'mark-input'}
+                              title={reviewCells.has(`${row}${question}`) ? 'Check this value: the OCR reading may be wrong' : undefined}
                             />
                           </td>
                         ))}

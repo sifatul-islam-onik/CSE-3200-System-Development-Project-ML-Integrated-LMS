@@ -363,6 +363,12 @@
   border-color: #9ca3af;
 }
 
+/* Cell flagged by the OCR service for the teacher to check */
+.marks-table .mark-input.mark-input-review {
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
 .question-marks {
   background: #f9fafb;
   padding: 16px;
