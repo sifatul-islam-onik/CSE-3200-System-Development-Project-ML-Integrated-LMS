@@ -371,7 +371,7 @@ The scripts in `ml_server/benchmark/` and `server/benchmark/` produce the OCR an
 
 ### Data
 
-The benchmark dataset is archived on Zenodo (the DOI is given in the paper's Data availability statement). It contains:
+The benchmark dataset is archived on Zenodo: https://doi.org/10.5281/zenodo.23387173. It contains:
 
 | Path | Content |
 |---|---|
